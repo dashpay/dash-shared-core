@@ -19,7 +19,8 @@ Pod::Spec.new do |s|
     ./build_ios_pod.sh
   CMD
 
-  s.ios.vendored_libraries = "DashSharedCore/lib/ios/**/*.a"
+  #s.ios.vendored_libraries = "DashSharedCore/lib/ios/**/*.a"
+  s.ios.vendored_frameworks = 'DashSharedCore/framework/DashSharedCore.xcframework' # Your XCFramework
   s.osx.vendored_libraries = "DashSharedCore/lib/macos/**/*.a"
 end
 
