@@ -12,15 +12,13 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '13.0'
 
   s.source_files = 'DashSharedCore/include/**/*.h'
-  #s.public_header_files = 'DashSharedCore/include/*.h'
 
   s.prepare_command = <<-CMD
     ./build_macos_pod.sh
     ./build_ios_pod.sh
   CMD
 
-  #s.ios.vendored_libraries = "DashSharedCore/lib/ios/**/*.a"
-  s.ios.vendored_frameworks = 'DashSharedCore/framework/DashSharedCore.xcframework' # Your XCFramework
+  s.ios.vendored_frameworks = 'DashSharedCore/framework/DashSharedCore.xcframework'
   s.osx.vendored_libraries = "DashSharedCore/lib/macos/**/*.a"
 end
 
