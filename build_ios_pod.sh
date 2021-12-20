@@ -23,9 +23,11 @@ cp -r -p target/aarch64-apple-ios/release/libdash_shared_core.a DashSharedCore/l
 cp -r -p target/aarch64-apple-ios-sim/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a
 cp -r -p target/dash_shared_core.h DashSharedCore/include
 
-lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_fat.a
+lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
 
 xcodebuild -create-xcframework \
 	-library DashSharedCore/lib/ios/libdash_shared_core_ios.a -headers DashSharedCore/include \
-	-library DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_fat.a -headers DashSharedCore/include \
+	-library DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a -headers DashSharedCore/include \
 	-output DashSharedCore/framework/DashSharedCore.xcframework
+
+echo "Done building for ios"
