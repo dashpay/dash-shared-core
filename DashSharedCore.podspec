@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.homepage         = 'https://github.com/dashevo/dash-shared-core'
 
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
-  s.source           = { :git => 'https://github.com/dashevo/dash-shared-core.git', :tag => s.version.to_s }
+  s.source           = { :git => 'https://github.com/dashevo/dash-shared-core.git', :branch => 'feature/make-cocoapod' }
 
   s.ios.deployment_target = '13.0'
 
@@ -19,6 +19,5 @@ Pod::Spec.new do |s|
   CMD
 
   s.ios.vendored_frameworks = 'DashSharedCore/framework/DashSharedCore.xcframework'
-  s.osx.vendored_libraries = "DashSharedCore/lib/macos/**/*.a"
+  s.osx.vendored_libraries = 'DashSharedCore/lib/macos/**/*.a'
 end
-
