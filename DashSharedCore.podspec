@@ -10,6 +10,7 @@ Pod::Spec.new do |s|
   s.source           = { :git => 'https://github.com/dashevo/dash-shared-core.git', :tag => s.version.to_s }
 
   s.ios.deployment_target = '13.0'
+  s.macos.deployment_target = '10.15'
 
   s.source_files = 'DashSharedCore/include/**/*.h'
 
