@@ -4,6 +4,7 @@ BASEPATH="${PWD}"
 
 echo "Building Dash Shared library..."
 
+
 cargo lipo --release
 cargo build --target=x86_64-apple-darwin --release
 lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a -output target/universal/release/libdash_shared_core_macos.a
