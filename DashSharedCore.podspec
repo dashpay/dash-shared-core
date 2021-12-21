@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.homepage         = 'https://github.com/dashevo/dash-shared-core'
 
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
-  s.source           = { :git => 'https://github.com/dashevo/dash-shared-core.git', :branch => 'feature/make-cocoapod' }
+  s.source           = { :git => 'https://github.com/dashevo/dash-shared-core.git', :branch => 'main' }
 
   s.ios.deployment_target = '13.0'
 
