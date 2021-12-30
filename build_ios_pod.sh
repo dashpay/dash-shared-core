@@ -8,6 +8,10 @@ rm -r DashSharedCore/framework
 rm -r DashSharedCore/lib/ios
 rm -r DashSharedCore/lib/ios-simulator
 
+rustup target add x86_64-apple-ios
+rustup target add aarch64-apple-ios
+rustup target add aarch64-apple-ios-sim
+
 cargo lipo --release
 cargo build --target=x86_64-apple-ios --release
 cargo build --target=aarch64-apple-ios --release
