@@ -9,7 +9,7 @@ build = "build.rs"
 [dependencies.dash_mndiff]
 git = "https://github.com/dashevo/masternode-diff-processor"
 branch = "fix/when-masternode-score-is-zero"
-version = "0.1.0"
+version = "0.1.1"
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashevo/rs-merk-verify-c-binding"
 branch = "for-use-in-main-crate"
