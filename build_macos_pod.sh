@@ -4,6 +4,12 @@ BASEPATH="${PWD}"
 
 echo "Building Dash Shared library..."
 
+./check_rust_version.sh
+if [ $? != 0 ]
+then
+exit 1
+fi
+
 rustup target add x86_64-apple-darwin
 rustup target add aarch64-apple-darwin
 

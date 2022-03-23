@@ -4,6 +4,12 @@ BASEPATH="${PWD}"
 
 echo "Building Dash Shared library..."
 
+./check_rust_version.sh
+if [ $? != 0 ]
+then
+exit 1
+fi
+
 rm -r DashSharedCore/framework
 rm -r DashSharedCore/lib/ios
 rm -r DashSharedCore/lib/ios-simulator
