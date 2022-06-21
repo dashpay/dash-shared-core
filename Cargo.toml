@@ -1,6 +1,6 @@
 [package]
 name = "dash_shared_core"
-version = "0.1.5"
+version = "0.1.7"
 edition = "2018"
 publish = false
 build = "build.rs"
@@ -8,8 +8,9 @@ build = "build.rs"
 [dependencies]
 [dependencies.dash_mndiff]
 git = "https://github.com/dashevo/masternode-diff-processor"
-branch = "dip-0024"
-version = "0.1.1"
+branch = "primitives-migration"
+version = "0.2.1"
+
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashevo/rs-merk-verify-c-binding"
 branch = "for-use-in-main-crate"
