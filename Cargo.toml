@@ -2,26 +2,41 @@
 name = "dash_shared_core"
 version = "0.1.7"
 edition = "2018"
-publish = false
 build = "build.rs"
+publish = false
 
 [dependencies]
 [dependencies.dash_mndiff]
 git = "https://github.com/dashevo/masternode-diff-processor"
 branch = "processor-test"
 version = "0.2.1"
-
+[dependencies.dash-spv-models]
+git = "https://github.com/pankcuf/dash-spv-models"
+branch = "core-v0.18"
+version = "0.1.11"
+[dependencies.dash-spv-ffi]
+git = "https://github.com/pankcuf/dash-spv-ffi"
+branch = "master"
+version = "0.1.12"
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashevo/rs-merk-verify-c-binding"
 branch = "for-use-in-main-crate"
 version = "0.1.3"
+
+#[dependencies.dash_mndiff]
+#path = "../masternodes-diff-processor"
+#[dependencies.dash-spv-ffi]
+#path = "../dash-spv-ffi"
+#[dependencies.dash-spv-models]
+#path = "../dash-spv-models"
+
 
 [build-dependencies]
 cbindgen = "0.20.0"
 
 [lib]
 name = "dash_shared_core"
-crate-type = ["staticlib", "cdylib"]
+#crate-type = ["staticlib", "cdylib"]
 
 [profile.release]
 lto = "thin"
