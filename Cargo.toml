@@ -9,7 +9,7 @@ publish = false
 [dependencies.dash_mndiff]
 git = "https://github.com/dashevo/masternode-diff-processor"
 branch = "processor-test"
-version = "0.2.4"
+version = "0.2.5"
 [dependencies.dash-spv-models]
 git = "https://github.com/pankcuf/dash-spv-models"
 branch = "core-v0.18"
