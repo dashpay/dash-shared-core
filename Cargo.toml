@@ -1,30 +1,30 @@
 [package]
 name = "dash_shared_core"
 version = "0.1.7"
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 publish = false
 
 [dependencies]
-[dependencies.dash_mndiff]
+[dependencies.dash-spv-masternode-processor]
 git = "https://github.com/dashevo/masternode-diff-processor"
-branch = "processor-test"
-version = "0.2.8"
+branch = "dev"
+version = "0.2.13"
 
 [dependencies.dash-spv-models]
 git = "https://github.com/pankcuf/dash-spv-models"
-branch = "core-v0.18"
-version = "0.1.15"
+branch = "master"
+version = "0.2.1"
 [dependencies.dash-spv-ffi]
 git = "https://github.com/pankcuf/dash-spv-ffi"
 branch = "master"
-version = "0.1.16"
+version = "0.2.1"
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashevo/rs-merk-verify-c-binding"
 branch = "for-use-in-main-crate"
 version = "0.1.3"
 
-#[dependencies.dash_mndiff]
+#[dependencies.dash-spv-masternode-processor]
 #path = "../masternodes-diff-processor"
 #[dependencies.dash-spv-ffi]
 #path = "../dash-spv-ffi"
