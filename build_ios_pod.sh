@@ -9,6 +9,7 @@ if [ $? != 0 ]
 then
 exit 1
 fi
+cargo install cargo-lipo
 
 rm -r DashSharedCore/framework
 rm -r DashSharedCore/lib/ios
