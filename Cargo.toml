@@ -17,7 +17,7 @@ branch = "fix/core-18-fixes"
 version = "0.2.3"
 [dependencies.dash-spv-ffi]
 git = "https://github.com/pankcuf/dash-spv-ffi"
-branch = "master"
+branch = "fix/core-18-fixes"
 version = "0.2.3"
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashevo/rs-merk-verify-c-binding"
