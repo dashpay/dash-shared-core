@@ -9,6 +9,7 @@ if [ $? != 0 ]
 then
 exit 1
 fi
+cargo install cargo-lipo
 
 rustup target add x86_64-apple-darwin
 rustup target add aarch64-apple-darwin
