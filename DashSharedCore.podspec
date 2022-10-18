@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'DashSharedCore'
-  s.version          = '0.2.1'
+  s.version          = '0.2.2'
   s.summary          = 'Dash Core written in Rust'
   s.author           = 'Dash'
   s.description      = "Dash Core"
