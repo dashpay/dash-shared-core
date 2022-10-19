@@ -11,12 +11,14 @@ fn main() {
         "dash-spv-masternode-processor".to_string(),
         "rs-merk-verify-c-binding".to_string()
     ];
-    let mut config: cbindgen::Config = cbindgen::Config::default();
-    config.language = cbindgen::Language::C;
-    config.parse = cbindgen::ParseConfig {
-        parse_deps: true,
-        include: Some(includes.clone()),
-        extra_bindings: includes,
+    let config = cbindgen::Config {
+        language: cbindgen::Language::C,
+        parse: cbindgen::ParseConfig {
+            parse_deps: true,
+            include: Some(includes.clone()),
+            extra_bindings: includes,
+            ..Default::default()
+        },
         ..Default::default()
     };
     cbindgen::generate_with_config(&crate_dir, config)
