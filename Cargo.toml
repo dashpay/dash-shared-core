@@ -1,6 +1,6 @@
 [package]
 name = "dash_shared_core"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 build = "build.rs"
 publish = false
@@ -9,7 +9,7 @@ publish = false
 [dependencies.dash-spv-masternode-processor]
 git = "https://github.com/dashpay/masternode-diff-processor"
 branch = "main"
-version = "0.3.6"
+version = "0.3.7"
 
 [dependencies.dash-spv-models]
 git = "https://github.com/pankcuf/dash-spv-models"
