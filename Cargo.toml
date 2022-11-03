@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 [dependencies.dash-spv-masternode-processor]
 git = "https://github.com/dashpay/masternode-diff-processor"
-branch = "improvement/merge-libs"
+branch = "improvement/llmq-validation-optimized"
 version = "0.3.8"
 
 [dependencies.rs-merk-verify-c-binding]
