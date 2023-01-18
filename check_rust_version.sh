@@ -19,7 +19,7 @@ compare_version() {
     fi
     return 1
 }
-REQUIRED_VERSION=1.57.0
+REQUIRED_VERSION=1.66.0
 CURRENT_VERSION=$(rustc -V | awk '{sub(/-.*/,"");print $2}')
 echo "rustc -V: current ${CURRENT_VERSION} vs. required ${REQUIRED_VERSION}"
 if compare_version "${REQUIRED_VERSION}" "${CURRENT_VERSION}"; then
