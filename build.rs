@@ -6,8 +6,8 @@ fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     // Here we write down crate names (!) where we want to retrieve C-bindings
     let includes = vec![
-        "dash-spv-ffi".to_string(),
-        "dash-spv-models".to_string(),
+        // "dash-spv-ffi".to_string(),
+        // "dash-spv-models".to_string(),
         "dash-spv-masternode-processor".to_string(),
         "rs-merk-verify-c-binding".to_string()
     ];

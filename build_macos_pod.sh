@@ -1,10 +1,9 @@
 #!/bin/bash
 
-BASEPATH="${PWD}"
-
 echo "Building Dash Shared library..."
 
 ./check_rust_version.sh
+# shellcheck disable=SC2181
 if [ $? != 0 ]
 then
 exit 1
