@@ -19,7 +19,6 @@ rustup target add aarch64-apple-ios
 rustup target add aarch64-apple-ios-sim
 
 cargo lipo --release
-#cargo lipo --release --targets aarch64-apple-ios
 cargo build --target=x86_64-apple-ios --release
 cargo build --target=aarch64-apple-ios --release
 cargo build --target=aarch64-apple-ios-sim --release
@@ -34,8 +33,8 @@ cp -r -p target/aarch64-apple-ios/release/libdash_shared_core.a DashSharedCore/l
 cp -r -p target/aarch64-apple-ios-sim/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a
 cp -r -p target/dash_shared_core.h DashSharedCore/include
 
-lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
-#lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
+lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a \
+  -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
 
 xcodebuild -create-xcframework \
 	-library DashSharedCore/lib/ios/libdash_shared_core_ios.a -headers DashSharedCore/include \
