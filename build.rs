@@ -24,7 +24,6 @@ fn main() {
         braces: cbindgen::Braces::SameLine,
         line_length: 80,
         tab_width: 4,
-        style: cbindgen::Style::Tag,
         // cpp_compat: false,
         documentation_style: cbindgen::DocumentationStyle::C,
         include_guard: Some("dash_shared_core_h".to_string()),
