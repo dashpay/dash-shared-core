@@ -9,7 +9,7 @@ publish = false
 
 [dependencies.dash-spv-masternode-processor]
 git = "https://github.com/dashpay/masternode-diff-processor"
-rev = "2c48f85"
+rev = "568642e"
 #branch = "feature/keys"
 
 [dependencies.rs-merk-verify-c-binding]
@@ -29,7 +29,7 @@ name = "dash_shared_core"
 crate-type = ["staticlib", "cdylib"]
 
 [profile.release]
-#lto = "thin"
-#opt-level = 3
-debug = true
+lto = "thin"
+opt-level = 3
+#debug = true
 
