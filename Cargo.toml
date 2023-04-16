@@ -9,7 +9,7 @@ publish = false
 
 [dependencies.dash-spv-masternode-processor]
 git = "https://github.com/dashpay/masternode-diff-processor"
-rev = "8f2b545"
+rev = "d6b892e"
 #branch = "feature/keys"
 
 [dependencies.rs-merk-verify-c-binding]
