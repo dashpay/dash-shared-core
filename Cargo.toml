@@ -1,11 +1,12 @@
 [package]
 name = "dash_shared_core"
-version = "0.2.8"
+version = "0.3.0"
 edition = "2021"
 build = "build.rs"
 publish = false
 
 [dependencies]
+
 [dependencies.dash-spv-masternode-processor]
 git = "https://github.com/dashpay/masternode-diff-processor"
 rev = "74200eb"
@@ -29,4 +30,5 @@ crate-type = ["staticlib", "cdylib"]
 [profile.release]
 lto = "thin"
 opt-level = 3
+#debug = true
 

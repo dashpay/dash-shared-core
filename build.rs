@@ -6,8 +6,6 @@ fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     // Here we write down crate names (!) where we want to retrieve C-bindings
     let includes = vec![
-        "dash-spv-ffi".to_string(),
-        "dash-spv-models".to_string(),
         "dash-spv-masternode-processor".to_string(),
         "rs-merk-verify-c-binding".to_string()
     ];
@@ -19,6 +17,16 @@ fn main() {
             extra_bindings: includes,
             ..Default::default()
         },
+        enumeration: cbindgen::EnumConfig {
+            prefix_with_name: true,
+            ..Default::default()
+        },
+        braces: cbindgen::Braces::SameLine,
+        line_length: 80,
+        tab_width: 4,
+        // cpp_compat: false,
+        documentation_style: cbindgen::DocumentationStyle::C,
+        include_guard: Some("dash_shared_core_h".to_string()),
         ..Default::default()
     };
     cbindgen::generate_with_config(&crate_dir, config)

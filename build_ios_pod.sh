@@ -1,10 +1,9 @@
 #!/bin/bash
 
-BASEPATH="${PWD}"
-
 echo "Building Dash Shared library..."
 
 ./check_rust_version.sh
+# shellcheck disable=SC2181
 if [ $? != 0 ]
 then
 exit 1
@@ -34,7 +33,8 @@ cp -r -p target/aarch64-apple-ios/release/libdash_shared_core.a DashSharedCore/l
 cp -r -p target/aarch64-apple-ios-sim/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a
 cp -r -p target/dash_shared_core.h DashSharedCore/include
 
-lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
+lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a \
+  -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
 
 xcodebuild -create-xcframework \
 	-library DashSharedCore/lib/ios/libdash_shared_core_ios.a -headers DashSharedCore/include \

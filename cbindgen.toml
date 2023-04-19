@@ -6,4 +6,5 @@ line_length = 80
 tab_width = 4
 documentation_style = "c"
 style = "tag"
+swift_enum_macro = "CF_ENUM"
 include_guard = "dash_shared_core_h"
