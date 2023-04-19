@@ -15,7 +15,10 @@ rustup target add aarch64-apple-darwin
 
 cargo lipo --release
 cargo build --target=x86_64-apple-darwin --release
+# Do we really need this?
+#cargo build --target=aarch64-apple-darwin --release
 lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a -output target/universal/release/libdash_shared_core_macos.a
+#lipo -create target/aarch64-apple-darwin/release/libdash_shared_core.a -output target/universal/release/libdash_shared_core_macos.a
 
 mkdir -p DashSharedCore/lib/macos
 mkdir -p DashSharedCore/include
