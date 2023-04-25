@@ -1,6 +1,6 @@
 [package]
 name = "dash_shared_core"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 build = "build.rs"
 publish = false
@@ -10,7 +10,7 @@ publish = false
 [dependencies.dash-spv-masternode-processor]
 git = "https://github.com/dashpay/masternode-diff-processor"
 # 0.4.2
-rev = "9c1bf84"
+rev = "136324e"
 
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashpay/rs-merk-verify-c-binding"
