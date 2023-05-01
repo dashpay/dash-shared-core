@@ -40,6 +40,6 @@ jobs:
         run: |
           cargo test --package dash_spv_apple_bindings --lib tests
       - name: Build Apple frameworks
-        working-directory: ./dash_spv_apple_bindings
+        working-directory: ./dash_spv_apple_bindings/dash-spv-apple-bindings
         run: |
-          ./dash-spv-apple-bindings/build_macos_pod.sh && ./dash-spv-apple-bindings/build_ios_pod.sh
+          ./build_macos_pod.sh && ./build_ios_pod.sh
