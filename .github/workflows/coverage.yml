@@ -18,15 +18,15 @@ jobs:
       - name: Install automake
         run: |
           brew install automake
-      - name: Checkout models-diff-processor
+      - name: Checkout dash-shared-core
         uses: actions/checkout@v2
         with:
           fetch-depth: 2
-          path: dash_shared_core
+          path: dash-shared-core
           submodules: recursive
       - name: Rustup add targets
         run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
       - name: Invoke uploader
-        working-directory: ./dash_shared_core
+        working-directory: ./dash-shared-core
         run: |
           curl -Os https://uploader.codecov.io/latest/macos/codecov && chmod +x codecov && ./codecov
