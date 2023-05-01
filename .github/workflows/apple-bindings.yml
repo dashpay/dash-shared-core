@@ -1,4 +1,4 @@
-name: Apple Bindings Tests
+name: XCode Framework
 
 on:
   push:
@@ -18,28 +18,28 @@ jobs:
       - name: Install automake
         run: |
           brew install automake
-      - name: Checkout dash-spv-apple-bindings
+      - name: Checkout dash-shared-core
         uses: actions/checkout@v2
         with:
-          path: dash_spv_apple_bindings
+          path: dash-shared-core
           submodules: recursive
       - name: Create LFS file list
         run: |
           git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
-        working-directory: ./dash_spv_apple_bindings
+        working-directory: ./dash-shared-core
       - name: Restore LFS cache
         uses: actions/cache@v2
         id: lfs-cache
         with:
-          path: dash_spv_apple_bindings/.git/lfs
+          path: dash-shared-core/.git/lfs
           key: lfs-${{ hashFiles('.lfs-assets-id') }}-v1
       - name: Rustup add targets
         run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim x86_64-apple-darwin aarch64-apple-darwin
       - name: Run tests
-        working-directory: ./dash_spv_apple_bindings
+        working-directory: ./dash-shared-core
         run: |
           cargo test --package dash_spv_apple_bindings --lib tests
       - name: Build Apple frameworks
-        working-directory: ./dash_spv_apple_bindings/dash-spv-apple-bindings
+        working-directory: ./dash-shared-core/dash-spv-apple-bindings
         run: |
           ./build_macos_pod.sh && ./build_ios_pod.sh

@@ -18,24 +18,24 @@ jobs:
       - name: Install automake
         run: |
           brew install automake
-      - name: Checkout dash-spv-masternode-processor
+      - name: Checkout dash-shared-core
         uses: actions/checkout@v2
         with:
-          path: dash_spv_masternode_processor
+          path: dash-shared-core
           submodules: recursive
       - name: Create LFS file list
         run: |
           git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
-        working-directory: ./dash_spv_masternode_processor
+        working-directory: ./dash-shared-core
       - name: Restore LFS cache
         uses: actions/cache@v2
         id: lfs-cache
         with:
-          path: dash_spv_masternode_processor/.git/lfs
+          path: dash-shared-core/.git/lfs
           key: lfs-${{ hashFiles('.lfs-assets-id') }}-v1
       - name: Rustup add targets
         run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
       - name: Run tests
-        working-directory: ./dash_spv_masternode_processor
+        working-directory: ./dash-shared-core/dash-spv-masternode-processor
         run: |
           cargo test --package dash-spv-masternode-processor --lib tests
