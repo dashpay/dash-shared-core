@@ -38,7 +38,7 @@ jobs:
       - name: Run tests
         working-directory: ./dash-shared-core
         run: |
-          cargo test --package dash_shared_core --lib tests
+          cargo test --package dash_spv_apple_bindings --lib tests
       - name: Build Apple frameworks
         working-directory: ./dash-shared-core/dash-spv-apple-bindings
         run: |
