@@ -1,0 +1,32 @@
+name: Code coverage
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    name: Code coverage
+    runs-on: macOS-latest
+    steps:
+      - name: Install automake
+        run: |
+          brew install automake
+      - name: Checkout models-diff-processor
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+          path: dash_shared_core
+          submodules: recursive
+      - name: Rustup add targets
+        run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+      - name: Invoke uploader
+        working-directory: ./dash_shared_core
+        run: |
+          curl -Os https://uploader.codecov.io/latest/macos/codecov && chmod +x codecov && ./codecov
