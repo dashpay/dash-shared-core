@@ -1,0 +1,45 @@
+name: Apple Bindings Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    name: Cargo test
+    runs-on: macOS-latest
+    steps:
+      - name: Install automake
+        run: |
+          brew install automake
+      - name: Checkout dash-spv-apple-bindings
+        uses: actions/checkout@v2
+        with:
+          path: dash_spv_apple_bindings
+          submodules: recursive
+      - name: Create LFS file list
+        run: |
+          git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
+        working-directory: ./dash_spv_apple_bindings
+      - name: Restore LFS cache
+        uses: actions/cache@v2
+        id: lfs-cache
+        with:
+          path: dash_spv_apple_bindings/.git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}-v1
+      - name: Rustup add targets
+        run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim x86_64-apple-darwin aarch64-apple-darwin
+      - name: Run tests
+        working-directory: ./dash_spv_apple_bindings
+        run: |
+          cargo test --package dash_spv_apple_bindings --lib tests
+      - name: Build Apple frameworks
+        working-directory: ./dash_spv_apple_bindings
+        run: |
+          ./build_macos_pod.sh && ./build_ios_pod.sh

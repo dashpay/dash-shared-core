@@ -1,8 +1,4 @@
 # dash-shared-core
-Dash shared core written in rust with bindings for different platforms (EXPERIMENT IN PROGRESS)
+Dash SPV core written in rust with bindings for different platforms (WORK IN PROGRESS)
 
-To release it as cocoapod don't forget to
-- update spec version
-- tag commit with version 
-- and push it to spec repo:
-- pod trunk push DashSharedCore.podspec --allow-warnings
+| [![Tests](https://github.com/dashpay/dash-shared-core/workflows/Tests/badge.svg?branch=main)](https://github.com/dashpay/dash-shared-core/actions) | [![codecov](https://codecov.io/gh/dashpay/masternode-diff-processor/branch/main/graph/badge.svg)](https://codecov.io/gh/dashpay/masternode-diff-processor) | ![Lint](https://github.com/dashpay/masternode-diff-processor/workflows/Lint/badge.svg) |

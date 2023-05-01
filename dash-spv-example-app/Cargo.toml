@@ -1,0 +1,7 @@
+[package]
+name = "dash-spv-example-app"
+version = "0.1.0"
+description = "Example app for Dash SPV"
+edition = "2021"
+
+[dependencies]
