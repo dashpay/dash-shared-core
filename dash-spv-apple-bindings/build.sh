@@ -60,9 +60,11 @@ mkdir -p DashSharedCore/lib/ios-simulator
 mkdir -p DashSharedCore/lib/macos
 
 ls -lat
-
 ls -lat target
+ls -lat ../target
 ls -lat DashSharedCore
+ls -lat target/x86_64-apple-ios/release
+ls -lat ../target/x86_64-apple-ios/release
 # macOS
 
 lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a \
@@ -71,8 +73,6 @@ lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a \
 
 
 # iOS
-ls -lat target
-ls -lat DashSharedCore
 
 #cp -r -p target/x86_64-apple-ios/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a
 #cp -r -p target/aarch64-apple-ios-sim/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a
