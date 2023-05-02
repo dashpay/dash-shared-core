@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
     ./build.sh
   CMD
 
-  s.source_files = 'dash-spv-apple-bindings/DashSharedCore/include/**/*.h'
-  s.ios.vendored_frameworks = 'dash-spv-apple-bindings/DashSharedCore/framework/DashSharedCore.xcframework'
-  s.osx.vendored_libraries = 'dash-spv-apple-bindings/DashSharedCore/lib/macos/**/*.a'
+  s.source_files = 'DashSharedCore/include/**/*.h'
+  s.ios.vendored_frameworks = 'DashSharedCore/framework/DashSharedCore.xcframework'
+  s.osx.vendored_libraries = 'DashSharedCore/lib/macos/**/*.a'
 end
