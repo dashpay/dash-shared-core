@@ -13,6 +13,7 @@ Pod::Spec.new do |s|
   s.macos.deployment_target = '10.15'
 
   s.prepare_command = <<-CMD
+    cd dash-spv-apple-bindings
     ./build.sh
   CMD
 
