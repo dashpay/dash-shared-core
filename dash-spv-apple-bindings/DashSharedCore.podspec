@@ -15,8 +15,8 @@ Pod::Spec.new do |s|
   s.source_files = 'DashSharedCore/include/**/*.h'
 
   s.prepare_command = <<-CMD
-    ./dash-spv-apple-bindings/build_macos_pod.sh
-    ./dash-spv-apple-bindings/build_ios_pod.sh
+    ./build_macos_pod.sh
+    ./build_ios_pod.sh
   CMD
 
   s.ios.vendored_frameworks = 'DashSharedCore/framework/DashSharedCore.xcframework'
