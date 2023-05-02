@@ -56,6 +56,7 @@ pub enum DevnetType {
     MiningTest = 5,
     Mobile2 = 6,
     Zero = 7,
+    Screwdriver = 8,
 }
 
 impl From<DevnetType> for ChainType {
@@ -84,6 +85,7 @@ impl From<i16> for DevnetType {
             5 => DevnetType::MiningTest,
             6 => DevnetType::Mobile2,
             7 => DevnetType::Zero,
+            8 => DevnetType::Screwdriver,
             _ => DevnetType::JackDaniels,
         }
     }
@@ -100,6 +102,7 @@ impl From<DevnetType> for i16 {
             DevnetType::MiningTest => 5,
             DevnetType::Mobile2 => 6,
             DevnetType::Zero => 7,
+            DevnetType::Screwdriver => 8,
         }
     }
 }
@@ -115,6 +118,7 @@ impl From<&str> for DevnetType {
             "miningTest" => DevnetType::MiningTest,
             "devnet-mobile-2" => DevnetType::Mobile2,
             "0" => DevnetType::Zero,
+            "screwdriver" => DevnetType::Screwdriver,
             _ => panic!("Devnet with name: {} not supported", value)
         }
     }
@@ -132,6 +136,7 @@ impl DevnetType {
             DevnetType::MiningTest => "miningTest".to_string(),
             DevnetType::Mobile2 => "devnet-mobile-2".to_string(),
             DevnetType::Zero => "0".to_string(),
+            DevnetType::Screwdriver => "screwdriver".to_string(),
         }
     }
 
@@ -408,12 +413,14 @@ impl ChainType {
                     DevnetType::Chacha => Some("cPTms6Sd7QuhPWXWQSzMbvg2VbEPsWCsLBbR4PBgvfYRzAPazbt3".to_string()),
                     DevnetType::Devnet333 => Some("cQnP9JNQp6oaZrvBtqBWRMeQERMkDyuXyvQh1qaph4FdP6cT2cVa".to_string()),
                     DevnetType::JackDaniels => Some("cTeGz53m7kHgA9L75s4vqFGR89FjYz4D9o44eHfoKjJr2ArbEtwg".to_string()),
+                    DevnetType::Screwdriver => Some("cSFv3jPKnyMnk14BL6EXEBy5sWsUDJz3MTsSaTUXGxYd3ioezvmH".to_string()),
                     _ => Some("".to_string())
                 },
                 address: match devnet {
                     DevnetType::Chacha => "ybiRzdGWFeijAgR7a8TJafeNi6Yk6h68ps".to_string(),
                     DevnetType::Devnet333 => "yM6zJAMWoouAZxPvqGDbuHb6BJaD6k4raQ".to_string(),
                     DevnetType::JackDaniels => "yYBanbwp2Pp2kYWqDkjvckY3MosuZzkKp7".to_string(),
+                    DevnetType::Screwdriver => "yg6R3jm3j3aaaP9sCz7v95vrtPEKhyinYV".to_string(),
                     _ => "".to_string(),
                 }
             }
