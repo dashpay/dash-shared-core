@@ -13,8 +13,7 @@ Pod::Spec.new do |s|
   s.macos.deployment_target = '10.15'
 
   s.prepare_command = <<-CMD
-    $(pwd)
-    ./dash-spv-apple-bindings/build.sh
+    ./build.sh
   CMD
 
   s.source_files = 'dash-spv-apple-bindings/DashSharedCore/include/**/*.h'
