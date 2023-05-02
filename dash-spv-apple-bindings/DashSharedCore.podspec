@@ -15,6 +15,7 @@ Pod::Spec.new do |s|
   s.source_files = 'DashSharedCore/include/**/*.h'
 
   s.prepare_command = <<-CMD
+    cd dash-spv-apple-bindings
     ./build_macos_pod.sh
     ./build_ios_pod.sh
   CMD
