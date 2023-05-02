@@ -63,12 +63,12 @@ ls -lat
 ls -lat target
 ls -lat ../target
 ls -lat DashSharedCore
-ls -lat target/x86_64-apple-ios/release
-ls -lat ../target/x86_64-apple-ios/release
+ls -lat ../target/x86_64-apple-darwin/release
+ls -lat ../target/aarch64-apple-darwin/release
 # macOS
 
-lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a \
-  target/aarch64-apple-darwin/release/libdash_shared_core.a \
+lipo -create ../target/x86_64-apple-darwin/release/libdash_shared_core.a \
+  ../target/aarch64-apple-darwin/release/libdash_shared_core.a \
   -output DashSharedCore/lib/macos/libdash_shared_core_macos.a
 
 
@@ -76,12 +76,12 @@ lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a \
 
 #cp -r -p target/x86_64-apple-ios/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a
 #cp -r -p target/aarch64-apple-ios-sim/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a
-cp -r -p target/aarch64-apple-ios/release/libdash_shared_core.a DashSharedCore/lib/ios/libdash_shared_core_ios.a
+cp -r -p ../target/aarch64-apple-ios/release/libdash_shared_core.a DashSharedCore/lib/ios/libdash_shared_core_ios.a
 
-cp -r -p target/dash_shared_core.h DashSharedCore/include
+cp -r -p ../target/dash_shared_core.h DashSharedCore/include
 
-lipo -create target/x86_64-apple-ios/release/libdash_shared_core.a \
-  target/aarch64-apple-ios-sim/release/libdash_shared_core.a \
+lipo -create ../target/x86_64-apple-ios/release/libdash_shared_core.a \
+  ../target/aarch64-apple-ios-sim/release/libdash_shared_core.a \
   -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
 
 xcodebuild -create-xcframework \
