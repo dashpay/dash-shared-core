@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "Building Dash Shared Core..."
+pwd
 
 compare_version() {
     if [[ $1 == $2 ]]; then
@@ -33,47 +34,50 @@ fi
 
 cargo install cargo-lipo
 
-# macOS
-rustup target add x86_64-apple-darwin
-rustup target add aarch64-apple-darwin
-
-cargo lipo --release
-cargo build --target=x86_64-apple-darwin --release
-cargo build --target=aarch64-apple-darwin --release
-
-mkdir -p DashSharedCore/lib/macos
-mkdir -p DashSharedCore/include
-
-lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a target/aarch64-apple-darwin/release/libdash_shared_core.a -output DashSharedCore/lib/macos/libdash_shared_core_macos.a
-
-cp -r -p target/dash_shared_core.h DashSharedCore/include
-
-# iOS
-
+rm -r DashSharedCore/include
+rm -r DashSharedCore/lib/macos
 rm -r DashSharedCore/framework
 rm -r DashSharedCore/lib/ios
 rm -r DashSharedCore/lib/ios-simulator
 
+rustup target add x86_64-apple-darwin
+rustup target add aarch64-apple-darwin
 rustup target add x86_64-apple-ios
 rustup target add aarch64-apple-ios
 rustup target add aarch64-apple-ios-sim
 
 cargo lipo --release
+cargo build --target=x86_64-apple-darwin --release
+cargo build --target=aarch64-apple-darwin --release
 cargo build --target=x86_64-apple-ios --release
 cargo build --target=aarch64-apple-ios --release
 cargo build --target=aarch64-apple-ios-sim --release
 
 mkdir -p DashSharedCore/framework
+mkdir -p DashSharedCore/include
 mkdir -p DashSharedCore/lib/ios
 mkdir -p DashSharedCore/lib/ios-simulator
-mkdir -p DashSharedCore/include
+mkdir -p DashSharedCore/lib/macos
 
-cp -r -p target/x86_64-apple-ios/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a
+ls -lat
+
+# macOS
+
+lipo -create target/x86_64-apple-darwin/release/libdash_shared_core.a \
+  target/aarch64-apple-darwin/release/libdash_shared_core.a \
+  -output DashSharedCore/lib/macos/libdash_shared_core_macos.a
+
+
+# iOS
+
+#cp -r -p target/x86_64-apple-ios/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a
+#cp -r -p target/aarch64-apple-ios-sim/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a
 cp -r -p target/aarch64-apple-ios/release/libdash_shared_core.a DashSharedCore/lib/ios/libdash_shared_core_ios.a
-cp -r -p target/aarch64-apple-ios-sim/release/libdash_shared_core.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a
+
 cp -r -p target/dash_shared_core.h DashSharedCore/include
 
-lipo -create DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_arm.a DashSharedCore/lib/ios-simulator/libdash_shared_core_ios_x86_64.a \
+lipo -create target/x86_64-apple-ios/release/libdash_shared_core.a \
+  target/aarch64-apple-ios-sim/release/libdash_shared_core.a \
   -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
 
 xcodebuild -create-xcframework \
