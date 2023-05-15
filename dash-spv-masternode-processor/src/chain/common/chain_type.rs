@@ -440,4 +440,12 @@ impl ChainType {
         }
     }
 
+    pub fn core19_activation_height(&self) -> u32 {
+        match self {
+            ChainType::MainNet => 1874880,
+            ChainType::TestNet => 850100,
+            ChainType::DevNet(_) => 0
+        }
+    }
+
 }
