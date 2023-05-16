@@ -42,7 +42,8 @@ fn test_checkpoint_530000() {
     assert!(result.is_valid(), "Result must be valid");
 }
 
-//#[test]
+// Need fix from core team
+// #[test]
 fn test_checkpoint_530000_70227() {
     let chain = ChainType::TestNet;
     let context = &mut (FFIContext { chain, is_dip_0024: false, cache: &mut Default::default(), blocks: init_testnet_store() });
