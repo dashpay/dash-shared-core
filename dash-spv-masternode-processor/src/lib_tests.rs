@@ -389,6 +389,7 @@ pub mod tests {
         assert!(result.has_valid_mn_list_root, "invalid mnl root {}", bh);
         assert!(result.has_valid_llmq_list_root, "invalid llmq root {}", bh);
         assert!(result.has_valid_quorums, "has invalid llmq height {}", bh);
+        println!("Diff is ok at {}", bh);
     }
 
     pub fn assert_qrinfo_result(context: &mut FFIContext, result: types::QRInfoResult) {

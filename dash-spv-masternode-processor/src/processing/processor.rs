@@ -132,6 +132,8 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
+        //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, base_block_hash);
+
         let base_list = self.find_masternode_list(
             base_block_hash,
             &cache.mn_lists,
@@ -148,6 +150,7 @@ impl MasternodeProcessor {
         is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
+        //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, list_diff.base_block_hash);
         let base_list = self.find_masternode_list(
             list_diff.base_block_hash,
             &cache.mn_lists,
@@ -332,13 +335,8 @@ impl MasternodeProcessor {
             for (&llmq_type, llmqs_of_type) in &mut added_quorums {
                 if self.should_process_quorum(llmq_type, is_dip_0024, is_rotated_quorums_presented) {
                     for (&llmq_block_hash, quorum) in llmqs_of_type {
-                        if let Some(models::MasternodeList { masternodes, .. }) = self.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists) {
-                            let valid = self.validate_quorum(quorum, skip_removed_masternodes, llmq_block_hash, masternodes, cache);
-                            // TMP Testnet Platform LLMQ fail verification
-                            if llmq_type != LLMQType::Llmqtype25_67 {
-                                has_valid_quorums &= valid;
-                            }
-                        }
+                        println!("----> {}:{}, {:?} {:?}", self.lookup_block_height_by_hash(llmq_block_hash), llmq_block_hash, quorum.index, llmq_type);
+                        has_valid_quorums &= self.validate_quorum(quorum, skip_removed_masternodes, llmq_block_hash, cache);
                     }
                 }
             }
@@ -359,7 +357,19 @@ impl MasternodeProcessor {
         (added_quorums, base_quorums, has_valid_quorums)
     }
 
-    pub fn validate_quorum(
+    pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, llmq_block_hash: UInt256, cache: &mut MasternodeProcessorCache) -> bool {
+        //println!("get list for quorum {}: find_masternode_list for", llmq_block_hash);
+        if let Some(models::MasternodeList { masternodes, .. }) = self.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists) {
+            let valid = self.validate_quorum_with_masternodes(quorum, skip_removed_masternodes, llmq_block_hash, masternodes, cache);
+            // TMP Testnet Platform LLMQ fail verification
+            // if llmq_type != LLMQType::Llmqtype25_67 {
+                return valid;
+            // }
+        }
+        true
+    }
+
+    pub fn validate_quorum_with_masternodes(
         &self,
         quorum: &mut models::LLMQEntry,
         skip_removed_masternodes: bool,
@@ -368,9 +378,9 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> bool {
         let block_height = self.lookup_block_height_by_hash(block_hash);
-        // if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-        //     println!("//////////// validate_quorum {:?}: {}: {} ({}): {:?}", quorum.llmq_type, block_height, block_hash, block_hash.reversed(), quorum);
-        // }
+        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
+            println!("//////////// validate_quorum {:?}: {}: {} ({}): {:?}", quorum.llmq_type, block_height, block_hash, block_hash.reversed(), quorum);
+        }
         // java::generate_masternode_list_from_map(&masternodes);
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(
@@ -469,6 +479,7 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("MISSING: block for height: {}", work_block_height),
             Some(work_block_hash) => {
+                println!("quorum_quarter_members_by_snapshot: {} find_masternode_list for {}: {}", quorum_base_block_height, work_block_height, work_block_hash);
                 if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
@@ -550,6 +561,7 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("missing block for height: {}", work_block_height),
             Some(work_block_hash) => {
+                println!("new_quorum_quarter_members {}: find_masternode_list for {}: {}", quorum_base_block_height, work_block_height, work_block_hash);
                 if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     //java::generate_masternode_list_from_map(&masternode_list.masternodes);
                     // println!("•••• new_quorum_quarter_members: {:?}: (skip_removed: {}) {}: {}", params.r#type, skip_removed_masternodes, work_block_height, work_block_hash.reversed());
@@ -854,13 +866,14 @@ impl MasternodeProcessor {
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType, is_dip_0024: bool, is_rotated_quorums_presented: bool) -> bool {
         // TODO: what we really wants here for platform quorum type?
-        if self.chain_type.isd_llmq_type() == llmq_type {
-            is_dip_0024 && is_rotated_quorums_presented
-        } else if is_dip_0024 { /*skip old quorums here for now*/
-            false
-        } else {
-            self.chain_type.should_process_llmq_of_type(llmq_type)
-        }
+        is_dip_0024 && llmq_type == LLMQType::Llmqtype60_75
+        // if self.chain_type.isd_llmq_type() == llmq_type {
+        //     is_dip_0024 && is_rotated_quorums_presented
+        // } else if is_dip_0024 { /*skip old quorums here for now*/
+        //     false
+        // } else {
+        //     self.chain_type.should_process_llmq_of_type(llmq_type)
+        // }
     }
 
     pub fn should_process_diff_with_range(

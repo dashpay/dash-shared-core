@@ -14,3 +14,4 @@ pub mod test_mainnet_checkpoints;
 pub mod testnet_test_retrieving;
 pub mod testnet_core19;
 pub mod migration_core19;
+pub mod mainnet_core19;

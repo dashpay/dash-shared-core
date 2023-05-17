@@ -316,7 +316,7 @@ impl LLMQEntry {
 impl LLMQEntry {
 
     pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
-        info!("• LLMQ::verify at {}: {:?}", block_height, self.llmq_type);
+        println!("• LLMQ::verify at {}: {:?}", block_height, self.llmq_type);
         if !self.validate_payload() {
             return false;
         }
