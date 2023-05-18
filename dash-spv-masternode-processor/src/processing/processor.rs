@@ -332,7 +332,6 @@ impl MasternodeProcessor {
             for (&llmq_type, llmqs_of_type) in &mut added_quorums {
                 if self.should_process_quorum(llmq_type, is_dip_0024, is_rotated_quorums_presented) {
                     for (&llmq_block_hash, quorum) in llmqs_of_type {
-                        println!("----> {}:{}, {:?} {:?}", self.lookup_block_height_by_hash(llmq_block_hash), llmq_block_hash, quorum.index, llmq_type);
                         has_valid_quorums &= self.validate_quorum(quorum, skip_removed_masternodes, llmq_block_hash, cache);
                     }
                 }
@@ -376,7 +375,7 @@ impl MasternodeProcessor {
     ) -> bool {
         let block_height = self.lookup_block_height_by_hash(block_hash);
         if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-            println!("//////////// validate_quorum {:?}: {}: {} ({}): {:?}", quorum.llmq_type, block_height, block_hash, block_hash.reversed(), quorum);
+            println!("validate_quorum {:?}: {}: {} ({}): {:?}", quorum.llmq_type, block_height, block_hash.reversed(), block_hash, quorum);
         }
         // java::generate_masternode_list_from_map(&masternodes);
         let valid_masternodes = if quorum.index.is_some() {
@@ -476,7 +475,6 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("MISSING: block for height: {}", work_block_height),
             Some(work_block_hash) => {
-                println!("quorum_quarter_members_by_snapshot: {} find_masternode_list for {}: {}", quorum_base_block_height, work_block_height, work_block_hash);
                 if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
@@ -558,7 +556,6 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("missing block for height: {}", work_block_height),
             Some(work_block_hash) => {
-                println!("new_quorum_quarter_members {}: find_masternode_list for {}: {}", quorum_base_block_height, work_block_height, work_block_hash);
                 if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     //java::generate_masternode_list_from_map(&masternode_list.masternodes);
                     // println!("•••• new_quorum_quarter_members: {:?}: (skip_removed: {}) {}: {}", params.r#type, skip_removed_masternodes, work_block_height, work_block_hash.reversed());

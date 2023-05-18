@@ -113,20 +113,14 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
         );
     }
     let result_at_h_4c = if extra_share {
-        println!("process diff: {}-{}", diff_h_4c.as_ref().unwrap().base_block_height, diff_h_4c.as_ref().unwrap().block_height);
         get_list_diff_result(diff_h_4c.unwrap(), false)
     } else {
         null_mut()
     };
-    println!("process diff: {}-{}", diff_h_3c.base_block_height, diff_h_3c.block_height);
     let result_at_h_3c = get_list_diff_result(diff_h_3c, false);
-    println!("process diff: {}-{}", diff_h_2c.base_block_height, diff_h_2c.block_height);
     let result_at_h_2c = get_list_diff_result(diff_h_2c, false);
-    println!("process diff: {}-{}", diff_h_c.base_block_height, diff_h_c.block_height);
     let result_at_h_c = get_list_diff_result(diff_h_c, false);
-    println!("process diff: {}-{}", diff_h.base_block_height, diff_h.block_height);
     let result_at_h = get_list_diff_result(diff_h, true);
-    println!("process diff: {}-{}", diff_tip.base_block_height, diff_tip.block_height);
     let result_at_tip = get_list_diff_result(diff_tip, false);
     // let last_quorum_per_index_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let last_quorum_per_index_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;

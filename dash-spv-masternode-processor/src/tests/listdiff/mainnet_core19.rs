@@ -1,5 +1,5 @@
 use crate::common::ChainType;
-use crate::lib_tests::tests::{assert_diff_result, create_default_context, message_from_file, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
+use crate::lib_tests::tests::{assert_diff_result, assert_qrinfo_result, create_default_context, message_from_file, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
 
 #[test]
 fn test_verify_chained_rotation2() {
@@ -58,7 +58,8 @@ fn test_verify_chained_rotation() {
     let context = &mut create_default_context(ChainType::MainNet, false, cache);
     let processor = register_default_processor();
     let diffs = vec![
-        "0_1871712",
+        "0_1870840",
+        "1870840_1871712",
         "1871712_1871722",
         "1871722_1871724",
         "1871724_1871726",
@@ -96,10 +97,5 @@ fn test_verify_chained_rotation() {
     });
     context.is_dip_0024 = true;
     let result = process_qrinfo(message_from_file("mainnet/QRINFO_0_1872425.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
+    assert_qrinfo_result(context, result);
 }
