@@ -122,19 +122,13 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let result_at_h_c = get_list_diff_result(diff_h_c, false);
     let result_at_h = get_list_diff_result(diff_h, true);
     let result_at_tip = get_list_diff_result(diff_tip, false);
-    // let last_quorum_per_index_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let last_quorum_per_index_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> =
         Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
-        let mut quorum = unwrap_or_qr_result_failure!(models::LLMQEntry::from_bytes(message, offset));
-        let quorum_hash = quorum.llmq_hash;
-        // println!("last_quorum_per_index: {}-{:?}-{}-{}", _i, quorum.index, processor.lookup_block_height_by_hash(quorum_hash), quorum_hash);
-        // let valid = processor.validate_quorum(&mut quorum, true, quorum_hash, cache);
-        // println!("valid: {}", valid);
+        let quorum = unwrap_or_qr_result_failure!(models::LLMQEntry::from_bytes(message, offset));
         last_quorum_per_index_vec.push(boxed(quorum.encode()));
     }
-    // let quorum_snapshot_list_count = 0;
     let quorum_snapshot_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> =
         Vec::with_capacity(quorum_snapshot_list_count);
@@ -143,7 +137,6 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
         let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
         snapshots.push(snapshot);
     }
-    // let mn_list_diff_list_count = 0;
     let mn_list_diff_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> =
         Vec::with_capacity(mn_list_diff_list_count);
