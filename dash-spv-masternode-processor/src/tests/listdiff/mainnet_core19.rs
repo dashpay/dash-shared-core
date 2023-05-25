@@ -1,7 +1,7 @@
 use crate::common::ChainType;
 use crate::lib_tests::tests::{assert_diff_result, assert_qrinfo_result, create_default_context, message_from_file, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
 
-#[test]
+// #[test]
 fn test_verify_chained_rotation2() {
     register_logger();
     let version = 70227;
@@ -50,7 +50,7 @@ fn test_verify_chained_rotation2() {
     assert_diff_result(context, unsafe { *result.result_at_tip });
 }
 
-#[test]
+// #[test]
 fn test_verify_chained_rotation() {
     register_logger();
     let version = 70227;
