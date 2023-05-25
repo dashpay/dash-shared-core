@@ -374,10 +374,6 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> bool {
         let block_height = self.lookup_block_height_by_hash(block_hash);
-        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-            println!("validate_quorum {:?}: {}: {} ({}): {:?}", quorum.llmq_type, block_height, block_hash.reversed(), block_hash, quorum);
-        }
-        // java::generate_masternode_list_from_map(&masternodes);
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(
                 quorum.llmq_type,
@@ -399,39 +395,6 @@ impl MasternodeProcessor {
                 quorum.llmq_type == self.chain_type.platform_type() && !quorum.version.use_bls_legacy()
             )
         };
-
-        // info!("••• validate_quorum ({}: {:?}: {:?}) •••", block_height, quorum, valid_masternodes);
-        // TMP Generate test for verification with this data
-        // info!("#[test]");
-        // info!("fn test_{}() {{", thread_rng().gen_range(0..8184));
-        // info!("  let block_height = {};", block_height);
-        // info!("  let mut quorum = {:?};", quorum);
-        // info!("  let valid_masternodes = vec!{:?};", valid_masternodes);
-        // info!("  assert!(quorum.validate(valid_masternodes, block_height));");
-        // info!("}}");
-        // generate_test(|| {
-        //     println!("Context context = new Context(TestNet3Params.get());");
-        //     println!("context.initDash(true, true);");
-        //     println!("NetworkParameters params = context.getParams();");
-        //     println!("params.setBasicBLSSchemeActivationHeight(40000);");
-        //     println!("BLSScheme.setLegacyDefault({});", quorum.version.use_bls_legacy());
-        //     println!("int height = {};", block_height);
-        //     println!("Sha256Hash blockHash = Sha256Hash.wrap(\"{}\");", block_hash);
-        //     println!("Sha256Hash blockHashReversed = Sha256Hash.wrap(\"{}\");", block_hash.reversed());
-        //     println!("StoredBlock storedBlock = new StoredBlock(");
-        //     println!("  new Block(params, 536870912, Sha256Hash.wrap(Sha256Hash.wrap(\"0000010080ade24d4fdde00be3b1c58dac97f62ece74b311286ec126e4310a28\").getReversedBytes()), Sha256Hash.wrap(\"afbf4427b30c57535fd8df5eb8750e7176057d5bcdb907274553aa7dfc4c55ad\"), 1681681442, 0, 678112, new ArrayList<>()),");
-        //     println!("  new BigInteger(Hex.decode(\"00000000000000000000000000000000000000000000000002d68cc84bf201da\")), height);");
-        //     java::generate_final_commitment(&quorum);
-        //     java::generate_masternode_list(&valid_masternodes);
-        //     println!("boolean verified = finalCommitment.verify(storedBlock, nodes, true);");
-        //     println!("assertTrue(verified);");
-        // });
-        // if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-        //     println!("//////////// validate_quorum {} ////////////////", block_height);
-        //     // println!("{:#?}", valid_masternodes);
-        //     println!("{:#?}", valid_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
-        // }
-
         quorum.verify(valid_masternodes, block_height)
     }
 
