@@ -181,6 +181,8 @@ impl MasternodeProcessor {
     ) {
         // It's good to cache lists to use it inside processing session
         // Here we use opaque-like pointer which we initiate on the C-side to sync its lifetime with runtime
+        #[cfg(feature = "generate-dashj-tests")]
+        crate::util::java::save_masternode_list_to_json(&list, self.lookup_block_height_by_hash(block_hash));
         cache.add_masternode_list(block_hash, list);
         // Here we just store it in the C-side ()
         // self.save_masternode_list(block_hash, &masternode_list);
@@ -395,6 +397,7 @@ impl MasternodeProcessor {
                 quorum.llmq_type == self.chain_type.platform_type() && !quorum.version.use_bls_legacy()
             )
         };
+        //crate::util::java::generate_final_commitment_test_file(self.chain_type, block_height, &quorum, &valid_masternodes);
         quorum.verify(valid_masternodes, block_height)
     }
 
@@ -804,6 +807,8 @@ impl MasternodeProcessor {
     }
 
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: models::LLMQSnapshot) -> bool {
+        #[cfg(feature = "generate-dashj-tests")]
+        crate::util::java::save_snapshot_to_json(&snapshot, self.lookup_block_height_by_hash(block_hash));
         unsafe {
             (self.save_llmq_snapshot)(
                 boxed(block_hash.0),
