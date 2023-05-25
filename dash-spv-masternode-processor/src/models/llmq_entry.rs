@@ -1,6 +1,10 @@
 use byte::{BytesExt, ctx::{Bytes, Endian}, TryRead, LE};
 use hashes::hex::ToHex;
 use std::convert::Into;
+#[cfg(feature = "generate-dashj-tests")]
+use serde::ser::SerializeStruct;
+#[cfg(feature = "generate-dashj-tests")]
+use serde::{Serialize, Serializer};
 use crate::common::{LLMQType, LLMQVersion};
 use crate::consensus::{encode::VarInt, Encodable, WriteExt};
 use crate::crypto::{byte_util::AsBytes, data_ops::Data, UInt256, UInt384, UInt768};
@@ -25,6 +29,28 @@ pub struct LLMQEntry {
     pub verified: bool,
     pub saved: bool,
     pub commitment_hash: Option<UInt256>,
+}
+
+#[cfg(feature = "generate-dashj-tests")]
+impl Serialize for LLMQEntry {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> where S: Serializer {
+        let mut state = serializer.serialize_struct("LLMQEntry", 10 + usize::from(self.index.is_some()))?;
+        state.serialize_field("version", &self.version)?;
+        if let Some(index) = self.index {
+            state.serialize_field("index", &index)?;
+        }
+        state.serialize_field("public_key", &self.public_key)?;
+        state.serialize_field("threshold_signature", &self.threshold_signature)?;
+        state.serialize_field("verification_vector_hash", &self.verification_vector_hash)?;
+        state.serialize_field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature)?;
+        state.serialize_field("llmq_type", &self.llmq_type)?;
+        state.serialize_field("signers_bitset", &self.signers_bitset.to_hex())?;
+        state.serialize_field("signers_count", &self.signers_count.0)?;
+        state.serialize_field("valid_members_bitset", &self.valid_members_bitset.to_hex())?;
+        state.serialize_field("valid_members_count", &self.valid_members_count.0)?;
+        state.end()
+
+    }
 }
 
 pub struct VecHex(pub Vec<u8>);
