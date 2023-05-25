@@ -393,6 +393,10 @@ pub mod tests {
     }
 
     pub fn assert_qrinfo_result(context: &mut FFIContext, result: types::QRInfoResult) {
+        if result.mn_list_diff_list_count > 0 {
+            let diff_result = unsafe { **result.mn_list_diff_list };
+            assert_diff_result(context, diff_result);
+        }
         if result.extra_share {
             assert_diff_result(context, unsafe { *result.result_at_h_4c });
         }
