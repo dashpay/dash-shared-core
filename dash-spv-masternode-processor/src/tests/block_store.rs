@@ -337,7 +337,6 @@ pub fn init_mainnet_store() -> Vec<MerkleBlock> {
         MerkleBlock { hash: UInt256::from_hex("000000000000001df6026dcd49b32b8cda38807cc475d6868679e6eb77e5edf4").unwrap().reverse(), height: 1097952, merkleroot: Default::default() },
         MerkleBlock { hash: UInt256::from_hex("000000000000000e78706ecf6d744a2edc5143d3325ade22940dc14ccfd3f938").unwrap().reverse(), height: 1094400, merkleroot: Default::default() },
 
-
         MerkleBlock { hash: UInt256::from_hex("0000000000000019dd3cacaadbd876c25743598f35277b846f75447343874caf").unwrap().reverse(), height: 1719072, merkleroot: UInt256::from_hex("f0e749a270b20cfd473e1945d3235036535b2fb4a6f03bc1372ef452b0e3fdd9").unwrap() },
         MerkleBlock { hash: UInt256::from_hex("0000000000000005196b2caac47f5b210738a36437ab84c77b8dd1cb65e5ff4e").unwrap().reverse(), height: 1719360, merkleroot: UInt256::from_hex("756d24889633a895ac5e147ec0e45084a0f33686ce900949230f56dff0e14f19").unwrap() },
         MerkleBlock { hash: UInt256::from_hex("00000000000000296ef101616eb4992c036ad23942ce11a497f4088d8f7f1d3c").unwrap().reverse(), height: 1719648, merkleroot: UInt256::from_hex("49e4ad3b5feb3b824582774382325c44b643c501f1b63e51d57b44611bf419da").unwrap() },
@@ -487,6 +486,7 @@ pub fn init_mainnet_store() -> Vec<MerkleBlock> {
 
         MerkleBlock::reversed(1869696, "000000000000001ec9b937a234a8f482c18fb9a31ea81a08d21fcf91ae60c389", "eb66b18d16559991fef3312e1ba9f47f6935735f2780fc05ea33f0a408af149d"),
         MerkleBlock::reversed(1869984, "000000000000000162f7ce32df4f55a467db5203913350a1ee6f5151c877513d", "e74d1887a0351f8baf43d71f6bac3046a8d28490aa68dace79e6101038fa4c15"),
+        MerkleBlock::reversed(1870264, "00000000000000135152878c212fa17b6e85161b329f8b724692dd2ec1088c3f", "914e64c453181543797526c155b916a11e0c71ccb44f98ef18e16bb503884a82"),
         MerkleBlock::reversed(1870272, "0000000000000020918ac37d981ffe86b10ad9dd48aa7ce8234d24cd1b2ce9a4", "c61c25457678118466158d6ec7de8b2dac55295a7c6d54fd980663576d31c5c1"),
         MerkleBlock::reversed(1870296, "0000000000000016b834ca862806a2e9bcbee069c04069599118eac8555bd53e", "3d62ab2395fc738aadf49df072e6fa242a7189ae576aa3b7765532c33e613fc3"),
         MerkleBlock::reversed(1870320, "0000000000000003d13d538a212625d3d66ceca985f6fe611a57229715090ff3", "ff9b366d4ca683d17d426f6a8a61d3b182affc57e9ce04c60513f255ca71500e"),
@@ -642,8 +642,10 @@ pub fn init_mainnet_store() -> Vec<MerkleBlock> {
 
 pub fn init_testnet_store() -> Vec<MerkleBlock> {
     vec![
-        MerkleBlock { hash: UInt256::from_hex("00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c").unwrap().reverse(), height: 0, merkleroot: Default::default() },
-        MerkleBlock { hash: UInt256::from_hex("0000000007697fd69a799bfa26576a177e817bc0e45b9fcfbf48b362b05aeff2").unwrap().reverse(), height: 72000, merkleroot: Default::default() },
+        MerkleBlock::reversed(0, "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c", "e0028eb9648db56b1ac77cf090b99048a8007e2bb64b68f092c03c7f56a662c7"),
+        MerkleBlock::reversed(72000, "0000000007697fd69a799bfa26576a177e817bc0e45b9fcfbf48b362b05aeff2", "634cfd75bb5cda0eab595376810448e0924ff33ee4a8997e80454bcc01e4dd80"),
+        MerkleBlock::reversed(116000, "0000000003525090da7c7a6fe571b030ba0477a54ebc0b34091887dd06f444dd", "31e860b51823939ad72aab072813baf182dbd8094df75d74c184885c3a76ebeb"),
+        MerkleBlock::reversed(116716, "0000000001ae45c1c24bad5a83a6cf12d7c493aa92579055c39fc16558ba26da", "804d959157f3422147dd18cba37eb0d957b5e54fd36b9572982f5f7bbe67c024"),
 
         MerkleBlock { hash: UInt256::from_hex("0000000007461970d06f6b3d9ac8e8b422da2597be8510f0190166f3a19bbf90").unwrap().reverse(), height: 121440, merkleroot: UInt256::from_hex("6038b4b36136ef6e0effd48d8dc2e461125ccffba5943334d40bf7b3a35b1d38").unwrap() },
         MerkleBlock { hash: UInt256::from_hex("000000000ebcd4db408530c84294cc69f8289a43e464a981b2f97557975c50de").unwrap().reverse(), height: 121464, merkleroot: UInt256::from_hex("da97b8aafc7df2e70d0347f4d258b2b4e87e1cbe2fe89c8175346c46c6c7a719").unwrap() },
