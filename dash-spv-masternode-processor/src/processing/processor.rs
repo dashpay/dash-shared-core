@@ -829,14 +829,14 @@ impl MasternodeProcessor {
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType, is_dip_0024: bool, is_rotated_quorums_presented: bool) -> bool {
         // TODO: what we really wants here for platform quorum type?
-        is_dip_0024 && llmq_type == LLMQType::Llmqtype60_75
-        // if self.chain_type.isd_llmq_type() == llmq_type {
-        //     is_dip_0024 && is_rotated_quorums_presented
-        // } else if is_dip_0024 { /*skip old quorums here for now*/
-        //     false
-        // } else {
-        //     self.chain_type.should_process_llmq_of_type(llmq_type)
-        // }
+        //is_dip_0024 && llmq_type == LLMQType::Llmqtype60_75
+        if self.chain_type.isd_llmq_type() == llmq_type {
+            is_dip_0024 && is_rotated_quorums_presented
+        } else if is_dip_0024 { /*skip old quorums here for now*/
+            false
+        } else {
+            self.chain_type.should_process_llmq_of_type(llmq_type)
+        }
     }
 
     pub fn should_process_diff_with_range(
