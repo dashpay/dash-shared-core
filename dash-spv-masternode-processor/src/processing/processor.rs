@@ -258,6 +258,7 @@ impl MasternodeProcessor {
             modified_masternodes,
             added_quorums,
             needed_masternode_lists,
+            quorums_cl_sigs: list_diff.quorums_cls_sigs,
         };
         result
     }
