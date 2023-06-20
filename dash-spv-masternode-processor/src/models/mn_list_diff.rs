@@ -2,6 +2,7 @@ use byte::BytesExt;
 use hashes::hex::ToHex;
 use std::collections::BTreeMap;
 use crate::common::LLMQType;
+use crate::chain::constants::{CORE_PROTO_20, CORE_PROTO_BLS_BASIC};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
@@ -25,12 +26,14 @@ pub struct MNListDiff {
     pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
     pub base_block_height: u32,
     pub block_height: u32,
-    // 0: protocol_version < 20225
+    // 0: protocol_version < 70225
     // 1: all pubKeyOperator of all CSimplifiedMNListEntry are serialised using legacy BLS scheme
     // 2: all pubKeyOperator of all CSimplifiedMNListEntry are serialised using basic BLS scheme
     pub version: u16,
 
-    // protocol_version > 20227
+    // protocol_version > 70228
+    // 19.2 goes with 70228
+    // 20.0 goes with 70228+?
     pub quorums_cls_sigs: Vec<QuorumsCLSigsObject>,
 }
 
@@ -74,14 +77,14 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        let version = if protocol_version >= 70225 {
+        let version = if protocol_version >= CORE_PROTO_BLS_BASIC {
             // BLS Basic
             u16::from_bytes(message, offset)?
         } else {
             // BLS Legacy
-            0
+            1
         };
-        let masternode_read_ctx = MasternodeReadContext(block_height, version);
+        let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
             Vec::with_capacity(deleted_masternode_count as usize);
@@ -121,7 +124,7 @@ impl MNListDiff {
             }
         }
         let mut quorums_cls_sigs = Vec::new();
-        if protocol_version > 70227 { // Core v0.20
+        if protocol_version >= CORE_PROTO_20 { // Core v0.20
             let quorums_cl_sigs_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..quorums_cl_sigs_count {
                 let sig = QuorumsCLSigsObject::from_bytes(message, offset)?;
@@ -146,4 +149,9 @@ impl MNListDiff {
             quorums_cls_sigs
         })
     }
+
+    pub fn has_basic_scheme_keys(&self) -> bool {
+        self.added_or_modified_masternodes.values().any(|m| m.version == 2)
+    }
+
 }

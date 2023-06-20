@@ -16,7 +16,7 @@ fn test_core19rc10() {
     let cache = register_cache();
     let context = &mut create_default_context(ChainType::TestNet, false, cache);
     let processor = register_default_processor();
-    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219, false, true);
+    let result = process_mnlistdiff(message_from_file("testnet/MNT530000.dat"), processor, context, 70219, false, true);
     assert_diff_result(context, result);
     unsafe {
         context.cache.mn_lists.insert(UInt256(*result.block_hash), (*result.masternode_list).decode());
@@ -32,7 +32,7 @@ fn test_core19_70224() {
     let cache = register_cache();
     let context = &mut create_default_context(ChainType::TestNet, false, cache);
     let processor = register_default_processor();
-    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219, false, true);
+    let result = process_mnlistdiff(message_from_file("testnet/MNT530000.dat"), processor, context, 70219, false, true);
     assert_diff_result(context, result);
     unsafe {
         context.cache.mn_lists.insert(UInt256(*result.block_hash), (*result.masternode_list).decode());
@@ -47,13 +47,13 @@ fn test_core19_70227() {
     let cache = register_cache();
     let context = &mut create_default_context(ChainType::TestNet, false, cache);
     let processor = register_default_processor();
-    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219, false, true);
+    let result = process_mnlistdiff(message_from_file("testnet/MNT530000.dat"), processor, context, 70219, false, true);
     // assert_diff_result(context, result);
     unsafe {
         let list = (*result.masternode_list).decode();
         context.cache.mn_lists.insert(UInt256(*result.block_hash), list);
     }
-    let result = process_mnlistdiff(message_from_file("MNL_530000_868321.dat"), processor, context, 70227, false, true);
+    let result = process_mnlistdiff(message_from_file("testnet/MNL_530000_868321.dat"), processor, context, 70227, false, true);
     assert_diff_result(context, result);
 }
 
@@ -268,6 +268,7 @@ fn test_verify_secure3() {
 
     let valid_masternodes = [
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("3ba330d521ffd8d0d7fee89e5b1222a91edd5ee077751bc171cec7b9157bcf9f").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -296,6 +297,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("0b2c6e528a7512c8b504f34c30c38373d34a935d044546405ac8654ee58669e2").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("d9e2dc9e851176b315c763e988d7dfb1164153ef2ad98f5565686acbc2b8b2df").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -324,6 +326,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("75007256476bb229815257529aa59e9cf5625e7f8137147de0d50c53e80ce711").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("432ab33e7663f79c28d25eb500edc0a6a17fa7ae2a718ce7efc2e79d3a070ad0").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -352,6 +355,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("f20d3c94aaec665afe13623784afe5e4d6c44edc2c274af5b01a0209e08956bc").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("0378aaa2e2ec71b47ab267aa9b55ec5422740471ce1651c2aee7cad48d8f0f61").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -380,6 +384,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("ae3a244b4d5c5b668091aa089e19d2b012cea3d5650671bf247913fbc70558dd").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("2f51f56b6a87988b682020bc75f6e827f36d43559f2adb59cf85d9aaf7ef9257").unwrap(),
             confirmed_hash: UInt256::from_hex("795cfdb19aff1aaaed00bb62b95dfef5748253be13d0dfc4d783b02ae2000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -408,6 +413,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("816b2025864c75d69c90d89c73e043ce239acabb12b1c940b93b661542225691").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("bc973f3a17c5fa3dd59493b7d2bc41ce472be2401459ca2d96fac25bedb2b7aa").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -436,6 +442,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("3460032f52e5b57c80827f180263ad5551cde16a37ce1cff9052a0b47b2233dc").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("b793ac00290abfe0ae6e8e96dd228c0a209d774ecb90b1e7f384e3e975f2aade").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -464,6 +471,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("e27008fcb83b8a961b29fffe8b738958ac3bd7111ef0fcff4947d8444aced9f5").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("3316e1e2cc137b2eb03f960324df219b2c5314f12296df4b4619460ae9e7f994").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -492,6 +500,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("107bf4d92436b91bfaf3e3c44af15cb11f994429d5fadfbdce3d7f0683f0291e").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("d62a3f54945dda86301e5b2118e6962c79b8d6461c075d97f1b926eda4e7dcae").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -520,6 +529,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("56c884c0ced7087c7734b6d8a345d516f102c1aa3158040e404332c595318dd7").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("995ed4288da0f7b3e9af9dfa8f2fcb6dc0389df6030e75c4a8fa4db5cede0d88").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -548,6 +558,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("a7e82894e3646eaab698bf52af4bcc9d02adb0737e6104473a28c30fc1006fdc").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("c10a2826f3e775d2d7527b131d5e3620647a6926938061a7ff16b7d0b745efb4").unwrap(),
             confirmed_hash: UInt256::from_hex("26cb9af0c2dd8555f03dccbc1f209376c344f2a89d021dad06bbe6aa2c020000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -576,6 +587,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("aa7cb9fe35349094fdaf85e6018eae20d38b3208a42e8ff1cc842780a2e81c85").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("f682389d5e0baed394a65cbdd6a666f59271943d935f85c9d05b3433978c9b28").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -604,6 +616,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("9b94fa8985507f9870305d431008cecd8feb30460696a557cc963d48dca4a7ab").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("0682c86d9afb864697190081adb9b1c4b0268b079edc428e41368fcb1655eff8").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -632,6 +645,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("3d006dfd19d34fdca40d7f85c98bbd196abcf006442ead76e20d0fd93274de4b").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("eed53ba18185f82a82196e11705d4a0e40576cc1884c060188adbc5560ac8b14").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -660,6 +674,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("5a16f1ecbe3cbb0780e7005131cb4ead957b88f1a83d1e21466538b42eefbda4").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("b2b69159973619cef08b9add969ba4d1ae18dd33bd62635429d44d93b62d5753").unwrap(),
             confirmed_hash: UInt256::from_hex("3d7c98b3942c5550e3bfcaa37e37282fd4b29bb40f677a38906e597257000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -688,6 +703,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("08dd2c380037f78507443f306f60a4b95d888576537a2a5ce7481d0cb45ea30a").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("ab0c1c4d1b59e95ef256598fc2663049f0fcf1a6e4845e80358b7d29c04dcb76").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -716,6 +732,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("c965262aa365649a04a917b2eb5cd5f753107c0297448d1a0572dde1e8fe38e3").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("5efba19efb8cb5e105f5b61f9ca2b0f543a0dee8161c0fae961d1e76ee883a07").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -744,6 +761,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("320cf222c2340e7463c0a256e8a2e81f41276ace2183a5ead1774453bc9614fc").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("790bd1b645d4cbbb155fe4a4c65b81a285197c6b94ef89b05cd2a024b7a6c441").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -772,6 +790,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("edb3cade9b9f40c5ab811743c3a9bb694a78f59f4fb1fdb31caf90011036f239").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("e3fd43389b149f8c4d64f36b1601f05ec3f3ceae0809dbeed137214d11b376a7").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -800,6 +819,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("0c0f28c40747d00857c61d3c661537f7573912a44a74ed51333f224f82a811b0").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("02769272e89a947728aebb2b1ce38a35e47ea334ee53fe29e8a6734cf439ee0c").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -828,6 +848,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("66ad4b21995106bb17b63a94752e284318d501f34fb1ecd8bea21c64cb3661be").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("d28018e798ccbd797d0b2fc33513d64d60d55c92f4b35f46db169332dae95f4d").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -856,6 +877,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("eea47e59d78ea141719ca2d19358d299c269d8948ec9f5b283e2edc1f2038c66").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("7260b2359075b4e479d94821e1745239384e92da675226464f1fc312682df6b2").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -884,6 +906,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("5821d4b7dfe9734350412a08a8b1a8efecead5383a47468a4e98256cec04f08a").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("f5cbcfe4f680596d703098ef1fc0ce9e3950372bda82c25090b79ae880e6932b").unwrap(),
             confirmed_hash: UInt256::from_hex("4f2ff1d62323f7dc16ccdfb3e3740af47a444871f72f09ac252f62753e000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -912,6 +935,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("03430ef59311f9797152779acb03d6c25fca40567b75f84058bf2f5ef3da335a").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("71ce9f30984ba8ff47618bdbb362be8315b11d7be903b37fb9ed2a0010090dca").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -940,6 +964,7 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("0526b60a35c51286e3685f143e0664d08a155bfdc49f1ae0f76db95709f24e99").unwrap(),
         },
         MasternodeEntry {
+            version: 0,
             provider_registration_transaction_hash: UInt256::from_hex("608c43a6a23324860eb2d8e6212798506bebac53120c591d6b32aeb0e35edc63").unwrap(),
             confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -1142,4 +1167,21 @@ fn test_verify_chained_rotation3() {
     assert_diff_result(context, unsafe { *result.result_at_h_c });
     assert_diff_result(context, unsafe { *result.result_at_h });
     assert_diff_result(context, unsafe { *result.result_at_tip });
+}
+
+
+#[test]
+fn test_core19_2() {
+    register_logger();
+    let version = 70228;
+    let cache = register_cache();
+    let context = &mut create_default_context(ChainType::TestNet, false, cache);
+    let processor = register_default_processor();
+    let diffs = vec![
+        "MNL_0_530000_70228.dat",
+        "MNL_530000_852596.dat",
+    ].iter().for_each(|name| {
+        let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, version, false, true);
+        assert_diff_result(context, result);
+    });
 }

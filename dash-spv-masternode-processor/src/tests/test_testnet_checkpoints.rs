@@ -8,7 +8,7 @@ use crate::tests::block_store::init_testnet_store;
 fn test_checkpoint_530000() {
     let chain = ChainType::TestNet;
     let context = &mut (FFIContext { chain, is_dip_0024: false, cache: &mut Default::default(), blocks: init_testnet_store() });
-    let bytes = message_from_file("MNT530000.dat");
+    let bytes = message_from_file("testnet/MNT530000.dat");
     let processor = unsafe {
         &mut *register_processor(
             get_merkle_root_by_hash_default,

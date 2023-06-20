@@ -292,14 +292,14 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             let voting_bytes = base58::from(node.voting_address.as_str()).unwrap();
             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
             let public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
-            let version = node.version;
+            let version = node.version.unwrap_or(0);
             let is_valid = u8::from(node.is_valid);
             let operator_public_key = OperatorPublicKey {
                 data: public_key,
-                version: version.unwrap_or(0)
+                version
             };
             let update_height = node.update_height.unwrap_or(0);
-            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, is_valid, MasternodeType::Regular, 0, UInt160::MIN, update_height);
+            let mut masternode = models::MasternodeEntry::new(version, provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, is_valid, MasternodeType::Regular, 0, UInt160::MIN, update_height, 70219);
             masternode.known_confirmed_at_height = node.known_confirmed_at_height;
             masternode
         })

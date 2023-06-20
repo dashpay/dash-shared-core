@@ -339,7 +339,7 @@ pub mod tests {
         }
     }
 
-    pub fn process_mnlistdiff(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, version: u32, use_insight: bool, is_from_snapshot: bool) -> types::MNListDiffResult {
+    pub fn process_mnlistdiff(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, protocol_version: u32, use_insight: bool, is_from_snapshot: bool) -> types::MNListDiffResult {
         unsafe {
             *process_mnlistdiff_from_message(
                 bytes.as_ptr(),
@@ -347,7 +347,7 @@ pub mod tests {
                 context.chain,
                 use_insight,
                 is_from_snapshot,
-                version,
+                protocol_version,
                 processor,
                 context.cache,
                 context as *mut _ as *mut std::ffi::c_void,
