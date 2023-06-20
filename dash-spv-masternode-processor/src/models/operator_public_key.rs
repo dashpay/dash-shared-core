@@ -28,8 +28,9 @@ impl Encodable for OperatorPublicKey {
     }
 }
 
-impl<'a> TryRead<'a, u16> for OperatorPublicKey {
-    fn try_read(bytes: &'a [u8], version: u16) -> byte::Result<(Self, usize)> {
+// Ctx: (version, protocol_version)
+impl<'a> TryRead<'a, (u16, u32)> for OperatorPublicKey {
+    fn try_read(bytes: &'a [u8], (version, protocol_version): (u16, u32)) -> byte::Result<(Self, usize)> {
         let data = bytes.read_with::<UInt384>(&mut 0, byte::LE)?;
         Ok((OperatorPublicKey { data, version }, 48))
     }

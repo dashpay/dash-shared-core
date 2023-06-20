@@ -140,6 +140,7 @@ impl ToFFI for models::MasternodeEntry {
     type Item = types::MasternodeEntry;
 
     fn encode(&self) -> Self::Item {
+        let version = self.version;
         let previous_operator_public_keys_count = self.previous_operator_public_keys.len();
         let previous_entry_hashes_count = self.previous_entry_hashes.len();
         let previous_validity_count = self.previous_validity.len();
@@ -213,6 +214,7 @@ impl ToFFI for models::MasternodeEntry {
         let platform_http_port = self.platform_http_port;
         let platform_node_id = boxed(self.platform_node_id.0);
         Self::Item {
+            version,
             confirmed_hash,
             confirmed_hash_hashed_with_provider_registration_transaction_hash,
             is_valid,

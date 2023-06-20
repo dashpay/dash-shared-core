@@ -251,7 +251,7 @@ fn test_core_19_rc_2_testnet() {
         cache,
         blocks: init_testnet_store()
     });
-    let bytes = message_from_file("MNL_TESTNET_CORE_19.dat");
+    let bytes = message_from_file("testnet/MNL_TESTNET_CORE_19.dat");
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),

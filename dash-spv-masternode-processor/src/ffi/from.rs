@@ -167,6 +167,7 @@ impl FromFFI for types::MasternodeEntry {
     type Item = models::MasternodeEntry;
     unsafe fn decode(&self) -> Self::Item {
         Self::Item {
+            version: self.version,
             provider_registration_transaction_hash: UInt256(
                 *self.provider_registration_transaction_hash,
             ),

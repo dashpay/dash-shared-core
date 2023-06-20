@@ -4,18 +4,20 @@ use std::collections::BTreeMap;
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
+use crate::chain::constants::CORE_PROTO_19_2;
 use crate::common::{Block, MasternodeType, SocketAddress};
 use crate::consensus::Encodable;
 use crate::crypto::{UInt160, UInt256, byte_util::Zeroable};
 use crate::models::OperatorPublicKey;
 use crate::util::data_ops::short_hex_string_from;
 
-// (block height, list diff version (2: BLSBasic))
+// (block height, list diff version (2: BLSBasic), protocol_version)
 #[derive(Clone, Copy)]
-pub struct MasternodeReadContext(pub u32, pub u16);
+pub struct MasternodeReadContext(pub u32, pub u16, pub u32);
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct MasternodeEntry {
+    pub version: u16,
     pub provider_registration_transaction_hash: UInt256,
     pub confirmed_hash: UInt256,
     pub confirmed_hash_hashed_with_provider_registration_transaction_hash: Option<UInt256>,
@@ -48,7 +50,7 @@ impl Serialize for MasternodeEntry {
         state.serialize_field("mn_type", &self.mn_type)?;
         state.serialize_field("platform_http_port", &self.platform_http_port)?;
         state.serialize_field("platform_node_id", &self.platform_node_id)?;
-        state.serialize_field("version", &self.operator_public_key.version)?;
+        state.serialize_field("version", &self.version)?;
         state.end()
 
     }
@@ -95,17 +97,22 @@ impl std::fmt::Debug for MasternodeEntry {
 
 impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
     fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
-        let MasternodeReadContext (block_height, diff_version) = context;
+        let MasternodeReadContext (block_height, diff_version, protocol_version) = context;
         let offset = &mut 0;
+        let version = if protocol_version >= CORE_PROTO_19_2 {
+            bytes.read_with::<u16>(offset, byte::LE)?
+        } else {
+            1 // legacy
+        };
         let provider_registration_transaction_hash =
             bytes.read_with::<UInt256>(offset, byte::LE)?;
         let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
         let socket_address = bytes.read_with::<SocketAddress>(offset, ())?;
-        let operator_public_key = bytes.read_with::<OperatorPublicKey>(offset, diff_version)?;
+        let operator_public_key = bytes.read_with::<OperatorPublicKey>(offset, (version, protocol_version))?;
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);
-        let mn_type = if diff_version == 2 {
+         let mn_type = if version >= 2 {
             bytes.read_with::<MasternodeType>(offset, byte::LE)?
         } else {
             MasternodeType::Regular
@@ -117,6 +124,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             (0u16, UInt160::MIN)
         };
         let mut entry = Self::new(
+            version,
             provider_registration_transaction_hash,
             confirmed_hash,
             socket_address,
@@ -127,6 +135,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             platform_http_port,
             platform_node_id,
             block_height,
+            protocol_version
         );
         if !entry.confirmed_hash.is_zero() && block_height != u32::MAX {
             entry.known_confirmed_at_height = Some(block_height);
@@ -137,6 +146,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
 
 impl MasternodeEntry {
     pub fn new(
+        version: u16,
         provider_registration_transaction_hash: UInt256,
         confirmed_hash: UInt256,
         socket_address: SocketAddress,
@@ -147,8 +157,10 @@ impl MasternodeEntry {
         platform_http_port: u16,
         platform_node_id: UInt160,
         update_height: u32,
+        protocol_version: u32,
     ) -> Self {
         let entry_hash = Self::calculate_entry_hash(
+            version,
             provider_registration_transaction_hash,
             confirmed_hash,
             socket_address,
@@ -158,8 +170,10 @@ impl MasternodeEntry {
             mn_type,
             platform_http_port,
             platform_node_id,
+            protocol_version,
         );
         Self {
+            version,
             provider_registration_transaction_hash,
             confirmed_hash,
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
@@ -182,6 +196,7 @@ impl MasternodeEntry {
     }
 
     pub fn calculate_entry_hash(
+        version: u16,
         provider_registration_transaction_hash: UInt256,
         confirmed_hash: UInt256,
         socket_address: SocketAddress,
@@ -191,6 +206,7 @@ impl MasternodeEntry {
         mn_type: MasternodeType,
         platform_http_port: u16,
         platform_node_id: UInt160,
+        protocol_version: u32,
     ) -> UInt256 {
         let mut writer = Vec::<u8>::new();
         provider_registration_transaction_hash.enc(&mut writer);
@@ -199,7 +215,7 @@ impl MasternodeEntry {
         operator_public_key.enc(&mut writer);
         key_id_voting.enc(&mut writer);
         is_valid.enc(&mut writer);
-        if operator_public_key.is_basic() {
+        if version >= 2 {
             u16::from(mn_type).enc(&mut writer);
             if mn_type == MasternodeType::HighPerformance {
                 platform_http_port.swap_bytes().enc(&mut writer);
