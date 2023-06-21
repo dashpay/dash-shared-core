@@ -443,7 +443,7 @@ impl ChainType {
 
     pub fn core19_activation_height(&self) -> u32 {
         match self {
-            ChainType::MainNet => 1870848,
+            ChainType::MainNet => 1870848, // should be replaced before release
             ChainType::TestNet => 850100,
             ChainType::DevNet(_) => 0
         }

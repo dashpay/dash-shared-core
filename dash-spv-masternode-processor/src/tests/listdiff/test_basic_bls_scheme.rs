@@ -275,7 +275,7 @@ fn test_legacy_basic_conversion() {
     let block_height = 530000;
     let legacy_key = OperatorPublicKey {
         data: UInt384::from_hex("16ca29d03ef4897a22fe467bb58c52448c63bb29534502305e8ff142ac03907fae0851ff2528e4878ef51bfa3d5a1f22").unwrap(),
-        version: 0
+        version: 1
     };
     let basic_key = OperatorPublicKey {
         data: UInt384::from_hex("96ca29d03ef4897a22fe467bb58c52448c63bb29534502305e8ff142ac03907fae0851ff2528e4878ef51bfa3d5a1f22").unwrap(),
