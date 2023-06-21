@@ -17,7 +17,6 @@ pub struct MasternodeReadContext(pub u32, pub u16, pub u32);
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct MasternodeEntry {
-    pub version: u16,
     pub provider_registration_transaction_hash: UInt256,
     pub confirmed_hash: UInt256,
     pub confirmed_hash_hashed_with_provider_registration_transaction_hash: Option<UInt256>,
@@ -79,7 +78,8 @@ impl std::fmt::Debug for MasternodeEntry {
             .field("confirmed_hash", &self.confirmed_hash)
             .field("confirmed_hash_hashed_with_provider_registration_transaction_hash", &self.confirmed_hash_hashed_with_provider_registration_transaction_hash)
             .field("socket_address", &self.socket_address)
-            .field("operator_public_key", &self.operator_public_key)
+            .field("operator_public_key", &self.operator_public_key.data)
+            .field("version", &self.operator_public_key.version)
             .field("previous_operator_public_keys", &prev_o)
             .field("previous_entry_hashes", &prev_e)
             .field("previous_validity", &prev_v)
@@ -173,7 +173,6 @@ impl MasternodeEntry {
             protocol_version,
         );
         Self {
-            version,
             provider_registration_transaction_hash,
             confirmed_hash,
             confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
