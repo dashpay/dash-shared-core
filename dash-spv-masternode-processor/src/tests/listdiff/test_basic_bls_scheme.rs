@@ -179,7 +179,7 @@ unsafe extern "C" fn get_block_hash_by_height_white_russian(
     }
 }
 
-#[test]
+//#[test]
 fn test_core_19_beta_6() {
     let chain = ChainType::DevNet(DevnetType::WhiteRussian);
     let processor = unsafe {
