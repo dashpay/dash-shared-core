@@ -12,6 +12,12 @@ pub extern "C" fn chain_type_index(chain_type: ChainType) -> i16 {
     chain_type.into()
 }
 
+/// # Safety
+#[no_mangle]
+pub extern "C" fn chain_core19_activation_height(chain_type: ChainType) -> u32 {
+    chain_type.core19_activation_height()
+}
+
 #[no_mangle]
 pub extern "C" fn chain_type_from_index(index: i16) -> ChainType {
     ChainType::from(index)

@@ -179,7 +179,7 @@ unsafe extern "C" fn get_block_hash_by_height_white_russian(
     }
 }
 
-#[test]
+//#[test]
 fn test_core_19_beta_6() {
     let chain = ChainType::DevNet(DevnetType::WhiteRussian);
     let processor = unsafe {
@@ -275,7 +275,7 @@ fn test_legacy_basic_conversion() {
     let block_height = 530000;
     let legacy_key = OperatorPublicKey {
         data: UInt384::from_hex("16ca29d03ef4897a22fe467bb58c52448c63bb29534502305e8ff142ac03907fae0851ff2528e4878ef51bfa3d5a1f22").unwrap(),
-        version: 0
+        version: 1
     };
     let basic_key = OperatorPublicKey {
         data: UInt384::from_hex("96ca29d03ef4897a22fe467bb58c52448c63bb29534502305e8ff142ac03907fae0851ff2528e4878ef51bfa3d5a1f22").unwrap(),

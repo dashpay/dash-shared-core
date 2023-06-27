@@ -151,7 +151,7 @@ impl MNListDiff {
     }
 
     pub fn has_basic_scheme_keys(&self) -> bool {
-        self.added_or_modified_masternodes.values().any(|m| m.version == 2)
+        self.added_or_modified_masternodes.values().any(|m| m.operator_public_key.version == 2)
     }
 
 }
