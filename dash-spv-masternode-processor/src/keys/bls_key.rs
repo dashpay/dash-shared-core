@@ -1,4 +1,4 @@
-use bls_signatures::bip32::{ExtendedPrivateKey, ExtendedPublicKey};
+use bls_signatures::bip32::{ChainCode, ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
 use hashes::{Hash, hex::FromHex, sha256, sha256d};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
@@ -21,9 +21,8 @@ pub struct BLSKey {
 
 impl BLSKey {
 
-    pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Option<Self> {
+    pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Result<Self, hashes::hex::Error> {
         Vec::from_hex(string)
-            .ok()
             .map(|data| Self::key_with_seed_data(&data, use_legacy))
     }
     pub fn key_with_private_key(string: &str, use_legacy: bool) -> Option<Self> {
@@ -41,7 +40,7 @@ impl BLSKey {
                     .ok()
                     .map(|bls_public_key| Self {
                         seckey,
-                        pubkey: UInt384(*if use_legacy { bls_public_key.serialize_legacy() } else { bls_public_key.serialize() }),
+                        pubkey: UInt384(g1_element_serialized(&bls_public_key, use_legacy)),
                         use_legacy,
                         ..Default::default()
                     })))
@@ -54,7 +53,7 @@ impl BLSKey {
     pub fn product(&self, public_key: &BLSKey) -> Option<[u8; 48]> {
         match (self.bls_private_key(), public_key.bls_public_key(), self.use_legacy) {
             (Ok(priv_key), Ok(pub_key), use_legacy) if public_key.use_legacy == use_legacy =>
-                (priv_key * pub_key).map(|pk| if use_legacy { *pk.serialize_legacy() } else { *pk.serialize() }).ok(),
+                (priv_key * pub_key).map(|pk| g1_element_serialized(&pk, use_legacy)).ok(),
             _ => None
         }
     }
@@ -111,7 +110,7 @@ impl IKey for BLSKey {
         ExtendedPrivateKey::from_bytes(self.extended_private_key_data.as_slice())
             .ok()
             .and_then(|bls_extended_private_key|
-                Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, path, self.use_legacy), self.use_legacy))
+                Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, path, self.use_legacy), self.use_legacy).ok())
     }
 
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
@@ -135,18 +134,14 @@ impl IKey for BLSKey {
 
 impl BLSKey {
 
-    pub fn init_with_extended_private_key_data(data: &Vec<u8>, use_legacy: bool) -> Option<Self> {
+    pub fn init_with_extended_private_key_data(data: &Vec<u8>, use_legacy: bool) -> Result<Self, BlsError> {
         ExtendedPrivateKey::from_bytes(data)
-            .ok()
-            .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
+            .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&bls_extended_private_key, use_legacy))
     }
 
-    pub fn init_with_extended_public_key_data(data: &Vec<u8>, use_legacy: bool) -> Option<Self> {
-        if use_legacy {
-            ExtendedPublicKey::from_bytes_legacy(data)
-        } else {
-            ExtendedPublicKey::from_bytes(data)
-        }.ok().map(|pk| Self::init_with_bls_extended_public_key(&pk, use_legacy))
+    pub fn init_with_extended_public_key_data(data: &Vec<u8>, use_legacy: bool) -> Result<Self, BlsError> {
+        extended_public_key_from_bytes(data, use_legacy)
+            .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
     }
 
     /// A little recursive magic since extended private keys can't be re-assigned in the library
@@ -194,96 +189,51 @@ impl BLSKey {
         let bls_private_key = PrivateKey::from_bip32_seed(seed);
         let bls_public_key = bls_private_key.g1_element().unwrap();
         let seckey = UInt256::from(&*bls_private_key.serialize());
-        let pubkey = UInt384(*if use_legacy {
-            bls_public_key.serialize_legacy()
-        } else {
-            bls_public_key.serialize()
-        });
+        let pubkey = UInt384(g1_element_serialized(&bls_public_key, use_legacy));
         Self { seckey, pubkey, use_legacy, ..Default::default() }
     }
 
 
     pub fn init_with_bls_extended_public_key(bls_extended_public_key: &ExtendedPublicKey, use_legacy: bool) ->  Self {
-        let extended_public_key_data = if use_legacy {
-            bls_extended_public_key.serialize_legacy()
-        } else {
-            bls_extended_public_key.serialize()
-        }.to_vec();
         let bls_public_key = bls_extended_public_key.public_key();
-        let public_key_data = if use_legacy {
-            bls_public_key.serialize_legacy()
-        } else {
-            bls_public_key.serialize()
-        };
         Self {
-            extended_private_key_data: SecVec::new(),
-            extended_public_key_data,
-            chaincode: UInt256(*bls_extended_public_key.chain_code().serialize()),
-            seckey: UInt256::MIN,
-            pubkey: UInt384(*public_key_data),
-            use_legacy
+            extended_public_key_data: extended_public_key_serialized(bls_extended_public_key, use_legacy).to_vec(),
+            chaincode: bls_extended_public_key.chain_code().into(),
+            pubkey: UInt384(g1_element_serialized(&bls_public_key, use_legacy)),
+            use_legacy,
+            ..Default::default()
         }
     }
 
-    pub fn init_with_bls_extended_private_key(bls_extended_private_key: &ExtendedPrivateKey, use_legacy: bool) -> Option<Self> {
-        let extended_private_key_data = bls_extended_private_key.serialize();
-        let extended_public_key_opt = if use_legacy {
-            bls_extended_private_key.extended_public_key_legacy()
+    pub fn init_with_bls_extended_private_key(bls_extended_private_key: &ExtendedPrivateKey, use_legacy: bool) -> Result<Self, BlsError> {
+        let extended_public_key = if use_legacy {
+            bls_extended_private_key.extended_public_key_legacy()?
         } else {
-            bls_extended_private_key.extended_public_key()
+            bls_extended_private_key.extended_public_key()?
         };
-        if extended_public_key_opt.is_err() {
-            warn!("Can't restore extended_public_key");
-            return None;
-        }
-        let extended_public_key = extended_public_key_opt.unwrap();
-        let extended_public_key_data = if use_legacy {
-            extended_public_key.serialize_legacy()
-        } else {
-            extended_public_key.serialize()
-        };
-        let chaincode = UInt256(*bls_extended_private_key.chain_code().serialize());
+        let extended_public_key_data = extended_public_key_serialized(&extended_public_key, use_legacy);
+        let chaincode = bls_extended_private_key.chain_code().into();
         let bls_private_key = bls_extended_private_key.private_key();
-        let bls_public_key_opt = bls_private_key.g1_element();
-        if bls_public_key_opt.is_err() {
-            warn!("Can't restore bls_public_key");
-            return None;
-        }
-        let bls_public_key = bls_public_key_opt.unwrap();
-        let bls_public_key_bytes = if use_legacy {
-            bls_public_key.serialize_legacy()
-        } else {
-            bls_public_key.serialize()
-        };
-        if let Some(seckey) = UInt256::from_bytes(bls_private_key.serialize().as_slice(), &mut 0) {
-            Some(Self {
-                extended_private_key_data: SecVec::with_vec(extended_private_key_data.to_vec()),
-                extended_public_key_data: extended_public_key_data.to_vec(),
-                chaincode,
-                seckey,
-                pubkey: UInt384(*bls_public_key_bytes),
-                use_legacy,
-            })
-        } else {
-            warn!("Can't restore secret_key");
-            return None;
-        }
+        let bls_public_key = bls_private_key.g1_element()?;
+        Ok(Self {
+            extended_private_key_data: SecVec::from(bls_extended_private_key),
+            extended_public_key_data: extended_public_key_data.to_vec(),
+            chaincode,
+            seckey: UInt256::from(bls_private_key),
+            pubkey: UInt384(g1_element_serialized(&bls_public_key, use_legacy)),
+            use_legacy,
+        })
     }
 
-    pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Option<Self> {
+    pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Result<Self, BlsError> {
         ExtendedPrivateKey::from_seed(seed)
-            .ok()
-            .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
+            .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&bls_extended_private_key, use_legacy))
     }
 
 
     pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], index_path: &PATH, use_legacy: bool) -> Option<Vec<u8>>
         where PATH: IIndexPath<Item = u32> {
-        if use_legacy {
-            ExtendedPublicKey::from_bytes_legacy(data)
-        } else {
-            ExtendedPublicKey::from_bytes(data)
-        }
+        extended_public_key_from_bytes(data, use_legacy)
             .ok()
             .and_then(|bls_extended_public_key|
                 BLSKey::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy)
@@ -292,10 +242,10 @@ impl BLSKey {
     }
 
     pub fn public_key_fingerprint(&self) -> u32 {
-        if self.use_legacy {
-            G1Element::from_bytes_legacy(self.pubkey.as_bytes()).unwrap().fingerprint_legacy()
-        } else {
-            G1Element::from_bytes(self.pubkey.as_bytes()).unwrap().fingerprint()
+        match g1_element_from_bytes(self.use_legacy, self.pubkey.as_bytes()) {
+            Ok(pk) if self.use_legacy => pk.fingerprint_legacy(),
+            Ok(pk) => pk.fingerprint(),
+            _ => 0
         }
     }
 
@@ -333,7 +283,7 @@ impl BLSKey {
 
     pub fn bls_extended_public_key(&mut self) -> Option<ExtendedPublicKey> {
         if let Some(bytes) = self.extended_public_key_data() {
-            if self.use_legacy { ExtendedPublicKey::from_bytes_legacy(&bytes) } else { ExtendedPublicKey::from_bytes(&bytes) }.ok()
+            extended_public_key_from_bytes(&bytes, self.use_legacy).ok()
         } else if let Some(bytes) = self.extended_private_key_data() {
             ExtendedPrivateKey::from_bytes(&bytes).and_then(|pk| pk.extended_public_key()).ok()
         } else {
@@ -341,12 +291,9 @@ impl BLSKey {
         }
     }
 
-    pub fn extended_private_key(&self) -> Option<Self> {
-        if let Ok(pk) = self.bls_extended_private_key() {
-            Self::init_with_bls_extended_private_key(&pk, self.use_legacy)
-        } else {
-            None
-        }
+    pub fn extended_private_key(&self) -> Result<Self, BlsError> {
+        self.bls_extended_private_key()
+            .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, self.use_legacy))
     }
 
     pub fn bls_extended_private_key(&self) -> Result<ExtendedPrivateKey, BlsError> {
@@ -364,17 +311,15 @@ impl BLSKey {
     pub(crate) fn bls_public_key(&self) -> Result<G1Element, BlsError> {
         if self.pubkey.is_zero() {
             self.bls_private_key().and_then(|bls_pk| bls_pk.g1_element())
-        } else if self.use_legacy {
-            G1Element::from_bytes_legacy(self.pubkey.as_bytes())
         } else {
-            G1Element::from_bytes(self.pubkey.as_bytes())
+            g1_element_from_bytes(self.use_legacy, self.pubkey.as_bytes())
         }
     }
 
     pub(crate) fn bls_public_key_serialized(&self) -> Option<[u8; 48]> {
         self.bls_public_key()
             .ok()
-            .map(|pk| if self.use_legacy { *pk.serialize_legacy() } else { *pk.serialize() })
+            .map(|pk| g1_element_serialized(&pk, self.use_legacy))
     }
 
     pub fn public_key_uint(&self) -> UInt384 {
@@ -391,51 +336,34 @@ impl BLSKey {
     }
 
     /// Signing
-    pub fn sign_data(&self, data: &[u8]) -> UInt768 {
+    fn sign_message(&self, private_key: &PrivateKey, message: &[u8]) -> UInt768 {
+        UInt768(g2_element_serialized(&if self.use_legacy {
+            LegacySchemeMPL::new().sign(private_key, message)
+        } else {
+            BasicSchemeMPL::new().sign(private_key, message)
+        }, self.use_legacy))
+    }
+
+    fn sign_with_key<F>(&self, message_producer: F) -> UInt768 where F: FnOnce() -> [u8; 32] {
         if self.seckey.is_zero() && self.extended_private_key_data.is_empty() {
             UInt768::MAX
         } else if let Ok(bls_private_key) = self.bls_private_key() {
-            let hash = sha256d::Hash::hash(data).into_inner();
-            let signature = if self.use_legacy {
-                LegacySchemeMPL::new().sign(&bls_private_key, &hash).serialize_legacy()
-            } else {
-                BasicSchemeMPL::new().sign(&bls_private_key, &hash).serialize()
-            };
-            UInt768(*signature)
+            self.sign_message(&bls_private_key, &message_producer())
         } else {
             UInt768::MAX
         }
+    }
+
+    pub fn sign_data(&self, data: &[u8]) -> UInt768 {
+        self.sign_with_key(|| sha256d::Hash::hash(data).into_inner())
     }
 
     pub fn sign_data_single_sha256(&self, data: &[u8]) -> UInt768 {
-        if self.seckey.is_zero() && self.extended_private_key_data.is_empty() {
-            UInt768::MAX
-        } else if let Ok(bls_private_key) = self.bls_private_key() {
-            let message = sha256::Hash::hash(data).into_inner();
-            let signature = if self.use_legacy {
-                LegacySchemeMPL::new().sign(&bls_private_key, &message).serialize_legacy()
-            } else {
-                BasicSchemeMPL::new().sign(&bls_private_key, &message).serialize()
-            };
-            UInt768(*signature)
-        } else {
-            UInt768::MAX
-        }
+        self.sign_with_key(|| sha256::Hash::hash(data).into_inner())
     }
 
     pub fn sign_digest(&self, md: UInt256) -> UInt768 {
-        if self.seckey.is_zero() && self.extended_private_key_data.is_empty() {
-            UInt768::MIN
-        } else if let Ok(bls_private_key) = self.bls_private_key() {
-            let bls_signature = if self.use_legacy {
-                LegacySchemeMPL::new().sign(&bls_private_key, md.as_bytes()).serialize_legacy()
-            } else {
-                BasicSchemeMPL::new().sign(&bls_private_key, md.as_bytes()).serialize()
-            };
-            UInt768(*bls_signature)
-        } else {
-            UInt768::MIN
-        }
+        self.sign_with_key(|| md.0)
     }
 
     pub fn sign_message_digest(&self, digest: UInt256, completion: fn(bool, UInt768)) {
@@ -443,75 +371,67 @@ impl BLSKey {
         completion(!signature.is_zero(), signature)
     }
 
-
     /// Verification
 
-    pub fn verify_uint768(&self, digest: UInt256, signature: UInt768) -> bool {
-        if let Ok(bls_public_key) = self.bls_public_key() {
-            if self.use_legacy {
-                LegacySchemeMPL::new().verify(&bls_public_key, digest.as_bytes(), &G2Element::from_bytes_legacy(signature.as_bytes()).unwrap())
-            } else {
-                BasicSchemeMPL::new().verify(&bls_public_key, digest.as_bytes(), &G2Element::from_bytes(signature.as_bytes()).unwrap())
-            }
-        } else {
-            false
+    fn verify_message(public_key: &G1Element, message: &[u8], signature: UInt768, use_legacy: bool) -> bool {
+        match g2_element_from_bytes(use_legacy, signature.as_bytes()) {
+            Ok(signature) if use_legacy =>
+                LegacySchemeMPL::new().verify(public_key, message, &signature),
+            Ok(signature) =>
+                BasicSchemeMPL::new().verify(public_key, message, &signature),
+            _ => false
         }
     }
 
+    fn verify_message_with_key(key: &BLSKey, message: &[u8], signature: UInt768) -> bool {
+        key.bls_public_key()
+            .map_or(false, |public_key| Self::verify_message(&public_key, message, signature, key.use_legacy))
+    }
+
+    pub fn verify_uint768(&self, digest: UInt256, signature: UInt768) -> bool {
+        Self::verify_message_with_key(self, digest.as_bytes(), signature)
+    }
+
     pub fn verify_with_public_key(digest: UInt256, signature: UInt768, public_key: UInt384, use_legacy: bool) -> bool {
-        if let Ok(bls_public_key) = BLSKey::key_with_public_key(public_key, use_legacy).bls_public_key() {
-            if use_legacy {
-                LegacySchemeMPL::new().verify(&bls_public_key, digest.as_bytes(), &G2Element::from_bytes_legacy(signature.as_bytes()).unwrap())
-            } else {
-                BasicSchemeMPL::new().verify(&bls_public_key, digest.as_bytes(), &G2Element::from_bytes(signature.as_bytes()).unwrap())
-            }
-        } else {
-            false
-        }
+        Self::verify_message_with_key(&BLSKey::key_with_public_key(public_key, use_legacy), digest.as_bytes(), signature)
     }
 
     pub fn verify_secure_aggregated(commitment_hash: UInt256, signature: UInt768, operator_keys: Vec<OperatorPublicKey>, use_legacy: bool) -> bool {
         let message = commitment_hash.as_bytes();
         let public_keys = operator_keys.iter().filter_map(|key| {
-            if key.is_legacy() {
-                G1Element::from_bytes_legacy(&key.data.0)
-            } else {
-                G1Element::from_bytes(&key.data.0)
-            }.ok()
+            let result: Result<G1Element, BlsError> = key.into();
+            result.ok()
         }).collect::<Vec<_>>();
-        if use_legacy {
-            G2Element::from_bytes_legacy(signature.as_bytes())
-                .map_or(false, |sig| LegacySchemeMPL::new()
-                    .verify_secure(public_keys.iter().collect::<Vec<&G1Element>>(), message, &sig))
-        } else {
-            G2Element::from_bytes(signature.as_bytes())
-                .map_or(false, |sig| BasicSchemeMPL::new()
-                    .verify_secure(public_keys.iter().collect::<Vec<&G1Element>>(), message, &sig))
+        let public_keys = public_keys.iter().collect::<Vec<&G1Element>>();
+        match g2_element_from_bytes(use_legacy, signature.as_bytes()) {
+            Ok(signature) if use_legacy => LegacySchemeMPL::new().verify_secure(public_keys, message, &signature),
+            Ok(signature) => BasicSchemeMPL::new().verify_secure(public_keys, message, &signature),
+            _ => false
         }
     }
 
     pub fn verify_quorum_signature(message: &[u8], threshold_signature: &[u8], public_key: &[u8], use_legacy: bool) -> bool {
-        if use_legacy {
-            G1Element::from_bytes_legacy(public_key)
-                .map_or(false, |pk| G2Element::from_bytes_legacy(threshold_signature)
-                    .map_or(false, |sig| LegacySchemeMPL::new().verify(&pk, message, &sig)))
-        } else {
-            G1Element::from_bytes(public_key)
-                .map_or(false, |pk| G2Element::from_bytes(threshold_signature)
-                    .map_or(false, |sig| BasicSchemeMPL::new().verify(&pk, message, &sig)))
+        match (g1_element_from_bytes(use_legacy, public_key),
+               g2_element_from_bytes(use_legacy, threshold_signature)) {
+            (Ok(public_key), Ok(signature)) if use_legacy =>
+                LegacySchemeMPL::new().verify(&public_key, message, &signature),
+            (Ok(public_key), Ok(signature)) =>
+                BasicSchemeMPL::new().verify(&public_key, message, &signature),
+            _ => false
         }
     }
 
-
-    pub fn verify_aggregated_signature(signature: UInt768, public_keys: Vec<BLSKey>, messages: Vec<Vec<u8>>, use_legacy: bool) -> bool {
-        let bls_public_keys = public_keys.iter().filter_map(|key| key.bls_public_key().ok()).collect::<Vec<_>>();
-        let keys = bls_public_keys.iter().collect::<Vec<&G1Element>>();
+    pub fn verify_aggregated_signature(signature: UInt768, keys: Vec<BLSKey>, messages: Vec<Vec<u8>>, use_legacy: bool) -> bool {
+        let bls_public_keys = keys.iter().filter_map(|key| key.bls_public_key().ok()).collect::<Vec<_>>();
+        let public_keys = bls_public_keys.iter().collect::<Vec<&G1Element>>();
         let messages = messages.iter().map(|m| m.as_slice()).collect::<Vec<_>>();
         let bytes = signature.as_bytes();
-        if use_legacy {
-            LegacySchemeMPL::new().aggregate_verify(keys, messages, &G2Element::from_bytes_legacy(bytes).unwrap())
-        } else {
-            BasicSchemeMPL::new().aggregate_verify(keys, messages, &G2Element::from_bytes(bytes).unwrap())
+        match g2_element_from_bytes(use_legacy, bytes) {
+            Ok(signature) if use_legacy =>
+                LegacySchemeMPL::new().aggregate_verify(public_keys, messages, &signature),
+            Ok(signature) =>
+                BasicSchemeMPL::new().aggregate_verify(public_keys, messages, &signature),
+            _ => false
         }
     }
 
@@ -521,6 +441,7 @@ impl BLSKey {
         let public_key = private_key.g1_element().unwrap();
         (public_key, signature)
     }
+
 }
 
 /// For FFI
@@ -532,19 +453,40 @@ impl BLSKey {
     }
 
     pub fn key_with_extended_public_key_data(bytes: &[u8], use_legacy: bool) -> Option<Self> {
-        if use_legacy {
-            ExtendedPublicKey::from_bytes_legacy(bytes)
-        } else {
-            ExtendedPublicKey::from_bytes(bytes)
-        }.ok().map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
-
+        extended_public_key_from_bytes(bytes, use_legacy)
+            .ok()
+            .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
     }
 
-    pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Option<Self> {
+    pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, BlsError> {
         ExtendedPrivateKey::from_bytes(bytes)
-            .ok()
             .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
+    }
 
+    pub fn migrate_from_legacy_extended_public_key_data(bytes: &[u8]) -> Result<Self, BlsError> {
+        ExtendedPublicKey::from_bytes_legacy(bytes)
+            .map(|extended_public_key| Self {
+                pubkey: UInt384(g1_element_serialized(&extended_public_key.public_key(), false)),
+                chaincode: extended_public_key.chain_code().into(),
+                extended_public_key_data: extended_public_key_serialized(&extended_public_key, false).to_vec(),
+                ..Default::default()
+            })
+    }
+
+    pub fn migrate_from_legacy_extended_private_key_data(bytes: &[u8]) -> Result<Self, BlsError> {
+        ExtendedPrivateKey::from_bytes(bytes)
+            .and_then(|bls_extended_private_key| {
+                let extended_public_key = bls_extended_private_key.extended_public_key_legacy()?;
+                let bls_private_key = bls_extended_private_key.private_key();
+                Ok(Self {
+                    pubkey: UInt384(g1_element_serialized(&bls_private_key.g1_element()?, false)),
+                    seckey: bls_private_key.into(),
+                    chaincode: bls_extended_private_key.chain_code().into(),
+                    extended_private_key_data: (&bls_extended_private_key).into(),
+                    extended_public_key_data: extended_public_key_serialized(&extended_public_key, false).to_vec(),
+                    use_legacy: false,
+                })
+            })
     }
 
     pub fn has_private_key(&self) -> bool {
@@ -565,7 +507,7 @@ impl DHKey for BLSKey {
                 (bls_private_key * bls_public_key)
                     .ok()
                     .map(|key|
-                        BLSKey::key_with_public_key(UInt384(if use_legacy { *key.serialize_legacy() } else { *key.serialize() }), use_legacy)),
+                        BLSKey::key_with_public_key(UInt384(g1_element_serialized(&key, use_legacy)), use_legacy)),
             _ => None
         }
     }
@@ -619,3 +561,74 @@ impl CryptoData<BLSKey> for Vec<u8> {
     }
 }
 
+fn extended_public_key_from_bytes(bytes: &[u8], use_legacy: bool) -> Result<ExtendedPublicKey, BlsError> {
+    if use_legacy {
+        ExtendedPublicKey::from_bytes_legacy(bytes)
+    } else {
+        ExtendedPublicKey::from_bytes(bytes)
+    }
+}
+
+fn g1_element_from_bytes(use_legacy: bool, bytes: &[u8]) -> Result<G1Element, BlsError> {
+    if use_legacy {
+        G1Element::from_bytes_legacy(bytes)
+    } else {
+        G1Element::from_bytes(bytes)
+    }
+}
+
+fn g1_element_serialized(public_key: &G1Element, use_legacy: bool) -> [u8; 48] {
+    *if use_legacy {
+        public_key.serialize_legacy()
+    } else {
+        public_key.serialize()
+    }
+}
+
+fn g2_element_serialized(signature: &G2Element, use_legacy: bool) -> [u8; 96] {
+    *if use_legacy {
+        signature.serialize_legacy()
+    } else {
+        signature.serialize()
+    }
+}
+
+fn g2_element_from_bytes(use_legacy: bool, bytes: &[u8]) -> Result<G2Element, BlsError> {
+    if use_legacy {
+        G2Element::from_bytes_legacy(bytes)
+    } else {
+        G2Element::from_bytes(bytes)
+    }
+}
+
+fn extended_public_key_serialized(public_key: &ExtendedPublicKey, use_legacy: bool) -> [u8; 93] {
+    *if use_legacy {
+        public_key.serialize_legacy()
+    } else {
+        public_key.serialize()
+    }
+}
+
+impl From<ChainCode> for UInt256 {
+    fn from(value: ChainCode) -> Self {
+        UInt256(*value.serialize())
+    }
+}
+
+impl From<PrivateKey> for UInt256 {
+    fn from(value: PrivateKey) -> Self {
+        UInt256::from(value.serialize().as_slice())
+    }
+}
+
+impl From<&OperatorPublicKey> for Result<G1Element, BlsError> {
+    fn from(value: &OperatorPublicKey) -> Self {
+        g1_element_from_bytes(value.is_legacy(), &value.data.0)
+    }
+}
+
+impl From<&ExtendedPrivateKey> for SecVec {
+    fn from(value: &ExtendedPrivateKey) -> Self {
+        SecVec::with_vec(value.serialize().to_vec())
+    }
+}

@@ -177,9 +177,11 @@ pub extern "C" fn key_derive_key_from_extened_private_key_data_for_index_path(se
             .and_then(|key| key.private_derive_to_path(&path))
             .to_opaque_ptr(),
         KeyKind::BLS => BLSKey::key_with_extended_private_key_data(bytes, true)
+            .ok()
             .and_then(|key| key.private_derive_to_path(&path))
             .to_opaque_ptr(),
         KeyKind::BLSBasic => BLSKey::key_with_extended_private_key_data(bytes, false)
+            .ok()
             .and_then(|key| key.private_derive_to_path(&path))
             .to_opaque_ptr(),
         KeyKind::ED25519 => ED25519Key::key_with_extended_private_key_data(bytes)
@@ -202,6 +204,7 @@ pub extern "C" fn key_derive_bls_from_extened_private_key_data_for_index_path(se
     let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
     let path = IndexPath::from_ffi(indexes, length);
     BLSKey::key_with_extended_private_key_data(bytes, use_legacy)
+        .ok()
         .and_then(|key| key.private_derive_to_path(&path))
         .map_or(null_mut(), boxed)
 }
