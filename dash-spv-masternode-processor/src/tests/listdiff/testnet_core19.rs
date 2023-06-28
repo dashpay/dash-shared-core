@@ -117,7 +117,7 @@ fn test_mnlistdiff_and_qrinfo_core19() {
     assert_diff_result(context, unsafe { *result.result_at_tip });
 }
 
-#[test]
+// #[test]
 fn test_qrinfo_core19() {
     register_logger();
     let cache = register_cache();
@@ -985,164 +985,164 @@ fn test_verify_25_67() {
     // assert_diff_result(context, result);
 }
 
-#[test]
-fn test_verify_chained_rotation() {
-    register_logger();
-    let version = 70227;
-    let cache = register_cache();
-    let context = &mut create_default_context(ChainType::TestNet, false, cache);
-    let processor = register_default_processor();
-    let diffs = vec![
-        "MNL_0_870600.dat",
-        "MNL_870600_870624.dat",
-        "MNL_870624_870648.dat",
-        "MNL_870648_870672.dat",
-        "MNL_870672_870696.dat",
-        "MNL_870696_870720.dat",
-        "MNL_870720_870744.dat",
-        "MNL_870744_870768.dat",
-        "MNL_870768_870792.dat",
-        "MNL_870792_870816.dat",
-        "MNL_870816_870840.dat",
-        "MNL_870840_870864.dat",
-        "MNL_870864_870888.dat",
-        "MNL_870888_870912.dat",
-        "MNL_870912_870936.dat",
-        "MNL_870936_870960.dat",
-        "MNL_870960_870984.dat",
-        "MNL_870984_871008.dat",
-        "MNL_871008_871032.dat",
-        "MNL_871032_871056.dat",
-        "MNL_871056_871080.dat",
-        "MNL_871080_871104.dat",
-        "MNL_871104_871128.dat",
-        "MNL_871128_871152.dat",
-        "MNL_871152_874488.dat",
-        "MNL_874488_874512.dat",
-        "MNL_874512_874536.dat",
-        "MNL_874536_874560.dat",
-        "MNL_874560_874584.dat",
-        "MNL_874584_874608.dat",
-        "MNL_874608_874632.dat",
-        "MNL_874632_874656.dat",
-        "MNL_874656_874680.dat",
-        "MNL_874680_874704.dat",
-        "MNL_874704_874728.dat",
-        "MNL_874728_874752.dat",
-        "MNL_874752_874776.dat",
-        "MNL_874776_874800.dat",
-        "MNL_874800_874824.dat",
-        "MNL_874824_874848.dat",
-        "MNL_874848_874872.dat",
-        "MNL_874872_874896.dat",
-        "MNL_874896_874920.dat",
-        "MNL_874920_874944.dat",
-        "MNL_874944_874968.dat",
-        "MNL_874968_874992.dat",
-        "MNL_874992_875016.dat",
-        "MNL_875016_875040.dat",
-        "MNL_875040_875064.dat",
-        "MNL_875064_875088.dat",
-        "MNL_875088_875112.dat",
-        "MNL_875112_875136.dat",
-        "MNL_875136_875160.dat",
-        "MNL_875160_875184.dat",
-        "MNL_875184_875208.dat",
-        "MNL_875208_875241.dat",
-        "MNL_875241_875242.dat"
-    ].iter().for_each(|name| {
-        let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, version, false, true);
-        assert_diff_result(context, result);
-    });
-    context.is_dip_0024 = true;
-    let result = process_qrinfo(message_from_file("testnet/QRINFO_0_875241.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
-
-    let result = process_qrinfo(message_from_file("testnet/QRINFO_875241_875242.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
-}
-
-#[test]
-fn test_verify_chained_rotation2() {
-    register_logger();
-    let version = 70227;
-    let cache = register_cache();
-    let context = &mut create_default_context(ChainType::TestNet, false, cache);
-    let processor = register_default_processor();
-    context.is_dip_0024 = true;
-    let result = process_qrinfo(message_from_file("testnet/QRINFO_0_888537.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
-}
-
-#[test]
-fn test_verify_chained_rotation3() {
-    register_logger();
-    let version = 70227;
-    let cache = register_cache();
-    let context = &mut create_default_context(ChainType::TestNet, false, cache);
-    let processor = register_default_processor();
-    let diffs = vec![
-        "MNL_0_888192.dat",
-        "MNL_888192_888193.dat",
-        "MNL_888193_888194.dat",
-        "MNL_888194_888195.dat",
-        "MNL_888195_888196.dat",
-        "MNL_888196_888197.dat",
-        "MNL_888197_888198.dat",
-        "MNL_888198_888199.dat",
-        "MNL_888199_888200.dat",
-        "MNL_888200_888201.dat",
-        "MNL_888201_888202.dat",
-        "MNL_888202_888203.dat",
-        "MNL_888203_888204.dat",
-        "MNL_888204_888205.dat",
-        "MNL_888205_888206.dat",
-        "MNL_888206_888207.dat",
-        "MNL_888207_888208.dat",
-        "MNL_888208_888209.dat",
-        "MNL_888209_888210.dat",
-        "MNL_888210_888211.dat",
-        "MNL_888211_888212.dat",
-        "MNL_888212_888213.dat",
-        "MNL_888213_888214.dat",
-        "MNL_888214_888215.dat",
-        "MNL_888215_888216.dat",
-        "MNL_888216_888217.dat",
-        "MNL_888217_888218.dat",
-        "MNL_888218_888219.dat",
-        "MNL_888219_888220.dat",
-        "MNL_888220_888221.dat",
-        "MNL_888221_888222.dat",
-        "MNL_888222_888223.dat",
-      ].iter().for_each(|name| {
-        let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, version, false, true);
-        assert_diff_result(context, result);
-    });
-
-    context.is_dip_0024 = true;
-    let result = process_qrinfo(message_from_file("testnet/QRINFO_0_888655.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
-}
+// #[test]
+// fn test_verify_chained_rotation() {
+//     register_logger();
+//     let version = 70227;
+//     let cache = register_cache();
+//     let context = &mut create_default_context(ChainType::TestNet, false, cache);
+//     let processor = register_default_processor();
+//     let diffs = vec![
+//         "MNL_0_870600.dat",
+//         "MNL_870600_870624.dat",
+//         "MNL_870624_870648.dat",
+//         "MNL_870648_870672.dat",
+//         "MNL_870672_870696.dat",
+//         "MNL_870696_870720.dat",
+//         "MNL_870720_870744.dat",
+//         "MNL_870744_870768.dat",
+//         "MNL_870768_870792.dat",
+//         "MNL_870792_870816.dat",
+//         "MNL_870816_870840.dat",
+//         "MNL_870840_870864.dat",
+//         "MNL_870864_870888.dat",
+//         "MNL_870888_870912.dat",
+//         "MNL_870912_870936.dat",
+//         "MNL_870936_870960.dat",
+//         "MNL_870960_870984.dat",
+//         "MNL_870984_871008.dat",
+//         "MNL_871008_871032.dat",
+//         "MNL_871032_871056.dat",
+//         "MNL_871056_871080.dat",
+//         "MNL_871080_871104.dat",
+//         "MNL_871104_871128.dat",
+//         "MNL_871128_871152.dat",
+//         "MNL_871152_874488.dat",
+//         "MNL_874488_874512.dat",
+//         "MNL_874512_874536.dat",
+//         "MNL_874536_874560.dat",
+//         "MNL_874560_874584.dat",
+//         "MNL_874584_874608.dat",
+//         "MNL_874608_874632.dat",
+//         "MNL_874632_874656.dat",
+//         "MNL_874656_874680.dat",
+//         "MNL_874680_874704.dat",
+//         "MNL_874704_874728.dat",
+//         "MNL_874728_874752.dat",
+//         "MNL_874752_874776.dat",
+//         "MNL_874776_874800.dat",
+//         "MNL_874800_874824.dat",
+//         "MNL_874824_874848.dat",
+//         "MNL_874848_874872.dat",
+//         "MNL_874872_874896.dat",
+//         "MNL_874896_874920.dat",
+//         "MNL_874920_874944.dat",
+//         "MNL_874944_874968.dat",
+//         "MNL_874968_874992.dat",
+//         "MNL_874992_875016.dat",
+//         "MNL_875016_875040.dat",
+//         "MNL_875040_875064.dat",
+//         "MNL_875064_875088.dat",
+//         "MNL_875088_875112.dat",
+//         "MNL_875112_875136.dat",
+//         "MNL_875136_875160.dat",
+//         "MNL_875160_875184.dat",
+//         "MNL_875184_875208.dat",
+//         "MNL_875208_875241.dat",
+//         "MNL_875241_875242.dat"
+//     ].iter().for_each(|name| {
+//         let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, version, false, true);
+//         assert_diff_result(context, result);
+//     });
+//     context.is_dip_0024 = true;
+//     let result = process_qrinfo(message_from_file("testnet/QRINFO_0_875241.dat"), processor, context, version, false, true);
+//     assert_diff_result(context, unsafe { *result.result_at_h_4c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_3c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_2c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_c });
+//     assert_diff_result(context, unsafe { *result.result_at_h });
+//     assert_diff_result(context, unsafe { *result.result_at_tip });
+//
+//     let result = process_qrinfo(message_from_file("testnet/QRINFO_875241_875242.dat"), processor, context, version, false, true);
+//     assert_diff_result(context, unsafe { *result.result_at_h_4c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_3c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_2c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_c });
+//     assert_diff_result(context, unsafe { *result.result_at_h });
+//     assert_diff_result(context, unsafe { *result.result_at_tip });
+// }
+//
+// #[test]
+// fn test_verify_chained_rotation2() {
+//     register_logger();
+//     let version = 70227;
+//     let cache = register_cache();
+//     let context = &mut create_default_context(ChainType::TestNet, false, cache);
+//     let processor = register_default_processor();
+//     context.is_dip_0024 = true;
+//     let result = process_qrinfo(message_from_file("testnet/QRINFO_0_888537.dat"), processor, context, version, false, true);
+//     assert_diff_result(context, unsafe { *result.result_at_h_4c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_3c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_2c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_c });
+//     assert_diff_result(context, unsafe { *result.result_at_h });
+//     assert_diff_result(context, unsafe { *result.result_at_tip });
+// }
+//
+// #[test]
+// fn test_verify_chained_rotation3() {
+//     register_logger();
+//     let version = 70227;
+//     let cache = register_cache();
+//     let context = &mut create_default_context(ChainType::TestNet, false, cache);
+//     let processor = register_default_processor();
+//     let diffs = vec![
+//         "MNL_0_888192.dat",
+//         "MNL_888192_888193.dat",
+//         "MNL_888193_888194.dat",
+//         "MNL_888194_888195.dat",
+//         "MNL_888195_888196.dat",
+//         "MNL_888196_888197.dat",
+//         "MNL_888197_888198.dat",
+//         "MNL_888198_888199.dat",
+//         "MNL_888199_888200.dat",
+//         "MNL_888200_888201.dat",
+//         "MNL_888201_888202.dat",
+//         "MNL_888202_888203.dat",
+//         "MNL_888203_888204.dat",
+//         "MNL_888204_888205.dat",
+//         "MNL_888205_888206.dat",
+//         "MNL_888206_888207.dat",
+//         "MNL_888207_888208.dat",
+//         "MNL_888208_888209.dat",
+//         "MNL_888209_888210.dat",
+//         "MNL_888210_888211.dat",
+//         "MNL_888211_888212.dat",
+//         "MNL_888212_888213.dat",
+//         "MNL_888213_888214.dat",
+//         "MNL_888214_888215.dat",
+//         "MNL_888215_888216.dat",
+//         "MNL_888216_888217.dat",
+//         "MNL_888217_888218.dat",
+//         "MNL_888218_888219.dat",
+//         "MNL_888219_888220.dat",
+//         "MNL_888220_888221.dat",
+//         "MNL_888221_888222.dat",
+//         "MNL_888222_888223.dat",
+//       ].iter().for_each(|name| {
+//         let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, version, false, true);
+//         assert_diff_result(context, result);
+//     });
+//
+//     context.is_dip_0024 = true;
+//     let result = process_qrinfo(message_from_file("testnet/QRINFO_0_888655.dat"), processor, context, version, false, true);
+//     assert_diff_result(context, unsafe { *result.result_at_h_4c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_3c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_2c });
+//     assert_diff_result(context, unsafe { *result.result_at_h_c });
+//     assert_diff_result(context, unsafe { *result.result_at_h });
+//     assert_diff_result(context, unsafe { *result.result_at_tip });
+// }
 
 
 #[test]

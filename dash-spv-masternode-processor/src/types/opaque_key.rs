@@ -1,6 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::ptr::null_mut;
+use bls_signatures::BlsError;
 use crate::ffi::boxer::boxed;
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, KeyKind};
 
@@ -79,6 +80,16 @@ impl AsOpaqueKey for Option<ECDSAKey> {
 impl AsOpaqueKey for Option<BLSKey> {
     fn to_opaque_ptr(self) -> *mut OpaqueKey {
         if let Some(key) = self {
+            key.to_opaque_ptr()
+        } else {
+            null_mut()
+        }
+    }
+}
+
+impl AsOpaqueKey for Result<BLSKey, BlsError> {
+    fn to_opaque_ptr(self) -> *mut OpaqueKey {
+        if let Ok(key) = self {
             key.to_opaque_ptr()
         } else {
             null_mut()

@@ -1,16 +1,18 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
 use bls_signatures::G1Element;
-use hashes::hex::FromHex;
+use hashes::hex::{FromHex, ToHex};
 use crate::{models, types};
 use crate::bindings::common::{processor_create_cache, register_processor};
 use crate::bindings::masternode::process_mnlistdiff_from_message;
 use crate::chain::common::chain_type::DevnetType;
 use crate::common::ChainType;
 use crate::crypto::{UInt256, UInt384};
+use crate::crypto::byte_util::Zeroable;
 use crate::ffi::boxer::boxed;
 use crate::ffi::to::ToFFI;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_height_by_hash_from_context, get_block_hash_by_height_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::keys::BLSKey;
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_height_by_hash_from_context, get_block_hash_by_height_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, register_logger};
 use crate::models::OperatorPublicKey;
 use crate::tests::block_store::init_testnet_store;
 
@@ -224,6 +226,22 @@ fn test_core_19_beta_6() {
     assert_diff_result(context, result);
 }
 
+#[test]
+fn test_bls_migration() {
+    register_logger();
+    let chain_type = ChainType::TestNet;
+    let bytes = Vec::from_hex("0000000104971efda88000000399eb1756922d7c107de051561deb0104612b6e96d273606c4277d7700f5f5a380bac7e5f4adc010f59973fc637cb7aed41ac52771a58c1f7c0978067be0ab44cf4b60d95ae9bdfe2e35d06f83cff7fbc").unwrap();
+    match BLSKey::migrate_from_legacy_extended_public_key_data(&bytes) {
+        Ok(key) => {
+            assert!(key.seckey.is_zero());
+            assert_eq!(key.pubkey.0.to_hex(), "8bac7e5f4adc010f59973fc637cb7aed41ac52771a58c1f7c0978067be0ab44cf4b60d95ae9bdfe2e35d06f83cff7fbc");
+            assert_eq!(key.chaincode.0.to_hex(), "99eb1756922d7c107de051561deb0104612b6e96d273606c4277d7700f5f5a38");
+            assert_eq!(key.extended_public_key_data.to_hex(), "0000000104971efda88000000399eb1756922d7c107de051561deb0104612b6e96d273606c4277d7700f5f5a388bac7e5f4adc010f59973fc637cb7aed41ac52771a58c1f7c0978067be0ab44cf4b60d95ae9bdfe2e35d06f83cff7fbc");
+            assert!(!key.use_legacy);
+        },
+        Err(err) => panic!("Can't migrate bls key from extended public key data: {err}")
+    }
+}
 
 #[test]
 fn test_core_19_rc_2_testnet() {

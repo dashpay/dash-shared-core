@@ -128,8 +128,8 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(Key::ED25519),
-            KeyKind::BLS => BLSKey::init_with_extended_private_key_data(data, true).map(Key::BLS),
-            KeyKind::BLSBasic => BLSKey::init_with_extended_private_key_data(data, false).map(Key::BLS),
+            KeyKind::BLS => BLSKey::init_with_extended_private_key_data(data, true).ok().map(Key::BLS),
+            KeyKind::BLSBasic => BLSKey::init_with_extended_private_key_data(data, false).ok().map(Key::BLS),
         }
     }
 
@@ -146,8 +146,8 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_seed_data(seed).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_seed_data(seed).map(Key::ED25519),
-            KeyKind::BLS => BLSKey::extended_private_key_with_seed_data(seed, true).map(Key::BLS),
-            KeyKind::BLSBasic => BLSKey::extended_private_key_with_seed_data(seed, false).map(Key::BLS),
+            KeyKind::BLS => BLSKey::extended_private_key_with_seed_data(seed, true).ok().map(Key::BLS),
+            KeyKind::BLSBasic => BLSKey::extended_private_key_with_seed_data(seed, false).ok().map(Key::BLS),
         }
     }
 
@@ -164,8 +164,8 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_public_key_data(data).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_public_key_data(data).map(Key::ED25519),
-            KeyKind::BLS => BLSKey::init_with_extended_public_key_data(data, true).map(Key::BLS),
-            KeyKind::BLSBasic => BLSKey::init_with_extended_public_key_data(data, false).map(Key::BLS),
+            KeyKind::BLS => BLSKey::init_with_extended_public_key_data(data, true).ok().map(Key::BLS),
+            KeyKind::BLSBasic => BLSKey::init_with_extended_public_key_data(data, false).ok().map(Key::BLS),
         }
     }
 
@@ -173,8 +173,8 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(Key::ED25519),
-            KeyKind::BLS => BLSKey::init_with_extended_private_key_data(data, true).map(Key::BLS),
-            KeyKind::BLSBasic => BLSKey::init_with_extended_private_key_data(data, false).map(Key::BLS),
+            KeyKind::BLS => BLSKey::init_with_extended_private_key_data(data, true).ok().map(Key::BLS),
+            KeyKind::BLSBasic => BLSKey::init_with_extended_private_key_data(data, false).ok().map(Key::BLS),
         }
     }
 
