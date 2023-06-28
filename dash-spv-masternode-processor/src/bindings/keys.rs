@@ -559,6 +559,23 @@ pub unsafe extern "C" fn key_bls_verify(public_key: *const u8, use_legacy: bool,
         .verify(message_digest, signature)
 }
 
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_bls_migrate_from_legacy_extended_private_key_data(ptr: *const u8, len: usize) -> *mut OpaqueKey {
+    let bytes = slice::from_raw_parts(ptr, len);
+    BLSKey::migrate_from_legacy_extended_private_key_data(bytes)
+        .to_opaque_ptr()
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_bls_migrate_from_legacy_extended_public_key_data(ptr: *const u8, len: usize) -> *mut OpaqueKey {
+    let bytes = slice::from_raw_parts(ptr, len);
+    BLSKey::migrate_from_legacy_extended_public_key_data(bytes)
+        .to_opaque_ptr()
+}
+
+
 // #[no_mangle]
 // pub unsafe extern "C" fn key_bls_check_payload_signature(key: *mut BLSKey, digest: *const u8, signature: *const u8) -> bool {
 //     let message_digest = slice::from_raw_parts(digest, UInt256::SIZE);
