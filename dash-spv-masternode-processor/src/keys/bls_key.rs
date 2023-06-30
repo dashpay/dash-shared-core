@@ -316,14 +316,14 @@ impl BLSKey {
         }
     }
 
-    pub(crate) fn bls_public_key_serialized(&self) -> Option<[u8; 48]> {
+    pub(crate) fn bls_public_key_serialized(&self, use_legacy: bool) -> Option<[u8; 48]> {
         self.bls_public_key()
             .ok()
-            .map(|pk| g1_element_serialized(&pk, self.use_legacy))
+            .map(|pk| g1_element_serialized(&pk, use_legacy))
     }
 
     pub fn public_key_uint(&self) -> UInt384 {
-        self.bls_public_key_serialized()
+        self.bls_public_key_serialized(self.use_legacy)
             .map_or(UInt384::MIN, |key| UInt384(key))
     }
 
@@ -459,7 +459,7 @@ impl BLSKey {
     }
 
     pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, BlsError> {
-        ExtendedPrivateKey::from_bytes(bytes)
+        ExtendedPrivateKey::from_seed(bytes)
             .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
     }
 
@@ -539,7 +539,7 @@ impl CryptoData<BLSKey> for Vec<u8> {
 
     fn encrypt_with_dh_key_using_iv(&self, key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
         let mut destination = initialization_vector.clone();
-        key.bls_public_key_serialized()
+        key.bls_public_key_serialized(key.use_legacy)
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
             .and_then(|key_data: [u8; 32]| initialization_vector[..16].try_into().ok()
                 .and_then(|iv_data: [u8; 16]| <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv_data))
@@ -553,7 +553,7 @@ impl CryptoData<BLSKey> for Vec<u8> {
         if self.len() < iv_size {
             return None;
         }
-        key.bls_public_key_serialized()
+        key.bls_public_key_serialized(key.use_legacy)
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
             .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().ok()
                 .and_then(|iv_data: [u8; 16]|

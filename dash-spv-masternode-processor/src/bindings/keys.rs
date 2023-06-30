@@ -287,13 +287,9 @@ pub unsafe extern "C" fn key_with_private_key(secret: *const c_char, key_type: K
 /// # Safety
 #[no_mangle]
 pub extern "C" fn key_with_seed_data(data: *const u8, len: usize, key_type: KeyKind) -> *mut OpaqueKey {
-    let seed_data = unsafe { slice::from_raw_parts(data, len) };
-    match key_type {
-        KeyKind::ECDSA => ECDSAKey::init_with_seed_data(seed_data).to_opaque_ptr(),
-        KeyKind::BLS => BLSKey::key_with_seed_data(seed_data, true).to_opaque_ptr(),
-        KeyKind::BLSBasic => BLSKey::key_with_seed_data(seed_data, false).to_opaque_ptr(),
-        KeyKind::ED25519 => ED25519Key::init_with_seed_data(seed_data).to_opaque_ptr()
-    }
+    let seed = unsafe { slice::from_raw_parts(data, len) };
+    key_type.key_with_seed_data(seed)
+        .to_opaque_ptr()
 }
 
 /// # Safety
