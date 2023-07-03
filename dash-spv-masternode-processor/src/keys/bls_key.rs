@@ -160,15 +160,6 @@ impl BLSKey {
         }
     }
 
-    // pub fn can_public_derive(index_path: IndexPath<u32>, use_legacy: bool) -> bool {
-    //     for i in 0..index_path.length() {
-    //         if index_path.index_at_position(0) >> 31 == 1 {
-    //             return false;
-    //         }
-    //     }
-    //     true
-    // }
-
     pub fn public_derive<PATH>(extended_public_key: ExtendedPublicKey, index_path: &PATH, use_legacy: bool) -> ExtendedPublicKey
         where PATH: IIndexPath<Item = u32> {
         if index_path.is_empty() {
@@ -206,11 +197,7 @@ impl BLSKey {
     }
 
     pub fn init_with_bls_extended_private_key(bls_extended_private_key: &ExtendedPrivateKey, use_legacy: bool) -> Result<Self, BlsError> {
-        let extended_public_key = if use_legacy {
-            bls_extended_private_key.extended_public_key_legacy()?
-        } else {
-            bls_extended_private_key.extended_public_key()?
-        };
+        let extended_public_key = extended_public_key_from_extended_private_key(bls_extended_private_key, use_legacy)?;
         let extended_public_key_data = extended_public_key_serialized(&extended_public_key, use_legacy);
         let chaincode = bls_extended_private_key.chain_code().into();
         let bls_private_key = bls_extended_private_key.private_key();
@@ -285,7 +272,8 @@ impl BLSKey {
         if let Some(bytes) = self.extended_public_key_data() {
             extended_public_key_from_bytes(&bytes, self.use_legacy).ok()
         } else if let Some(bytes) = self.extended_private_key_data() {
-            ExtendedPrivateKey::from_bytes(&bytes).and_then(|pk| pk.extended_public_key()).ok()
+            ExtendedPrivateKey::from_bytes(&bytes)
+                .and_then(|pk| extended_public_key_from_extended_private_key(&pk, self.use_legacy)).ok()
         } else {
             None
         }
@@ -316,14 +304,14 @@ impl BLSKey {
         }
     }
 
-    pub(crate) fn bls_public_key_serialized(&self) -> Option<[u8; 48]> {
+    pub(crate) fn bls_public_key_serialized(&self, use_legacy: bool) -> Option<[u8; 48]> {
         self.bls_public_key()
             .ok()
-            .map(|pk| g1_element_serialized(&pk, self.use_legacy))
+            .map(|pk| g1_element_serialized(&pk, use_legacy))
     }
 
     pub fn public_key_uint(&self) -> UInt384 {
-        self.bls_public_key_serialized()
+        self.bls_public_key_serialized(self.use_legacy)
             .map_or(UInt384::MIN, |key| UInt384(key))
     }
 
@@ -476,7 +464,7 @@ impl BLSKey {
     pub fn migrate_from_legacy_extended_private_key_data(bytes: &[u8]) -> Result<Self, BlsError> {
         ExtendedPrivateKey::from_bytes(bytes)
             .and_then(|bls_extended_private_key| {
-                let extended_public_key = bls_extended_private_key.extended_public_key_legacy()?;
+                let extended_public_key = extended_public_key_from_extended_private_key(&bls_extended_private_key, true)?;
                 let bls_private_key = bls_extended_private_key.private_key();
                 Ok(Self {
                     pubkey: UInt384(g1_element_serialized(&bls_private_key.g1_element()?, false)),
@@ -539,7 +527,7 @@ impl CryptoData<BLSKey> for Vec<u8> {
 
     fn encrypt_with_dh_key_using_iv(&self, key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
         let mut destination = initialization_vector.clone();
-        key.bls_public_key_serialized()
+        key.bls_public_key_serialized(key.use_legacy)
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
             .and_then(|key_data: [u8; 32]| initialization_vector[..16].try_into().ok()
                 .and_then(|iv_data: [u8; 16]| <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv_data))
@@ -553,7 +541,7 @@ impl CryptoData<BLSKey> for Vec<u8> {
         if self.len() < iv_size {
             return None;
         }
-        key.bls_public_key_serialized()
+        key.bls_public_key_serialized(key.use_legacy)
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
             .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().ok()
                 .and_then(|iv_data: [u8; 16]|
@@ -598,6 +586,13 @@ fn g2_element_from_bytes(use_legacy: bool, bytes: &[u8]) -> Result<G2Element, Bl
         G2Element::from_bytes_legacy(bytes)
     } else {
         G2Element::from_bytes(bytes)
+    }
+}
+fn extended_public_key_from_extended_private_key(private_key: &ExtendedPrivateKey, use_legacy: bool) -> Result<ExtendedPublicKey, BlsError> {
+    if use_legacy {
+        private_key.extended_public_key_legacy()
+    } else {
+        private_key.extended_public_key()
     }
 }
 
