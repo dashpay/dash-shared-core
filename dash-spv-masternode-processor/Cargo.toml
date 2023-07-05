@@ -33,7 +33,7 @@ bls-signatures = { git = "https://github.com/dashevo/bls-signatures", rev = "a55
 ed25519-dalek = "2.0.0-pre.0"
 secp256k1 = { version = "0.26.0", features = [ "recovery", "rand-std", "bitcoin_hashes" ] }
 core2 = { version = "0.4.0", optional = true, default-features = false }
-rs-x11-hash = "0.1.4"
+rs-x11-hash = "0.1.8"
 zeroize = "1.5.7"
 bip38 = { git = "https://github.com/pankcuf/bip38", rev = "87abd21" }
 log = { version = "0.4.*", features = ["std"] }
