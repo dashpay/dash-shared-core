@@ -516,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "dash_spv_apple_bindings"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "cbindgen 0.24.3",
  "dash-spv-masternode-processor",
@@ -1526,9 +1526,9 @@ dependencies = [
 
 [[package]]
 name = "rs-x11-hash"
-version = "0.1.4"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2684f844ccdefb42cd267b2527074010163aa77d5dff5285276b7b0ee0b0c595"
+checksum = "94ea852806513d6f5fd7750423300375bc8481a18ed033756c1a836257893a30"
 dependencies = [
  "bindgen 0.65.1",
  "cc",
