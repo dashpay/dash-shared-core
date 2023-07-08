@@ -4,7 +4,7 @@ use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use hashes::hex::{FromHex, ToHex};
 use hashes::sha256;
-use crate::crypto::{UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
+use crate::crypto::{UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}, ECPoint};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, IChildKeyDerivationData}};
@@ -19,7 +19,6 @@ const EXT_PUBKEY_SIZE: usize = 4 + mem::size_of::<UInt256>() + mem::size_of::<UI
 pub struct ED25519Key {
     pub seckey: UInt256,
     pub pubkey: Vec<u8>,
-    pub compressed: bool,
     pub chaincode: UInt256,
     pub fingerprint: u32,
     pub is_extended: bool,
@@ -37,7 +36,7 @@ impl IKey for ED25519Key
             warn!("There is no seckey for sign");
             return vec![];
         }
-        let signing_key = SigningKey::from_bytes(&self.seckey.0);
+        let signing_key: SigningKey = self.seckey.into();
         match signing_key.try_sign(data) {
             Ok(signature) => signature.to_vec(),
             Err(err) => {
@@ -50,7 +49,7 @@ impl IKey for ED25519Key
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         // todo: check if this needed & correct
         Signature::from_slice(signature)
-            .map_or(false, |s| SigningKey::from_bytes(&self.seckey.0)
+            .map_or(false, |s| SigningKey::from(self.seckey)
                 .verifying_key()
                 .verify(message_digest, &s)
                 .is_ok())
@@ -77,8 +76,8 @@ impl IKey for ED25519Key
         if !self.pubkey.is_empty() {
             self.pubkey.to_vec()
         } else {
-            let signing_key = SigningKey::from_bytes(&self.seckey.0);
-            let public_key = VerifyingKey::from(&signing_key);
+            let signing_key: SigningKey = self.seckey.into();
+            let public_key = signing_key.verifying_key();
             public_key.as_bytes().to_vec()
             // ECPoint::from(signing_key.verifying_key()).0.to_vec()
         }
@@ -109,35 +108,9 @@ impl IKey for ED25519Key
         })
     }
 
-    // fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Option<Self>
-    //     where Self: Sized + IChildKeyDerivation<INDEX, SK, PK>,
-    //           PATH: IIndexPath<Item=INDEX>, SK: SignKey {
-    //     // todo!()
-    //     let mut signing_key = SigningKey::from_bytes(&self.seckey.0);
-    //     let mut chaincode = self.chaincode.clone();
-    //     let mut fingerprint = 0u32;
-    //     let length = path.length();
-    //     (0..length)
-    //         .into_iter()
-    //         .for_each(|position| {
-    //             if position + 1 == length {
-    //                 fingerprint = UInt160::hash160(ECPoint::from(signing_key.verifying_key()).as_ref()).u32_le();
-    //             }
-    //             <Self as IChildKeyDerivation<INDEX, SigningKey, ECPoint>>::derive_child_private_key::<PATH>(&mut signing_key, &mut chaincode, path, position);
-    //         });
-    //     Some(Self {
-    //         seckey: UInt256(signing_key.to_bytes()),
-    //         chaincode,
-    //         fingerprint,
-    //         is_extended: true,
-    //         compressed: true,
-    //         ..Default::default()
-    //     })
-    // }
-
     fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
-        let mut signing_key = SigningKey::from_bytes(&self.seckey.0);
+        let mut signing_key: SigningKey = self.seckey.into();
         let mut chaincode = self.chaincode.clone();
         let mut fingerprint = 0u32;
         let length = path.length();
@@ -145,24 +118,17 @@ impl IKey for ED25519Key
             .into_iter()
             .for_each(|position| {
                 if position + 1 == length {
-                    // fingerprint = UInt160::hash160(ECPoint::from(signing_key.verifying_key()).as_ref()).u32_le();
-                    fingerprint = UInt160::hash160(UInt256::from(signing_key.verifying_key()).as_ref()).u32_le();
+                    fingerprint = UInt160::hash160u32le(ECPoint::from(signing_key.verifying_key()).as_bytes());
+                    // fingerprint = UInt160::hash160u32le(signing_key.verifying_key().as_bytes());
                 }
                 Self::derive_child_private_key(&mut signing_key, &mut chaincode, path, position);
             });
-        Some(Self {
-            seckey: UInt256(signing_key.to_bytes()),
-            chaincode,
-            fingerprint,
-            is_extended: true,
-            compressed: true,
-            ..Default::default()
-        })
+        Some(Self::init_with_extended_private_parts(signing_key.into(), chaincode, fingerprint))
     }
 
     fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item=UInt256> {
-        let mut signing_key = SigningKey::from_bytes(&self.seckey.0);
+        let mut signing_key: SigningKey = self.seckey.into();
         let mut chaincode = self.chaincode.clone();
         let mut fingerprint = 0u32;
         let length = path.length();
@@ -170,18 +136,12 @@ impl IKey for ED25519Key
             .into_iter()
             .for_each(|position| {
                 if position + 1 == length {
-                    fingerprint = UInt160::hash160(UInt256::from(signing_key.verifying_key()).as_ref()).u32_le();
+                    fingerprint = UInt160::hash160u32le(ECPoint::from(signing_key.verifying_key()).as_bytes());
+                    // fingerprint = UInt160::hash160u32le(signing_key.verifying_key().as_bytes());
                 }
                 Self::derive_child_private_key(&mut signing_key, &mut chaincode, path, position);
         });
-        Some(Self {
-            seckey: UInt256(signing_key.to_bytes()),
-            chaincode,
-            fingerprint,
-            is_extended: true,
-            compressed: true,
-            ..Default::default()
-        })
+        Some(Self::init_with_extended_private_parts(signing_key.into(), chaincode, fingerprint))
     }
 
     fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Option<Self>
@@ -195,16 +155,15 @@ impl IKey for ED25519Key
             .into_iter()
             .for_each(|position| {
                 if position + 1 == length {
-                    fingerprint = UInt160::hash160(data.as_ref()).u32_le();
+                    fingerprint = UInt160::hash160u32le(ECPoint::from(data.as_bytes()).as_bytes());
+                    // fingerprint = UInt160::hash160u32le(data.as_bytes());
                 }
                 Self::derive_child_public_key(&mut data, &mut chaincode, path, position);
             });
-        Some(Self { pubkey: data.0.to_vec(), chaincode, fingerprint, is_extended: true, ..Default::default() })
+        Some(Self::init_with_extended_public_parts(data.0.to_vec(), chaincode, fingerprint))
     }
 
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
-        //if (uint256_is_zero(_seckey)) return nil;
-        //NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
         let mut writer = SecVec::with_capacity(33);
         script.privkey.enc(&mut writer);
         self.seckey.enc(&mut writer);
@@ -221,8 +180,8 @@ impl IKey for ED25519Key
 
     fn forget_private_key(&mut self) {
         if self.pubkey.is_empty() && !self.seckey.is_zero() {
-            let signing_key = SigningKey::from_bytes(&self.seckey.0);
-            let public_key = VerifyingKey::from(&signing_key);
+            let signing_key: SigningKey = self.seckey.into();
+            let public_key = signing_key.verifying_key();
             // self.pubkey = ECPoint::from(public_key).0.to_vec();
             self.pubkey = public_key.as_bytes().to_vec();
         }
@@ -234,25 +193,29 @@ impl ED25519Key {
 
     pub fn init_with_seed_data(seed: &[u8]) -> Option<Self> {
         let i = UInt512::ed25519_seed_key(seed);
-        Some(Self {
-            seckey: UInt256::from(&i.0[..32]),
-            chaincode: UInt256::from(&i.0[32..]),
-            compressed: true,
-            ..Default::default() })
+        Some(Self { seckey: UInt256::from(&i.0[..32]), chaincode: UInt256::from(&i.0[32..]), ..Default::default() })
+    }
+
+    fn init_with_extended_private_parts(seckey: UInt256, chaincode: UInt256, fingerprint: u32) -> Self {
+        Self { fingerprint, chaincode, seckey, is_extended: true, ..Default::default() }
+    }
+
+    fn init_with_extended_public_parts(pubkey: Vec<u8>, chaincode: UInt256, fingerprint: u32) -> Self {
+        Self { fingerprint, chaincode, pubkey, is_extended: true, ..Default::default() }
     }
 
     pub fn init_with_extended_private_key_data(data: &Vec<u8>) -> Option<Self> {
-        todo!()
+        Self::key_with_extended_private_key_data(data)
     }
 
     pub fn init_with_extended_public_key_data(data: &Vec<u8>) -> Option<Self> {
-        todo!()
+        Self::key_with_extended_public_key_data(data)
     }
 
-    pub fn key_with_secret_data(data: &[u8], compressed: bool) -> Option<Self> {
+    pub fn key_with_secret_data(data: &[u8]) -> Option<Self> {
         Self::secret_key_from_bytes(data)
             .ok()
-            .map(|seckey| Self { seckey: UInt256(seckey.to_bytes()), compressed, ..Default::default() })
+            .map(|seckey| Self { seckey: seckey.into(), ..Default::default() })
     }
 
     pub fn public_key_from_bytes(data: &[u8]) -> Result<VerifyingKey, SignatureError> {
@@ -271,7 +234,7 @@ impl ED25519Key {
             32 => Self::public_key_from_bytes(data).ok(),
             33 => Self::public_key_from_bytes(&data[1..]).ok(),
             _ => None
-        }.map(|pk| Self { pubkey: pk.to_bytes().to_vec(), compressed: true, ..Default::default() })
+        }.map(|pk| Self { pubkey: pk.to_bytes().to_vec(), ..Default::default() })
     }
 
     pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Option<Vec<u8>>
@@ -280,15 +243,13 @@ impl ED25519Key {
             assert!(false, "Extended public key is wrong size");
             return None;
         }
-        let mut c = UInt256::from(&data[4..36]);
-        // let mut k = ECPoint::from(&data[36..69]);
-        let mut k = UInt256::from(&data[36..68]);
+        let mut chaincode = UInt256::from(&data[4..36]);
+        // let mut key = ECPoint::from(&data[36..69]);
+        let mut key = UInt256::from(&data[36..68]);
         (0..path.length())
             .into_iter()
-            .for_each(|position|
-                Self::derive_child_public_key(&mut k, &mut c, path, position)
-            );
-        Some(k.as_bytes().to_vec())
+            .for_each(|position| Self::derive_child_public_key(&mut key, &mut chaincode, path, position));
+        Some(key.as_bytes().to_vec())
     }
 }
 
@@ -298,7 +259,7 @@ impl ED25519Key {
     pub fn key_with_private_key(string: &str) -> Option<Self> {
         Vec::from_hex(string.as_bytes().to_hex().as_str())
             .ok()
-            .and_then(|data| Self::key_with_secret_data(&data, false))
+            .and_then(|data| Self::key_with_secret_data(&data))
     }
 
     pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
@@ -320,15 +281,9 @@ impl ED25519Key {
             //     *offset += 1;
             // }
             let data: &[u8] = bytes.read_with(offset, Bytes::Len(32)).unwrap();
-            Self::public_key_from_bytes(data).ok().map(|pubkey| {
-                Self {
-                    fingerprint,
-                    chaincode,
-                    compressed: true,
-                    pubkey: pubkey.as_bytes().to_vec(),
-                    is_extended: true,
-                    ..Default::default() }
-            })
+            Self::public_key_from_bytes(data)
+                .ok()
+                .map(|pubkey| Self::init_with_extended_public_parts(pubkey.as_bytes().to_vec(), chaincode, fingerprint))
         } else {
             None
         }
@@ -340,14 +295,7 @@ impl ED25519Key {
             let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
             let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
             let seckey = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
-            Self {
-                fingerprint,
-                chaincode,
-                seckey,
-                compressed: true,
-                is_extended: true,
-                ..Default::default()
-            }
+            Self::init_with_extended_private_parts(seckey, chaincode, fingerprint)
         })
     }
 
