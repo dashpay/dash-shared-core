@@ -1,6 +1,6 @@
 use byte::{BytesExt, ctx::Endian, LE, Result, TryRead, TryWrite};
 use std::{io::Write, mem, net::{IpAddr, Ipv4Addr}, slice};
-use ed25519_dalek::VerifyingKey;
+use ed25519_dalek::{SigningKey, VerifyingKey};
 use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
 use secp256k1::rand::{Rng, thread_rng};
 #[cfg(feature = "generate-dashj-tests")]
@@ -481,6 +481,9 @@ impl UInt160 {
     pub fn hash160(data: &[u8]) -> Self {
         UInt160(hash160::Hash::hash(data).into_inner())
     }
+    pub fn hash160u32le(data: &[u8]) -> u32 {
+        Self::hash160(data).u32_le()
+    }
     pub fn ripemd160(data: &[u8]) -> Self {
         UInt160(ripemd160::Hash::hash(data).into_inner())
     }
@@ -840,6 +843,18 @@ impl UInt256 {
 impl secp256k1::ThirtyTwoByteHash for UInt256 {
     fn into_32(self) -> [u8; 32] {
         self.0
+    }
+}
+
+impl From<SigningKey> for UInt256 {
+    fn from(value: SigningKey) -> Self {
+        UInt256(value.to_bytes())
+    }
+}
+
+impl From<UInt256> for SigningKey {
+    fn from(value: UInt256) -> Self {
+        SigningKey::from_bytes(&value.0)
     }
 }
 

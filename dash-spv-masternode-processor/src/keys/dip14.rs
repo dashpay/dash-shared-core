@@ -109,7 +109,7 @@ impl IChildKeyDerivationData<UInt256, SigningKey, UInt256> for ED25519Key {
         let i_is_31_bits = index.is_31_bits();
         let mut writer = Vec::<u8>::new();
         if is_hardened {
-            // 0u8.enc(&mut writer);
+            0u8.enc(&mut writer);
             writer.extend_from_slice(&key.to_bytes());
         } else {
             panic!("For ED25519 only hardened derivation is supported");

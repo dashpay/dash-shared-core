@@ -1,7 +1,15 @@
+use base64::{alphabet, Engine};
+use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use hashes::hex::{FromHex, ToHex};
 use crate::chain::derivation::{IIndexPath, IndexPath};
-use crate::crypto::{UInt256, UInt512};
+use crate::crypto::{UInt160, UInt256, UInt512};
+use crate::crypto::byte_util::AsBytes;
 use crate::keys::{IKey, KeyKind};
+use crate::lib_tests::tests::register_logger;
+
+fn test_derivation_path() {
+
+}
 
 // Test vectors taken from  https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 #[test]
@@ -25,6 +33,7 @@ pub fn test_key_with_private_key() {
 }
 
 /// Without padding-byte 0x00 in public key data there are different result for this test vectors
+///
 #[test]
 pub fn test_vector_1_derivation() {
     // Test Vector 1
@@ -51,10 +60,10 @@ pub fn test_vector_1_derivation() {
     let hardened = vec![true];
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("69e8577b").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "b307fed094e548bdd725dd946073136451fd4259f161fbdcad7892fe4b849267", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "263a25182eb17ddc3ca84467d480bf3afbd383619e45188a54624da340717df6", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "408beec8c8eda1302f554edee0e4e0d28eff1e852390b2aeedbf107d8d59679e", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0xddebc675u32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "8b59aa11380b624e81507a27fedda59fea6d0b779a778918a2fd3590e16e9c69", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "68e0fe46dfb67e368c75379acec591dad19df3cde26e63b93a8e704f1dade7a3", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "8c8a13df77a28f3445213a0f432fde644acaa215fc72dcdf300d5efaa85d350c", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -64,10 +73,10 @@ pub fn test_vector_1_derivation() {
     let hardened = vec![true, true];
     let index_path = IndexPath::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("f00d1e1c").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "362b1cab1aa6aadd331bd0aab73986fe7654ea65aa26adfddcd4e16c41a81bdd", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "bcf19f49f025ef1872fbef76c503674c40f9b535b7f9d2ad2c1300942968d0ea", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "154f104f509ddc6f165f49188b2c3b0b2fda14c8632b1ce007f1ee1faebdf2d5", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0x13dab143u32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "a320425f77d1b5c2505a6b1b27382b37368ee640e3557c315416801243552f14", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "b1d0bad404bf35da785a64ca1ac54b2617211d2777696fbffaf208f746ae84f2", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "1932a5270f335bed617d5b935c80aedb1a35bd9fc1e31acafd5372c30f5c1187", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -77,10 +86,10 @@ pub fn test_vector_1_derivation() {
     let hardened = vec![true, true, true];
     let index_path = IndexPath::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("fec60588").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "44da8805d0451eb3ae91e52cf90a71cbb6b44bcc09ab765ea45a81ce8532b0cc", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "b24a1b962511fa147383fd36a8c87c2d8af1e2718b555e389000789dfdfd4651", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "e0058ed08bfe349453e2d40b7cbb7606d7fa3dac7c3f6f756182a42a8fa4b5cd", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0xebe4cb29u32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "2e69929e00b5ab250f49c3fb1c12f252de4fed2c1db88387094a0f8c4c9ccd6c", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "92a5b23c0b8a99e37d07df3fb9966917f5d06e02ddbd909c7e184371463e9fc9", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "ae98736566d30ed0e9d2f4486a64bc95740d89c7db33f52121f8ea8f76ff0fc1", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -90,10 +99,10 @@ pub fn test_vector_1_derivation() {
     let hardened = vec![true, true, true, true];
     let index_path = IndexPath::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("676458de").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "172b6a88ab3fca00615af6aabb355ea9fff8a34b3c4c6d8d17b683fb412cbb0f", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "b6c7575b7327391e8310da69a59c82c16e5938e77ec86465dc75df9bbe788b94", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "6ef147b3fc3765e2be1f89d4b03f70f7323921b6ddf44a1752483269d81819ed", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0x316ec1c6u32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "8f6d87f93d750e0efccda017d662a1b31a266e4a6f5993b15f5c1f07f74dd5cc", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "30d1dc7e5fc04c31219ab25a27ae00b50f6fd66622f6e9c913253d6511d1e662", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "8abae2d66361c879b900d204ad2cc4984fa2aa344dd7ddc46007329ac76c429c", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -103,10 +112,10 @@ pub fn test_vector_1_derivation() {
     let hardened = vec![true, true, true, true, true];
     let index_path = IndexPath::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("6d205270").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "c845c62fc11620a9baccea1ce6ff657892d866516037e17453b27abedde3e38f", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "fe5a062acc906c23648c892979e4ec0d8266e33ef3fdbf765cc4de19c886ace4", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "9532aea0cb26170539ab1ae7f101f79cf27725a00b10074ebc6add33872e0bd8", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0xd6322ccdu32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "68789923a0cac2cd5a29172a475fe9e0fb14cd6adb5ad98a3fa70333e7afa230", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "3c24da049451555d51a7014a37337aa4e12d41e485abccfa46b47dfb2af54b7a", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 }
 
@@ -137,10 +146,10 @@ pub fn test_vector_2_derivation() {
     let hardened = vec![true];
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("c6e5512a").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "2a1ba3d06a3accda18bc7ed6bff47b78d80be5c1641c8c07def2cf8cb229a078", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "5c0915bcb6c38a51292023db99d0ce7db07facb898e80d0321eba5afd53f69c0", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "2d76d670e2c1873a012973c840f74343a0ad10149644a275c6139ee053d681a1", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0x31981b50u32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "0b78a3226f915c082bf118f83618a618ab6dec793752624cbeb622acb562862d", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "1559eb2bbec5790b0c65d8693e4d0875b1747f4970ae8b650486ed7470845635", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "86fab68dcb57aa196c77c5f264f215a112c22a912c10d123b0d03c3c28ef1037", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -150,10 +159,10 @@ pub fn test_vector_2_derivation() {
     let hardened = vec![true, true];
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("40b443bd").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "bf3dc38ccc53caae2b2bb622ffc71bab13e4e290542c0edf8f7116ffc80605a3", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "6c2e51273dbd5ea4c6c99a6df48f077dc5c6bda46cec67bf4ea3c869d4c1e036", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "9ed180e7a58a74471d9989cac237686d9a1cb4245e605f7e5fc2259abf7c9940", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0x1e9411b1u32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "138f0b2551bcafeca6ff2aa88ba8ed0ed8de070841f0c4ef0165df8181eaad7f", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "ea4f5bfe8694d8bb74b7b59404632fd5968b774ed545e810de9c32a4fb4192f4", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "5ba3b9ac6e90e83effcd25ac4e58a1365a9e35a3d3ae5eb07b9e4d90bcf7506d", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -163,10 +172,10 @@ pub fn test_vector_2_derivation() {
     let hardened = vec![true, true, true];
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("80a89165").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "5e33c9206c7ab6d5953957daced9f9fb04b50373b1a3a9c66f83b437073494c4", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "615b7ec4f3930bca8da3f47ec3dae32d4a613df6ba1f353d4fc8d17026d6a067", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "ded83db2ad3bb741bec15f93a1d24030e1ca249e765d66b49dca1aba270fc1ac", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0xfcadf38cu32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "73bd9fff1cfbde33a1b846c27085f711c0fe2d66fd32e139d3ebc28e5a4a6b90", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "3757c7577170179c7868353ada796c839135b3d30554bbb74a4b1e4a5a58505c", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "2e66aa57069c86cc18249aecf5cb5a9cebbfd6fadeab056254763874a9352b45", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -176,10 +185,10 @@ pub fn test_vector_2_derivation() {
     let hardened = vec![true, true, true, true];
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("bbde61c1").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "b1ce6c5a5f654ba6fc6b53e3f8a7ace78bd95a3a2af4dd5f5b31ffc620eb376d", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "6d74b1b04dac77b54cfd2b80135cceac80b9fde83f8a2ca7d5ee0282b18fe1e9", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "cee65c0d7feb16f71d923c2cc4ed0a87c2d9fd0bb603721a03ae50e256c6a8ad", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0xaca70953u32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "0902fe8a29f9140480a00ef244bd183e8a13288e4412d8389d140aac1794825a", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "5837736c89570de861ebc173b1086da4f505d4adb387c6a1b1342d5e4ac9ec72", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "e33c0f7d81d843c572275f287498e8d408654fdf0d1e065b84e2e6f157aab09b", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
 
     //--------------------------------------------------------------------------------------------------//
@@ -189,9 +198,134 @@ pub fn test_vector_2_derivation() {
     let hardened = vec![true, true, true, true, true];
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("685ca0ae").unwrap().to_hex(), "fingerprint is wrong");
-    assert_eq!(private_key.chaincode().0.to_hex(), "7ebbf16212d10e17f0f42d3265c836bfd2d563e433345755b0f1b8421def8423", "chain code is wrong");
-    assert_eq!(private_key.secret_key().0.to_hex(), "43a4d36c18de9949e4e43883083d5dbebf99cfbc658448609131505d932a2ad7", "private key is wrong");
-    assert_eq!(private_key.public_key_data().to_hex(), "2573212fb7f146012f89793ea96d9917a69898789656a3ec62db56198feed609", "public key is wrong");
+    assert_eq!(private_key.fingerprint(), 0x422c654bu32.swap_bytes(), "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "5d70af781f3a37b829f0d060924d5e960bdc02e85423494afc0b1a41bbe196d4", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "551d333177df541ad876a60ea71f00447931c0a9da16f227c11ea080d7391b8d", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "47150c75db263559a70d5778bf36abbab30fb061ad69f69ece61a72b0cfa4fc0", "public key is wrong");
     println!("••••••••••••••••••••••••••••••••••••••");
+}
+
+
+#[test]
+pub fn test_platform_node_key_derivation() {
+    register_logger();
+    // let seed = "enemy check owner stumble unaware debris suffer peanut good fabric bleak outside";
+    let seed_data = Vec::from_hex("44cb0848958cb77898e464d18e3c70e2a437b343a894defa6010c5056a2b4a1caa01d04760871b578721b0a797fd1aacdfcd77f1870dddb34f1b204d5dbe07c0").unwrap();
+    let seed_key = KeyKind::ED25519.key_with_seed_data(&seed_data).unwrap();
+
+    //--------------------------------------------------------------------------------------------------//
+    // Chain m
+    //--------------------------------------------------------------------------------------------------//
+    println!("••••••••••••••••••••••••••••••••••••••");
+    let indexes = vec![];
+    let hardened = vec![];
+    let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
+    let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
+    assert_eq!(private_key.fingerprint(), 0, "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "e9e82625ceba55e48938338bf9e5c65f295995a056c4245f56111d20ed4483ce", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "f7b51597adf83c1adac7548b86ce1b310d92cee606ada8ed77ebb2e897579c3f", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "bd1de92c05b3a56067887d081e03a0cf65666d8f719bb70b9932106b4e4848ec", "public key is wrong");
+
+    warn!("chain: m");
+    warn!("fingerprint: {}", private_key.fingerprint());
+    warn!("chaincode: {}", private_key.chaincode().0.to_hex());
+    warn!("secret_key: {}", private_key.secret_key().0.to_hex());
+    warn!("public_key_data: {}", private_key.public_key_data().to_hex());
+    println!("••••••••••••••••••••••••••••••••••••••");
+
+    //--------------------------------------------------------------------------------------------------//
+    // Chain m/9'
+    //--------------------------------------------------------------------------------------------------//
+    let indexes = vec![UInt256::from(9u32)];
+    let hardened = vec![true];
+    let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
+    let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
+    assert_eq!(private_key.fingerprint(), 1680968818u32, "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "d6217f1090e57c89e8466a68a524a4ad200abcd4710b5e636e2251bdb9d3a178", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "4fa90d6d6fcc62320ecdd8726ac2831707a28f07650aa995d6f1e58b69e0cf3f", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "e7b90950199237c73e6fcce396a4cc1d3bf9b2095a02f463deed7f3f4e3377b6", "public key is wrong");
+
+    warn!("chain: m/9'");
+    warn!("fingerprint: {}", private_key.fingerprint());
+    warn!("chaincode: {}", private_key.chaincode().0.to_hex());
+    warn!("secret_key: {}", private_key.secret_key().0.to_hex());
+    warn!("public_key_data: {}", private_key.public_key_data().to_hex());
+
+    //--------------------------------------------------------------------------------------------------//
+    // Chain m/9'/5'
+    //--------------------------------------------------------------------------------------------------//
+    let indexes = vec![UInt256::from(9u32), UInt256::from(5u32)];
+    let hardened = vec![true, true];
+    let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
+    let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
+    assert_eq!(private_key.fingerprint(), 3111175390u32, "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "f16eb77c77266fc40a35864cb9140076de928ffbe4d02f0e059de2012d178ab5", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "d5447a2806ad8077235d4f98f4883ac98293a819a4ed97e5b00d976a6f7abecd", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "5c02a36691329fb024b7c4f05c6601c7ca3014160c529a2596755f13a77999c0", "public key is wrong");
+    warn!("chain: m/9'/5'");
+    warn!("fingerprint: {}", private_key.fingerprint());
+    warn!("chaincode: {}", private_key.chaincode().0.to_hex());
+    warn!("secret_key: {}", private_key.secret_key().0.to_hex());
+    warn!("public_key_data: {}", private_key.public_key_data().to_hex());
+
+    //--------------------------------------------------------------------------------------------------//
+    // Chain m/9'/5'/3'
+    //--------------------------------------------------------------------------------------------------//
+    let indexes = vec![UInt256::from(9u32), UInt256::from(5u32), UInt256::from(3u32)];
+    let hardened = vec![true, true, true];
+    let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
+    let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
+    assert_eq!(private_key.fingerprint(), 208479033u32, "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "4de438f0b3a812faf3af2e898907fcdf3a5a2f70ce69e35e9c4f65bb9e273e6c", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "cfb8aa1eca1c24f9f1efc46425901fe8f285d47c480a8a8c32800954967b994e", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "6931ef2303d2e4be4d8c53e5245349f1eb054f27e4c086cef3c7b163e4251ea5", "public key is wrong");
+    warn!("chain: m/9'/5'/3'");
+    warn!("fingerprint: {}", private_key.fingerprint());
+    warn!("chaincode: {}", private_key.chaincode().0.to_hex());
+    warn!("secret_key: {}", private_key.secret_key().0.to_hex());
+    warn!("public_key_data: {}", private_key.public_key_data().to_hex());
+
+    //--------------------------------------------------------------------------------------------------//
+    // Chain m/9'/5'/3'/4'
+    //--------------------------------------------------------------------------------------------------//
+    let indexes = vec![UInt256::from(9u32), UInt256::from(5u32), UInt256::from(3u32), UInt256::from(4u32)];
+    let hardened = vec![true, true, true, true];
+    let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
+    let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
+    assert_eq!(private_key.fingerprint(), 3805166404u32, "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "5240adb1df0ac47b8cd8d2355c3a8f8f03783b54e28128937e5e4cc1530e71d7", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "32700c6d3124260f71ee8dda05138270ad3362768ca4d31b4297825b14947bb4", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "f2d0fa62e162350ebe9d7a74a816b3d9e6481b9f962b5370749d8168ae1bfe92", "public key is wrong");
+    warn!("chain: m/9'/5'/3'/4'");
+    warn!("fingerprint: {}", private_key.fingerprint());
+    warn!("chaincode: {}", private_key.chaincode().0.to_hex());
+    warn!("secret_key: {}", private_key.secret_key().0.to_hex());
+    warn!("public_key_data: {}", private_key.public_key_data().to_hex());
+
+    //--------------------------------------------------------------------------------------------------//
+    // Chain m/9'/5'/3'/4'/0'
+    //--------------------------------------------------------------------------------------------------//
+    let indexes = vec![UInt256::from(9u32), UInt256::from(5u32), UInt256::from(3u32), UInt256::from(4u32), UInt256::from(0u32)];
+    let hardened = vec![true, true, true, true, true];
+    let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
+    let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
+    let key_id = UInt160::hash160(&private_key.public_key_data());
+    let key_id2 = UInt160::hash160(&[&[b'\x00'], &private_key.public_key_data()[..]].concat());
+    let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
+    let base64_key = base64_engine.encode(&[private_key.secret_key().as_bytes(), &private_key.public_key_data()[..]].concat());
+    let base64_key2 = base64_engine.encode(&[private_key.secret_key().as_bytes(), &[b'\x00'], &private_key.public_key_data()[..]].concat());
+    assert_eq!(private_key.fingerprint(), 2497558984u32, "fingerprint is wrong");
+    assert_eq!(private_key.chaincode().0.to_hex(), "587dc2c7de6d36e06c6de0a2989cd8cb112c1e41b543002a5ff422f3eb1e8cd6", "chain code is wrong");
+    assert_eq!(private_key.secret_key().0.to_hex(), "7898dbaa7ab9b550e3befcd53dc276777ffc8a27124f830c04e17fcf74b9e071", "private key is wrong");
+    assert_eq!(private_key.public_key_data().to_hex(), "08e2698fdcaa0af8416966ba9349b0c8dfaa80ed7f4094e032958a343e45f4b6", "public key is wrong");
+    assert_eq!(key_id.0.to_hex(), "391c5b8c7ded917530dd354f3f986c3ec88c06d6", "key id is wrong");
+    warn!("chain: m/9'/5'/3'/4'/0'");
+    warn!("fingerprint: {}", private_key.fingerprint());
+    warn!("chaincode: {}", private_key.chaincode().0.to_hex());
+    warn!("secret_key: {}", private_key.secret_key().0.to_hex());
+    warn!("public_ksey_data: {}", private_key.public_key_data().to_hex());
+    warn!("key_id: {}", key_id);
+    warn!("key_id2: {}", key_id2);
+    warn!("base64_1: {}", base64_key);
+    warn!("base64_2: {}", base64_key2);
 }

@@ -195,26 +195,6 @@ pub extern "C" fn key_derive_ecdsa_from_extened_private_key_data_for_index_path(
         .map_or(null_mut(), boxed)
 }
 
-// #[no_mangle]
-// pub extern "C" fn key_derive_bls_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, indexes: *const c_ulong, length: usize, use_legacy: bool) -> *mut BLSKey {
-//     let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
-//     let path = IndexPath::from_ffi(indexes, length);
-//     BLSKey::key_with_extended_private_key_data(bytes, use_legacy)
-//         .ok()
-//         .and_then(|key| key.private_derive_to_path(&path))
-//         .map_or(null_mut(), boxed)
-// }
-
-#[no_mangle]
-pub extern "C" fn key_derive_ed25519_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, indexes: *const c_ulong, length: usize) -> *mut ED25519Key {
-    let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
-    let path = IndexPath::from_ffi(indexes, length);
-    ED25519Key::key_with_extended_private_key_data(bytes)
-        .and_then(|key| key.private_derive_to_path(&path))
-        .map_or(null_mut(), boxed)
-}
-
-
 /// # Safety
 /// digest is UInt256
 #[no_mangle]
@@ -567,14 +547,6 @@ pub unsafe extern "C" fn key_bls_migrate_from_legacy_extended_public_key_data(pt
         .to_opaque_ptr()
 }
 
-
-// #[no_mangle]
-// pub unsafe extern "C" fn key_bls_check_payload_signature(key: *mut BLSKey, digest: *const u8, signature: *const u8) -> bool {
-//     let message_digest = slice::from_raw_parts(digest, UInt256::SIZE);
-//     let signature = slice::from_raw_parts(signature, UInt768::SIZE);
-//     (&mut *key).verify(message_digest, signature)
-// }
-//
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_public_key_data(key: *mut ECDSAKey) -> ByteArray {
@@ -738,7 +710,7 @@ pub unsafe extern "C" fn key_create_with_private_key_data(ptr: *const u8, len: u
     let bytes = slice::from_raw_parts(ptr, len);
     match key_type {
         KeyKind::ECDSA => ECDSAKey::key_with_secret_data(bytes, true).to_opaque_ptr(),
-        KeyKind::ED25519 => ED25519Key::key_with_secret_data(bytes, true).to_opaque_ptr(),
+        KeyKind::ED25519 => ED25519Key::key_with_secret_data(bytes).to_opaque_ptr(),
         KeyKind::BLS => BLSKey::key_with_private_key_data(bytes, true).to_opaque_ptr(),
         KeyKind::BLSBasic => BLSKey::key_with_private_key_data(bytes, false).to_opaque_ptr()
     }
@@ -767,18 +739,6 @@ pub unsafe extern "C" fn key_create_from_extended_public_key_data(ptr: *const u8
         KeyKind::BLSBasic => BLSKey::key_with_extended_public_key_data(bytes, false).to_opaque_ptr()
     }
 }
-
-// /// # Safety
-// #[no_mangle]
-// pub unsafe extern "C" fn key_create_from_extended_private_key_data(ptr: *const u8, len: usize, key_type: KeyKind) -> *mut OpaqueKey {
-//     let bytes = unsafe { slice::from_raw_parts(ptr, len) };
-//     match key_type {
-//         KeyKind::ECDSA => ECDSAKey::key_with_extended_private_key_data(bytes).to_opaque_ptr(),
-//         KeyKind::ED25519 => ED25519Key::key_with_extended_private_key_data(bytes).to_opaque_ptr(),
-//         KeyKind::BLS => BLSKey::key_with_extended_private_key_data(bytes, true).to_opaque_ptr(),
-//         KeyKind::BLSBasic => BLSKey::key_with_extended_private_key_data(bytes, false).to_opaque_ptr(),
-//     }
-// }
 
 /// Deserializes extended private key from string and create opaque pointer to ECDSAKey
 /// To pass NSIndexPath need to be serialized as byte array with u264 with path_length = bytes.length / 33

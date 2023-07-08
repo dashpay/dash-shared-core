@@ -235,7 +235,7 @@ impl ECDSAKey {
                 if position + 1 == length {
                     fingerprint = secp256k1::SecretKey::from_slice(&seckey.0)
                         .map(|sk| secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &sk))
-                        .map(|pk| UInt160::hash160(&pk.serialize()).u32_le())
+                        .map(|pk| UInt160::hash160u32le(&pk.serialize()))
                         .unwrap_or(0);
                 }
                 Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
@@ -356,7 +356,7 @@ impl IKey for ECDSAKey {
                 if position + 1 == length {
                     fingerprint = secp256k1::SecretKey::from_slice(&seckey.0)
                         .map(|sk| secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &sk))
-                        .map(|pk| UInt160::hash160(&pk.serialize()).u32_le())
+                        .map(|pk| UInt160::hash160u32le(&pk.serialize()))
                         .unwrap_or(0);
                 }
                 Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
@@ -399,7 +399,7 @@ impl IKey for ECDSAKey {
         (offset..length)
             .into_iter()
             .for_each(|position| {
-                if position + 1 == length { fingerprint = UInt160::hash160(data.as_ref()).u32_le(); }
+                if position + 1 == length { fingerprint = UInt160::hash160u32le(data.as_ref()); }
                 Self::derive_child_public_key(&mut data, &mut chaincode, path, position)
             });
         if let Ok(mut child_key) = Self::public_key_from_bytes(&data.0).map(|pubkey| Self::with_pubkey_compressed(pubkey, true)) {

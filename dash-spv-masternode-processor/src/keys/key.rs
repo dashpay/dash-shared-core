@@ -134,7 +134,7 @@ impl KeyKind {
     pub(crate) fn key_with_private_key_data(&self, data: &[u8]) -> Option<Key> {
         match self {
             KeyKind::ECDSA => ECDSAKey::key_with_secret_data(data, true).map(Key::ECDSA),
-            KeyKind::ED25519 => ED25519Key::key_with_secret_data(data, true).map(Key::ED25519),
+            KeyKind::ED25519 => ED25519Key::key_with_secret_data(data).map(Key::ED25519),
             _ => BLSKey::key_with_private_key_data(data, *self == KeyKind::BLS).map(Key::BLS),
         }
     }
