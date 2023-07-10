@@ -456,19 +456,13 @@ impl BLSKey {
             })
     }
 
-    pub fn migrate_from_legacy_extended_private_key_data(bytes: &[u8]) -> Result<Self, BlsError> {
-        ExtendedPrivateKey::from_bytes(bytes)
-            .and_then(|bls_extended_private_key| {
-                let extended_public_key = extended_public_key_from_extended_private_key(&bls_extended_private_key, true)?;
-                let bls_private_key = bls_extended_private_key.private_key();
-                Ok(Self {
-                    pubkey: UInt384(g1_element_serialized(&bls_private_key.g1_element()?, false)),
-                    seckey: bls_private_key.into(),
-                    chaincode: bls_extended_private_key.chain_code().into(),
-                    extended_private_key_data: (&bls_extended_private_key).into(),
-                    extended_public_key_data: extended_public_key_serialized(&extended_public_key, false).to_vec(),
-                    use_legacy: false,
-                })
+    pub fn migrate_from_basic_extended_public_key_data(bytes: &[u8]) -> Result<Self, BlsError> {
+        ExtendedPublicKey::from_bytes(bytes)
+            .map(|extended_public_key| Self {
+                pubkey: UInt384(g1_element_serialized(&extended_public_key.public_key(), true)),
+                chaincode: extended_public_key.chain_code().into(),
+                extended_public_key_data: extended_public_key_serialized(&extended_public_key, true).to_vec(),
+                ..Default::default()
             })
     }
 
