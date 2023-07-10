@@ -1,5 +1,5 @@
 use crate::bindings::common::{processor_create_cache, register_processor};
-use crate::common::ChainType;
+use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::hashes::hex::FromHex;

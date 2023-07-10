@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 use std::ptr::null;
-use crate::{common, common::{LLMQParams, LLMQType}, models, types};
-use crate::chain::common::chain_type::IHaveChainSettings;
-use crate::common::ChainType;
+use crate::{common, models, types};
+use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
 use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;

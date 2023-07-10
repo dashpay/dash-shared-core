@@ -1,7 +1,7 @@
 use hashes::hex::FromHex;
 use crate::bindings::common::register_processor;
 use crate::bindings::masternode::process_mnlistdiff_from_message;
-use crate::common::ChainType;
+use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::ffi::from::FromFFI;

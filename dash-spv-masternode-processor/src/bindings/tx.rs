@@ -1,5 +1,5 @@
 use std::slice;
-use crate::common::ChainType;
+use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, Reversable};
 use crate::crypto::{UInt160, UInt256};
