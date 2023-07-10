@@ -1,8 +1,8 @@
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use hashes::hex::FromHex;
 use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
+use crate::chain::common::LLMQType;
 use crate::chain::params::DUFFS;
-use crate::common::LLMQType;
 use crate::crypto::{byte_util::Reversable, UInt256};
 
 pub trait IHaveChainSettings {
@@ -19,6 +19,7 @@ pub trait IHaveChainSettings {
             self.isd_llmq_type() == llmq_type
     }
     fn is_evolution_enabled(&self) -> bool;
+    fn name(&self) -> String;
 }
 
 #[repr(C)]
@@ -280,6 +281,13 @@ impl IHaveChainSettings for ChainType {
         false
     }
 
+    fn name(&self) -> String {
+        match self {
+            Self::MainNet => "Mainnet".to_string(),
+            Self::TestNet => "Testnet".to_string(),
+            Self::DevNet(devnet) => devnet.name()
+        }
+    }
 }
 
 impl IHaveChainSettings for DevnetType {
@@ -318,6 +326,10 @@ impl IHaveChainSettings for DevnetType {
 
     fn is_evolution_enabled(&self) -> bool {
         false
+    }
+
+    fn name(&self) -> String {
+        format!("Devnet - {}.{}", self.identifier(), self.version())
     }
 }
 // Params
@@ -362,6 +374,10 @@ impl ChainType {
         }
     }
 
+    pub fn use_legacy_bls(&self) -> bool {
+        self.protocol_version() >= 70225
+    }
+
     pub fn standard_port(&self) -> u16 {
         match self {
             ChainType::MainNet => 9999,
@@ -375,7 +391,7 @@ impl ChainType {
     pub fn standard_dapi_jrpc_port(&self) -> u16 { 3000 }
 
     pub fn localhost(&self) -> SocketAddr {
-        SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::from(0x7f000001), self.standard_port()))
+        SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::from(0x7f000001), 0))
     }
 
     pub fn transaction_version(&self) -> u16 {

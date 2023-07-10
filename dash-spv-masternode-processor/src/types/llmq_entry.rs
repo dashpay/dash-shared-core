@@ -1,8 +1,8 @@
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, TryRead, LE};
 use std::ptr::null_mut;
-use crate::common::llmq_type::LLMQType;
-use crate::common::llmq_version::LLMQVersion;
+use crate::chain::common::LLMQType;
+use crate::common::LLMQVersion;
 use crate::consensus;
 use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
 use crate::ffi::boxer::{boxed, boxed_vec};
