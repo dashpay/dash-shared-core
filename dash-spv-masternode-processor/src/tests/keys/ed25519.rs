@@ -302,6 +302,7 @@ pub fn test_platform_node_key_derivation() {
     warn!("secret_key: {}", private_key.secret_key().0.to_hex());
     warn!("public_key_data: {}", private_key.public_key_data().to_hex());
 
+    let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
     //--------------------------------------------------------------------------------------------------//
     // Chain m/9'/5'/3'/4'/0' (last index is UInt256)
     //--------------------------------------------------------------------------------------------------//
@@ -309,21 +310,20 @@ pub fn test_platform_node_key_derivation() {
     let hardened = vec![true, true, true, true, true];
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
-    let key_id = &sha256::Hash::hash(&private_key.public_key_data())[..20];
-    let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
+    let key_id = UInt160::from(&sha256::Hash::hash(&private_key.public_key_data())[..20]);
     let base64_key = base64_engine.encode(&[private_key.secret_key().as_bytes(), &private_key.public_key_data()[..]].concat());
     assert_eq!(private_key.fingerprint(), 2497558984u32, "fingerprint is wrong");
     assert_eq!(private_key.chaincode().0.to_hex(), "587dc2c7de6d36e06c6de0a2989cd8cb112c1e41b543002a5ff422f3eb1e8cd6", "chain code is wrong");
     assert_eq!(private_key.secret_key().0.to_hex(), "7898dbaa7ab9b550e3befcd53dc276777ffc8a27124f830c04e17fcf74b9e071", "private key is wrong");
     assert_eq!(private_key.public_key_data().to_hex(), "08e2698fdcaa0af8416966ba9349b0c8dfaa80ed7f4094e032958a343e45f4b6", "public key is wrong");
-    assert_eq!(key_id.to_hex(), "c9bbba6a3ad5e87fb11af4f10458a52d3160259c", "key id is wrong");
+    assert_eq!(key_id.0.to_hex(), "c9bbba6a3ad5e87fb11af4f10458a52d3160259c", "key id is wrong");
     assert_eq!(base64_key, "eJjbqnq5tVDjvvzVPcJ2d3/8iicST4MMBOF/z3S54HEI4mmP3KoK+EFpZrqTSbDI36qA7X9AlOAylYo0PkX0tg==", "base64 is wrong");
     warn!("chain: m/9'/5'/3'/4'/0' (last index as UInt256)");
     warn!("fingerprint: {}", private_key.fingerprint());
     warn!("chaincode: {}", private_key.chaincode().0.to_hex());
     warn!("secret_key: {}", private_key.secret_key().0.to_hex());
     warn!("public_key_data: {}", private_key.public_key_data().to_hex());
-    warn!("key_id: {}", UInt160::from(key_id));
+    warn!("key_id: {}", key_id);
     warn!("base64: {}", base64_key);
 
     //--------------------------------------------------------------------------------------------------//
@@ -334,15 +334,13 @@ pub fn test_platform_node_key_derivation() {
     let index_path = IndexPath::<UInt256>::new_hardened(indexes, hardened);
     let private_key = seed_key.private_derive_to_256bit_derivation_path(&index_path).unwrap();
     let private_child = private_key.private_derive_to_path(&IndexPath::new_hardened(vec![0], vec![true])).unwrap();
-
-    let key_id = &sha256::Hash::hash(&private_child.public_key_data())[..20];
-    let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
+    let key_id = UInt160::from(&sha256::Hash::hash(&private_child.public_key_data())[..20]);
     let base64_key = base64_engine.encode(&[private_child.secret_key().as_bytes(), &private_child.public_key_data()[..]].concat());
     assert_eq!(private_child.fingerprint(), 2497558984u32, "fingerprint is wrong");
     assert_eq!(private_child.chaincode().0.to_hex(), "84971af242a6434a09371b9a1a036e7585426fc2602f7fac4a2a70f74ec84e3f", "chain code is wrong");
     assert_eq!(private_child.secret_key().0.to_hex(), "b8b76db1e1b37924465c754016a34df210bd7c507b671d9e9ec57442093d489d", "private key is wrong");
     assert_eq!(private_child.public_key_data().to_hex(), "9a26ef455a75b93e0a3febdc29171e91b8930c6bc6a9c1743b28ac76327f9a43", "public key is wrong");
-    assert_eq!(key_id.to_hex(), "11cebdf25e2a4d612055b4a287af6c28ffefdf4e", "key id is wrong");
+    assert_eq!(key_id.0.to_hex(), "11cebdf25e2a4d612055b4a287af6c28ffefdf4e", "key id is wrong");
     assert_eq!(base64_key, "uLdtseGzeSRGXHVAFqNN8hC9fFB7Zx2ensV0Qgk9SJ2aJu9FWnW5Pgo/69wpFx6RuJMMa8apwXQ7KKx2Mn+aQw==", "base64 is wrong");
 
     warn!("chain: m/9'/5'/3'/4'/0' (last index as u32)");
@@ -350,6 +348,6 @@ pub fn test_platform_node_key_derivation() {
     warn!("chaincode: {}", private_child.chaincode().0.to_hex());
     warn!("secret_key: {}", private_child.secret_key().0.to_hex());
     warn!("public_key_data: {}", private_child.public_key_data().to_hex());
-    warn!("key_id: {}", UInt160::from(key_id));
+    warn!("key_id: {}", key_id);
     warn!("base64: {}", base64_key);
 }
