@@ -42,7 +42,7 @@ jobs:
         working-directory: ./dash-shared-core
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/homebrew/lib/
-          cargo test --lib tests --verbose
+          cargo test --lib --verbose
       - name: Build Apple frameworks
         working-directory: ./dash-shared-core/dash-spv-apple-bindings
         run: |
