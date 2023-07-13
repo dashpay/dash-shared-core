@@ -20,11 +20,7 @@ pub mod address {
     }
 
     pub fn with_public_key_data(data: &[u8], map: &ScriptMap) -> String {
-        // TODO: SecAllocate SecureRandom
-        // NSMutableData *d = [NSMutableData secureDataWithCapacity:160 / 8 + 1];
-        // let d = SecureBox::new(160 / 8 + 1);
         let mut writer = SecVec::with_capacity(21);
-        // let mut d = Vec::<u8>::new();
         map.pubkey.enc(&mut writer);
         UInt160::hash160(data).enc(&mut writer);
         base58::check_encode_slice(&writer)
