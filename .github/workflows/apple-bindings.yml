@@ -22,7 +22,7 @@ jobs:
         run: |
           brew install gmp
       - name: Checkout dash-shared-core
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: dash-shared-core
           submodules: recursive
@@ -31,7 +31,7 @@ jobs:
           git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
         working-directory: ./dash-shared-core
       - name: Restore LFS cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         id: lfs-cache
         with:
           path: dash-shared-core/.git/lfs
@@ -41,7 +41,7 @@ jobs:
       - name: Run tests
         working-directory: ./dash-shared-core
         run: |
-          cargo test --package dash_spv_apple_bindings --lib tests
+          cargo test --package dash_spv_apple_bindings --lib tests --verbose
       - name: Build Apple frameworks
         working-directory: ./dash-shared-core/dash-spv-apple-bindings
         run: |
