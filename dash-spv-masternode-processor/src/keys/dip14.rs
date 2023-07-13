@@ -77,15 +77,12 @@ impl IChildKeyDerivationData<UInt256, UInt256, ECPoint> for ECDSAKey {
 
 impl IChildKeyDerivationData<u32, SigningKey, UInt256> for ED25519Key {
     fn private_key_data_input<PATH>(key: &SigningKey, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=u32> {
-        let index = path.index_at_position(position);
-        // let writer = &mut [0u8; 37];
-        let writer = &mut [0u8; 36];
-        if index & BIP32_HARD != 0 {
-            writer[..32].copy_from_slice(&key.to_bytes());
-        } else {
-            writer[..32].copy_from_slice(key.verifying_key().as_bytes());
-        }
-        writer[32..36].copy_from_slice(&index.to_be_bytes());
+        let mut index = path.index_at_position(position);
+        // it's always hardened
+        index |= BIP32_HARD;
+        let writer = &mut [0u8; 37];
+        writer[1..33].copy_from_slice(&key.to_bytes());
+        writer[33..37].copy_from_slice(&index.to_be_bytes());
         writer.to_vec()
     }
 
