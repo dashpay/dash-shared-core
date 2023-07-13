@@ -18,6 +18,9 @@ jobs:
       - name: Install automake
         run: |
           brew install automake
+      - name: Install gmp
+        run: |
+          brew install gmp
       - name: Checkout dash-shared-core
         uses: actions/checkout@v2
         with:
