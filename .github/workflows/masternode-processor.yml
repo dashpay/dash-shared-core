@@ -41,5 +41,5 @@ jobs:
       - name: Run tests
         working-directory: ./dash-shared-core/dash-spv-masternode-processor
         run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/homebrew/lib/
           cargo test --package dash-spv-masternode-processor --lib tests --verbose
