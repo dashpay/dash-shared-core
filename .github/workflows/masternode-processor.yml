@@ -35,7 +35,7 @@ jobs:
         id: lfs-cache
         with:
           path: dash-shared-core/.git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}-v1
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}-v3
       - name: Rustup add targets
         run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
       - name: Run tests
