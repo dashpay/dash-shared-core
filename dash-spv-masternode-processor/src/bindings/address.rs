@@ -20,19 +20,27 @@ pub extern "C" fn address_from_hash160(hash: *const u8, chain_type: ChainType) -
 /// # Safety
 #[no_mangle]
 pub extern "C" fn address_with_script_pubkey(script: *const u8, script_len: usize, chain_type: ChainType) -> *mut c_char {
-    let script = unsafe { slice::from_raw_parts(script, script_len) };
-    let script_map = chain_type.script_map();
-    address::with_script_pub_key(&script.to_vec(), &script_map)
-        .to_c_string_ptr()
+    if script.is_null() {
+        std::ptr::null_mut()
+    } else {
+        let script = unsafe { slice::from_raw_parts(script, script_len) };
+        let script_map = chain_type.script_map();
+        address::with_script_pub_key(&script.to_vec(), &script_map)
+            .to_c_string_ptr()
+    }
 }
 
 /// # Safety
 #[no_mangle]
 pub extern "C" fn address_with_script_sig(script: *const u8, script_len: usize, chain_type: ChainType) -> *mut c_char {
-    let script = unsafe { slice::from_raw_parts(script, script_len) };
-    let script_map = chain_type.script_map();
-    address::with_script_sig(&script.to_vec(), &script_map)
-        .to_c_string_ptr()
+    if script.is_null() {
+        std::ptr::null_mut()
+    } else {
+        let script = unsafe { slice::from_raw_parts(script, script_len) };
+        let script_map = chain_type.script_map();
+        address::with_script_sig(&script.to_vec(), &script_map)
+            .to_c_string_ptr()
+    }
 }
 
 /// # Safety
