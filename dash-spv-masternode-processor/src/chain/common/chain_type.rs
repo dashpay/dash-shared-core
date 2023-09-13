@@ -1,9 +1,9 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
-use hashes::hex::FromHex;
-use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::chain::common::LLMQType;
 use crate::chain::params::DUFFS;
+use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::crypto::{byte_util::Reversable, UInt256};
+use hashes::hex::FromHex;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 pub trait IHaveChainSettings {
     fn genesis_hash(&self) -> UInt256;
@@ -13,10 +13,10 @@ pub trait IHaveChainSettings {
     fn chain_locks_type(&self) -> LLMQType;
     fn platform_type(&self) -> LLMQType;
     fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool {
-        self.chain_locks_type() == llmq_type ||
-            self.is_llmq_type() == llmq_type ||
-            self.platform_type() == llmq_type ||
-            self.isd_llmq_type() == llmq_type
+        self.chain_locks_type() == llmq_type
+            || self.is_llmq_type() == llmq_type
+            || self.platform_type() == llmq_type
+            || self.isd_llmq_type() == llmq_type
     }
     fn is_evolution_enabled(&self) -> bool;
     fn name(&self) -> String;
@@ -24,6 +24,7 @@ pub trait IHaveChainSettings {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub enum ChainType {
     #[default]
     MainNet,
@@ -52,6 +53,7 @@ impl From<ChainType> for i16 {
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub enum DevnetType {
     JackDaniels = 0,
     Devnet333 = 1,
@@ -77,7 +79,7 @@ impl From<ChainType> for DevnetType {
     fn from(orig: ChainType) -> Self {
         match orig {
             ChainType::DevNet(devnet_type) => devnet_type,
-            _ => panic!("Can't get DevnetType from ChainType {:?}", orig)
+            _ => panic!("Can't get DevnetType from ChainType {:?}", orig),
         }
     }
 }
@@ -133,11 +135,10 @@ impl From<&str> for DevnetType {
             "devnet-screwdriver" => DevnetType::Screwdriver,
             "devnet-absinthe" => DevnetType::Absinthe,
             "devnet-bintang" => DevnetType::Bintang,
-            _ => panic!("Devnet with name: {} not supported", value)
+            _ => panic!("Devnet with name: {} not supported", value),
         }
     }
 }
-
 
 impl DevnetType {
     pub fn identifier(&self) -> String {
@@ -153,7 +154,8 @@ impl DevnetType {
             DevnetType::Screwdriver => "devnet-screwdriver",
             DevnetType::Absinthe => "devnet-absinthe",
             DevnetType::Bintang => "devnet-bintang",
-        }.to_string()
+        }
+        .to_string()
     }
 
     pub fn version(&self) -> u16 {
@@ -175,16 +177,23 @@ impl ChainType {
     }
 
     pub fn user_agent(&self) -> String {
-        format!("/dash-spv-core:{}{}/", env!("CARGO_PKG_VERSION"),
-                match self {
-                    ChainType::MainNet => format!(""),
-                    ChainType::TestNet => format!("(testnet)"),
-                    ChainType::DevNet(devnet_type) => format!("(devnet.{})", devnet_type.identifier())
-                })
+        format!(
+            "/dash-spv-core:{}{}/",
+            env!("CARGO_PKG_VERSION"),
+            match self {
+                ChainType::MainNet => format!(""),
+                ChainType::TestNet => format!("(testnet)"),
+                ChainType::DevNet(devnet_type) => format!("(devnet.{})", devnet_type.identifier()),
+            }
+        )
     }
 
     pub fn coin_type(&self) -> u32 {
-        if self.is_mainnet() { 5 } else { 1 }
+        if self.is_mainnet() {
+            5
+        } else {
+            1
+        }
     }
 
     pub fn devnet_identifier(&self) -> Option<String> {
@@ -207,36 +216,43 @@ impl ChainType {
         match self {
             ChainType::MainNet => vec!["dnsseed.dash.org"],
             ChainType::TestNet => vec!["testnet-seed.dashdot.io"],
-            ChainType::DevNet(_) => vec![]
+            ChainType::DevNet(_) => vec![],
         }
     }
 
     pub fn script_map(&self) -> ScriptMap {
         match self {
             ChainType::MainNet => ScriptMap::MAINNET,
-            _ => ScriptMap::TESTNET
+            _ => ScriptMap::TESTNET,
         }
     }
     pub fn bip32_script_map(&self) -> BIP32ScriptMap {
         match self {
             ChainType::MainNet => BIP32ScriptMap::MAINNET,
-            _ => BIP32ScriptMap::TESTNET
+            _ => BIP32ScriptMap::TESTNET,
         }
     }
     pub fn dip14_script_map(&self) -> DIP14ScriptMap {
         match self {
             ChainType::MainNet => DIP14ScriptMap::MAINNET,
-            _ => DIP14ScriptMap::TESTNET
+            _ => DIP14ScriptMap::TESTNET,
         }
     }
 }
 
 impl IHaveChainSettings for ChainType {
-
     fn genesis_hash(&self) -> UInt256 {
         match self {
-            ChainType::MainNet => UInt256::from_hex("00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6").unwrap().reverse(),
-            ChainType::TestNet => UInt256::from_hex("00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c").unwrap().reverse(),
+            ChainType::MainNet => UInt256::from_hex(
+                "00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6",
+            )
+            .unwrap()
+            .reverse(),
+            ChainType::TestNet => UInt256::from_hex(
+                "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
+            )
+            .unwrap()
+            .reverse(),
             ChainType::DevNet(devnet_type) => devnet_type.genesis_hash(),
         }
     }
@@ -285,23 +301,36 @@ impl IHaveChainSettings for ChainType {
         match self {
             Self::MainNet => "Mainnet".to_string(),
             Self::TestNet => "Testnet".to_string(),
-            Self::DevNet(devnet) => devnet.name()
+            Self::DevNet(devnet) => devnet.name(),
         }
     }
 }
 
 impl IHaveChainSettings for DevnetType {
-
     fn genesis_hash(&self) -> UInt256 {
         UInt256::from_hex(match self {
-            DevnetType::JackDaniels => "79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26",
-            DevnetType::Chacha => "8862eca4bdb5255b51dc72903b8a842f6ffe7356bc40c7b7a7437b8e4556e220",
-            DevnetType::Mojito => "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357",
-            DevnetType::WhiteRussian => "9163d6958065ca5e73c36f0f2474ce618846260c215f5cba633bd0003585cb35",
-            DevnetType::Screwdriver => "4ac35ceb629e529b2a0eb2e2676983d4b11ebddaff5bd00cae7156a02b521e6f",
-            DevnetType::Absinthe => "53ab7716f36a92068d7bbfa6475681018788a438e028d8bfdf86bfff4f6b78ab",
+            DevnetType::JackDaniels => {
+                "79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26"
+            },
+            DevnetType::Chacha => {
+                "8862eca4bdb5255b51dc72903b8a842f6ffe7356bc40c7b7a7437b8e4556e220"
+            },
+            DevnetType::Mojito => {
+                "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357"
+            },
+            DevnetType::WhiteRussian => {
+                "9163d6958065ca5e73c36f0f2474ce618846260c215f5cba633bd0003585cb35"
+            },
+            DevnetType::Screwdriver => {
+                "4ac35ceb629e529b2a0eb2e2676983d4b11ebddaff5bd00cae7156a02b521e6f"
+            },
+            DevnetType::Absinthe => {
+                "53ab7716f36a92068d7bbfa6475681018788a438e028d8bfdf86bfff4f6b78ab"
+            },
             _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
-        }).unwrap().reverse()
+        })
+        .unwrap()
+        .reverse()
     }
 
     fn genesis_height(&self) -> u32 {
@@ -351,18 +380,24 @@ impl ChainType {
             "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         } else {
             "00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-        }).unwrap().reverse()
+        })
+        .unwrap()
+        .reverse()
     }
 
     pub fn max_proof_of_work_target(&self) -> u32 {
-        if self.is_devnet_any() { 0x207fffff } else { 0x1e0fffff }
+        if self.is_devnet_any() {
+            0x207fffff
+        } else {
+            0x1e0fffff
+        }
     }
 
     pub fn min_protocol_version(&self) -> u32 {
         match self {
             ChainType::MainNet => 70218,
             ChainType::TestNet => 70218,
-            ChainType::DevNet(_) => 70219
+            ChainType::DevNet(_) => 70219,
         }
     }
 
@@ -370,7 +405,7 @@ impl ChainType {
         match self {
             ChainType::MainNet => 70228,
             ChainType::TestNet => 70228,
-            ChainType::DevNet(_) => 70228
+            ChainType::DevNet(_) => 70228,
         }
     }
 
@@ -382,13 +417,17 @@ impl ChainType {
         match self {
             ChainType::MainNet => 9999,
             ChainType::TestNet => 19999,
-            ChainType::DevNet(_) => 20001
+            ChainType::DevNet(_) => 20001,
         }
     }
 
-    pub fn standard_dapi_grpc_port(&self) -> u16 { 3010 }
+    pub fn standard_dapi_grpc_port(&self) -> u16 {
+        3010
+    }
 
-    pub fn standard_dapi_jrpc_port(&self) -> u16 { 3000 }
+    pub fn standard_dapi_jrpc_port(&self) -> u16 {
+        3000
+    }
 
     pub fn localhost(&self) -> SocketAddr {
         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::from(0x7f000001), 0))
@@ -405,7 +444,7 @@ impl ChainType {
     pub fn base_reward(&self) -> u64 {
         match self {
             ChainType::MainNet => 5 * DUFFS,
-            _ => 50 * DUFFS
+            _ => 50 * DUFFS,
         }
     }
 
@@ -453,7 +492,7 @@ impl ChainType {
         match self {
             ChainType::MainNet => 20,
             ChainType::TestNet => 40,
-            ChainType::DevNet(_) => 4
+            ChainType::DevNet(_) => 4,
         }
     }
 
@@ -461,8 +500,7 @@ impl ChainType {
         match self {
             ChainType::MainNet => 1899072,
             ChainType::TestNet => 850100,
-            ChainType::DevNet(_) => 0
+            ChainType::DevNet(_) => 0,
         }
     }
-
 }

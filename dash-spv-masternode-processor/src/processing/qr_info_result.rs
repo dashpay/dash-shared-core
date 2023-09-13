@@ -1,30 +1,28 @@
-use crate::models;
-use crate::processing::{MNListDiffResult, ProcessingError};
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct QRInfoResult {
-    pub error_status: ProcessingError,
-    pub result_at_tip: MNListDiffResult,
-    pub result_at_h: MNListDiffResult,
-    pub result_at_h_c: MNListDiffResult,
-    pub result_at_h_2c: MNListDiffResult,
-    pub result_at_h_3c: MNListDiffResult,
-    pub result_at_h_4c: Option<MNListDiffResult>,
+    pub error_status: crate::processing::processing_error::ProcessingError,
+    pub result_at_tip: crate::processing::mn_listdiff_result::MNListDiffResult,
+    pub result_at_h: crate::processing::mn_listdiff_result::MNListDiffResult,
+    pub result_at_h_c: crate::processing::mn_listdiff_result::MNListDiffResult,
+    pub result_at_h_2c: crate::processing::mn_listdiff_result::MNListDiffResult,
+    pub result_at_h_3c: crate::processing::mn_listdiff_result::MNListDiffResult,
+    pub result_at_h_4c: Option<crate::processing::mn_listdiff_result::MNListDiffResult>,
 
-    pub snapshot_at_h_c: models::LLMQSnapshot,
-    pub snapshot_at_h_2c: models::LLMQSnapshot,
-    pub snapshot_at_h_3c: models::LLMQSnapshot,
-    pub snapshot_at_h_4c: Option<models::LLMQSnapshot>,
+    pub snapshot_at_h_c: crate::models::snapshot::LLMQSnapshot,
+    pub snapshot_at_h_2c: crate::models::snapshot::LLMQSnapshot,
+    pub snapshot_at_h_3c: crate::models::snapshot::LLMQSnapshot,
+    pub snapshot_at_h_4c: Option<crate::models::snapshot::LLMQSnapshot>,
 
     pub extra_share: bool,
-    pub last_quorum_per_index: Vec<models::LLMQEntry>,
-    pub quorum_snapshot_list: Vec<models::LLMQSnapshot>,
-    pub mn_list_diff_list: Vec<MNListDiffResult>,
+    pub last_quorum_per_index: Vec<crate::models::llmq_entry::LLMQEntry>,
+    pub quorum_snapshot_list: Vec<crate::models::snapshot::LLMQSnapshot>,
+    pub mn_list_diff_list: Vec<crate::processing::mn_listdiff_result::MNListDiffResult>,
 }
 impl Default for QRInfoResult {
     fn default() -> Self {
         Self {
-            error_status: ProcessingError::None,
+            error_status: crate::processing::ProcessingError::None,
             result_at_tip: Default::default(),
             result_at_h: Default::default(),
             result_at_h_c: Default::default(),
@@ -44,7 +42,7 @@ impl Default for QRInfoResult {
 }
 
 impl QRInfoResult {
-    pub fn default_with_error(error: ProcessingError) -> Self {
+    pub fn default_with_error(error: crate::processing::ProcessingError) -> Self {
         Self { error_status: error, ..Self::default() }
     }
 }

@@ -1,13 +1,13 @@
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, TryRead, LE};
+use rs_ffi_interfaces::{boxed_vec, unbox_vec_ptr};
 use crate::common::LLMQSnapshotSkipMode;
 use crate::consensus::encode;
 use crate::crypto::byte_util::BytesDecodable;
-use crate::ffi::boxer::boxed_vec;
 use crate::impl_bytes_decodable;
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct LLMQSnapshot {
     pub member_list_length: usize,
     pub member_list: *mut u8,
@@ -42,5 +42,16 @@ impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
             },
             *offset,
         ))
+    }
+}
+
+impl Drop for LLMQSnapshot {
+    fn drop(&mut self) {
+        unsafe {
+            let member_list = unbox_vec_ptr(self.member_list, self.member_list_length);
+            drop(member_list);
+            let skip_list = unbox_vec_ptr(self.skip_list, self.skip_list_length);
+            drop(skip_list);
+        }
     }
 }

@@ -7,6 +7,7 @@ use crate::crypto::byte_util::BytesDecodable;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct DKGParams {
     pub interval: u32, // one DKG per hour
     pub phase_blocks: u32,
@@ -16,11 +17,11 @@ pub struct DKGParams {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct LLMQParams {
     pub r#type: LLMQType,
     pub name: &'static str,
-    // pub use_rotation: bool,
     pub size: u32,
     pub min_size: u32,
     pub threshold: u32,
@@ -287,6 +288,7 @@ pub const LLMQ_DEV_PLATFORM: LLMQParams = LLMQParams {
 #[warn(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub enum LLMQType {
     LlmqtypeUnknown = 0,    // other kind of
     Llmqtype50_60 = 1,      // 50 members,  30  (60%) threshold, 24 / day
@@ -411,3 +413,4 @@ impl<'a> BytesDecodable<'a, LLMQType> for LLMQType {
         bytes.read_with::<LLMQType>(offset, byte::LE).ok()
     }
 }
+

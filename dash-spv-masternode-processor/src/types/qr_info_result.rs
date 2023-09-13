@@ -3,7 +3,7 @@ use crate::processing::ProcessingError;
 use crate::types;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct QRInfoResult {
     pub error_status: ProcessingError,
     pub result_at_tip: *mut types::MNListDiffResult,
@@ -54,5 +54,62 @@ impl Default for QRInfoResult {
 impl QRInfoResult {
     pub fn default_with_error(error: ProcessingError) -> Self {
         Self { error_status: error, ..Default::default() }
+    }
+}
+
+impl Drop for QRInfoResult {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.result_at_tip.is_null() {
+                rs_ffi_interfaces::unbox_any(self.result_at_tip);
+            }
+            if !self.result_at_h.is_null() {
+                rs_ffi_interfaces::unbox_any(self.result_at_h);
+            }
+            if !self.result_at_h_c.is_null() {
+                rs_ffi_interfaces::unbox_any(self.result_at_h_c);
+            }
+            if !self.result_at_h_2c.is_null() {
+                rs_ffi_interfaces::unbox_any(self.result_at_h_2c);
+            }
+            if !self.result_at_h_3c.is_null() {
+                rs_ffi_interfaces::unbox_any(self.result_at_h_3c);
+            }
+            if !self.snapshot_at_h_c.is_null() {
+                rs_ffi_interfaces::unbox_any(self.snapshot_at_h_c);
+            }
+            if !self.snapshot_at_h_2c.is_null() {
+                rs_ffi_interfaces::unbox_any(self.snapshot_at_h_2c);
+            }
+            if !self.snapshot_at_h_3c.is_null() {
+                rs_ffi_interfaces::unbox_any(self.snapshot_at_h_3c);
+            }
+            if self.extra_share {
+                if !self.result_at_h_4c.is_null() {
+                    rs_ffi_interfaces::unbox_any(self.result_at_h_4c);
+                }
+                if !self.snapshot_at_h_4c.is_null() {
+                    rs_ffi_interfaces::unbox_any(self.snapshot_at_h_4c);
+                }
+            }
+            if !self.last_quorum_per_index.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.last_quorum_per_index,
+                    self.last_quorum_per_index_count,
+                );
+            }
+            if !self.quorum_snapshot_list.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.quorum_snapshot_list,
+                    self.quorum_snapshot_list_count,
+                );
+            }
+            if !self.mn_list_diff_list.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.mn_list_diff_list,
+                    self.mn_list_diff_list_count,
+                );
+            }
+        }
     }
 }

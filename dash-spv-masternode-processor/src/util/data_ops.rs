@@ -4,8 +4,6 @@ use std::fmt::Write;
 use crate::consensus::Encodable;
 use crate::crypto::UInt256;
 
-pub const DASH_MESSAGE_MAGIC: &str = "DarkCoin Signed Message:\n";
-
 #[inline]
 pub fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();

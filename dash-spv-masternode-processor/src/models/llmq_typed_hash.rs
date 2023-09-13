@@ -1,13 +1,14 @@
-use crate::chain::common::LLMQType;
 use crate::crypto::UInt256;
 
 #[derive(Debug, Copy, Clone)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct LLMQTypedHash {
-    pub r#type: LLMQType,
+    pub r#type: crate::chain::common::llmq_type::LLMQType,
     pub hash: UInt256,
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct LLMQIndexedHash {
     pub index: u32,
     pub hash: UInt256,

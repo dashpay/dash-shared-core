@@ -134,12 +134,12 @@ impl FromFFI for types::MasternodeList {
             quorums: (0..self.llmq_type_maps_count).into_iter().fold(
                 BTreeMap::new(),
                 |mut acc, i| {
-                    let llmq_map = *(*self.llmq_type_maps.add(i));
+                    let llmq_map = &*(*self.llmq_type_maps.add(i));
                     let key = chain::common::LLMQType::from(llmq_map.llmq_type);
                     let value: BTreeMap<UInt256, models::LLMQEntry> = (0..llmq_map.count)
                         .into_iter()
                         .fold(BTreeMap::new(), |mut acc, j| {
-                            let raw_value = *(*llmq_map.values.add(j));
+                            let raw_value = &*(*llmq_map.values.add(j));
                             let value = raw_value.decode();
                             let key = value.llmq_hash;
                             acc.insert(key, value);

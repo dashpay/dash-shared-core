@@ -1,32 +1,11 @@
-use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::ptr::null_mut;
 use bls_signatures::BlsError;
-use crate::ffi::boxer::boxed;
+use rs_ffi_interfaces::boxed;
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, KeyKind};
 
 pub trait AsOpaqueKey {
     fn to_opaque_ptr(self) -> *mut OpaqueKey;
-}
-
-pub trait AsCStringPtr {
-    fn to_c_string_ptr(self) -> *mut c_char;
-}
-
-impl AsCStringPtr for String {
-    fn to_c_string_ptr(self) -> *mut c_char {
-        CString::new(self).unwrap().into_raw()
-    }
-}
-
-impl AsCStringPtr for Option<String> {
-    fn to_c_string_ptr(self) -> *mut c_char {
-        if let Some(str) = self {
-            CString::new(str).unwrap().into_raw()
-        } else {
-            null_mut()
-        }
-    }
 }
 
 #[repr(C)]

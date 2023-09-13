@@ -8,6 +8,7 @@ use crate::crypto::byte_util::BytesDecodable;
 #[warn(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub enum LLMQVersion {
     Default = 1,
     Indexed = 2,

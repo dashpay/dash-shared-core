@@ -5,16 +5,15 @@ pub mod tests {
     extern crate reqwest;
     use byte::BytesExt;
     use hashes::hex::{FromHex, ToHex};
+    use rs_ffi_interfaces::{boxed, unbox_any};
     use serde::{Deserialize, Serialize};
     use std::io::Read;
     use std::ptr::null_mut;
     use std::{env, fs, slice};
     use crate::bindings::common::{processor_create_cache, register_processor, register_rust_logger};
     use crate::bindings::masternode::{process_mnlistdiff_from_message, process_qrinfo_from_message};
-    use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
-    use crate::ffi::unboxer::unbox_any;
     use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384};

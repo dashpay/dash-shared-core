@@ -2,8 +2,8 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use crate::chain::common::{ChainType, DevnetType};
 use crate::ffi::ByteArray;
-use crate::types::opaque_key::AsCStringPtr;
 use crate::util::data_append::DataAppend;
+
 
 /// # Safety
 #[no_mangle]
@@ -90,8 +90,8 @@ pub extern "C" fn chain_devnet_version(devnet_type: DevnetType) -> u16 {
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn chain_devnet_identifier(devnet_type: DevnetType) -> *mut c_char {
-    devnet_type.identifier().to_c_string_ptr()
+pub unsafe extern "C" fn chain_devnet_identifier(devnet_type: DevnetType) -> *mut c_char {
+    rs_ffi_interfaces::FFIConversion::ffi_to(devnet_type.identifier())
 }
 
 /// # Safety
@@ -115,8 +115,8 @@ pub extern "C" fn chain_type_is_devnet_any(chain_type: ChainType) -> bool {
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn devnet_identifier_for_chain_type(chain_type: ChainType) -> *mut c_char {
-    chain_type.devnet_identifier().to_c_string_ptr()
+pub unsafe extern "C" fn devnet_identifier_for_chain_type(chain_type: ChainType) -> *mut c_char {
+    rs_ffi_interfaces::FFIConversion::ffi_to_opt(chain_type.devnet_identifier())
 }
 
 /// # Safety

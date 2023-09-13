@@ -6,6 +6,7 @@ use crate::crypto::UInt384;
 use crate::keys::BLSKey;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct OperatorPublicKey {
     pub data: UInt384,
     pub version: u16,

@@ -4,6 +4,7 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::UInt768;
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct QuorumsCLSigsObject {
     pub signature: UInt768,
     pub index_set: Vec<u16>,

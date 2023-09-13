@@ -3,7 +3,7 @@ use std::ptr::null_mut;
 use crate::processing::ProcessingError;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct MNListDiffResult {
     pub error_status: ProcessingError,
     pub base_block_hash: *mut [u8; 32],
@@ -63,5 +63,55 @@ impl MNListDiffResult {
             && self.has_valid_quorums
             && self.has_valid_mn_list_root
             && self.has_valid_llmq_list_root
+    }
+}
+
+impl Drop for MNListDiffResult {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.base_block_hash.is_null() {
+                rs_ffi_interfaces::unbox_any(self.base_block_hash);
+            }
+            if !self.block_hash.is_null() {
+                rs_ffi_interfaces::unbox_any(self.block_hash);
+            }
+            if !self.masternode_list.is_null() {
+                rs_ffi_interfaces::unbox_any(self.masternode_list);
+            }
+            if !self.needed_masternode_lists.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.needed_masternode_lists,
+                    self.needed_masternode_lists_count,
+                );
+            }
+            if !self.added_masternodes.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.added_masternodes,
+                    self.added_masternodes_count,
+                );
+            }
+            if !self.modified_masternodes.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.modified_masternodes,
+                    self.modified_masternodes_count,
+                );
+            }
+            if !self.added_llmq_type_maps.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.added_llmq_type_maps,
+                    self.added_llmq_type_maps_count,
+                );
+            }
+            if !self.quorums_cl_sigs.is_null() {
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.quorums_cl_sigs,
+                    self.quorums_cl_sigs_count,
+                );
+                rs_ffi_interfaces::unbox_any_vec_ptr(
+                    self.quorums_cl_sigs,
+                    self.quorums_cl_sigs_count,
+                );
+            }
+        }
     }
 }

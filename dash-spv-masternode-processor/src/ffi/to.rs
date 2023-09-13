@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
+use rs_ffi_interfaces::{boxed, boxed_vec};
 use crate::{chain, common, models, tx, types};
 use crate::crypto::UInt256;
-use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
 
 pub trait ToFFI {

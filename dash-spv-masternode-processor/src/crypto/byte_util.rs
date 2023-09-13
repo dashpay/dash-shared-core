@@ -40,16 +40,22 @@ pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct UInt128(pub [u8; 16]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct UInt160(pub [u8; 20]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct UInt256(pub [u8; 32]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct UInt384(pub [u8; 48]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct UInt512(pub [u8; 64]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct UInt768(pub [u8; 96]);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -72,6 +78,18 @@ macro_rules! impl_ffi_bytearray {
                 } else {
                     ffi::ByteArray::default()
                 }
+            }
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! impl_from_const_ptr {
+    ($var_type: ident, $byte_len: expr) => {
+        impl From<*const [u8; $byte_len]> for $var_type {
+            fn from(value: *const [u8; $byte_len]) -> Self {
+                let slice = unsafe { &*value };
+                $var_type(*slice)
             }
         }
     }
@@ -218,6 +236,7 @@ macro_rules! define_bytes_to_big_uint {
         define_try_read_to_big_uint!($uint_type, $byte_len);
         define_try_write_from_big_uint!($uint_type);
         impl_decodable!($uint_type, $byte_len);
+        impl_from_const_ptr!($uint_type, $byte_len);
         define_try_from_bytes!($uint_type);
         impl_ffi_bytearray!($uint_type);
         #[cfg(feature = "generate-dashj-tests")]

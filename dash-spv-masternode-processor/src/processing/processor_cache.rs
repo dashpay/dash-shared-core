@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use rs_ffi_interfaces::FFIConversion;
 use crate::chain::common;
 use crate::crypto::UInt256;
 use crate::models;
@@ -86,5 +87,31 @@ impl MasternodeProcessorCache {
                 map.remove(h);
             });
         });
+    }
+}
+
+// We need to do this in order to work with proc macro for methods
+// as when processing methods where MasternodeProcessorCache is declared as parameter
+// it's transformed into MasternodeProcessorCache
+pub type MasternodeProcessorCacheFFI = MasternodeProcessorCache;
+
+impl FFIConversion<MasternodeProcessorCache> for MasternodeProcessorCacheFFI {
+    unsafe fn ffi_from_const(ffi: *const Self) -> MasternodeProcessorCache {
+        panic!("It's not intended")
+    }
+
+    unsafe fn ffi_to_const(obj: MasternodeProcessorCache) -> *const Self {
+        rs_ffi_interfaces::boxed(obj)
+    }
+
+    unsafe fn ffi_from(ffi: *mut Self) -> MasternodeProcessorCache {
+        // After unboxing MasternodeProcessorCache we've taken back ownership of the memory in Rust
+        // So we should not attempt to free or use the raw pointer in C again after this, as it would lead to undefined behavior
+        // So we have to to re-box it and send it back to C again
+        *rs_ffi_interfaces::unbox_any(ffi)
+    }
+
+    unsafe fn ffi_to(obj: MasternodeProcessorCache) -> *mut Self {
+        rs_ffi_interfaces::boxed(obj)
     }
 }

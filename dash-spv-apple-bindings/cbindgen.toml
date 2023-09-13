@@ -6,5 +6,58 @@ line_length = 80
 tab_width = 4
 documentation_style = "c"
 style = "tag"
-swift_enum_macro = "CF_ENUM"
+#swift_enum_macro = "CF_ENUM"
 include_guard = "dash_shared_core_h"
+
+[parse]
+parse_deps = true
+#expand = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
+include = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
+extra_bindings = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
+
+[enum]
+prefix_with_name = true
+#rename_variants = "None"
+## must_use = "MUST_USE_ENUM"
+#add_sentinel = false
+#derive_helper_methods = false
+#derive_const_casts = false
+#derive_mut_casts = false
+## cast_assert_name = "ASSERT"
+#derive_tagged_enum_destructor = false
+#derive_tagged_enum_copy_constructor = false
+#enum_class = true
+#private_default_tagged_enum_constructor = false
+
+
+#// Here we write down crate names (!) where we want to retrieve C-bindings
+#let includes = vec![
+#"dash-spv-masternode-processor".to_string(),
+#"rs-merk-verify-c-binding".to_string()
+#];
+#let config = cbindgen::Config {
+#language: cbindgen::Language::C,
+#parse: cbindgen::ParseConfig {
+#parse_deps: true,
+#include: Some(includes.clone()),
+#extra_bindings: includes.clone(),
+#expand: cbindgen::ParseExpandConfig {
+#crates: includes.clone(),
+#..Default::default()
+#},
+#..Default::default()
+#},
+#enumeration: cbindgen::EnumConfig {
+#prefix_with_name: true,
+#..Default::default()
+#},
+#braces: cbindgen::Braces::SameLine,
+#line_length: 80,
+#tab_width: 4,
+#documentation_style: cbindgen::DocumentationStyle::C,
+#include_guard: Some("dash_shared_core_h".to_string()),
+#..Default::default()
+#};
+#cbindgen::generate_with_config(&crate_dir, config)
+#.unwrap()
+#.write_to_file("../target/dash_shared_core.h");

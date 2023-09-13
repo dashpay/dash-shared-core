@@ -1,11 +1,11 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use std::ptr::null_mut;
+use rs_ffi_interfaces::{boxed_vec, unbox_any};
 use crate::crypto::VarBytes;
-use crate::ffi::boxer::boxed_vec;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct TransactionOutput {
     pub amount: u64,
     pub script: *mut u8,
@@ -28,5 +28,18 @@ impl<'a> TryRead<'a, Endian> for TransactionOutput {
             },
             *offset,
         ))
+    }
+}
+
+impl Drop for TransactionOutput {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.script.is_null() && self.script_length > 0 {
+                unbox_any(std::ptr::slice_from_raw_parts_mut(self.script, self.script_length));
+            }
+            if !self.address.is_null() && self.address_length > 0 {
+                unbox_any(std::ptr::slice_from_raw_parts_mut(self.address, self.address_length) as *mut [u8]);
+            }
+        }
     }
 }

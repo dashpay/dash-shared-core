@@ -1,6 +1,3 @@
-// block height indicating transaction is unconfirmed
-pub const TX_UNCONFIRMED: i32 = i32::MAX;
-
 pub static SIGHASH_ALL: u32 = 1;
 pub static TX_VERSION: u32 = 0x00000001;
 pub static SPECIAL_TX_VERSION: u32 = 0x00000003;

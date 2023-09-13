@@ -10,7 +10,6 @@ pub use self::transaction::Transaction;
 pub use self::transaction::TransactionInput;
 pub use self::transaction::TransactionOutput;
 pub use self::transaction::TransactionType;
-pub use self::transaction::TX_UNCONFIRMED;
 
 impl_bytes_decodable!(TransactionInput);
 impl_bytes_decodable!(TransactionOutput);

@@ -1,13 +1,13 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use std::ptr::null_mut;
+use crate::chain::params::TX_UNCONFIRMED;
 use crate::consensus;
-use crate::ffi::boxer::{boxed, boxed_vec};
-use crate::tx::{TransactionType, TX_UNCONFIRMED};
+use crate::tx::TransactionType;
 use crate::types::{TransactionInput, TransactionOutput};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Transaction {
     pub inputs: *mut *mut TransactionInput,
     pub inputs_count: usize,
@@ -33,21 +33,21 @@ impl<'a> TryRead<'a, Endian> for Transaction {
         }
         let mut inputs_vec: Vec<*mut TransactionInput> = Vec::with_capacity(inputs_count);
         for _i in 0..inputs_count {
-            inputs_vec.push(boxed(bytes.read_with::<TransactionInput>(offset, LE)?));
+            inputs_vec.push(rs_ffi_interfaces::boxed(bytes.read_with::<TransactionInput>(offset, LE)?));
         }
         let outputs_count = bytes
             .read_with::<consensus::encode::VarInt>(offset, LE)?
             .0 as usize;
         let mut outputs_vec: Vec<*mut TransactionOutput> = Vec::new();
         for _i in 0..outputs_count {
-            outputs_vec.push(boxed(bytes.read_with::<TransactionOutput>(offset, LE)?));
+            outputs_vec.push(rs_ffi_interfaces::boxed(bytes.read_with::<TransactionOutput>(offset, LE)?));
         }
         let lock_time = bytes.read_with::<u32>(offset, LE)?;
         Ok((
             Self {
-                inputs: boxed_vec(inputs_vec),
+                inputs: rs_ffi_interfaces::boxed_vec(inputs_vec),
                 inputs_count,
-                outputs: boxed_vec(outputs_vec),
+                outputs: rs_ffi_interfaces::boxed_vec(outputs_vec),
                 outputs_count,
                 tx_hash: null_mut(),
                 version,
@@ -58,5 +58,15 @@ impl<'a> TryRead<'a, Endian> for Transaction {
             },
             *offset,
         ))
+    }
+}
+
+impl Drop for Transaction {
+    fn drop(&mut self) {
+        unsafe {
+            rs_ffi_interfaces::unbox_any_vec_ptr(self.inputs, self.inputs_count);
+            rs_ffi_interfaces::unbox_any_vec_ptr(self.outputs, self.outputs_count);
+            rs_ffi_interfaces::unbox_any(self.tx_hash);
+        }
     }
 }

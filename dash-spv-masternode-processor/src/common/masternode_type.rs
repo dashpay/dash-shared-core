@@ -6,6 +6,7 @@ use crate::crypto::byte_util::BytesDecodable;
 
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub enum MasternodeType {
     Regular = 0,
     HighPerformance = 1,

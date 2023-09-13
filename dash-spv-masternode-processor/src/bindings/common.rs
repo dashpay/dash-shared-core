@@ -1,12 +1,12 @@
 use std::ffi::CString;
 use std::fs::File;
 use std::os::raw::c_char;
+use rs_ffi_interfaces::unbox_any;
 use simplelog::{ColorChoice, CombinedLogger, ConfigBuilder, LevelFilter, TerminalMode, TermLogger, WriteLogger};
 use crate::crypto::byte_util::ConstDecodable;
 use crate::crypto::UInt256;
-use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
-use crate::ffi::unboxer::{unbox_any, unbox_block, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_masternode_list, unbox_mn_list_diff_result, unbox_qr_info_result, unbox_vec_ptr};
+// use crate::ffi::unboxer::{unbox_block, unbox_llmq_snapshot, unbox_masternode_list, unbox_mn_list_diff_result, unbox_qr_info_result};
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use crate::types;
 
@@ -79,7 +79,7 @@ pub unsafe extern "C" fn register_processor(
         should_process_diff_with_range,
     );
     println!("register_processor: {:?}", processor);
-    boxed(processor)
+    rs_ffi_interfaces::boxed(processor)
 }
 
 /// Unregister all the callbacks for use across FFI
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn register_processor(
 #[no_mangle]
 pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor) {
     println!("unregister_processor: {:?}", processor);
-    let unboxed = unbox_any(processor);
+    let unboxed = rs_ffi_interfaces::unbox_any(processor);
 }
 
 /// Initialize opaque cache to store needed information between FFI calls
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcesso
 pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCache {
     let cache = MasternodeProcessorCache::default();
     println!("processor_create_cache: {:?}", cache);
-    boxed(cache)
+    rs_ffi_interfaces::boxed(cache)
 }
 
 /// Destroy opaque cache
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCac
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
     println!("processor_destroy_cache: {:?}", cache);
-    let cache = unbox_any(cache);
+    let cache = rs_ffi_interfaces::unbox_any(cache);
 }
 
 /// Remove models list from cache
@@ -151,58 +151,42 @@ pub unsafe extern "C" fn processor_clear_cache(cache: *mut MasternodeProcessorCa
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
-    unbox_any(block_hash);
+    rs_ffi_interfaces::unbox_any(block_hash);
 }
 
 /// Destroys anonymous internal holder for UInt256
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_byte_array(data: *const u8, len: usize) {
-    unbox_vec_ptr(data as *mut u8, len);
-}
-
-/// Destroys types::LLMQValidationData
-/// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn processor_destroy_llmq_validation_data(
-    data: *mut types::LLMQValidationData,
-) {
-    unbox_llmq_validation_data(data);
+    rs_ffi_interfaces::unbox_vec_ptr(data as *mut u8, len);
 }
 
 /// # Safety
 /// Destroys types::MNListDiffResult
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
-    unbox_masternode_list(list);
+    unbox_any(list);
 }
 
 /// Destroys types::MNListDiffResult
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
-    unbox_mn_list_diff_result(result);
+    unbox_any(result);
 }
 
 /// Destroys types::LLMQRotationInfoResult
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
-    unbox_qr_info_result(result);
+    unbox_any(result);
 }
 
 /// Destroys types::LLMQSnapshot
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
-    unbox_llmq_snapshot(result);
-}
-
-/// Destroys types::Block
-/// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn processor_destroy_block(result: *mut types::Block) {
-    unbox_block(result);
+    unbox_any(result);
 }
 
 // Here we have temporary replacement for DSKey from the DashSync

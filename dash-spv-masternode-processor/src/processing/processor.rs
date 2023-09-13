@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::ptr::null;
+use rs_ffi_interfaces::boxed;
 use crate::{common, models, types};
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
-use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::to::ToFFI;
@@ -131,8 +131,6 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
-        //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, base_block_hash);
-
         let base_list = self.find_masternode_list(
             base_block_hash,
             &cache.mn_lists,
@@ -149,7 +147,6 @@ impl MasternodeProcessor {
         is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
-        //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, list_diff.base_block_hash);
         let base_list = self.find_masternode_list(
             list_diff.base_block_hash,
             &cache.mn_lists,
@@ -196,7 +193,7 @@ impl MasternodeProcessor {
         is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
-        let skip_removed_masternodes = list_diff.version >= 2;
+        let skip_removed_masternodes = list_diff.should_skip_removed_masternodes();
         let base_block_hash = list_diff.base_block_hash;
         let block_hash = list_diff.block_hash;
         let block_height = list_diff.block_height;
@@ -426,7 +423,7 @@ impl MasternodeProcessor {
     // Reconstruct quorum members at index from snapshot
     pub fn quorum_quarter_members_by_snapshot(
         &self,
-        llmq_params: LLMQParams,
+        llmq_params: &LLMQParams,
         quorum_base_block_height: u32,
         cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
         cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>,
@@ -649,15 +646,15 @@ impl MasternodeProcessor {
         let cycle_length = llmq_params.dkg_params.interval;
         // println!("/////////////////////// rotate_members {}: {} /////////", cycle_quorum_base_block_height, cycle_length);
         let quorum_base_block_height = cycle_quorum_base_block_height - cycle_length;
-        let prev_q_h_m_c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
+        let prev_q_h_m_c = self.quorum_quarter_members_by_snapshot(&llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
         // println!("/////////////////////// prev_q_h_m_c : {} /////////", quorum_base_block_height);
         // println!("{:#?}", prev_q_h_m_c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
         let quorum_base_block_height = cycle_quorum_base_block_height - 2 * cycle_length;
-        let prev_q_h_m_2c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
+        let prev_q_h_m_2c = self.quorum_quarter_members_by_snapshot(&llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
         // println!("/////////////////////// prev_q_h_m_2c : {} /////////", quorum_base_block_height);
         // println!("{:#?}", prev_q_h_m_2c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
         let quorum_base_block_height = cycle_quorum_base_block_height - 3 * cycle_length;
-        let prev_q_h_m_3c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
+        let prev_q_h_m_3c = self.quorum_quarter_members_by_snapshot(&llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
         // println!("/////////////////////// prev_q_h_m_3c : {} /////////", quorum_base_block_height);
         // println!("{:#?}", prev_q_h_m_3c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
 

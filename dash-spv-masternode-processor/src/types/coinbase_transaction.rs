@@ -1,13 +1,13 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use std::ptr::null_mut;
+use rs_ffi_interfaces::{boxed, unbox_any};
 use crate::consensus;
 use crate::crypto::{UInt256, UInt768};
-use crate::ffi::boxer::boxed;
 use crate::types::transaction::Transaction;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct CoinbaseTransaction {
     pub base: *mut Transaction,
     pub coinbase_transaction_version: u16,
@@ -50,5 +50,20 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             },
             *offset,
         ))
+    }
+}
+
+impl Drop for CoinbaseTransaction {
+    fn drop(&mut self) {
+        unsafe {
+            unbox_any(self.base);
+            unbox_any(self.merkle_root_mn_list);
+            if !self.merkle_root_llmq_list.is_null() {
+                unbox_any(self.merkle_root_llmq_list);
+            }
+            if !self.best_cl_signature.is_null() {
+                unbox_any(self.best_cl_signature);
+            }
+        }
     }
 }

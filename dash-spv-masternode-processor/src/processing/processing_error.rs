@@ -1,6 +1,7 @@
 #[warn(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub enum ProcessingError {
     None = 0,
     PersistInRetrieval = 1,

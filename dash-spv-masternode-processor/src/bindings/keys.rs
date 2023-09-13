@@ -3,6 +3,7 @@ use std::os::raw::{c_char, c_ulong, c_void};
 use std::ptr::null_mut;
 use std::slice;
 use byte::BytesExt;
+use rs_ffi_interfaces::{boxed, boxed_vec, unbox_any};
 use secp256k1::Scalar;
 use crate::chain::bip::bip32;
 use crate::chain::bip::bip38::BIP38;
@@ -11,14 +12,13 @@ use crate::chain::derivation::{BIP32_HARD, IndexPath};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable, Reversable, Zeroable};
 use crate::crypto::{UInt160, UInt256, UInt384, UInt512, UInt768};
-use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::{ByteArray, IndexPathData};
-use crate::ffi::unboxer::{unbox_any, unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
+use crate::ffi::unboxer::{unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyKind};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::dip14::secp256k1_point_from_bytes;
 use crate::processing::keys_cache::KeysCache;
-use crate::types::opaque_key::{AsCStringPtr, AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
+use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
 use crate::util::address::address;
 use crate::util::sec_vec::SecVec;
 
@@ -238,12 +238,12 @@ pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
 #[no_mangle]
 pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKey, chain_type: ChainType) -> *mut c_char {
     let script = chain_type.script_map();
-    match *key {
+    rs_ffi_interfaces::FFIConversion::ffi_to(match *key {
         OpaqueKey::ECDSA(ptr) => (&*ptr).serialized_private_key_for_script(&script),
         OpaqueKey::BLSLegacy(ptr) |
         OpaqueKey::BLSBasic(ptr) => (&*ptr).serialized_private_key_for_script(&script),
         OpaqueKey::ED25519(ptr) => (&*ptr).serialized_private_key_for_script(&script),
-    }.to_c_string_ptr()
+    })
 }
 
 /// # Safety
@@ -574,9 +574,8 @@ pub unsafe extern "C" fn key_ecdsa_with_bip38_key(private_key: *const c_char, pa
     let private_key = CStr::from_ptr(private_key).to_str().unwrap();
     let passphrase = CStr::from_ptr(passphrase).to_str().unwrap();
     let script = chain_type.script_map();
-    ECDSAKey::key_with_bip38_key(private_key, passphrase, &script)
-        .map(|key| key.serialized_private_key_for_script(&script))
-        .to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to_opt(ECDSAKey::key_with_bip38_key(private_key, passphrase, &script)
+        .map(|key| key.serialized_private_key_for_script(&script)))
 }
 
 /// # Safety
@@ -637,8 +636,7 @@ pub unsafe extern "C" fn key_ecdsa_has_private_key(key: *mut ECDSAKey) -> bool {
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut ECDSAKey, chain_type: ChainType) -> *mut c_char {
-    (&*key).serialized_private_key_for_script(&chain_type.script_map())
-        .to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to((&*key).serialized_private_key_for_script(&chain_type.script_map()))
 }
 
 // + (NSString *)serializedAuthPrivateKeyFromSeed:(NSData *)seed forChain:(DSChain *)chain
@@ -647,8 +645,7 @@ pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut EC
 pub unsafe extern "C" fn key_ecdsa_serialized_auth_private_key_for_chain(seed: *const u8, seed_len: usize, chain_type: ChainType) -> *mut c_char {
     let seed = slice::from_raw_parts(seed, seed_len);
     let script_map = chain_type.script_map();
-    ECDSAKey::serialized_auth_private_key_from_seed(seed, script_map)
-        .to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to(ECDSAKey::serialized_auth_private_key_from_seed(seed, script_map))
 }
 
 /// # Safety
@@ -750,10 +747,9 @@ pub unsafe extern "C" fn key_serialized_extended_private_key_from_seed(
     derivation_hardened: *const bool,
     derivation_len: usize,
     chain_type: ChainType) -> *mut c_char {
-    let secret_slice = unsafe { slice::from_raw_parts(secret, secret_len) };
+    let secret_slice = slice::from_raw_parts(secret, secret_len);
     let index_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
-    ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type)
-        .to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to_opt(ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type))
 }
 
 /// # Safety
@@ -784,29 +780,25 @@ pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_type: Ch
 pub unsafe extern "C" fn key_address_with_public_key_data(data: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
     let map = chain_type.script_map();
     let data = slice::from_raw_parts(data, len);
-    address::with_public_key_data(data, &map)
-        .to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to(address::with_public_key_data(data, &map))
 }
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_ecdsa_key(key: *mut ECDSAKey, chain_type: ChainType) -> *mut c_char {
-    let key = unsafe { &*key };
+pub unsafe extern "C" fn address_for_ecdsa_key(key: *mut ECDSAKey, chain_type: ChainType) -> *mut c_char {
     let script_map = chain_type.script_map();
-    key.address_with_public_key_data(&script_map).to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to((&*key).address_with_public_key_data(&script_map))
 }
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_bls_key(key: *mut BLSKey, chain_type: ChainType) -> *mut c_char {
-    let key = unsafe { &*key };
+pub unsafe extern "C" fn address_for_bls_key(key: *mut BLSKey, chain_type: ChainType) -> *mut c_char {
     let script_map = chain_type.script_map();
-    key.address_with_public_key_data(&script_map).to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to((&*key).address_with_public_key_data(&script_map))
 }
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_type: ChainType) -> *mut c_char {
-    let key = unsafe { &*key };
+pub unsafe extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_type: ChainType) -> *mut c_char {
     let script_map = chain_type.script_map();
-    key.address_with_public_key_data(&script_map).to_c_string_ptr()
+    rs_ffi_interfaces::FFIConversion::ffi_to((&*key).address_with_public_key_data(&script_map))
 }
 
 
@@ -816,13 +808,12 @@ pub extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_type: Chai
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8, chain_type: ChainType) -> *mut c_char {
-    let compact_sig = unsafe { slice::from_raw_parts(data, len) };
+pub unsafe extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8, chain_type: ChainType) -> *mut c_char {
+    let compact_sig = slice::from_raw_parts(data, len);
     let script_map = chain_type.script_map();
-    UInt256::from_const(digest)
+    rs_ffi_interfaces::FFIConversion::ffi_to_opt(UInt256::from_const(digest)
         .and_then(|message_digest| ECDSAKey::key_with_compact_sig(compact_sig, message_digest))
-        .map(|key| key.address_with_public_key_data(&script_map))
-        .to_c_string_ptr()
+        .map(|key| key.address_with_public_key_data(&script_map)))
 }
 /// # Safety
 #[no_mangle]
@@ -843,11 +834,10 @@ pub extern "C" fn ecdsa_public_key_unique_id_from_derived_key_data(data: *const 
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
-    let public_key_data = unsafe { slice::from_raw_parts(data, len) };
-    ECDSAKey::key_with_public_key_data(public_key_data)
-        .map(|key| key.address_with_public_key_data(&chain_type.script_map()))
-        .to_c_string_ptr()
+pub unsafe extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
+    let public_key_data = slice::from_raw_parts(data, len);
+    rs_ffi_interfaces::FFIConversion::ffi_to_opt(ECDSAKey::key_with_public_key_data(public_key_data)
+        .map(|key| key.address_with_public_key_data(&chain_type.script_map())))
 }
 
 
@@ -973,12 +963,12 @@ pub unsafe extern "C" fn key_check_payload_signature(key_ptr: *mut OpaqueKey, ke
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_secret_key_string(ptr: *mut OpaqueKey) -> *mut c_char {
-    match *ptr {
+    rs_ffi_interfaces::FFIConversion::ffi_to(match *ptr {
         OpaqueKey::ECDSA(key) => (&*key).secret_key_string(),
         OpaqueKey::BLSLegacy(key) |
         OpaqueKey::BLSBasic(key) => (&*key).secret_key_string(),
         OpaqueKey::ED25519(key) => (&*key).secret_key_string(),
-    }.to_c_string_ptr()
+    })
 
 }
 

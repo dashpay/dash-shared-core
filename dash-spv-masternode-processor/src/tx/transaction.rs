@@ -1,17 +1,16 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
+use crate::chain::params::TX_UNCONFIRMED;
 use crate::consensus::encode::VarInt;
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, VarBytes};
-
-// block height indicating transaction is unconfirmed
-pub const TX_UNCONFIRMED: i32 = i32::MAX;
 
 pub static SIGHASH_ALL: u32 = 1;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub enum TransactionType {
     Classic = 0,
     ProviderRegistration = 1,
@@ -67,6 +66,7 @@ impl TransactionType {
 }
 
 #[derive(Clone)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct TransactionInput {
     pub input_hash: UInt256,
     pub index: u32,
@@ -119,6 +119,7 @@ impl<'a> TryRead<'a, Endian> for TransactionInput {
 }
 
 #[derive(Clone)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct TransactionOutput {
     pub amount: u64,
     pub script: Option<Vec<u8>>,
@@ -164,6 +165,7 @@ pub trait ITransaction {
 }
 
 #[derive(Debug, Clone)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct Transaction {
     pub inputs: Vec<TransactionInput>,
     pub outputs: Vec<TransactionOutput>,

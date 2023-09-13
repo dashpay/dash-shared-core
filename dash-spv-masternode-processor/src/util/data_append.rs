@@ -20,9 +20,7 @@ pub trait DataAppend: std::io::Write {
     fn append_proposal_info(proposal_info: &Vec<u8>, writer: Self) -> Self;
     fn append_script_pub_key_for_address(address: &str, script_map: &ScriptMap, writer: Self) -> Self;
     fn append_script_push_data<W: std::io::Write>(&self, writer: W);
-    // fn append_script_push_data(&mut self, data: Vec<u8>);
     fn append_shapeshift_memo_for_address(address: String, writer: Self) -> Self;
-    // fn append_string(&mut self, data: String);
 
     fn script_elements(&self) -> Vec<ScriptElement>;
 }
@@ -35,7 +33,6 @@ impl DataAppend for Vec<u8> /* io::Write */ {
 
     fn from_coinbase_message(message: &String, height: u32) -> Self {
         Vec::<u8>::new().append_coinbase_message(message, height, Vec::<u8>::new())
-        // Self::append_coinbase_message(message, height, Vec::<u8>::new())
     }
 
     fn devnet_genesis_coinbase_message(devnet_type: DevnetType, protocol_version: u32) -> Self {
@@ -58,13 +55,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         Self::append_shapeshift_memo_for_address(address, Vec::<u8>::new())
     }
 
-    // fn append_coinbase_message<W: std::io::Write>(message: &String, height: u32, mut writer: W) {
     fn append_coinbase_message<W: std::io::Write>(&self, message: &String, height: u32, mut writer: W) -> W {
-
-        // }
-        // fn append_coinbase_message(message: &String, height: u32, mut writer: Self) -> Self {
-        // todo: check
-        //NSUInteger l = [message lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
         let l = message.len();
         match height {
             0..=0xfc => {
@@ -152,28 +143,6 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         writer
     }
 
-    // fn append_script_push_data(&mut self, data: Vec<u8>) {
-    //     let len = data.len();
-    //     match len {
-    //         0 => { return },
-    //         1..=0x4b => {
-    //             (len as u8).enc(self);
-    //         }
-    //         0x4c..=0xffff => {
-    //             OP_PUSHDATA1.into_u8().enc(self);
-    //             (len as u8).enc(self);
-    //         },
-    //         0x10000..=0xffffffff => {
-    //             OP_PUSHDATA2.into_u8().enc(self);
-    //             (len as u16).enc(self);
-    //         },
-    //         _ => {
-    //             OP_PUSHDATA4.into_u8().enc(self);
-    //             (len as u32).enc(self);
-    //         },
-    //     }
-    //     self.extend(data);
-    // }
     fn append_script_push_data<W: std::io::Write>(&self, mut writer: W) {
         // todo: migrate into slice
         let len = self.len();
@@ -197,8 +166,6 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         }
         writer.write(self)
             .expect("can't write script push data");
-        // self.enc(&mut writer);
-        // writer
     }
 
     fn append_shapeshift_memo_for_address(address: String, mut writer: Self) -> Self {
@@ -222,14 +189,6 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         }
         writer
     }
-
-    // fn append_string(&mut self, data: String) {
-    //     // NSUInteger l = [s lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-    //     // [self appendVarInt:l];
-    //     // [self appendBytes:s.UTF8String length:l];
-    //     VarInt(data.len() as u64).enc(self);
-    //     data.enc(self);
-    // }
 
     fn script_elements(&self) -> Vec<ScriptElement> {
         let mut a = Vec::<ScriptElement>::new();

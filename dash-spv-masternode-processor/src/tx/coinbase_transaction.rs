@@ -3,11 +3,12 @@ use byte::{BytesExt, TryRead};
 use crate::consensus::encode::VarInt;
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt768};
-use crate::tx::{Transaction, TransactionType::Coinbase};
+use crate::tx::TransactionType::Coinbase;
 
 #[derive(Debug, Clone)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct CoinbaseTransaction {
-    pub base: Transaction,
+    pub base: crate::tx::transaction::Transaction,
     pub coinbase_transaction_version: u16,
     pub height: u32,
     pub merkle_root_mn_list: UInt256,
@@ -19,7 +20,7 @@ pub struct CoinbaseTransaction {
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
-        let mut base = bytes.read_with::<Transaction>(offset, endian)?;
+        let mut base = bytes.read_with::<crate::tx::Transaction>(offset, endian)?;
         let _extra_payload_size = bytes.read_with::<VarInt>(offset, endian)?;
         let coinbase_transaction_version = bytes.read_with::<u16>(offset, endian)?;
         let height = bytes.read_with::<u32>(offset, endian)?;
@@ -77,7 +78,7 @@ impl CoinbaseTransaction {
     }
 
     pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> Vec<u8> {
-        let mut buffer = Transaction::data_with_subscript_index_static(
+        let mut buffer = crate::tx::Transaction::data_with_subscript_index_static(
             subscript_index,
             self.base.version,
             self.base.tx_type,
@@ -106,3 +107,4 @@ impl CoinbaseTransaction {
         hashes.iter().any(|h| coinbase_hash == *h)
     }
 }
+

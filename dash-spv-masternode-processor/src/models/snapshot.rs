@@ -5,13 +5,13 @@ use hashes::hex::ToHex;
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
-use crate::common::LLMQSnapshotSkipMode;
 use crate::consensus::encode::VarInt;
 use crate::crypto::{byte_util::BytesDecodable, data_ops::Data};
 use crate::impl_bytes_decodable;
 use crate::models::MasternodeEntry;
 
 #[derive(Clone)]
+#[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct LLMQSnapshot {
     // The bitset of nodes already in quarters at the start of cycle at height n
     // (masternodeListSize + 7)/8
@@ -19,14 +19,14 @@ pub struct LLMQSnapshot {
     // Skiplist at height n
     pub skip_list: Vec<i32>,
     //  Mode of the skip list
-    pub skip_list_mode: LLMQSnapshotSkipMode,
+    pub skip_list_mode: crate::common::llmq_snapshot_skip_mode::LLMQSnapshotSkipMode,
 }
 impl Default for LLMQSnapshot {
     fn default() -> Self {
         Self {
             member_list: vec![],
             skip_list: vec![],
-            skip_list_mode: LLMQSnapshotSkipMode::NoSkipping,
+            skip_list_mode: crate::common::LLMQSnapshotSkipMode::NoSkipping,
         }
     }
 }
@@ -57,7 +57,7 @@ impl<'a> std::fmt::Debug for LLMQSnapshot {
 impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
-        let skip_list_mode = bytes.read_with::<LLMQSnapshotSkipMode>(offset, LE)?;
+        let skip_list_mode = bytes.read_with::<crate::common::LLMQSnapshotSkipMode>(offset, LE)?;
         let member_list_length = bytes.read_with::<VarInt>(offset, LE)?.0 as usize;
         let member_list: &[u8] =
             bytes.read_with(offset, Bytes::Len((member_list_length + 7) / 8))?;
@@ -77,7 +77,7 @@ impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
 
 impl LLMQSnapshot {
 
-    pub fn new(member_list: Vec<u8>, skip_list: Vec<i32>, skip_list_mode: LLMQSnapshotSkipMode) -> Self {
+    pub fn new(member_list: Vec<u8>, skip_list: Vec<i32>, skip_list_mode: crate::common::LLMQSnapshotSkipMode) -> Self {
         LLMQSnapshot {
             member_list,
             skip_list,
@@ -101,7 +101,7 @@ impl LLMQSnapshot {
     ) -> Vec<Vec<MasternodeEntry>> {
         let mut quarter_quorum_members = vec![Vec::<MasternodeEntry>::new(); quorum_count];
         match self.skip_list_mode {
-            LLMQSnapshotSkipMode::NoSkipping => {
+            crate::common::LLMQSnapshotSkipMode::NoSkipping => {
                 let mut iter = sorted_combined_mns_list.iter();
                 (0..quorum_count).for_each(|_i| {
                     let mut quarter = Vec::<MasternodeEntry>::new();
@@ -115,7 +115,7 @@ impl LLMQSnapshot {
                     quarter_quorum_members.push(quarter);
                 });
             }
-            LLMQSnapshotSkipMode::SkipFirst => {
+            crate::common::LLMQSnapshotSkipMode::SkipFirst => {
                 let mut first_entry_index = 0;
                 let mut processed_skip_list = Vec::<i32>::new();
                 for &s in &self.skip_list {
@@ -142,7 +142,7 @@ impl LLMQSnapshot {
                     }
                 }
             }
-            LLMQSnapshotSkipMode::SkipExcept => {
+            crate::common::LLMQSnapshotSkipMode::SkipExcept => {
                 (0..quorum_count).for_each(|_i| {
                     let mut quarter = Vec::<MasternodeEntry>::new();
                     self.skip_list.iter().for_each(|unskipped| {
@@ -155,7 +155,7 @@ impl LLMQSnapshot {
                     quarter_quorum_members.push(quarter);
                 });
             }
-            LLMQSnapshotSkipMode::SkipAll => {
+            crate::common::LLMQSnapshotSkipMode::SkipAll => {
                 // TODO: do we need to impl smth in this strategy ?
             }
         }
@@ -163,3 +163,4 @@ impl LLMQSnapshot {
     }
 }
 impl_bytes_decodable!(LLMQSnapshot);
+

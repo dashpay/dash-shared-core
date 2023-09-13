@@ -1,0 +1,2 @@
+1. There are multiple macros: 
+- rs_ffi_macro_derive::ffi_dictionary: it traverses through entire crate root level module, and seeks 

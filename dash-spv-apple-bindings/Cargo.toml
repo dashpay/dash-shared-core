@@ -4,7 +4,7 @@ version = "0.4.10"
 description = "C-bindings for using and interoperating with Dash SPV"
 readme = "README.md"
 edition = "2021"
-build = "build.rs"
+#build = "build.rs"
 publish = true
 
 [dependencies]

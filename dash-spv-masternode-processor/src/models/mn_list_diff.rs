@@ -154,4 +154,7 @@ impl MNListDiff {
         self.added_or_modified_masternodes.values().any(|m| m.operator_public_key.version == 2)
     }
 
+    pub fn should_skip_removed_masternodes(&self) -> bool {
+        self.version >= 2
+    }
 }
