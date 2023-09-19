@@ -1,9 +1,7 @@
 use std::fmt::Debug;
-use std::ptr::null_mut;
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
 use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyError};
-use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey};
 use crate::util::sec_vec::SecVec;
 
 #[repr(C)]
@@ -343,36 +341,3 @@ impl IKey for Key {
 
     }
 }
-
-impl AsOpaqueKey for Key {
-    fn to_opaque_ptr(self) -> *mut OpaqueKey {
-        match self {
-            Key::ECDSA(key) => key.to_opaque_ptr(),
-            Key::BLS(key) => key.to_opaque_ptr(),
-            Key::ED25519(key) => key.to_opaque_ptr(),
-        }
-    }
-}
-
-impl AsOpaqueKey for Option<Key> {
-    fn to_opaque_ptr(self) -> *mut OpaqueKey {
-        match self {
-            Some(Key::ECDSA(key)) => key.to_opaque_ptr(),
-            Some(Key::BLS(key)) => key.to_opaque_ptr(),
-            Some(Key::ED25519(key)) => key.to_opaque_ptr(),
-            _ => null_mut()
-        }
-    }
-}
-
-impl AsOpaqueKey for Result<Key, KeyError> {
-    fn to_opaque_ptr(self) -> *mut OpaqueKey {
-        match self {
-            Ok(Key::ECDSA(key)) => key.to_opaque_ptr(),
-            Ok(Key::BLS(key)) => key.to_opaque_ptr(),
-            Ok(Key::ED25519(key)) => key.to_opaque_ptr(),
-            _ => null_mut()
-        }
-    }
-}
-

@@ -36,7 +36,6 @@ pub mod keys;
 pub mod models;
 pub mod network;
 pub mod tx;
-pub mod types;
 pub mod util;
 pub mod logger;
 

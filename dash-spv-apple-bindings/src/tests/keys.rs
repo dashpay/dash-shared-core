@@ -6,8 +6,8 @@ use dash_spv_masternode_processor::crypto::{UInt256, UInt384};
 use dash_spv_masternode_processor::ffi::IndexPathData;
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::keys::KeyKind;
-use dash_spv_masternode_processor::types::opaque_key::OpaqueKey;
 use crate::keys::{key_bls_chaincode, key_bls_public_key, key_bls_with_bip32_seed_data, key_create_from_extended_public_key_data, key_extended_public_key_data, key_private_key_at_index_path, key_with_private_key};
+use crate::types::opaque_key::OpaqueKey;
 
 #[test]
 fn test_keys() {
@@ -62,11 +62,9 @@ fn bls_chaincode() {
 
 #[test]
 fn bls_operator_key() {
-    //return key_with_private_key([key UTF8String], keyType, chainType);
     let operator_key_hex_string = "0fc63f4e6d7572a6c33465525b5c3323f57036873dd37c98c393267c58b50533";
     let str = CString::new(operator_key_hex_string).unwrap();
     let key = unsafe { key_with_private_key(str.as_ptr(), KeyKind::BLS, ChainType::TestNet.into()) };
-
     unsafe {
         match key.as_ref() {
             Some(OpaqueKey::BLSLegacy(bls_key)) => {

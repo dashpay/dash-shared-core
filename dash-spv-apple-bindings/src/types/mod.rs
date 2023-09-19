@@ -11,6 +11,7 @@ pub mod masternode_entry_hash;
 pub mod masternode_list;
 pub mod mn_list_diff;
 pub mod mn_list_diff_result;
+pub mod opaque_key;
 pub mod operator_public_key;
 pub mod qr_info;
 pub mod qr_info_result;

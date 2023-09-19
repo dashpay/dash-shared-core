@@ -6,12 +6,12 @@ use rs_ffi_interfaces::{boxed, boxed_vec, unbox_any};
 use dash_spv_masternode_processor::chain::{bip::{bip32, bip38::BIP38}, common::{ChainType, IHaveChainSettings}, derivation::IndexPath};
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::{byte_util::{AsBytes, ConstDecodable, Reversable, Zeroable}, UInt160, UInt256, UInt384, UInt512, UInt768};
-use dash_spv_masternode_processor::ffi::{ByteArray, IndexPathData, unboxer::{unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys}};
+use dash_spv_masternode_processor::ffi::{ByteArray, IndexPathData};
 use dash_spv_masternode_processor::keys::{BLSKey, crypto_data::{CryptoData, DHKey}, ECDSAKey, ED25519Key, IKey, KeyError, KeyKind};
 use dash_spv_masternode_processor::processing::{keys_cache::KeysCache, ProcessingError};
-use dash_spv_masternode_processor::types::opaque_key::{AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
 use dash_spv_masternode_processor::util::{address::address, sec_vec::SecVec};
-
+use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
+use crate::ffi::{unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 /// Destroys
 /// # Safety
 #[no_mangle]
@@ -420,7 +420,7 @@ pub unsafe extern "C" fn serialized_key_private_keys_at_index_paths(
                 .flatten()
                 .collect::<Vec<_>>();
             let len = keys.len();
-            boxed(OpaqueSerializedKeys { keys: boxed_vec(keys), len })
+            boxed(OpaqueSerializedKeys { keys: boxed_vec(keys), count: len })
         })
 }
 
