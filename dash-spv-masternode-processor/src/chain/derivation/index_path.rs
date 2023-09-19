@@ -232,13 +232,6 @@ impl IndexPath<u32> {
     }
 }
 
-// impl IndexPath<UInt256> {
-//     pub fn from_ffi(indexes: *const [u8; 32], hardened_indexes: *const u8, length: usize) -> Self {
-//         let indexes_slice = unsafe { slice::from_raw_parts(indexes, length) };
-//         IndexPath::new(indexes_slice.iter().map(|&index| UInt256(index)).collect())
-//     }
-// }
-
 impl<'a> TryRead<'a, usize> for IndexPath<UInt256> {
     #[inline]
     fn try_read(bytes: &'a [u8], size: usize) -> byte::Result<(Self, usize)> {

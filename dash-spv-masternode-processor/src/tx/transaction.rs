@@ -4,9 +4,7 @@ use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
 use crate::chain::params::TX_UNCONFIRMED;
-use crate::consensus;
-use crate::consensus::encode::VarInt;
-use crate::consensus::{Decodable, Encodable, encode};
+use crate::consensus::{Decodable, Encodable, encode, encode::VarInt};
 use crate::crypto::{UInt256, VarBytes};
 
 pub static SIGHASH_ALL: u32 = 1;
@@ -32,7 +30,7 @@ pub enum TransactionType {
     /// TODO: find actual value for this type
     CreditFunding = 255,
 }
-impl consensus::Decodable for TransactionType {
+impl Decodable for TransactionType {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         Ok(TransactionType::from(u16::consensus_decode(&mut d)?))
@@ -349,7 +347,7 @@ impl Transaction {
     }
 }
 
-impl consensus::Decodable for Transaction {
+impl Decodable for Transaction {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         let version = u16::consensus_decode(&mut d)?;
