@@ -1,5 +1,3 @@
-use rs_ffi_interfaces::unbox_any;
-
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct LLMQTypedHash {
@@ -10,7 +8,7 @@ pub struct LLMQTypedHash {
 impl Drop for LLMQTypedHash {
     fn drop(&mut self) {
         unsafe {
-            unbox_any(self.llmq_hash);
+            rs_ffi_interfaces::unbox_any(self.llmq_hash);
         }
     }
 }

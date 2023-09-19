@@ -11,6 +11,9 @@ mod tx;
 
 #[cfg(test)]
 mod tests;
+mod ffi_core_provider;
+mod ffi;
+mod types;
 
 pub extern crate dash_spv_masternode_processor;
 pub extern crate merk;

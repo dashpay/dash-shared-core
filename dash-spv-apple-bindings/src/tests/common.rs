@@ -3,16 +3,15 @@ use rs_ffi_interfaces::boxed;
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings};
 use dash_spv_masternode_processor::crypto::byte_util::{BytesDecodable, Reversable};
 use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::ffi::from::FromFFI;
-use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::logger::register_rust_logger;
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 use dash_spv_masternode_processor::block_store::{init_mainnet_store, init_testnet_store, MerkleBlock};
 use dash_spv_masternode_processor::test_helpers::Block;
-use dash_spv_masternode_processor::types;
 use crate::common::{processor_create_cache, register_processor};
+use crate::ffi::{from::FromFFI, to::ToFFI};
 use crate::masternode::{process_mnlistdiff_from_message, process_qrinfo_from_message};
+use crate::types;
 
 extern crate libc;
 extern crate reqwest;

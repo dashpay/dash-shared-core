@@ -3,11 +3,10 @@ use std::os::raw::c_char;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
 use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
-// use dash_spv_masternode_processor::ffi::unboxer::{unbox_block, unbox_llmq_snapshot, unbox_masternode_list, unbox_mn_list_diff_result, unbox_qr_info_result};
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache};
-use dash_spv_masternode_processor::processing::core_provider::FFICoreProvider;
-use dash_spv_masternode_processor::types;
+use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
+use crate::ffi_core_provider::FFICoreProvider;
+use crate::types;
 
 
 // /// Initializes logger (it could be initialize only once)

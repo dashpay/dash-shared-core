@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
 use rs_ffi_interfaces::{boxed, boxed_vec};
-use crate::{chain, common, models, tx, types};
-use crate::crypto::UInt256;
+use dash_spv_masternode_processor::{chain, common, models, tx};
+use dash_spv_masternode_processor::crypto::UInt256;
 use crate::ffi::from::FromFFI;
+use crate::types;
 
 pub trait ToFFI {
     type Item: FromFFI;

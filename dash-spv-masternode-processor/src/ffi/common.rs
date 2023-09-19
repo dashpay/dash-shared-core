@@ -171,19 +171,3 @@ impl From<(*const u8, *const bool, usize)> for IndexPath<UInt256> {
         IndexPath::new_hardened(indexes, hardened.to_vec())
     }
 }
-
-// #[repr(C)]
-// pub struct SecVecData {
-//     data: *const u8,
-//     len: usize,
-// }
-//
-// impl From<SecVec> for SecVecData {
-//     fn from(sec_vec: SecVec) -> Self {
-//         let data = sec_vec.as_ptr();
-//         let len = sec_vec.len();
-//         mem::forget(sec_vec);
-//         SecVecData { data, len }
-//     }
-// }
-

@@ -1,5 +1,3 @@
-use rs_ffi_interfaces::unbox_any;
-
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Block {
@@ -10,7 +8,7 @@ pub struct Block {
 impl Drop for Block {
     fn drop(&mut self) {
         unsafe {
-            unbox_any(self.hash);
+            rs_ffi_interfaces::unbox_any(self.hash);
         }
     }
 }

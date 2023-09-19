@@ -1,17 +1,18 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
-use dash_spv_masternode_processor::{models, types};
+use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::chain::common::{ChainType, DevnetType};
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::crypto::byte_util::Zeroable;
-use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::keys::BLSKey;
 use dash_spv_masternode_processor::block_store::{init_testnet_store, MerkleBlock};
 use rs_ffi_interfaces::boxed;
 use crate::common::{processor_create_cache, register_processor};
+use crate::ffi::to::ToFFI;
 use crate::masternode::process_mnlistdiff_from_message;
 use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, register_logger, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::types;
 
 unsafe extern "C" fn get_merkle_root_for_chacha(
     block_hash: *mut [u8; 32],

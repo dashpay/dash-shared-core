@@ -1,12 +1,13 @@
 use dash_spv_masternode_processor::block_store::init_mainnet_store;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt256};
-use dash_spv_masternode_processor::ffi::from::FromFFI;
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::models;
-use dash_spv_masternode_processor::processing::{FFICoreProvider, MasternodeProcessor};
+use dash_spv_masternode_processor::processing::MasternodeProcessor;
 use dash_spv_masternode_processor::test_helpers::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
 use crate::common::processor_create_cache;
+use crate::ffi::from::FromFFI;
+use crate::ffi_core_provider::FFICoreProvider;
 use crate::masternode::process_qr_info;
 use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 

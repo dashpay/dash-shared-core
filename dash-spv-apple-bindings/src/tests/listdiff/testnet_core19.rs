@@ -1,6 +1,6 @@
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::ffi::from::FromFFI;
+use crate::ffi::from::FromFFI;
 use crate::tests::common::{assert_diff_result, create_default_context, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
 
 // #[test]

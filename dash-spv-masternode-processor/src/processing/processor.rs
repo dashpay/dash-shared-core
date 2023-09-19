@@ -20,37 +20,6 @@ impl MasternodeProcessor {
 
 impl MasternodeProcessor {
 
-    // pub(crate) fn get_list_diff_result(
-    //     &self,
-    //     base_list: Option<models::MasternodeList>,
-    //     list_diff: models::MNListDiff,
-    //     should_process_quorums: bool,
-    //     is_dip_0024: bool,
-    //     is_rotated_quorums_presented: bool,
-    //     cache: &mut MasternodeProcessorCache,
-    // ) -> types::MNListDiffResult {
-    //     let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache);
-    //     // println!("get_list_diff_result: {:#?}", result);
-    //     result.into()
-    // }
-    //
-    // pub fn get_list_diff_result_with_base_lookup(
-    //     &self,
-    //     list_diff: models::MNListDiff,
-    //     should_process_quorums: bool,
-    //     is_dip_0024: bool,
-    //     is_rotated_quorums_presented: bool,
-    //     cache: &mut MasternodeProcessorCache,
-    // ) -> types::MNListDiffResult {
-    //     let base_block_hash = list_diff.base_block_hash;
-    //     let base_list = self.provider.find_masternode_list(
-    //         base_block_hash,
-    //         &cache.mn_lists,
-    //         &mut cache.needed_masternode_lists,
-    //     );
-    //     self.get_list_diff_result(base_list.ok(), list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
-    // }
-
     pub fn get_list_diff_result_internal_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
@@ -332,7 +301,7 @@ impl MasternodeProcessor {
         let quorum_size = llmq_params.size;
         let quarter_size = (quorum_size / 4) as usize;
         // Quorum members dichotomy in snapshot
-        match self.provider.masternode_info_for_height(work_block_height, cached_lists, cached_snapshots, unknown_lists) {
+        match self.provider.masternode_list_info_for_height(work_block_height, cached_lists, cached_snapshots, unknown_lists) {
             Ok((masternode_list, snapshot, work_block_hash)) => {
                 let mut i: u32 = 0;
                 // println!("•••• quorum_quarter_members_by_snapshot: {:?}: {:?}: {}: {}", llmq_type, snapshot.skip_list_mode, work_block_height, work_block_hash.reversed());
@@ -656,7 +625,7 @@ impl MasternodeProcessor {
         models::MNListDiff::new(protocol_version, message, offset, |block_hash| self.provider.lookup_block_height_by_hash(block_hash))
     }
 
-    pub fn process_mnlist_diff(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, cache: &mut MasternodeProcessorCache) -> Result<MNListDiffResult, ProcessingError> {
+    pub fn mn_list_diff_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, cache: &mut MasternodeProcessorCache) -> Result<MNListDiffResult, ProcessingError> {
         match self.read_list_diff_from_message(message, &mut 0, protocol_version) {
             Ok(list_diff) => {
                 if !is_from_snapshot {
@@ -668,7 +637,7 @@ impl MasternodeProcessor {
         }
     }
 
-    pub fn process_qr_info(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, is_rotated_quorums_presented: bool, cache: &mut MasternodeProcessorCache) -> Result<processing::QRInfoResult, ProcessingError> {
+    pub fn qr_info_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, is_rotated_quorums_presented: bool, cache: &mut MasternodeProcessorCache) -> Result<processing::QRInfoResult, ProcessingError> {
         let process_list_diff = |list_diff, should_process_quorums|
             self.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache);
         message.read_with::<models::QRInfo>(&mut 0, (&*self.provider, is_from_snapshot, protocol_version, is_rotated_quorums_presented))

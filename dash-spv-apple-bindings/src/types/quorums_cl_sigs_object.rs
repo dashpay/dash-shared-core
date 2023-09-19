@@ -1,5 +1,3 @@
-use rs_ffi_interfaces::{unbox_any, unbox_vec_ptr};
-
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct QuorumsCLSigsObject {
@@ -12,8 +10,8 @@ impl Drop for QuorumsCLSigsObject {
     fn drop(&mut self) {
         unsafe {
             let ffi_ref = self;
-            unbox_any(ffi_ref.signature);
-            let index_set = unbox_vec_ptr(ffi_ref.index_set, ffi_ref.index_set_count);
+            rs_ffi_interfaces::unbox_any(ffi_ref.signature);
+            let index_set = rs_ffi_interfaces::unbox_vec_ptr(ffi_ref.index_set, ffi_ref.index_set_count);
             drop(index_set);
         }
     }

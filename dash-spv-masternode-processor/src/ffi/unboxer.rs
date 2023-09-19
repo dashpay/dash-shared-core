@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use std::ffi::CString;
-use std::os::raw::c_char;
+// use std::ffi::CString;
+// use std::os::raw::c_char;
 use rs_ffi_interfaces::{unbox_any, unbox_vec_ptr};
 use crate::types::opaque_key::{OpaqueKey, OpaqueKeys, OpaqueSerializedKeys};
 //
@@ -342,10 +342,6 @@ use crate::types::opaque_key::{OpaqueKey, OpaqueKeys, OpaqueSerializedKeys};
 //     }
 // }
 
-/// # Safety
-pub unsafe fn unbox_string(data: *mut c_char) {
-    let _ = CString::from_raw(data);
-}
 
 pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
     let k = unbox_any(data);
@@ -371,7 +367,7 @@ pub unsafe fn unbox_opaque_serialized_keys(data: *mut OpaqueSerializedKeys) {
     let res = unbox_any(data);
     let keys = unbox_vec_ptr(res.keys, res.len);
     for &x in keys.iter() {
-        unbox_string(x)
+        rs_ffi_interfaces::unbox_string(x)
     }
 }
 

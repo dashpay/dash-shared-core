@@ -3,8 +3,8 @@ use crate::masternode::process_mnlistdiff_from_message;
 use dash_spv_masternode_processor::block_store::init_testnet_store;
 use dash_spv_masternode_processor::chain::common::chain_type::ChainType;
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
-use dash_spv_masternode_processor::ffi::from::FromFFI;
 use dash_spv_masternode_processor::hashes::hex::FromHex;
+use crate::ffi::from::FromFFI;
 use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_default, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
 
 #[test]

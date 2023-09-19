@@ -1,13 +1,13 @@
 use std::slice;
-use dash_spv_masternode_processor::{models, ok_or_return_processing_error, types};
+use dash_spv_masternode_processor::{models, ok_or_return_processing_error};
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_masternode_processor::consensus::encode;
 use dash_spv_masternode_processor::crypto::{UInt256, byte_util::ConstDecodable};
 use dash_spv_masternode_processor::crypto::byte_util::BytesDecodable;
-use dash_spv_masternode_processor::ffi::{ByteArray, from::FromFFI};
-use dash_spv_masternode_processor::ffi::to::ToFFI;
+use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
-
+use crate::ffi::{from::FromFFI, to::ToFFI};
+use crate::types;
 
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
 /// Here we calculate quorums according to Core v0.17
@@ -233,10 +233,18 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
     } else {
         (None, None)
     };
+    #[cfg(feature = "generate-dashj-tests")]
+    crate::util::java::save_snapshot_to_json(&snapshot_at_h_c, processor.provider.lookup_block_height_by_hash(block_hash));
     processor.provider.save_snapshot(diff_h_c.block_hash, snapshot_at_h_c.clone());
+    #[cfg(feature = "generate-dashj-tests")]
+    crate::util::java::save_snapshot_to_json(&snapshot_at_h_2c, processor.provider.lookup_block_height_by_hash(block_hash));
     processor.provider.save_snapshot(diff_h_2c.block_hash, snapshot_at_h_2c.clone());
+    #[cfg(feature = "generate-dashj-tests")]
+    crate::util::java::save_snapshot_to_json(&snapshot_at_h_3c, processor.provider.lookup_block_height_by_hash(block_hash));
     processor.provider.save_snapshot(diff_h_3c.block_hash, snapshot_at_h_3c.clone());
     if extra_share {
+        #[cfg(feature = "generate-dashj-tests")]
+        crate::util::java::save_snapshot_to_json(snapshot_at_h_4c.as_ref().unwrap(), processor.provider.lookup_block_height_by_hash(block_hash));
         processor.provider.save_snapshot(diff_h_4c.as_ref().unwrap().block_hash, snapshot_at_h_4c.clone().unwrap());
     }
 

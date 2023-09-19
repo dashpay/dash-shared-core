@@ -1,9 +1,9 @@
-use crate::common::{processor_create_cache, register_processor};
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings};
 use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt256};
-use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
 use dash_spv_masternode_processor::block_store::init_testnet_store;
 use dash_spv_masternode_processor::test_helpers::{masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
+use crate::common::{processor_create_cache, register_processor};
+use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
 
 #[test]
 pub fn test_from_snapshot() {

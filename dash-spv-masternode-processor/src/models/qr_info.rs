@@ -31,14 +31,14 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
         let is_from_snapshot = ctx.1;
         let protocol_version = ctx.2;
         let is_rotated_quorums_presented = ctx.3;
-        let read_list_diff =
-            |offset: &mut usize|
-                models::MNListDiff::new(protocol_version, bytes, offset, |block_hash| provider.lookup_block_height_by_hash(block_hash));
-
-        let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(bytes, offset);
-        let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(bytes, offset);
-
-
+        let block_height_lookup = |block_hash|
+            provider.lookup_block_height_by_hash(block_hash);
+        let read_list_diff = |offset: &mut usize|
+            models::MNListDiff::new(protocol_version, bytes, offset, block_height_lookup);
+        let read_snapshot = |offset: &mut usize|
+            models::LLMQSnapshot::from_bytes(bytes, offset);
+        let read_var_int = |offset: &mut usize|
+            encode::VarInt::from_bytes(bytes, offset);
 
         let snapshot_h_c = read_snapshot(&mut offset)?;
         let snapshot_h_2c = read_snapshot(&mut offset)?;
@@ -61,10 +61,18 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
         } else {
             (None, None)
         };
+        #[cfg(feature = "generate-dashj-tests")]
+        crate::util::java::save_snapshot_to_json(&snapshot_h_c, block_height_lookup(diff_h_c.block_hash));
         provider.save_snapshot(diff_h_c.block_hash, snapshot_h_c.clone());
+        #[cfg(feature = "generate-dashj-tests")]
+        crate::util::java::save_snapshot_to_json(&snapshot_h_2c, block_height_lookup(diff_h_2c.block_hash));
         provider.save_snapshot(diff_h_2c.block_hash, snapshot_h_2c.clone());
+        #[cfg(feature = "generate-dashj-tests")]
+        crate::util::java::save_snapshot_to_json(&snapshot_h_3c, block_height_lookup(diff_h_3c.block_hash));
         provider.save_snapshot(diff_h_3c.block_hash, snapshot_h_3c.clone());
         if extra_share {
+            #[cfg(feature = "generate-dashj-tests")]
+            crate::util::java::save_snapshot_to_json(snapshot_h_4c.as_ref().unwrap(), block_height_lookup(diff_h_4c.as_ref().unwrap().block_hash));
             provider.save_snapshot(diff_h_4c.as_ref().unwrap().block_hash, snapshot_h_4c.clone().unwrap());
         }
 
@@ -87,7 +95,10 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
             let list_diff = read_list_diff(&mut offset)?;
             let block_hash = list_diff.block_hash;
             mn_list_diff_list.push(list_diff);
-            provider.save_snapshot(block_hash, quorum_snapshot_list.get(i).unwrap().clone());
+            let snapshot = quorum_snapshot_list.get(i).unwrap();
+            #[cfg(feature = "generate-dashj-tests")]
+            crate::util::java::save_snapshot_to_json(&snapshot, block_height_lookup(block_hash));
+            provider.save_snapshot(block_hash, snapshot.clone());
         }
 
         Ok((Self {

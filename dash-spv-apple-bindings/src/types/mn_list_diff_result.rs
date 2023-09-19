@@ -1,6 +1,7 @@
-use crate::{processing, types};
+use dash_spv_masternode_processor::processing;
 use std::ptr::null_mut;
 use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
+use crate::types;
 
 #[repr(C)]
 #[derive(Clone, Debug)]

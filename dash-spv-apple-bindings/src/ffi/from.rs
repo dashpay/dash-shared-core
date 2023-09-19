@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 use std::slice;
-use crate::{chain, common, models, tx, types};
-use crate::common::Bitset;
-use crate::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
+use dash_spv_masternode_processor::{chain, common, models, tx};
+use dash_spv_masternode_processor::common::Bitset;
+use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
+use dash_spv_masternode_processor::tx::transaction;
 use crate::ffi::to::ToFFI;
-use crate::tx::transaction;
+use crate::types;
 
 pub trait FromFFI {
     type Item: ToFFI;

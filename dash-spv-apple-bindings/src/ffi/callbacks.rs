@@ -1,8 +1,8 @@
-extern crate libc;
+// extern crate libc;
 use std::ffi::c_void;
-use crate::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::processing::ProcessingError;
 use crate::types;
-use crate::processing::ProcessingError;
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
 pub type AddInsightCallback =
@@ -11,7 +11,7 @@ pub type AddInsightCallback =
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
 pub type ShouldProcessDiffWithRangeCallback =
     fn(base_block_hash: UInt256, block_hash: UInt256, context: rs_ffi_interfaces::OpaqueContext)
-        -> crate::processing::processing_error::ProcessingError;
+        -> dash_spv_masternode_processor::processing::processing_error::ProcessingError;
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
 pub type GetBlockHeightByHashCallback =
@@ -29,34 +29,43 @@ pub type GetMerkleRootCallback =
        -> UInt256;
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
-pub type GetMasternodeListCallback =
-    fn(block_hash: UInt256, context: rs_ffi_interfaces::OpaqueContext)
-       -> crate::models::masternode_list::MasternodeList;
+pub type GetMasternodeListCallback = fn(
+    block_hash: UInt256,
+    context: rs_ffi_interfaces::OpaqueContext
+) -> dash_spv_masternode_processor::models::masternode_list::MasternodeList;
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
-pub type DestroyMasternodeListCallback =
-    fn(masternode_list: crate::models::masternode_list::MasternodeList);
+pub type DestroyMasternodeListCallback = fn(
+    masternode_list: dash_spv_masternode_processor::models::masternode_list::MasternodeList
+);
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
-pub type SaveMasternodeListCallback =
-    fn(block_hash: UInt256, masternode_list: crate::models::masternode_list::MasternodeList, context: rs_ffi_interfaces::OpaqueContext)
-        -> bool;
+pub type SaveMasternodeListCallback = fn(
+    block_hash: UInt256,
+    masternode_list: dash_spv_masternode_processor::models::masternode_list::MasternodeList,
+    context: rs_ffi_interfaces::OpaqueContext
+) -> bool;
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
-pub type GetLLMQSnapshotByBlockHashCallback =
-    fn(block_hash: UInt256, context: rs_ffi_interfaces::OpaqueContext)
-        -> crate::models::snapshot::LLMQSnapshot;
+pub type GetLLMQSnapshotByBlockHashCallback = fn(
+    block_hash: UInt256,
+    context: rs_ffi_interfaces::OpaqueContext
+) -> dash_spv_masternode_processor::models::snapshot::LLMQSnapshot;
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
-pub type SaveLLMQSnapshotCallback =
-    fn(block_hash: UInt256, snapshot: crate::models::snapshot::LLMQSnapshot, context: rs_ffi_interfaces::OpaqueContext)
-       -> bool;
+pub type SaveLLMQSnapshotCallback = fn(
+    block_hash: UInt256,
+    snapshot: dash_spv_masternode_processor::models::snapshot::LLMQSnapshot,
+    context: rs_ffi_interfaces::OpaqueContext
+) -> bool;
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
 pub type DestroyHashCallback = fn(hash: UInt256);
 
 #[rs_ffi_macro_derive::impl_ffi_ty_conv]
-pub type DestroyLLMQSnapshotCallback = fn(snapshot: crate::models::snapshot::LLMQSnapshot);
+pub type DestroyLLMQSnapshotCallback = fn(
+    snapshot: dash_spv_masternode_processor::models::snapshot::LLMQSnapshot
+);
 
 
 pub type AddInsightBlockingLookup = unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *const c_void);
