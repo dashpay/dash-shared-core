@@ -93,6 +93,25 @@ impl std::fmt::Debug for MasternodeEntry {
             .finish()
     }
 }
+// impl consensus::Decodable for MasternodeEntry {
+//     #[inline]
+//     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+//         let version = u16::consensus_decode(&mut d)?;
+//         let provider_registration_transaction_hash = UInt256::consensus_decode(&mut d)?;
+//         let confirmed_hash = UInt256::consensus_decode(&mut d)?;
+//         let socket_address = crate::common::SocketAddress::consensus_decode(&mut d)?;
+//         let mut operator_public_key = crate::models::OperatorPublicKey::consensus_decode(&mut d)?;
+//         operator_public_key.version = version;
+//         let key_id_voting = UInt160::consensus_decode(&mut d)?;
+//         // TODO: check this logic
+//         let is_valid = u8::consensus_decode(&mut d).unwrap_or(0);
+//         // let index = u32::consensus_decode(&mut d)?;
+//         // let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
+//         // let sequence = u32::consensus_decode(&mut d)?;
+//         // Ok(Self { input_hash, index, signature, sequence, script: None })
+//     }
+// }
+
 
 impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
     fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
@@ -107,7 +126,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             bytes.read_with::<UInt256>(offset, byte::LE)?;
         let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
         let socket_address = bytes.read_with::<crate::common::SocketAddress>(offset, ())?;
-        let operator_public_key = bytes.read_with::<crate::models::OperatorPublicKey>(offset, (version, protocol_version))?;
+        let operator_public_key = bytes.read_with::<crate::models::OperatorPublicKey>(offset, version)?;
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);

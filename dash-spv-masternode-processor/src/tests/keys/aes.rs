@@ -21,12 +21,12 @@ fn test_ecdsa_encryption_and_decryption() {
     // Alice is sending to Bob
     let iv = Vec::from_hex("eac5bcd6eb85074759e0261497428c9b").unwrap();
     let encrypted = <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_secret_key_using_iv(&mut data, &alice_key_pair, &bob_key_pair, iv);
-    assert!(encrypted.is_some(), "Encrypted data is None");
+    assert!(encrypted.is_ok(), "Encrypted data is None");
     let mut encrypted = encrypted.unwrap();
     assert_eq!(encrypted.to_hex(), "eac5bcd6eb85074759e0261497428c9b3725d3b9ec4d739a842116277c6ace81549089be0d11a54ee09a99dcf7ac695a8ea56d41bf0b62def90b6f78f8b0aca9");
     // Bob is receiving from Alice
     let decrypted = <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_secret_key(&mut encrypted, &bob_key_pair, &alice_key_pair);
-    assert!(decrypted.is_some(), "Decrypted data is None");
+    assert!(decrypted.is_ok(), "Decrypted data is None");
     let decrypted = decrypted.unwrap();
     let decrypted_str = String::from_utf8(decrypted).unwrap();
     assert_eq!(secret, decrypted_str.as_str(), "they should be the same string");
@@ -64,12 +64,12 @@ fn test_bls_encryption_and_decryption() {
     // Alice is sending to Bob
     let iv = Vec::from_hex("eac5bcd6eb85074759e0261497428c9b").unwrap();
     let encrypted = <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_secret_key_using_iv(&mut data, &alice_key_pair, &bob_key_pair, iv);
-    assert!(encrypted.is_some(), "Encrypted data is None");
+    assert!(encrypted.is_ok(), "Encrypted data is None");
     let mut encrypted = encrypted.unwrap();
     assert_eq!(encrypted.to_hex(), "eac5bcd6eb85074759e0261497428c9bd72bd418ce96e69cbb6766e59f8d1f8138afb0686018bb4d401369e77ba47367f93a49a528f4cc9e3f209a515e6dd8f2");
     // Bob is receiving from Alice
     let decrypted = <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_secret_key(&mut encrypted, &bob_key_pair, &alice_key_pair);
-    assert!(decrypted.is_some(), "Decrypted data is None");
+    assert!(decrypted.is_ok(), "Decrypted data is None");
     let decrypted = decrypted.unwrap();
     let decrypted_str = String::from_utf8(decrypted).unwrap();
     assert_eq!(secret, decrypted_str.as_str(), "they should be the same string");

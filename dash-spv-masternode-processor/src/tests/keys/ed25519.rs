@@ -6,7 +6,6 @@ use crate::chain::derivation::{IIndexPath, IndexPath};
 use crate::crypto::{UInt160, UInt256, UInt512};
 use crate::crypto::byte_util::AsBytes;
 use crate::keys::{IKey, KeyKind};
-use crate::lib_tests::tests::register_logger;
 
 fn test_derivation_path() {
 
@@ -209,7 +208,6 @@ pub fn test_vector_2_derivation() {
 
 #[test]
 pub fn test_platform_node_key_derivation() {
-    register_logger();
     let seed_data = Vec::from_hex("44cb0848958cb77898e464d18e3c70e2a437b343a894defa6010c5056a2b4a1caa01d04760871b578721b0a797fd1aacdfcd77f1870dddb34f1b204d5dbe07c0").unwrap();
     let seed_key = KeyKind::ED25519.key_with_seed_data(&seed_data).unwrap();
 

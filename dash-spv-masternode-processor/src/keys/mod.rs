@@ -1,9 +1,9 @@
 pub mod bls_key;
-pub mod key;
-pub mod ecdsa_key;
-pub mod ed25519_key;
-pub mod dip14;
 pub mod crypto_data;
+pub mod dip14;
+pub mod ed25519_key;
+pub mod ecdsa_key;
+pub mod key;
 
 pub use self::key::Key;
 pub use self::key::KeyKind;
@@ -12,6 +12,7 @@ pub use self::ecdsa_key::ECDSAKey;
 pub use self::ed25519_key::ED25519Key;
 
 use std::fmt::Debug;
+use crate::chain::bip::bip32;
 use crate::chain::ScriptMap;
 use crate::chain::derivation::index_path::IIndexPath;
 use crate::chain::tx::protocol::SIGHASH_ALL;
@@ -19,6 +20,7 @@ use crate::consensus::Encodable;
 use crate::crypto::UInt256;
 use crate::keys::dip14::{IChildKeyDerivation, SignKey};
 use crate::util::address::address;
+use crate::util::base58;
 use crate::util::data_append::DataAppend;
 use crate::util::script::ScriptElement;
 use crate::util::sec_vec::SecVec;
@@ -48,36 +50,36 @@ pub trait IKey: Send + Sync + Debug {
         panic!("Should be overriden in implementation")
     }
 
-    fn private_key_data(&self) -> Option<Vec<u8>> {
+    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> {
         panic!("Should be overriden in implementation")
     }
     fn public_key_data(&self) -> Vec<u8> {
         panic!("Should be overriden in implementation")
     }
-    fn extended_private_key_data(&self) -> Option<SecVec> {
+    fn extended_private_key_data(&self) -> Result<SecVec, KeyError> {
         panic!("Should be overriden in implementation")
     }
-    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
+    fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
         panic!("Should be overriden in implementation")
     }
-    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized + IChildKeyDerivation<INDEX, SK, PK>, PATH: IIndexPath<Item = INDEX>, SK: SignKey {
         panic!("Should be overriden in implementation")
     }
 
-    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
         panic!("Should be overriden in implementation")
     }
-    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         self.private_derive_to_path(&path.base_index_path())
     }
-    fn public_derive_to_256bit_derivation_path<PATH>(&mut self, path: &PATH) -> Option<Self>
+    fn public_derive_to_256bit_derivation_path<PATH>(&mut self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         self.public_derive_to_256bit_derivation_path_with_offset(path, 0)
     }
-    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Option<Self>
+    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         panic!("Should be overriden in implementation")
     }
@@ -115,4 +117,81 @@ pub trait IKey: Send + Sync + Debug {
     }
 
 
+}
+
+#[derive(Debug)]
+pub enum KeyError {
+    WrongFormat,
+    WrongLength(usize),
+    Extended(bool),
+    Bip32(bip32::Error),
+    Bip38(bip38::Error),
+    Bytes(byte::Error),
+    Secp256k1(secp256k1::Error),
+    Base58(base58::Error),
+    Bls(bls_signatures::BlsError),
+    Hex(hashes::hex::Error),
+    EDSignature(ed25519_dalek::SignatureError),
+    UnableToDerive,
+    DHKeyExchange,
+    CCCrypt(i32),
+    EmptySecKey,
+    Product,
+    TryFromSliceError(std::array::TryFromSliceError)
+}
+
+impl std::fmt::Display for KeyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+impl std::error::Error for KeyError {}
+
+impl From<std::array::TryFromSliceError> for KeyError {
+    fn from(value: std::array::TryFromSliceError) -> Self {
+        Self::TryFromSliceError(value)
+    }
+}
+
+impl From<base58::Error> for KeyError {
+    fn from(value: base58::Error) -> Self {
+        Self::Base58(value)
+    }
+}
+
+impl From<bip32::Error> for KeyError {
+    fn from(value: bip32::Error) -> Self {
+        Self::Bip32(value)
+    }
+}
+impl From<bip38::Error> for KeyError {
+    fn from(value: bip38::Error) -> Self {
+        Self::Bip38(value)
+    }
+}
+
+impl From<byte::Error> for KeyError {
+    fn from(value: byte::Error) -> Self {
+        Self::Bytes(value)
+    }
+}
+impl From<secp256k1::Error> for KeyError {
+    fn from(value: secp256k1::Error) -> Self {
+        Self::Secp256k1(value)
+    }
+}
+impl From<bls_signatures::BlsError> for KeyError {
+    fn from(value: bls_signatures::BlsError) -> Self {
+        Self::Bls(value)
+    }
+}
+impl From<hashes::hex::Error> for KeyError {
+    fn from(value: hashes::hex::Error) -> Self {
+        Self::Hex(value)
+    }
+}
+impl From<ed25519_dalek::SignatureError> for KeyError {
+    fn from(value: ed25519_dalek::SignatureError) -> Self {
+        Self::EDSignature(value)
+    }
 }

@@ -38,16 +38,20 @@ impl<'a, T> TryRead<'a, Endian> for VarArray<T> where T: TryRead<'a, Endian> {
 }
 impl<'a, T> BytesDecodable<'a, VarArray<T>> for VarArray<T> where T: TryRead<'a, Endian>{
     #[inline]
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-        let var_int: VarInt = VarInt::from_bytes(bytes, offset)?;
-        let arr_len = var_int.0 as usize;
-        let mut arr = Vec::<T>::with_capacity(arr_len);
-        for _i  in 0..arr_len {
-            match bytes.read_with::<T>(offset, LE) {
-                Ok(data) => { arr.push(data); },
-                Err(_err) => { return None; }
-            }
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Result<Self> {
+        match bytes.read_with::<VarInt>(offset, LE) {
+            Ok(var_int) => {
+                let arr_len = var_int.0 as usize;
+                let mut arr = Vec::<T>::with_capacity(arr_len);
+                for _i  in 0..arr_len {
+                    match bytes.read_with::<T>(offset, LE) {
+                        Ok(data) => { arr.push(data); },
+                        Err(err) => { return Err(err); }
+                    }
+                }
+                Ok(VarArray(var_int, arr))
+            },
+            Err(err) => Err(err)
         }
-        Some(VarArray(var_int, arr))
     }
 }

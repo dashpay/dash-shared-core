@@ -29,11 +29,10 @@ impl<'a> TryRead<'a, Endian> for VarBytes<'a> {
 }
 impl<'a> BytesDecodable<'a, VarBytes<'a>> for VarBytes<'a> {
     #[inline]
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-        let var_int: VarInt = VarInt::from_bytes(bytes, offset)?;
-        match bytes.read_with(offset, Bytes::Len(var_int.0 as usize)) {
-            Ok(data) => Some(VarBytes(var_int, data)),
-            Err(_err) => None
-        }
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<Self> {
+        bytes.read_with::<VarInt>(offset, LE)
+            .and_then(|var_int|
+                bytes.read_with(offset, Bytes::Len(var_int.0 as usize))
+                    .map(|data| VarBytes(var_int, data)))
     }
 }

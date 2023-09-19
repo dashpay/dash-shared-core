@@ -7,7 +7,7 @@ use hashes::sha256;
 use crate::crypto::{UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}, ECPoint};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
-use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, IChildKeyDerivationData}};
+use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, IChildKeyDerivationData}, KeyError};
 use crate::util::base58;
 use crate::util::sec_vec::SecVec;
 
@@ -67,9 +67,11 @@ impl IKey for ED25519Key
         self.fingerprint
     }
 
-    fn private_key_data(&self) -> Option<Vec<u8>> {
-        (!self.seckey.is_zero())
-            .then_some(self.seckey.0.to_vec())
+    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> {
+        match self.seckey.is_zero() {
+            true => Err(KeyError::EmptySecKey),
+            false => Ok(self.seckey.0.to_vec())
+        }
     }
 
     fn public_key_data(&self) -> Vec<u8> {
@@ -83,32 +85,34 @@ impl IKey for ED25519Key
         }
     }
 
-    fn extended_private_key_data(&self) -> Option<SecVec> {
-        if !self.is_extended {
-            None
-        } else if let Some(private_key_data) = self.private_key_data() {
-            // TODO: secure allocator
-            let mut writer = SecVec::new();
-            self.fingerprint.enc(&mut writer);
-            self.chaincode.enc(&mut writer);
-            writer.extend(private_key_data);
-            Some(writer)
-        } else {
-            None
+    fn extended_private_key_data(&self) -> Result<SecVec, KeyError> {
+        match self.is_extended {
+            true => self.private_key_data().map(|private_key_data| {
+                // TODO: secure allocator
+                let mut writer = SecVec::new();
+                self.fingerprint.enc(&mut writer);
+                self.chaincode.enc(&mut writer);
+                writer.extend(private_key_data);
+                writer
+            }),
+            extended => Err(KeyError::Extended(extended))
         }
     }
 
-    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
-        self.is_extended.then_some({
-            let mut writer = Vec::<u8>::new();
-            self.fingerprint.enc(&mut writer);
-            self.chaincode.enc(&mut writer);
-            writer.extend(self.public_key_data());
-            writer
-        })
+    fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
+        match self.is_extended {
+            true => {
+                let mut writer = Vec::<u8>::new();
+                self.fingerprint.enc(&mut writer);
+                self.chaincode.enc(&mut writer);
+                writer.extend(self.public_key_data());
+                Ok(writer)
+            },
+            extended => Err(KeyError::Extended(extended))
+        }
     }
 
-    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
         let mut signing_key: SigningKey = self.seckey.into();
         let mut chaincode = self.chaincode.clone();
@@ -123,10 +127,10 @@ impl IKey for ED25519Key
                 }
                 Self::derive_child_private_key(&mut signing_key, &mut chaincode, path, position);
             });
-        Some(Self::init_with_extended_private_parts(signing_key.into(), chaincode, fingerprint))
+        Ok(Self::init_with_extended_private_parts(signing_key.into(), chaincode, fingerprint))
     }
 
-    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item=UInt256> {
         let mut signing_key: SigningKey = self.seckey.into();
         let mut chaincode = self.chaincode.clone();
@@ -141,10 +145,10 @@ impl IKey for ED25519Key
                 }
                 Self::derive_child_private_key(&mut signing_key, &mut chaincode, path, position);
         });
-        Some(Self::init_with_extended_private_parts(signing_key.into(), chaincode, fingerprint))
+        Ok(Self::init_with_extended_private_parts(signing_key.into(), chaincode, fingerprint))
     }
 
-    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Option<Self>
+    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item=UInt256> {
         let mut chaincode = self.chaincode.clone();
         // let mut data = ECPoint::from(&self.public_key_data());
@@ -160,7 +164,7 @@ impl IKey for ED25519Key
                 }
                 Self::derive_child_public_key(&mut data, &mut chaincode, path, position);
             });
-        Some(Self::init_with_extended_public_parts(data.0.to_vec(), chaincode, fingerprint))
+        Ok(Self::init_with_extended_public_parts(data.0.to_vec(), chaincode, fingerprint))
     }
 
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
@@ -191,9 +195,9 @@ impl IKey for ED25519Key
 
 impl ED25519Key {
 
-    pub fn init_with_seed_data(seed: &[u8]) -> Option<Self> {
+    pub fn init_with_seed_data(seed: &[u8]) -> Result<Self, KeyError> {
         let i = UInt512::ed25519_seed_key(seed);
-        Some(Self { seckey: UInt256::from(&i.0[..32]), chaincode: UInt256::from(&i.0[32..]), ..Default::default() })
+        Ok(Self { seckey: UInt256::from(&i.0[..32]), chaincode: UInt256::from(&i.0[32..]), ..Default::default() })
     }
 
     fn init_with_extended_private_parts(seckey: UInt256, chaincode: UInt256, fingerprint: u32) -> Self {
@@ -204,17 +208,17 @@ impl ED25519Key {
         Self { fingerprint, chaincode, pubkey, is_extended: true, ..Default::default() }
     }
 
-    pub fn init_with_extended_private_key_data(data: &Vec<u8>) -> Option<Self> {
+    pub fn init_with_extended_private_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
         Self::key_with_extended_private_key_data(data)
     }
 
-    pub fn init_with_extended_public_key_data(data: &Vec<u8>) -> Option<Self> {
+    pub fn init_with_extended_public_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
         Self::key_with_extended_public_key_data(data)
     }
 
-    pub fn key_with_secret_data(data: &[u8]) -> Option<Self> {
+    pub fn key_with_secret_data(data: &[u8]) -> Result<Self, KeyError> {
         Self::secret_key_from_bytes(data)
-            .ok()
+            .map_err(KeyError::from)
             .map(|seckey| Self { seckey: seckey.into(), ..Default::default() })
     }
 
@@ -226,22 +230,22 @@ impl ED25519Key {
         SigningKey::try_from(data)
     }
 
-    pub fn key_with_public_key_data(data: &[u8]) -> Option<Self> {
+    pub fn key_with_public_key_data(data: &[u8]) -> Result<Self, KeyError> {
         assert!(!data.is_empty());
         // TODO: if we follow SLIP-0010 then we have 33-bytes, and need to cut off 1st byte (0x00)
         // TODO: if we follow IETF then we must ensure length == 32 bytes
         match data.len() {
-            32 => Self::public_key_from_bytes(data).ok(),
-            33 => Self::public_key_from_bytes(&data[1..]).ok(),
-            _ => None
+            32 => Self::public_key_from_bytes(data).map_err(KeyError::from),
+            33 => Self::public_key_from_bytes(&data[1..]).map_err(KeyError::from),
+            len => Err(KeyError::WrongLength(len))
         }.map(|pk| Self { pubkey: pk.to_bytes().to_vec(), ..Default::default() })
     }
 
-    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Option<Vec<u8>>
+    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Result<Vec<u8>, KeyError>
         where PATH: IIndexPath<Item = u32> {
         if data.len() < EXT_PUBKEY_SIZE {
             assert!(false, "Extended public key is wrong size");
-            return None;
+            return Err(KeyError::WrongLength(data.len()));
         }
         let mut chaincode = UInt256::from(&data[4..36]);
         // let mut key = ECPoint::from(&data[36..69]);
@@ -249,54 +253,57 @@ impl ED25519Key {
         (0..path.length())
             .into_iter()
             .for_each(|position| Self::derive_child_public_key(&mut key, &mut chaincode, path, position));
-        Some(key.as_bytes().to_vec())
+        Ok(key.as_bytes().to_vec())
     }
 }
 
 /// For FFI
 impl ED25519Key {
 
-    pub fn key_with_private_key(string: &str) -> Option<Self> {
+    pub fn key_with_private_key(string: &str) -> Result<Self, KeyError> {
         Vec::from_hex(string.as_bytes().to_hex().as_str())
-            .ok()
+            .map_err(KeyError::from)
             .and_then(|data| Self::key_with_secret_data(&data))
     }
 
-    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
+    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Result<Self, KeyError> where Self: Sized, PATH: IIndexPath<Item=u32> {
         key.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path))
             .and_then(|pub_key_data| Self::key_with_public_key_data(&pub_key_data))
     }
 
 
-    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Option<Self> {
-        let len = bytes.len();
-        // if len == 68 || len == 69 {
-        if len == 68 {
-            let offset = &mut 0;
-            let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
-            let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
-            // if len == 69 {
-            //     // skip 1st byte as pub key was padded with 0x00
-            //     *offset += 1;
-            // }
-            let data: &[u8] = bytes.read_with(offset, Bytes::Len(32)).unwrap();
-            Self::public_key_from_bytes(data)
-                .ok()
-                .map(|pubkey| Self::init_with_extended_public_parts(pubkey.as_bytes().to_vec(), chaincode, fingerprint))
-        } else {
-            None
+    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        match bytes.len() {
+            // if len == 68 || len == 69 {
+            68 => {
+                let offset = &mut 0;
+                let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
+                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+                // if len == 69 {
+                //     // skip 1st byte as pub key was padded with 0x00
+                //     *offset += 1;
+                // }
+                let data: &[u8] = bytes.read_with(offset, Bytes::Len(32)).unwrap();
+                Self::public_key_from_bytes(data)
+                    .map_err(KeyError::from)
+                    .map(|pubkey| Self::init_with_extended_public_parts(pubkey.as_bytes().to_vec(), chaincode, fingerprint))
+            },
+            len => Err(KeyError::WrongLength(len))
         }
     }
 
-    pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Option<Self> {
-        (bytes.len() == 68).then_some({
-            let offset = &mut 0;
-            let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
-            let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
-            let seckey = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
-            Self::init_with_extended_private_parts(seckey, chaincode, fingerprint)
-        })
+    pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        match bytes.len() {
+            69 => {
+                let offset = &mut 0;
+                let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
+                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+                let seckey = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+                Ok(Self::init_with_extended_private_parts(seckey, chaincode, fingerprint))
+            },
+            len => Err(KeyError::WrongLength(len))
+        }
     }
 
     pub fn secret_key_string(&self) -> String {

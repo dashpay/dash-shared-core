@@ -6,7 +6,6 @@ use std::collections::BTreeMap;
 #[derive(Clone)]
 #[rs_ffi_macro_derive::impl_ffi_conv]
 pub struct MNListDiffResult {
-    pub error_status: crate::processing::processing_error::ProcessingError,
     pub base_block_hash: UInt256,
     pub block_hash: UInt256,
     pub has_found_coinbase: bool,       //1 byte
@@ -28,7 +27,7 @@ pub struct MNListDiffResult {
 impl std::fmt::Debug for MNListDiffResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MNListDiffResult")
-            .field("error_status", &self.error_status)
+            // .field("error_status", &self.error_status)
             .field("base_block_hash", &self.base_block_hash)
             .field("block_hash", &self.block_hash)
             .field(
@@ -54,7 +53,6 @@ impl std::fmt::Debug for MNListDiffResult {
 impl Default for MNListDiffResult {
     fn default() -> Self {
         Self {
-            error_status: crate::processing::ProcessingError::None,
             base_block_hash: UInt256::MIN,
             block_hash: UInt256::MAX,
             has_found_coinbase: false,
@@ -73,18 +71,9 @@ impl Default for MNListDiffResult {
 }
 
 impl MNListDiffResult {
-    pub fn default_with_error(error: crate::processing::ProcessingError) -> Self {
-        Self {
-            error_status: error,
-            ..Default::default()
-        }
-    }
-}
-
-impl MNListDiffResult {
     pub fn encode(&self) -> types::MNListDiffResult {
         types::MNListDiffResult {
-            error_status: self.error_status.into(),
+            // error_status: self.error_status.into(),
             base_block_hash: rs_ffi_interfaces::boxed(self.base_block_hash.0),
             block_hash: rs_ffi_interfaces::boxed(self.block_hash.0),
             has_found_coinbase: self.has_found_coinbase,

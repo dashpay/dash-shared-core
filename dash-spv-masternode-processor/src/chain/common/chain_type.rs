@@ -363,6 +363,15 @@ impl IHaveChainSettings for DevnetType {
 }
 // Params
 impl ChainType {
+    pub fn from_magic(magic: u32) -> Option<ChainType> {
+        // Note: any new entries here must be added to `magic` below
+        match magic {
+            0xbd6b0cbf => Some(Self::MainNet),
+            0xffcae2ce => Some(Self::TestNet),
+            _ => None
+        }
+    }
+
     pub fn magic(&self) -> u32 {
         match self {
             ChainType::MainNet => 0xbd6b0cbf,

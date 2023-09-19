@@ -4,15 +4,17 @@ use byte::ctx::Bytes;
 use hashes::sha256;
 use hashes::hex::{FromHex, ToHex};
 use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
-use secp256k1::Secp256k1;
+use secp256k1::{Scalar, Secp256k1};
 use crate::chain::bip::bip32;
 use crate::chain::common::ChainType;
 use crate::chain::derivation::{BIP32_HARD, IIndexPath, IndexPath};
 use crate::chain::params::ScriptMap;
 use crate::consensus::Encodable;
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
-use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
+use crate::crypto::byte_util::clone_into_array;
+use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}, KeyError};
 use crate::keys::crypto_data::{CryptoData, DHKey};
+use crate::keys::dip14::secp256k1_point_from_bytes;
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
 use crate::util::sec_vec::SecVec;
@@ -38,87 +40,93 @@ impl ECDSAKey {
                 Self::public_key_from_secret_key_serialized(&secret_key, compressed))
     }
 
-    pub fn key_with_secret(secret: &UInt256, compressed: bool) -> Option<Self> {
+    pub fn key_with_secret(secret: &UInt256, compressed: bool) -> Result<Self, KeyError> {
         Self::secret_key_from_bytes(secret.as_bytes())
-            .ok()
+            .map_err(KeyError::from)
             .map(|seckey| Self::with_seckey(seckey, compressed))
     }
-    pub fn key_with_combined_secret(data: &UInt512, compressed: bool) -> Option<Self> {
+    pub fn key_with_combined_secret(data: &UInt512, compressed: bool) -> Result<Self, KeyError> {
         Self::secret_key_from_bytes(&data.0[..32])
-            .ok()
+            .map_err(KeyError::from)
             .map(|seckey| Self::with_seckey_and_chaincode(seckey, UInt256::from(&data.0[32..]), compressed))
     }
-    pub fn key_with_secret_data(data: &[u8], compressed: bool) -> Option<Self> {
+    pub fn key_with_secret_data(data: &[u8], compressed: bool) -> Result<Self, KeyError> {
         Self::secret_key_from_bytes(data)
-            .ok()
+            .map_err(KeyError::from)
             .map(|seckey| Self::with_seckey(seckey, compressed))
     }
-    pub fn key_with_secret_hex(string: &str, compressed: bool) -> Option<Self> {
+    pub fn key_with_secret_hex(string: &str, compressed: bool) -> Result<Self, KeyError> {
         Vec::from_hex(string)
-            .ok()
+            .map_err(KeyError::from)
             .and_then(|data| Self::key_with_secret_data(&data, compressed))
     }
 
-    pub fn key_recovered_from_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Option<Self> {
+    pub fn key_recovered_from_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Result<Self, KeyError> {
         Self::init_with_compact_sig(compact_sig, message_digest)
     }
 
-    pub fn key_with_private_key(private_key_string: &str, chain_type: ChainType) -> Option<Self> {
+    pub fn key_with_private_key(private_key_string: &str, chain_type: ChainType) -> Result<Self, KeyError> {
         Self::init_with_private_key(private_key_string, chain_type)
     }
 
-    pub fn key_with_public_key_data(data: &[u8]) -> Option<Self> {
+    pub fn key_with_public_key_data(data: &[u8]) -> Result<Self, KeyError> {
         assert!(!data.is_empty());
         match data.len() {
-            33 | 65 => Self::public_key_from_bytes(data).map(|pubkey| Self::with_pubkey_compressed(pubkey, data.len() == 33)).ok(),
-            _ => None
+            33 | 65 => Self::public_key_from_bytes(data)
+                .map(|pubkey| Self::with_pubkey_compressed(pubkey, data.len() == 33))
+                .map_err(KeyError::from),
+            len => Err(KeyError::WrongLength(len))
         }
     }
 
-    pub fn init_with_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Option<ECDSAKey> {
-        // assert!(compact_sig, "ECDSAKey::init_with_compact_sig {null}");
+    pub fn init_with_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Result<ECDSAKey, KeyError> {
         if compact_sig.len() != 65 {
-            return None;
+            return Err(KeyError::WrongLength(compact_sig.len()));
         }
         let compressed = compact_sig[0] - 27 >= 4;
         let recid = RecoveryId::from_i32(((compact_sig[0] - 27) % 4) as i32).unwrap();
         RecoverableSignature::from_compact(&compact_sig[1..], recid)
+            .map_err(KeyError::from)
             .and_then(|sig| Secp256k1::new().recover_ecdsa(&secp256k1::Message::from(message_digest), &sig)
+                .map_err(KeyError::from)
                 .map(|pk| Self::with_pubkey_compressed(pk, compressed)))
-            .ok()
+            .map_err(KeyError::from)
     }
 
-    pub fn init_with_seed_data(seed: &[u8]) -> Option<Self> {
+    pub fn init_with_seed_data(seed: &[u8]) -> Result<Self, KeyError> {
         let i = UInt512::bip32_seed_key(seed);
         Self::secret_key_from_bytes(&i.0[..32])
-            .ok()
+            .map_err(KeyError::from)
             .map(|seckey| Self::with_seckey_and_chaincode(seckey, UInt256::from(&i.0[32..]), true))
     }
 
-    pub fn init_with_secret(secret: UInt256, compressed: bool) -> Option<Self> {
+    pub fn init_with_secret(secret: UInt256, compressed: bool) -> Result<Self, KeyError> {
         Self::secret_key_from_bytes(secret.as_bytes())
-            .ok()
+            .map_err(KeyError::from)
             .map(|seckey| Self::with_seckey(seckey, compressed))
     }
 
-    pub fn init_with_extended_private_key_data(data: &Vec<u8>) -> Option<Self> {
-        // assert_eq!(data.len(), ECDSA_EXTENDED_SECRET_KEY_SIZE, "Key size is incorrect");
-        Self::init_with_secret(data.read_with::<UInt256>(&mut 36, byte::LE).unwrap(), true)
-            .map(|s| Self::update_extended_params(s, data))
+    pub fn init_with_extended_private_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
+        data.read_with::<UInt256>(&mut 36, byte::LE)
+            .map_err(KeyError::from)
+            .and_then(|secret| Self::init_with_secret(secret, true))
+            .map(|key| Self::update_extended_params(key, data))
     }
 
-    pub fn init_with_extended_public_key_data(data: &Vec<u8>) -> Option<Self> {
+    pub fn init_with_extended_public_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
         Self::init_with_public_key(data[36..].to_vec())
-            .map(|s| Self::update_extended_params(s, data))
+            .map_err(KeyError::from)
+            .map(|key| Self::update_extended_params(key, data))
     }
 
-    pub fn init_with_private_key(private_key: &str, chain_type: ChainType) -> Option<Self> {
+    pub fn init_with_private_key(private_key: &str, chain_type: ChainType) -> Result<Self, KeyError> {
         match private_key.len() {
-            0 => None,
+            0 => Err(KeyError::WrongLength(0)),
             // mini private key format
-            22 | 30 if private_key.starts_with('L') =>
-                is_valid_dash_private_key(&private_key.to_string(), &chain_type.script_map())
-                    .then_some(Self::with_seckey(secp256k1::SecretKey::from_hashed_data::<sha256::Hash>(private_key.as_bytes()), false)),
+            22 | 30 if private_key.starts_with('L') => match is_valid_dash_private_key(&private_key.to_string(), &chain_type.script_map()) {
+                true => Ok(Self::with_seckey(secp256k1::SecretKey::from_hashed_data::<sha256::Hash>(private_key.as_bytes()), false)),
+                false => Err(KeyError::WrongFormat)
+            },
             _ => {
                 let mut d = base58::from_check(private_key).ok();
                 if d.is_none() || d.as_ref().unwrap().len() == 28 {
@@ -128,29 +136,32 @@ impl ECDSAKey {
                     d = Vec::from_hex(private_key).ok();
                 }
                 if d.as_ref().is_none() {
-                    return None;
+                    return Err(KeyError::WrongLength(0));
                 }
                 let data = d.unwrap();
                 match data.len() {
                     33 | 34 if data[0] == chain_type.script_map().privkey =>
-                        Self::secret_key_from_bytes(&data[1..33]).ok().map(|seckey| Self::with_seckey(seckey, data.len() == 34)),
+                        Self::secret_key_from_bytes(&data[1..33])
+                            .map_err(KeyError::from)
+                            .map(|seckey| Self::with_seckey(seckey, data.len() == 34)),
                     32 =>
-                        Self::secret_key_from_bytes(&data[..]).ok().map(|seckey| Self::with_seckey(seckey, false)),
-                    _ =>
-                        None
+                        Self::secret_key_from_bytes(&data[..])
+                            .map_err(KeyError::from)
+                            .map(|seckey| Self::with_seckey(seckey, false)),
+                    len =>
+                        Err(KeyError::WrongLength(len)),
                 }
             }
         }
     }
 
-    pub fn init_with_public_key(public_key: Vec<u8>) -> Option<Self> {
+    pub fn init_with_public_key(public_key: Vec<u8>) -> Result<Self, KeyError> {
         assert!(!public_key.is_empty(), "public_key is empty");
-        if public_key.len() != 33 && public_key.len() != 65 {
-            None
-        } else {
-            Self::public_key_from_bytes(&public_key)
-                .ok()
-                .map(|pubkey| Self::with_pubkey_compressed(pubkey, public_key.len() == 33))
+        match public_key.len() {
+            33 | 65 => Self::public_key_from_bytes(&public_key)
+                .map_err(KeyError::from)
+                .map(|pubkey| Self::with_pubkey_compressed(pubkey, public_key.len() == 33)),
+            _ => Err(KeyError::WrongLength(public_key.len()))
         }
     }
 
@@ -206,8 +217,9 @@ impl ECDSAKey {
         }
     }
 
-    pub fn public_key_from_inner_secret_key_serialized(&self) -> Option<Vec<u8>> {
-        self.secret_key().ok().map(|seckey| Self::public_key_from_secret_key_serialized(&seckey, self.compressed))
+    pub fn public_key_from_inner_secret_key_serialized(&self) -> Result<Vec<u8>, secp256k1::Error> {
+        self.secret_key()
+            .map(|ref secret_key| Self::public_key_from_secret_key_serialized(secret_key, self.compressed))
     }
 
     pub fn public_key_from_secret_key_serialized(secret_key: &secp256k1::SecretKey, compressed: bool) -> Vec<u8> {
@@ -223,7 +235,7 @@ impl ECDSAKey {
         !self.seckey.is_zero()
     }
 
-    fn private_derive_to_256bit_derivation_path_for_seckey_and_chaincode<PATH>(seckey: UInt256, chaincode: UInt256, path: &PATH) -> Option<Self>
+    fn private_derive_to_256bit_derivation_path_for_seckey_and_chaincode<PATH>(seckey: UInt256, chaincode: UInt256, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         let mut seckey = seckey.clone();
         let mut chaincode = chaincode.clone();
@@ -240,7 +252,7 @@ impl ECDSAKey {
                 }
                 Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
             });
-        Some(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
+        Ok(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
 
     }
 
@@ -292,9 +304,11 @@ impl IKey for ECDSAKey {
         self.fingerprint
     }
 
-    fn private_key_data(&self) -> Option<Vec<u8>> {
-        (!self.seckey.is_zero())
-            .then_some(self.seckey.0.to_vec())
+    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> {
+        match self.seckey.is_zero() {
+            true => Err(KeyError::EmptySecKey),
+            false => Ok(self.seckey.0.to_vec())
+        }
     }
 
     fn public_key_data(&self) -> Vec<u8> {
@@ -311,40 +325,42 @@ impl IKey for ECDSAKey {
         self.pubkey.clone()
     }
 
-    fn extended_private_key_data(&self) -> Option<SecVec> {
-        if !self.is_extended {
-            None
-        } else if let Some(private_key_data) = self.private_key_data() {
-            // TODO: secure data
-            //NSMutableData *data = [NSMutableData secureData];
-            let mut writer = SecVec::new();
-            self.fingerprint.enc(&mut writer);
-            self.chaincode.enc(&mut writer);
-            writer.extend(private_key_data);
-            // private_key_data.enc(&mut writer);
-            Some(writer)
-        } else {
-            None
+    fn extended_private_key_data(&self) -> Result<SecVec, KeyError> {
+        match (self.is_extended, self.private_key_data()) {
+            (true, Ok(private_key_data)) => {
+                // TODO: secure data
+                //NSMutableData *data = [NSMutableData secureData];
+                let mut writer = SecVec::new();
+                self.fingerprint.enc(&mut writer);
+                self.chaincode.enc(&mut writer);
+                writer.extend(private_key_data);
+                // private_key_data.enc(&mut writer);
+                Ok(writer)
+            },
+            _ => Err(KeyError::Extended(self.is_extended))
         }
     }
 
-    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
-        self.is_extended.then_some({
-            let mut writer = Vec::<u8>::new();
-            self.fingerprint.enc(&mut writer);
-            self.chaincode.enc(&mut writer);
-            writer.extend(self.public_key_data());
-            writer
-        })
+    fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
+        match self.is_extended {
+            true => {
+                let mut writer = Vec::<u8>::new();
+                self.fingerprint.enc(&mut writer);
+                self.chaincode.enc(&mut writer);
+                writer.extend(self.public_key_data());
+                Ok(writer)
+            },
+            extended => Err(KeyError::Extended(extended))
+        }
     }
 
-    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized + IChildKeyDerivation<INDEX, SK, PK>,
               PATH: IIndexPath<Item=INDEX>, SK: SignKey {
         todo!()
     }
 
-    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
         let mut seckey = self.seckey.clone();
         let mut chaincode = self.chaincode.clone();
@@ -361,7 +377,7 @@ impl IKey for ECDSAKey {
                 }
                 Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
             });
-        Some(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
+        Ok(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
     }
 
     // fn private_derive_to_path2<PATH, INDEX>(&self, path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=INDEX> {
@@ -384,12 +400,12 @@ impl IKey for ECDSAKey {
         // Some(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
     // }
 
-    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         Self::private_derive_to_256bit_derivation_path_for_seckey_and_chaincode(self.seckey, self.chaincode, path)
     }
 
-    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Option<Self>
+    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         assert!(path.length() > offset, "derivation path offset must be smaller than the its length");
         let mut chaincode = self.chaincode.clone();
@@ -406,10 +422,10 @@ impl IKey for ECDSAKey {
             child_key.chaincode = chaincode;
             child_key.fingerprint = fingerprint;
             child_key.is_extended = true;
-            Some(child_key)
+            Ok(child_key)
         } else {
             assert!(false, "Public key should be created");
-            None
+            Err(KeyError::UnableToDerive)
         }
     }
 
@@ -498,18 +514,19 @@ impl ECDSAKey {
             .serialize(chain_type)
     }
 
-    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Option<Vec<u8>>
+    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Result<Vec<u8>, KeyError>
         where PATH: IIndexPath<Item = u32> {
-        if data.len() < EXT_PUBKEY_SIZE {
-            assert!(false, "Extended public key is wrong size");
-            return None;
+        match data.len() {
+            EXT_PUBKEY_SIZE.. => {
+                let mut c = UInt256::from(&data[4..36]);
+                let mut k = ECPoint::from(&data[36..69]);
+                (0..path.length())
+                    .into_iter()
+                    .for_each(|position| Self::derive_child_public_key(&mut k, &mut c, path, position));
+                Ok(k.as_bytes().to_vec())
+            },
+            _ => Err(KeyError::WrongLength(data.len()))
         }
-        let mut c = UInt256::from(&data[4..36]);
-        let mut k = ECPoint::from(&data[36..69]);
-        (0..path.length())
-            .into_iter()
-            .for_each(|position| Self::derive_child_public_key(&mut k, &mut c, path, position));
-        Some(k.as_bytes().to_vec())
     }
 
     // pub fn encrypt_data_for_public_key(&self, secret: &str, mut public_key: Self, initialization_vector: &str) -> Vec<u8> {
@@ -543,53 +560,57 @@ impl ECDSAKey {
 /// For FFI
 impl ECDSAKey {
 
-    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
+    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Result<Self, KeyError>
+        where Self: Sized, PATH: IIndexPath<Item=u32> {
         key.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path))
             .and_then(|pub_key_data| Self::key_with_public_key_data(&pub_key_data))
     }
 
-    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Option<Self> {
+    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
         let len = bytes.len();
-        if len == 69 || len == 101 {
-            let offset = &mut 0;
-            let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
-            let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
-            let pubkeydata: &[u8] = bytes.read_with(offset, Bytes::Len(len - *offset)).unwrap();
-            let compressed = pubkeydata.len() == 33;
-            Self::public_key_from_bytes(pubkeydata).ok().map(|pubkey| {
-                Self {
-                    fingerprint,
-                    chaincode,
-                    compressed,
-                    pubkey: if compressed { pubkey.serialize().to_vec() } else { pubkey.serialize_uncompressed().to_vec() },
-                    is_extended: true,
-                    ..Default::default() }
-            })
-        } else {
-            None
+        match len {
+            69 | 101 => {
+                let offset = &mut 0;
+                let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
+                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+                let pubkeydata: &[u8] = bytes.read_with(offset, Bytes::Len(len - *offset)).unwrap();
+                let compressed = pubkeydata.len() == 33;
+                Self::public_key_from_bytes(pubkeydata)
+                    .map_err(KeyError::from)
+                    .map(|pubkey| Self {
+                        fingerprint,
+                        chaincode,
+                        compressed,
+                        pubkey: if compressed { pubkey.serialize().to_vec() } else { pubkey.serialize_uncompressed().to_vec() },
+                        is_extended: true,
+                        ..Default::default()
+                    })
+            },
+            len => Err(KeyError::WrongLength(len))
         }
     }
 
-    pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Option<Self> {
-        Self::init_with_secret(bytes.read_with::<UInt256>(&mut 36, byte::LE).unwrap(), true)
+    pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        bytes.read_with::<UInt256>(&mut 36, byte::LE)
+            .map_err(KeyError::from)
+            .and_then(|key| Self::init_with_secret(key, true))
             .map(|key| Self::update_extended_params(key, bytes))
     }
 
-    pub fn key_with_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Option<ECDSAKey> {
+    pub fn key_with_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Result<ECDSAKey, secp256k1::Error> {
         if compact_sig.len() != 65 {
-            return None;
+            return Err(secp256k1::Error::InvalidSignature);
         }
         RecoveryId::from_i32(((compact_sig[0] - 27) % 4) as i32)
             .and_then(|recid| RecoverableSignature::from_compact(&compact_sig[1..], recid)
                 .and_then(|sig| Secp256k1::new()
                     .recover_ecdsa(&secp256k1::Message::from(message_digest), &sig)
                     .map(|pubkey| ECDSAKey::with_pubkey_compressed(pubkey, compact_sig[0] - 27 >= 4))))
-            .ok()
     }
 
 
-    pub fn serialized_extended_private_key_from_seed(seed: &[u8], index_path: IndexPath<UInt256>, chain_type: ChainType) -> Option<String> {
+    pub fn serialized_extended_private_key_from_seed(seed: &[u8], index_path: IndexPath<UInt256>, chain_type: ChainType) -> Result<String, KeyError> {
         let i = UInt512::bip32_seed_key(seed);
         Self::private_derive_to_256bit_derivation_path_for_seckey_and_chaincode(UInt256::from(&i.0[..32]), UInt256::from(&i.0[32..]), &index_path)
             .map(|key| bip32::Key::new(
@@ -605,54 +626,98 @@ impl ECDSAKey {
 }
 
 impl DHKey for ECDSAKey {
-    fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Option<Self> where Self: Sized {
+    fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Result<Self, KeyError>
+        where Self: Sized {
         match (Self::public_key_from_bytes(&public_key.public_key_data()),
                Self::secret_key_from_bytes(private_key.seckey.as_bytes())) {
-            (Ok(pubkey), Ok(seckey)) => Some(Self::with_shared_secret(secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey), false)),
-            _ => None
+            (Ok(pubkey), Ok(seckey)) => Ok(Self::with_shared_secret(secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey), false)),
+            _ => Err(KeyError::DHKeyExchange)
         }
     }
 }
 
 impl CryptoData<ECDSAKey> for Vec<u8> {
-    fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &ECDSAKey, public_key: &ECDSAKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+    fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &ECDSAKey, public_key: &ECDSAKey, initialization_vector: Vec<u8>) -> Result<Vec<u8>, KeyError> {
         let mut destination = initialization_vector.clone();
-        ECDSAKey::secret_key_from_bytes(public_key.seckey.as_bytes())
+        secret_key.secret_key()
+            .map_err(KeyError::from)
+            .and_then(|scalar| ECDSAKey::secret_key_from_bytes(public_key.seckey.as_bytes())
             .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false)))
-            .map(|pubkey| secp256k1::ecdh::SharedSecret::new(&pubkey, &secret_key.secret_key().unwrap()))
-            .ok()
+            .map(|pubkey| secp256k1::ecdh::SharedSecret::new(&pubkey, &scalar))
+            .map_err(KeyError::from)
             .and_then(|shared_secret| <Self as CryptoData<ECDSAKey>>::encrypt(self, shared_secret.secret_bytes(), initialization_vector))
             .map(|encrypted_data| {
                 destination.extend(encrypted_data);
                 destination
             })
+        )
+        // ECDSAKey::secret_key_from_bytes(public_key.seckey.as_bytes())
+        //     .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false)))
+        //     .map(|pubkey| secp256k1::ecdh::SharedSecret::new(&pubkey, &secret_key.secret_key().unwrap()))
+        //     .map_err(KeyError::from)
+        //     .and_then(|shared_secret| <Self as CryptoData<ECDSAKey>>::encrypt(self, shared_secret.secret_bytes(), initialization_vector))
+        //     .map(|encrypted_data| {
+        //         destination.extend(encrypted_data);
+        //         destination
+        //     })
     }
 
-    fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &ECDSAKey, public_key: &ECDSAKey, iv_size: usize) -> Option<Vec<u8>> {
+    fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &ECDSAKey, public_key: &ECDSAKey, iv_size: usize) -> Result<Vec<u8>, KeyError> {
         if self.len() < iv_size {
-            return None;
+            return Err(KeyError::WrongLength(self.len()));
         }
         ECDSAKey::secret_key_from_bytes(public_key.seckey.as_bytes())
             .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false)))
+            .map_err(KeyError::from)
             .map(|pubkey| secp256k1::ecdh::SharedSecret::new(&pubkey, &secret_key.secret_key().unwrap()))
-            .ok()
             .and_then(|shared_secret|
                 <Self as CryptoData<ECDSAKey>>::decrypt(self[iv_size..self.len()].to_vec(), shared_secret.secret_bytes(), &self[..iv_size]))
     }
 
-    fn encrypt_with_dh_key_using_iv(&self, key: &ECDSAKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+    fn encrypt_with_dh_key_using_iv(&self, key: &ECDSAKey, initialization_vector: Vec<u8>) -> Result<Vec<u8>, KeyError> {
         let mut destination = initialization_vector.clone();
         let pubkey_data = key.public_key_from_inner_secret_key_serialized().unwrap_or(key.public_key_data());
+        // TODO: make it crash-safe
         if pubkey_data.is_empty() {
-            None
+            Err(KeyError::DHKeyExchange)
         } else {
-            pubkey_data[..32].try_into().ok()
-                .and_then(|key_data: [u8; 32]| initialization_vector.try_into().ok()
-                    .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
-                    .map(|encrypted_data| {
-                        destination.extend(encrypted_data);
-                        destination
-                    }))
+            // ed25519_dalek::SecretKey::try_from(&i.0[..32])
+
+            match (<&[u8] as TryInto<[u8; 32]>>::try_into(&pubkey_data[..32]),
+                   <Vec<u8> as TryInto<[u8; 16]>>::try_into(initialization_vector)) {
+                (Ok(key_data), Ok(iv_data)) =>
+                    <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data)
+                        .map(|encrypted_data| {
+                            destination.extend(encrypted_data);
+                            destination
+                        }),
+                _ => Err(KeyError::DHKeyExchange)
+            }
+            // pubkey_data[..32]
+            //     .try_into()
+            //     .and_then(|key_data: [u8; 32]| initialization_vector
+            //         .try_into()
+            //         .and_then(|iv_data: [u8; 16]| match <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data) {
+            //             Ok(encrypted_data) => {
+            //                 destination.extend(encrypted_data);
+            //                 destination
+            //             },
+            //             Err(err) => Err(err)
+            //         }))
+            //     .map_err(KeyError::from)
+                    // .map(|encrypted_data| {
+                    //     destination.extend(encrypted_data);
+                    //     destination
+                    // }))
+
+            // pubkey_data[..32].try_into()
+            //     .and_then(|key_data: [u8; 32]| initialization_vector.try_into()
+            //         .map_err(KeyError::from)
+            //         .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
+            //         .map(|encrypted_data| {
+            //             destination.extend(encrypted_data);
+            //             destination
+            //         }))
         }
 
 
@@ -669,12 +734,50 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
         //         }))
     }
 
-    fn decrypt_with_dh_key_using_iv_size(&self, key: &ECDSAKey, iv_size: usize) -> Option<Vec<u8>> {
+    fn decrypt_with_dh_key_using_iv_size(&self, key: &ECDSAKey, iv_size: usize) -> Result<Vec<u8>, KeyError> {
         key.public_key_from_inner_secret_key_serialized()
-            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
-            .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().ok()
+            .map_err(KeyError::from)
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().map_err(KeyError::from))
+            .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().map_err(KeyError::from)
                 .and_then(|iv_data: [u8; 16]|
                     <Self as CryptoData<ECDSAKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, iv_data)))
     }
 }
 
+impl ECDSAKey {
+    pub fn deprecated_incorrect_extended_public_key_from_seed(
+        &self,
+        secret: &[u8],
+        chaincode: &[u8],
+        hashes: &[u8],
+        derivation_len: usize)
+        -> Result<Self, KeyError> {
+        let mut chaincode = UInt256::from(chaincode);
+        let mut key = UInt256::from(secret);
+        let mut writer = SecVec::new();
+        self.hash160().u32_le().enc(&mut writer);
+        (0..derivation_len).into_iter().for_each(|position| {
+            let soft_index = hashes.read_with::<u64>(&mut position.clone(), byte::LE).unwrap() as u32;
+            // let soft_index = slice.read_with::<u64>(&mut 0, byte::BE).unwrap() as u32;
+            let buf = &mut [0u8; 37];
+            if soft_index & BIP32_HARD != 0 {
+                buf[1..33].copy_from_slice(&key.0);
+            } else {
+                buf[..33].copy_from_slice(&secp256k1_point_from_bytes(&key.0));
+            }
+            buf[33..37].copy_from_slice(soft_index.to_be_bytes().as_slice());
+            let i = UInt512::hmac(chaincode.as_ref(), buf);
+            let mut sec_key = secp256k1::SecretKey::from_slice(&key.0).expect("invalid private key");
+            let tweak = Scalar::from_be_bytes(clone_into_array(&i.0[..32])).expect("invalid tweak");
+            sec_key = sec_key.add_tweak(&tweak).expect("failed to add tweak");
+            key.0.copy_from_slice(&sec_key.secret_bytes());
+            chaincode.0.copy_from_slice(&i.0[32..]);
+        });
+        ECDSAKey::key_with_secret(&key, true)
+            .and_then(|seckey| {
+                chaincode.enc(&mut writer);
+                writer.extend(seckey.public_key_data());
+                ECDSAKey::key_with_extended_public_key_data(&writer)
+            })
+    }
+}

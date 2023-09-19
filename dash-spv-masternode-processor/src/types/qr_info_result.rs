@@ -51,12 +51,6 @@ impl Default for QRInfoResult {
     }
 }
 
-impl QRInfoResult {
-    pub fn default_with_error(error: ProcessingError) -> Self {
-        Self { error_status: error, ..Default::default() }
-    }
-}
-
 impl Drop for QRInfoResult {
     fn drop(&mut self) {
         unsafe {

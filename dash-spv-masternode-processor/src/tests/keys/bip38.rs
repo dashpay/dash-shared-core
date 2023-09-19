@@ -14,5 +14,5 @@ fn test_key_with_bip38_key() {
     assert_eq!(key.bip38_key_with_passphrase("TestingOneTwoThree", &script).unwrap(), "6PRT3Wy4p7MZETE3n56KzyjyizMsE26WnMWpSeSoZawawEm7jaeCVa2wMu", "key_with_bip38_key: wrong result");
 
     let key = ECDSAKey::key_with_bip38_key("6PRW5o9FLp4gJDDVqJQKJFTpMvdsSGJxMYHtHaQBF3ooa8mwD69bapcDQn", "foobar", &script);
-    assert!(key.is_none(), "Should be none");
+    assert!(key.is_err(), "Should be err");
 }

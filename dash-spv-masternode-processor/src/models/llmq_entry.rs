@@ -1,17 +1,17 @@
-use crate::consensus::{encode::VarInt, Encodable, WriteExt};
-use crate::crypto::{byte_util::AsBytes, data_ops::Data, UInt256, UInt384, UInt768};
-use crate::keys::BLSKey;
-use crate::models;
-use byte::{
-    ctx::{Bytes, Endian},
-    BytesExt, TryRead, LE,
-};
+use std::convert::Into;
+use std::io;
+use byte::{BytesExt, TryRead, LE};
+use byte::ctx::Endian;
 use hashes::hex::ToHex;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
-use std::convert::Into;
+use crate::consensus::{encode::VarInt, Encodable, Decodable, encode};
+use crate::crypto::{byte_util::AsBytes, UInt256, UInt384, UInt768};
+use crate::keys::BLSKey;
+use crate::models;
+
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
 #[rs_ffi_macro_derive::impl_ffi_conv]
@@ -24,10 +24,8 @@ pub struct LLMQEntry {
     pub verification_vector_hash: UInt256,
     pub all_commitment_aggregated_signature: UInt768,
     pub llmq_type: crate::chain::common::llmq_type::LLMQType,
-    pub signers_bitset: Vec<u8>,
-    pub signers_count: VarInt,
-    pub valid_members_bitset: Vec<u8>,
-    pub valid_members_count: VarInt,
+    pub signers: crate::common::bitset::Bitset,
+    pub valid_members: crate::common::bitset::Bitset,
     pub entry_hash: UInt256,
     pub verified: bool,
     pub saved: bool,
@@ -36,12 +34,8 @@ pub struct LLMQEntry {
 
 #[cfg(feature = "generate-dashj-tests")]
 impl Serialize for LLMQEntry {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state =
-            serializer.serialize_struct("LLMQEntry", 10 + usize::from(self.index.is_some()))?;
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let mut state = serializer.serialize_struct("LLMQEntry", 10 + usize::from(self.index.is_some()))?;
         state.serialize_field("version", &self.version)?;
         if let Some(index) = self.index {
             state.serialize_field("index", &index)?;
@@ -49,15 +43,10 @@ impl Serialize for LLMQEntry {
         state.serialize_field("public_key", &self.public_key)?;
         state.serialize_field("threshold_signature", &self.threshold_signature)?;
         state.serialize_field("verification_vector_hash", &self.verification_vector_hash)?;
-        state.serialize_field(
-            "all_commitment_aggregated_signature",
-            &self.all_commitment_aggregated_signature,
-        )?;
+        state.serialize_field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature)?;
         state.serialize_field("llmq_type", &self.llmq_type)?;
-        state.serialize_field("signers_bitset", &self.signers_bitset.to_hex())?;
-        state.serialize_field("signers_count", &self.signers_count.0)?;
-        state.serialize_field("valid_members_bitset", &self.valid_members_bitset.to_hex())?;
-        state.serialize_field("valid_members_count", &self.valid_members_count.0)?;
+        state.serialize_field("signers", &self.signers)?;
+        state.serialize_field("valid_members", &self.valid_members)?;
         state.end()
     }
 }
@@ -78,18 +67,10 @@ impl std::fmt::Debug for LLMQEntry {
             .field("public_key", &self.public_key)
             .field("threshold_signature", &self.threshold_signature)
             .field("verification_vector_hash", &self.verification_vector_hash)
-            .field(
-                "all_commitment_aggregated_signature",
-                &self.all_commitment_aggregated_signature,
-            )
+            .field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature)
             .field("llmq_type", &self.llmq_type)
-            .field("signers_bitset", &VecHex(self.signers_bitset.clone()))
-            .field("signers_count", &self.signers_count)
-            .field(
-                "valid_members_bitset",
-                &VecHex(self.valid_members_bitset.clone()),
-            )
-            .field("valid_members_count", &self.valid_members_count)
+            .field("signers", &self.signers)
+            .field("valid_members", &self.valid_members)
             .field("entry_hash", &self.entry_hash)
             .field("verified", &self.verified)
             .field("saved", &self.saved)
@@ -97,6 +78,56 @@ impl std::fmt::Debug for LLMQEntry {
             .finish()
     }
 }
+
+impl Encodable for LLMQEntry {
+    fn consensus_encode<S: io::Write>(&self, mut s: S) -> Result<usize, io::Error> {
+        let mut len = 0;
+        len += self.version.consensus_encode(&mut s)?;
+        len += self.llmq_type.consensus_encode(&mut s)?;
+        len += self.llmq_hash.consensus_encode(&mut s)?;
+        if self.version.use_rotated_quorums() {
+            len += self.index.unwrap().consensus_encode(&mut s)?;
+        }
+        len += self.signers.consensus_encode(&mut s)?;
+        len += self.valid_members.consensus_encode(&mut s)?;
+        len += self.public_key.consensus_encode(&mut s)?;
+        len += self.verification_vector_hash.consensus_encode(&mut s)?;
+        len += self.threshold_signature.consensus_encode(&mut s)?;
+        len += self.all_commitment_aggregated_signature.consensus_encode(&mut s)?;
+        Ok(len)
+    }
+}
+
+impl Decodable for LLMQEntry {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let version = crate::common::LLMQVersion::consensus_decode(&mut d)?;
+        let llmq_type = crate::chain::common::LLMQType::consensus_decode(&mut d)?;
+        let llmq_hash = UInt256::consensus_decode(&mut d)?;
+        let index = version.use_rotated_quorums().then_some(u16::consensus_decode(&mut d)?);
+        let signers = crate::common::Bitset::consensus_decode(&mut d)?;
+        let valid_members = crate::common::Bitset::consensus_decode(&mut d)?;
+        let public_key = UInt384::consensus_decode(&mut d)?;
+        let verification_vector_hash = UInt256::consensus_decode(&mut d)?;
+        let threshold_signature = UInt768::consensus_decode(&mut d)?;
+        let all_commitment_aggregated_signature = UInt768::consensus_decode(&mut d)?;
+        let entry = LLMQEntry::new(
+            version,
+            llmq_type,
+            llmq_hash,
+            index,
+            signers,
+            valid_members,
+            public_key,
+            verification_vector_hash,
+            threshold_signature,
+            all_commitment_aggregated_signature,
+        );
+        Ok(entry)
+
+    }
+}
+
 
 impl<'a> TryRead<'a, Endian> for LLMQEntry {
     fn try_read(bytes: &'a [u8], _ctx: Endian) -> byte::Result<(Self, usize)> {
@@ -109,13 +140,8 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry {
         } else {
             None
         };
-        let signers_count = bytes.read_with::<VarInt>(offset, LE)?;
-        let signers_buffer_length: usize = ((signers_count.0 as usize) + 7) / 8;
-        let signers_bitset: &[u8] = bytes.read_with(offset, Bytes::Len(signers_buffer_length))?;
-        let valid_members_count = bytes.read_with::<VarInt>(offset, LE)?;
-        let valid_members_count_buffer_length: usize = ((valid_members_count.0 as usize) + 7) / 8;
-        let valid_members_bitset: &[u8] =
-            bytes.read_with(offset, Bytes::Len(valid_members_count_buffer_length))?;
+        let signers = bytes.read_with::<crate::common::Bitset>(offset, LE)?;
+        let valid_members = bytes.read_with::<crate::common::Bitset>(offset, LE)?;
         let public_key = bytes.read_with::<UInt384>(offset, LE)?;
         let verification_vector_hash = bytes.read_with::<UInt256>(offset, LE)?;
         let threshold_signature = bytes.read_with::<UInt768>(offset, LE)?;
@@ -125,10 +151,8 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry {
             llmq_type,
             llmq_hash,
             index,
-            signers_count,
-            valid_members_count,
-            signers_bitset.to_vec(),
-            valid_members_bitset.to_vec(),
+            signers,
+            valid_members,
             public_key,
             verification_vector_hash,
             threshold_signature,
@@ -145,10 +169,8 @@ impl LLMQEntry {
         llmq_type: crate::chain::common::LLMQType,
         llmq_hash: UInt256,
         index: Option<u16>,
-        signers_count: VarInt,
-        valid_members_count: VarInt,
-        signers_bitset: Vec<u8>,
-        valid_members_bitset: Vec<u8>,
+        signers: crate::common::Bitset,
+        valid_members: crate::common::Bitset,
         public_key: UInt384,
         verification_vector_hash: UInt256,
         threshold_signature: UInt768,
@@ -159,17 +181,13 @@ impl LLMQEntry {
             llmq_type,
             llmq_hash,
             index,
-            signers_count,
-            signers_bitset.as_slice(),
-            valid_members_count,
-            valid_members_bitset.as_slice(),
+            &signers,
+            &valid_members,
             public_key,
             verification_vector_hash,
             threshold_signature,
             all_commitment_aggregated_signature,
         );
-        let entry_hash = UInt256::sha256d(q_data);
-        //println!("LLMQEntry::new({}, {:?}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}, {}) = {}", version, llmq_type, llmq_hash, index, signers_count, signers_bitset.to_hex(), valid_members_count, valid_members_bitset.to_hex(), public_key, verification_vector_hash, threshold_signature, all_commitment_aggregated_signature, entry_hash);
         Self {
             version,
             llmq_hash,
@@ -179,11 +197,9 @@ impl LLMQEntry {
             verification_vector_hash,
             all_commitment_aggregated_signature,
             llmq_type,
-            signers_bitset,
-            signers_count,
-            valid_members_bitset,
-            valid_members_count,
-            entry_hash,
+            signers,
+            valid_members,
+            entry_hash: UInt256::sha256d(q_data),
             verified: false,
             saved: false,
             commitment_hash: None,
@@ -195,54 +211,31 @@ impl LLMQEntry {
         version: crate::common::LLMQVersion,
         llmq_type: crate::chain::common::LLMQType,
         llmq_hash: UInt256,
-        llmq_index: Option<u16>,
-        signers_count: VarInt,
-        signers_bitset: &[u8],
-        valid_members_count: VarInt,
-        valid_members_bitset: &[u8],
+        index: Option<u16>,
+        signers: &crate::common::Bitset,
+        valid_members: &crate::common::Bitset,
         public_key: UInt384,
         verification_vector_hash: UInt256,
         threshold_signature: UInt768,
         all_commitment_aggregated_signature: UInt768,
     ) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
-        let offset: &mut usize = &mut 0;
+        let offset = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
         let llmq_v: u16 = version.into();
         *offset += llmq_v.enc(&mut buffer);
         *offset += llmq_u8.enc(&mut buffer);
         *offset += llmq_hash.enc(&mut buffer);
-        if let Some(index) = llmq_index {
+        if let Some(index) = index {
             *offset += index.enc(&mut buffer);
         }
-        *offset += signers_count.enc(&mut buffer);
-        buffer.emit_slice(signers_bitset).unwrap();
-        *offset += signers_bitset.len();
-        *offset += valid_members_count.enc(&mut buffer);
-        buffer.emit_slice(valid_members_bitset).unwrap();
-        *offset += valid_members_bitset.len();
+        *offset += signers.enc(&mut buffer);
+        *offset += valid_members.enc(&mut buffer);
         *offset += public_key.enc(&mut buffer);
         *offset += verification_vector_hash.enc(&mut buffer);
         *offset += threshold_signature.enc(&mut buffer);
         *offset += all_commitment_aggregated_signature.enc(&mut buffer);
         buffer
-    }
-
-    pub fn to_data(&self) -> Vec<u8> {
-        Self::generate_data(
-            self.version,
-            self.llmq_type,
-            self.llmq_hash,
-            self.index,
-            self.signers_count,
-            &self.signers_bitset,
-            self.valid_members_count,
-            &self.valid_members_bitset,
-            self.public_key,
-            self.verification_vector_hash,
-            self.threshold_signature,
-            self.all_commitment_aggregated_signature,
-        )
     }
 
     pub fn build_llmq_quorum_hash(
@@ -265,9 +258,7 @@ impl LLMQEntry {
         let llmq_type = VarInt(self.llmq_type as u64);
         *offset += llmq_type.enc(&mut buffer);
         *offset += self.llmq_hash.enc(&mut buffer);
-        *offset += self.valid_members_count.enc(&mut buffer);
-        buffer.emit_slice(&self.valid_members_bitset).unwrap();
-        *offset += self.valid_members_bitset.len();
+        *offset += self.valid_members.enc(&mut buffer);
         *offset += self.public_key.enc(&mut buffer);
         *offset += self.verification_vector_hash.enc(&mut buffer);
         buffer
@@ -292,63 +283,25 @@ impl LLMQEntry {
         }
         self.commitment_hash.unwrap()
     }
-
-    fn validate_bitset(bitset: Vec<u8>, count: VarInt) -> bool {
-        if bitset.len() != (count.0 as usize + 7) / 8 {
-            warn!(
-                "Error: The byte size of the bitvectors ({}) must match “(quorumSize + 7) / 8 ({})",
-                bitset.len(),
-                (count.0 + 7) / 8
-            );
-            return false;
-        }
-        let len = (bitset.len() * 8) as i32;
-        let size = count.0 as i32;
-        if len != size {
-            let rem = len - size;
-            let mask = !(0xff >> rem);
-            let last_byte = match bitset.last() {
-                Some(&last) => last as i32,
-                None => 0,
-            };
-            if last_byte & mask != 0 {
-                warn!("Error: No out-of-range bits should be set in byte representation of the bitvector");
-                return false;
-            }
-        }
-        true
-    }
-
-    pub fn validate_payload(&self) -> bool {
+   pub fn validate_payload(&self) -> bool {
         // The quorumHash must match the current DKG session
         // todo
-        let is_valid_signers =
-            Self::validate_bitset(self.signers_bitset.clone(), self.signers_count);
-        if !is_valid_signers {
-            warn!(
-                "Error: signers_bitset is invalid ({:?} {})",
-                self.signers_bitset, self.signers_count
-            );
+        if !self.signers.is_valid() {
+            warn!("Error: signers_bitset is invalid {:?}", self.signers);
             return false;
         }
-        let is_valid_members =
-            Self::validate_bitset(self.valid_members_bitset.clone(), self.valid_members_count);
-        if !is_valid_members {
-            warn!(
-                "Error: valid_members_bitset is invalid ({:?} {})",
-                self.valid_members_bitset, self.valid_members_count
-            );
+        if !self.valid_members.is_valid() {
+            warn!("Error: valid_members_bitset is invalid {:?}", self.valid_members);
             return false;
         }
         let quorum_threshold = self.llmq_type.threshold() as u64;
         // The number of set bits in the signers and validMembers bitvectors must be at least >= quorumThreshold
-        let signers_bitset_true_bits_count = self.signers_bitset.as_slice().true_bits_count();
+        let signers_bitset_true_bits_count = self.signers.true_bits_count();
         if signers_bitset_true_bits_count < quorum_threshold {
             warn!("Error: The number of set bits in the signers bitvector {} must be at least >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
             return false;
         }
-        let valid_members_bitset_true_bits_count =
-            self.valid_members_bitset.as_slice().true_bits_count();
+        let valid_members_bitset_true_bits_count = self.valid_members.true_bits_count();
         if valid_members_bitset_true_bits_count < quorum_threshold {
             warn!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
             return false;
@@ -381,12 +334,9 @@ impl LLMQEntry {
         let operator_keys = valid_masternodes
             .iter()
             .enumerate()
-            .filter_map(|(i, node)| {
-                self.signers_bitset
-                    .as_slice()
-                    .bit_is_true_at_le_index(i as u32)
-                    .then_some(node.operator_public_key_at(block_height))
-            })
+            .filter_map(|(i, node)|
+                self.signers.bit_is_true_at_le_index(i)
+                    .then_some(node.operator_public_key_at(block_height)))
             .collect::<Vec<_>>();
         // info!("let operator_keys = vec![{:?}];", operator_keys);
         let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(

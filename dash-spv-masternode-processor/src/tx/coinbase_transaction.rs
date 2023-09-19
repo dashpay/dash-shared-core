@@ -1,7 +1,9 @@
+use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
+use crate::{consensus, tx};
 use crate::consensus::encode::VarInt;
-use crate::consensus::Encodable;
+use crate::consensus::{Encodable, encode};
 use crate::crypto::{UInt256, UInt768};
 use crate::tx::TransactionType::Coinbase;
 
@@ -15,6 +17,40 @@ pub struct CoinbaseTransaction {
     pub merkle_root_llmq_list: Option<UInt256>,
     pub best_cl_height_diff: u32,
     pub best_cl_signature: Option<UInt768>,
+}
+
+impl consensus::Decodable for CoinbaseTransaction {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let mut base = tx::Transaction::consensus_decode(&mut d)?;
+        let _extra_payload_size = VarInt::consensus_decode(&mut d)?;
+        let coinbase_transaction_version = u16::consensus_decode(&mut d)?;
+        let height = u32::consensus_decode(&mut d)?;
+        let merkle_root_mn_list = UInt256::consensus_decode(&mut d)?;
+
+        let merkle_root_llmq_list = if coinbase_transaction_version >= 2 {
+            Some(UInt256::consensus_decode(&mut d)?)
+        } else {
+            None
+        };
+        let (best_cl_height_diff, best_cl_signature) = if coinbase_transaction_version >= 3 {
+            (u32::consensus_decode(&mut d)?, UInt768::consensus_decode(&mut d).ok())
+        } else {
+            (u32::MAX, None)
+        };
+        base.tx_type = Coinbase;
+        let mut tx = Self {
+            base,
+            coinbase_transaction_version,
+            height,
+            merkle_root_mn_list,
+            merkle_root_llmq_list,
+            best_cl_height_diff,
+            best_cl_signature
+        };
+        tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()));
+        Ok(tx)
+    }
 }
 
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {

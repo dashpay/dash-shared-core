@@ -4,7 +4,9 @@ pub mod llmq_version;
 pub mod merkle_tree;
 pub mod socket_address;
 pub mod masternode_type;
+pub mod bitset;
 
+pub use self::bitset::Bitset;
 pub use self::block::Block;
 pub use self::llmq_snapshot_skip_mode::LLMQSnapshotSkipMode;
 pub use self::llmq_version::LLMQVersion;

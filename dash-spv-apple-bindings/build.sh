@@ -53,9 +53,16 @@ cargo build --target=x86_64-apple-ios --release
 cargo build --target=aarch64-apple-ios --release
 cargo build --target=aarch64-apple-ios-sim --release
 
-cargo expand > expanded.rs
+#cargo expand > expanded.rs
 #cbindgen --config cbindgen.toml --output ../target/dash_shared_core.h
-cbindgen --config cbindgen.toml -o ../target/dash_shared_core.h expanded.rs
+#cbindgen --config cbindgen.toml -o ../target/dash_shared_core.h expanded.rs
+
+set -e
+#cargo build --release --verbose
+cargo expand | sed '/#!/d' > target/expanded.rs
+sed -n '/#\[prelude_import\]/,$p' target/expanded.rs > target/expanded_reduced.rs
+cbindgen --config cbindgen.toml -o ../target/dash_shared_core.h target/expanded_reduced.rs
+
 
 mkdir -p DashSharedCore/framework
 mkdir -p DashSharedCore/include

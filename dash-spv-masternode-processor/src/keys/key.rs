@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::ptr::null_mut;
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
 use crate::crypto::{UInt256, UInt384, UInt768};
-use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
+use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyError};
 use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey};
 use crate::util::sec_vec::SecVec;
 
@@ -115,7 +115,7 @@ impl KeyKind {
         }.to_string()
     }
 
-    pub(crate) fn public_key_from_extended_public_key_data(&self, data: &[u8], index_path: &IndexPath<u32>) -> Option<Vec<u8>> {
+    pub fn public_key_from_extended_public_key_data(&self, data: &[u8], index_path: &IndexPath<u32>) -> Result<Vec<u8>, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::public_key_from_extended_public_key_data(data, index_path),
             KeyKind::ED25519 => ED25519Key::public_key_from_extended_public_key_data(data, index_path),
@@ -123,15 +123,15 @@ impl KeyKind {
         }
     }
 
-    pub(crate) fn private_key_from_extended_private_key_data(&self, data: &Vec<u8>) -> Option<Key> {
+    pub fn private_key_from_extended_private_key_data(&self, data: &Vec<u8>) -> Result<Key, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(Key::ED25519),
-            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).ok().map(Key::BLS),
+            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from),
         }
     }
 
-    pub(crate) fn key_with_private_key_data(&self, data: &[u8]) -> Option<Key> {
+    pub fn key_with_private_key_data(&self, data: &[u8]) -> Result<Key, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::key_with_secret_data(data, true).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::key_with_secret_data(data).map(Key::ED25519),
@@ -139,35 +139,35 @@ impl KeyKind {
         }
     }
 
-    pub(crate) fn key_with_seed_data(&self, seed: &[u8]) -> Option<Key> {
+    pub fn key_with_seed_data(&self, seed: &[u8]) -> Result<Key, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_seed_data(seed).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_seed_data(seed).map(Key::ED25519),
-            _ => BLSKey::extended_private_key_with_seed_data(seed, *self == KeyKind::BLS).ok().map(Key::BLS)
+            _ => BLSKey::extended_private_key_with_seed_data(seed, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from)
         }
     }
 
-    pub(crate) fn key_with_public_key_data(&self, data: &[u8]) -> Option<Key> {
+    pub fn key_with_public_key_data(&self, data: &[u8]) -> Result<Key, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::key_with_public_key_data(data).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::key_with_public_key_data(data).map(Key::ED25519),
-            _ => Some(Key::BLS(BLSKey::key_with_public_key(UInt384::from(data), *self == KeyKind::BLS))),
+            _ => Ok(Key::BLS(BLSKey::key_with_public_key(UInt384::from(data), *self == KeyKind::BLS))),
         }
     }
 
-    pub(crate) fn key_with_extended_public_key_data(&self, data: &Vec<u8>) -> Option<Key> {
+    pub fn key_with_extended_public_key_data(&self, data: &Vec<u8>) -> Result<Key, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_public_key_data(data).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_public_key_data(data).map(Key::ED25519),
-            _ => BLSKey::init_with_extended_public_key_data(data, *self == KeyKind::BLS).ok().map(Key::BLS)
+            _ => BLSKey::init_with_extended_public_key_data(data, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from)
         }
     }
 
-    pub(crate) fn key_with_extended_private_key_data(&self, data: &Vec<u8>) -> Option<Key> {
+    pub fn key_with_extended_private_key_data(&self, data: &Vec<u8>) -> Result<Key, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(Key::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(Key::ED25519),
-            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).ok().map(Key::BLS)
+            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from)
         }
     }
 
@@ -250,7 +250,7 @@ impl IKey for Key {
         }
     }
 
-    fn private_key_data(&self) -> Option<Vec<u8>> {
+    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> {
         match self {
             Key::ECDSA(key) => key.private_key_data(),
             Key::BLS(key) => key.private_key_data(),
@@ -266,7 +266,7 @@ impl IKey for Key {
         }
     }
 
-    fn extended_private_key_data(&self) -> Option<SecVec> {
+    fn extended_private_key_data(&self) -> Result<SecVec, KeyError> {
         match self {
             Key::ECDSA(key) => key.extended_private_key_data(),
             Key::BLS(key) => key.extended_private_key_data(),
@@ -274,7 +274,7 @@ impl IKey for Key {
         }
     }
 
-    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
+    fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
         match self {
             Key::ECDSA(key) => key.extended_public_key_data(),
             Key::BLS(key) => key.extended_public_key_data(),
@@ -282,7 +282,7 @@ impl IKey for Key {
         }
     }
 
-    fn private_derive_to_path<PATH>(&self, index_path: &PATH) -> Option<Self>
+    fn private_derive_to_path<PATH>(&self, index_path: &PATH) -> Result<Self, KeyError>
         where PATH: IIndexPath<Item = u32> {
         match self {
             Key::ECDSA(key) => key.private_derive_to_path(index_path).map(Into::into),
@@ -291,7 +291,7 @@ impl IKey for Key {
         }
     }
 
-    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item=UInt256> {
         match self {
             Key::ECDSA(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
@@ -300,7 +300,7 @@ impl IKey for Key {
         }
     }
 
-    fn public_derive_to_256bit_derivation_path<PATH>(&mut self, derivation_path: &PATH) -> Option<Self>
+    fn public_derive_to_256bit_derivation_path<PATH>(&mut self, derivation_path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         match self {
             Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
@@ -309,7 +309,7 @@ impl IKey for Key {
         }
     }
 
-    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, derivation_path: &PATH, offset: usize) -> Option<Self>
+    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, derivation_path: &PATH, offset: usize) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         match self {
             Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
@@ -360,6 +360,17 @@ impl AsOpaqueKey for Option<Key> {
             Some(Key::ECDSA(key)) => key.to_opaque_ptr(),
             Some(Key::BLS(key)) => key.to_opaque_ptr(),
             Some(Key::ED25519(key)) => key.to_opaque_ptr(),
+            _ => null_mut()
+        }
+    }
+}
+
+impl AsOpaqueKey for Result<Key, KeyError> {
+    fn to_opaque_ptr(self) -> *mut OpaqueKey {
+        match self {
+            Ok(Key::ECDSA(key)) => key.to_opaque_ptr(),
+            Ok(Key::BLS(key)) => key.to_opaque_ptr(),
+            Ok(Key::ED25519(key)) => key.to_opaque_ptr(),
             _ => null_mut()
         }
     }

@@ -4,8 +4,9 @@ use hashes::{Hash, hex::FromHex, sha256, sha256d};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
-use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
+use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}, KeyError};
 use crate::keys::crypto_data::{CryptoData, DHKey};
+use crate::keys::KeyError::DHKeyExchange;
 use crate::models::OperatorPublicKey;
 use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
 
@@ -25,19 +26,20 @@ impl BLSKey {
         Vec::from_hex(string)
             .map(|data| Self::key_with_seed_data(&data, use_legacy))
     }
-    pub fn key_with_private_key(string: &str, use_legacy: bool) -> Option<Self> {
+    pub fn key_with_private_key(string: &str, use_legacy: bool) -> Result<Self, KeyError> {
         Vec::from_hex(string)
-            .ok()
+            .map_err(KeyError::from)
             .and_then(|data| Self::key_with_private_key_data(&data, use_legacy))
     }
 
-    pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Option<Self> {
+    pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
         UInt256::from_bytes(data, &mut 0)
+            .map_err(KeyError::from)
             .and_then(|seckey| PrivateKey::from_bytes(data, use_legacy)
-                .ok()
+                .map_err(KeyError::from)
                 .and_then(|bls_private_key| bls_private_key
                     .g1_element()
-                    .ok()
+                    .map_err(KeyError::from)
                     .map(|bls_public_key| Self {
                         seckey,
                         pubkey: UInt384(g1_element_serialized(&bls_public_key, use_legacy)),
@@ -50,11 +52,13 @@ impl BLSKey {
         Self { pubkey, use_legacy, ..Default::default() }
     }
 
-    pub fn product(&self, public_key: &BLSKey) -> Option<[u8; 48]> {
+    pub fn product(&self, public_key: &BLSKey) -> Result<[u8; 48], KeyError> {
         match (self.bls_private_key(), public_key.bls_public_key(), self.use_legacy) {
             (Ok(priv_key), Ok(pub_key), use_legacy) if public_key.use_legacy == use_legacy =>
-                (priv_key * pub_key).map(|pk| g1_element_serialized(&pk, use_legacy)).ok(),
-            _ => None
+                (priv_key * pub_key)
+                    .map_err(KeyError::from)
+                    .map(|pk| g1_element_serialized(&pk, use_legacy)),
+            _ => Err(KeyError::Product)
         }
     }
 }
@@ -82,35 +86,36 @@ impl IKey for BLSKey {
         self.public_key_fingerprint()
     }
 
-    fn private_key_data(&self) -> Option<Vec<u8>> where Self: Sized {
-        (!self.seckey.is_zero())
-            .then_some(self.seckey.0.to_vec())
+    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> where Self: Sized {
+        match self.seckey.is_zero() {
+            true => Err(KeyError::EmptySecKey),
+            false => Ok(self.seckey.0.to_vec()),
+        }
     }
 
     fn public_key_data(&self) -> Vec<u8> {
         self.pubkey.0.to_vec()
     }
 
-    fn extended_private_key_data(&self) -> Option<SecVec> {
-        Some(self.extended_private_key_data.clone())
+    fn extended_private_key_data(&self) -> Result<SecVec, KeyError> {
+        Ok(self.extended_private_key_data.clone())
     }
 
-    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
-        Some(self.extended_public_key_data.clone())
+    fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
+        Ok(self.extended_public_key_data.clone())
     }
 
-    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized + IChildKeyDerivation<INDEX, SK, PK>,
               PATH: IIndexPath<Item=INDEX>, SK: SignKey {
         todo!()
     }
 
-    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
+    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
         ExtendedPrivateKey::from_bytes(self.extended_private_key_data.as_slice())
-            .ok()
-            .and_then(|bls_extended_private_key|
-                Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, path), self.use_legacy).ok())
+            .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, path), self.use_legacy))
+            .map_err(KeyError::from)
     }
 
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
@@ -213,10 +218,10 @@ impl BLSKey {
     }
 
 
-    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], index_path: &PATH, use_legacy: bool) -> Option<Vec<u8>>
+    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], index_path: &PATH, use_legacy: bool) -> Result<Vec<u8>, KeyError>
         where PATH: IIndexPath<Item = u32> {
         extended_public_key_from_bytes(data, use_legacy)
-            .ok()
+            .map_err(KeyError::from)
             .and_then(|bls_extended_public_key|
                 BLSKey::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy)
                     .public_derive_to_path(index_path)
@@ -239,38 +244,40 @@ impl BLSKey {
         }
     }
 
-    pub fn serialized_private_key_for_script_map(&self, map: &ScriptMap) -> Option<String> {
+    pub fn serialized_private_key_for_script_map(&self, map: &ScriptMap) -> Result<String, KeyError> {
         if self.seckey.is_zero() {
-            None
+            Err(KeyError::EmptySecKey)
         } else {
             // todo: impl securebox here
             let mut writer = Vec::<u8>::with_capacity(34);
             map.privkey.enc(&mut writer);
             self.seckey.enc(&mut writer);
             b'\x02'.enc(&mut writer);
-            Some(base58::check_encode_slice(&writer))
+            Ok(base58::check_encode_slice(&writer))
         }
     }
 
-    pub fn public_derive_to_path<PATH>(&mut self, index_path: &PATH) -> Option<Self>
+    pub fn public_derive_to_path<PATH>(&mut self, index_path: &PATH) -> Result<Self, KeyError>
         where PATH: IIndexPath<Item = u32> {
-        if (self.extended_public_key_data().is_none() || self.extended_public_key_data().unwrap().is_empty()) && self.extended_private_key_data.is_empty() {
-            None
-        } else if let Some(bls_extended_public_key) = self.bls_extended_public_key() {
-            Some(BLSKey::init_with_bls_extended_public_key(&BLSKey::public_derive(bls_extended_public_key, index_path, self.use_legacy), self.use_legacy))
+        if (self.extended_public_key_data().is_err() || self.extended_public_key_data().unwrap().is_empty()) && self.extended_private_key_data.is_empty() {
+            Err(KeyError::UnableToDerive)
+        } else if let Ok(bls_extended_public_key) = self.bls_extended_public_key() {
+            Ok(BLSKey::init_with_bls_extended_public_key(&BLSKey::public_derive(bls_extended_public_key, index_path, self.use_legacy), self.use_legacy))
         } else {
-            None
+            Err(KeyError::UnableToDerive)
         }
     }
 
-    pub fn bls_extended_public_key(&mut self) -> Option<ExtendedPublicKey> {
-        if let Some(bytes) = self.extended_public_key_data() {
-            extended_public_key_from_bytes(&bytes, self.use_legacy).ok()
-        } else if let Some(bytes) = self.extended_private_key_data() {
+    pub fn bls_extended_public_key(&mut self) -> Result<ExtendedPublicKey, KeyError> {
+        if let Ok(bytes) = self.extended_public_key_data() {
+            extended_public_key_from_bytes(&bytes, self.use_legacy)
+                .map_err(KeyError::from)
+        } else if let Ok(bytes) = self.extended_private_key_data() {
             ExtendedPrivateKey::from_bytes(&bytes)
-                .and_then(|pk| extended_public_key_from_extended_private_key(&pk, self.use_legacy)).ok()
+                .and_then(|pk| extended_public_key_from_extended_private_key(&pk, self.use_legacy))
+                .map_err(KeyError::from)
         } else {
-            None
+            Err(KeyError::UnableToDerive)
         }
     }
 
@@ -299,9 +306,8 @@ impl BLSKey {
         }
     }
 
-    pub(crate) fn bls_public_key_serialized(&self, use_legacy: bool) -> Option<[u8; 48]> {
+    pub fn bls_public_key_serialized(&self, use_legacy: bool) -> Result<[u8; 48], BlsError> {
         self.bls_public_key()
-            .ok()
             .map(|pk| g1_element_serialized(&pk, use_legacy))
     }
 
@@ -429,15 +435,15 @@ impl BLSKey {
 
 /// For FFI
 impl BLSKey {
-    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
+    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Result<Self, KeyError> where Self: Sized, PATH: IIndexPath<Item=u32> {
         key.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path, key.use_legacy))
             .map(|pub_key_data| Self::key_with_public_key(UInt384::from(pub_key_data), key.use_legacy))
     }
 
-    pub fn key_with_extended_public_key_data(bytes: &[u8], use_legacy: bool) -> Option<Self> {
+    pub fn key_with_extended_public_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
         extended_public_key_from_bytes(bytes, use_legacy)
-            .ok()
+            .map_err(KeyError::from)
             .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
     }
 
@@ -478,23 +484,22 @@ impl BLSKey {
 
 
 impl DHKey for BLSKey {
-    fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Option<Self> where Self: Sized {
+    fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Result<Self, KeyError> where Self: Sized {
         match (public_key.bls_public_key(), private_key.bls_private_key(), private_key.use_legacy) {
             (Ok(bls_public_key), Ok(bls_private_key), use_legacy) if public_key.use_legacy == use_legacy =>
                 (bls_private_key * bls_public_key)
-                    .ok()
-                    .map(|key|
-                        BLSKey::key_with_public_key(UInt384(g1_element_serialized(&key, use_legacy)), use_legacy)),
-            _ => None
+                    .map_err(KeyError::from)
+                    .map(|key| BLSKey::key_with_public_key(UInt384(g1_element_serialized(&key, use_legacy)), use_legacy)),
+            _ => Err(DHKeyExchange)
         }
     }
 }
 
 impl CryptoData<BLSKey> for Vec<u8> {
 
-    fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &BLSKey, public_key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+    fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &BLSKey, public_key: &BLSKey, initialization_vector: Vec<u8>) -> Result<Vec<u8>, KeyError> {
         secret_key.product(public_key)
-            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().map_err(KeyError::from))
             .map(|key_data: [u8; 32]| {
                 let mut destination = initialization_vector.clone();
                 let iv: [u8; 16] = initialization_vector[..16].try_into().unwrap();
@@ -504,35 +509,38 @@ impl CryptoData<BLSKey> for Vec<u8> {
             })
     }
 
-    fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &BLSKey, public_key: &BLSKey, iv_size: usize) -> Option<Vec<u8>> {
+    fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &BLSKey, public_key: &BLSKey, iv_size: usize) -> Result<Vec<u8>, KeyError> {
         if self.len() < iv_size {
-            return None;
+            return Err(KeyError::WrongLength(self.len()));
         }
         secret_key.product(public_key)
-            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().map_err(KeyError::from))
             .and_then(|key_data: [u8; 32]|
                 <Self as CryptoData<BLSKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, &self[..iv_size]))
     }
 
-    fn encrypt_with_dh_key_using_iv(&self, key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+    fn encrypt_with_dh_key_using_iv(&self, key: &BLSKey, initialization_vector: Vec<u8>) -> Result<Vec<u8>, KeyError> {
         let mut destination = initialization_vector.clone();
         key.bls_public_key_serialized(key.use_legacy)
-            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
-            .and_then(|key_data: [u8; 32]| initialization_vector[..16].try_into().ok()
-                .and_then(|iv_data: [u8; 16]| <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv_data))
+            .map_err(KeyError::from)
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().map_err(KeyError::from))
+            .and_then(|key_data: [u8; 32]| initialization_vector[..16].try_into().map_err(KeyError::from)
+                .and_then(|iv_data: [u8; 16]|
+                    <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv_data))
                 .map(|encrypted_data| {
                     destination.extend(encrypted_data);
                     destination
                 }))
     }
 
-    fn decrypt_with_dh_key_using_iv_size(&self, key: &BLSKey, iv_size: usize) -> Option<Vec<u8>> {
+    fn decrypt_with_dh_key_using_iv_size(&self, key: &BLSKey, iv_size: usize) -> Result<Vec<u8>, KeyError> {
         if self.len() < iv_size {
-            return None;
+            return Err(KeyError::WrongLength(self.len()));
         }
         key.bls_public_key_serialized(key.use_legacy)
-            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
-            .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().ok()
+            .map_err(KeyError::from)
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().map_err(KeyError::from))
+            .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().map_err(KeyError::from)
                 .and_then(|iv_data: [u8; 16]|
                     <Self as CryptoData<BLSKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, iv_data)))
     }

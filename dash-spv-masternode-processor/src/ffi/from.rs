@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::slice;
 use crate::{chain, common, models, tx, types};
-use crate::consensus::encode;
+use crate::common::Bitset;
 use crate::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::ffi::to::ToFFI;
 use crate::tx::transaction;
@@ -260,11 +260,13 @@ impl FromFFI for types::LLMQEntry {
             threshold_signature: UInt768(*self.threshold_signature),
             verification_vector_hash: UInt256(*self.verification_vector_hash),
             all_commitment_aggregated_signature: UInt768(*self.all_commitment_aggregated_signature),
-            signers_count: encode::VarInt(self.signers_count),
             llmq_type: self.llmq_type,
-            valid_members_count: encode::VarInt(self.valid_members_count),
-            signers_bitset,
-            valid_members_bitset,
+            signers: Bitset { count: self.signers_count as usize, bitset: signers_bitset },
+            valid_members: Bitset { count: self.valid_members_count as usize, bitset: valid_members_bitset },
+            // signers_count: encode::VarInt(self.signers_count),
+            // signers_bitset,
+            // valid_members_count: encode::VarInt(self.valid_members_count),
+            // valid_members_bitset,
             entry_hash: UInt256(*self.entry_hash),
             verified: self.verified,
             saved: self.saved,

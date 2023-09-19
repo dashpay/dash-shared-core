@@ -257,12 +257,20 @@ impl ToFFI for models::LLMQEntry {
         let saved = self.saved;
         let verified = self.verified;
         let version = self.version;
-        let signers_count = self.signers_count.0;
-        let valid_members_count = self.valid_members_count.0;
-        let signers_bitset = boxed_vec(self.signers_bitset.clone());
-        let signers_bitset_length = self.signers_bitset.len();
-        let valid_members_bitset = boxed_vec(self.valid_members_bitset.clone());
-        let valid_members_bitset_length = self.valid_members_bitset.len();
+
+        let signers_count = self.signers.count as u64;
+        let valid_members_count = self.valid_members.count as u64;
+        let signers_bitset = boxed_vec(self.signers.bitset.clone());
+        let signers_bitset_length = self.signers.bitset.len();
+        let valid_members_bitset = boxed_vec(self.valid_members.bitset.clone());
+        let valid_members_bitset_length = self.valid_members.bitset.len();
+
+        // let signers_count = self.signers_count.0;
+        // let valid_members_count = self.valid_members_count.0;
+        // let signers_bitset = boxed_vec(self.signers_bitset.clone());
+        // let signers_bitset_length = self.signers_bitset.len();
+        // let valid_members_bitset = boxed_vec(self.valid_members_bitset.clone());
+        // let valid_members_bitset_length = self.valid_members_bitset.len();
         Self::Item {
             all_commitment_aggregated_signature,
             commitment_hash,

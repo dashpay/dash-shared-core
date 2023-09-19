@@ -30,13 +30,13 @@ pub trait Random {
 }
 
 pub trait MutDecodable<'a, T: TryRead<'a, Endian>> {
-    fn from_mut(bytes: *mut u8) -> Option<T>;
+    fn from_mut(bytes: *mut u8) -> Result<T>;
 }
 pub trait ConstDecodable<'a, T: TryRead<'a, Endian>> {
-    fn from_const(bytes: *const u8) -> Option<T>;
+    fn from_const(bytes: *const u8) -> Result<T>;
 }
 pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<T>;
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Result<T>;
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -115,8 +115,8 @@ macro_rules! impl_random {
 macro_rules! impl_bytes_decodable {
     ($var_type: ident) => {
         impl<'a> BytesDecodable<'a, $var_type> for $var_type {
-            fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-                bytes.read_with(offset, LE).ok()
+            fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<Self> {
+                bytes.read_with(offset, LE)
             }
         }
     }
@@ -125,8 +125,8 @@ macro_rules! impl_bytes_decodable {
 macro_rules! impl_bytes_decodable_lt {
     ($var_type: ident) => {
         impl<'a> BytesDecodable<'a, $var_type<'a>> for $var_type<'a> {
-            fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-                bytes.read_with(offset, LE).ok()
+            fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<Self> {
+                bytes.read_with(offset, LE)
             }
         }
     }
@@ -139,16 +139,16 @@ macro_rules! impl_decodable {
 
         impl<'a> ConstDecodable<'a, $var_type> for $var_type {
             #[allow(clippy::not_unsafe_ptr_arg_deref)]
-            fn from_const(bytes: *const u8) -> Option<Self> {
+            fn from_const(bytes: *const u8) -> byte::Result<Self> {
                 let safe_bytes = unsafe { slice::from_raw_parts(bytes, $byte_len) };
-                safe_bytes.read_with::<Self>(&mut 0, LE).ok()
+                safe_bytes.read_with::<Self>(&mut 0, LE)
             }
         }
         impl<'a> MutDecodable<'a, $var_type> for $var_type {
             #[allow(clippy::not_unsafe_ptr_arg_deref)]
-            fn from_mut(bytes: *mut u8) -> Option<Self> {
+            fn from_mut(bytes: *mut u8) -> byte::Result<Self> {
                 let safe_bytes = unsafe { slice::from_raw_parts_mut(bytes, $byte_len) };
-                safe_bytes.read_with::<Self>(&mut 0, LE).ok()
+                safe_bytes.read_with::<Self>(&mut 0, LE)
             }
         }
     }
@@ -845,9 +845,8 @@ impl UInt256 {
 
 impl UInt256 {
     pub fn from_base58_string(data: &str) -> Option<Self> {
-        base58::from(data)
-            .ok()
-            .and_then(|d| Self::from_bytes(&d, &mut 0))
+        base58::from(data).ok()
+            .and_then(|d| Self::from_bytes(&d, &mut 0).ok())
     }
 }
 

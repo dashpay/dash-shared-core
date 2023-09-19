@@ -9,10 +9,12 @@ pub extern crate secp256k1;
 extern crate simplelog;
 
 #[cfg(test)]
-mod lib_tests;
-#[cfg(test)]
-mod tests;
+pub mod tests;
 
+#[cfg(feature = "test-helpers")]
+pub mod block_store;
+#[cfg(feature = "test-helpers")]
+pub mod test_helpers;
 
 #[cfg(feature = "std")]
 use std::io;
@@ -23,7 +25,6 @@ use core2::io;
 pub mod internal_macros;
 #[macro_use]
 pub mod macros;
-pub mod bindings;
 pub mod blockdata;
 pub mod chain;
 pub mod common;
@@ -37,6 +38,7 @@ pub mod network;
 pub mod tx;
 pub mod types;
 pub mod util;
+pub mod logger;
 
 // Don't remove, it's for testing purposes (look at ${project_dir}/c/main.c)
 // #[no_mangle]

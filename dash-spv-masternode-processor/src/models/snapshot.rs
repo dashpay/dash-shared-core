@@ -55,7 +55,7 @@ impl<'a> std::fmt::Debug for LLMQSnapshot {
     }
 }
 impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
-    fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
+    fn try_read(bytes: &'a [u8], _ctx: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let skip_list_mode = bytes.read_with::<crate::common::LLMQSnapshotSkipMode>(offset, LE)?;
         let member_list_length = bytes.read_with::<VarInt>(offset, LE)?.0 as usize;

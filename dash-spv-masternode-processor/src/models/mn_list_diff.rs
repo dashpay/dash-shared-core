@@ -58,13 +58,44 @@ impl std::fmt::Debug for MNListDiff {
     }
 }
 
+// impl<V> consensus::Decodable for MNListDiff {
+//     #[inline]
+//     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+//         let base_block_hash = UInt256::consensus_decode(&mut d)?;
+//         let block_hash = UInt256::consensus_decode(&mut d)?;
+//         let total_transactions = u32::consensus_decode(&mut d)?;
+//         let merkle_hashes: Vec<UInt256> = Vec::consensus_decode(&mut d)?;
+//         let merkle_flags: Vec<u8> = Vec::consensus_decode(&mut d)?;
+//         let coinbase_transaction = CoinbaseTransaction::consensus_decode(&mut d)?;
+//
+//         let version = if protocol_version >= CORE_PROTO_BLS_BASIC {
+//             // BLS Basic
+//             u16::consensus_decode(&mut d)?
+//         } else {
+//             // BLS Legacy
+//             1
+//         };
+//         let deleted_masternode_hashes: Vec<UInt256> = Vec::consensus_decode(&mut d)?;
+//         let added_or_modified_masternodes: Vec<MasternodeEntry> = Vec::consensus_decode(&mut d)?;
+//
+//         let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = added_or_modified_masternodes
+//             .iter()
+//             .fold(BTreeMap::new(), |mut acc, _| {
+//                 if let Ok(entry) = message.read_with::<MasternodeEntry>(offset, masternode_read_ctx) {
+//                     acc.insert(entry.provider_registration_transaction_hash.reversed(), entry);
+//                 }
+//                 acc
+//             });
+//     }
+// }
+
 impl MNListDiff {
     pub fn new<F: Fn(UInt256) -> u32>(
+        protocol_version: u32,
         message: &[u8],
         offset: &mut usize,
         block_height_lookup: F,
-        protocol_version: u32,
-    ) -> Option<Self> {
+    ) -> Result<Self, byte::Error> {
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
         let base_block_height = block_height_lookup(base_block_hash);
@@ -72,10 +103,7 @@ impl MNListDiff {
         let total_transactions = u32::from_bytes(message, offset)?;
         let merkle_hashes = VarArray::<UInt256>::from_bytes(message, offset)?;
         let merkle_flags_count = VarInt::from_bytes(message, offset)?.0 as usize;
-        let merkle_flags: &[u8] = match message.read_with(offset, byte::ctx::Bytes::Len(merkle_flags_count)) {
-            Ok(data) => data,
-            Err(_err) => { return None; },
-        };
+        let merkle_flags: &[u8] = message.read_with(offset, byte::ctx::Bytes::Len(merkle_flags_count))?;
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
         let version = if protocol_version >= CORE_PROTO_BLS_BASIC {
             // BLS Basic
@@ -84,7 +112,6 @@ impl MNListDiff {
             // BLS Legacy
             1
         };
-        let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
             Vec::with_capacity(deleted_masternode_count as usize);
@@ -92,6 +119,7 @@ impl MNListDiff {
             deleted_masternode_hashes.push(UInt256::from_bytes(message, offset)?);
         }
         let added_masternode_count = VarInt::from_bytes(message, offset)?.0;
+        let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
             .fold(BTreeMap::new(), |mut acc, _| {
                 if let Ok(entry) = message.read_with::<MasternodeEntry>(offset, masternode_read_ctx) {
@@ -115,7 +143,7 @@ impl MNListDiff {
             }
             let added_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..added_quorums_count {
-                if let Some(entry) = LLMQEntry::from_bytes(message, offset) {
+                if let Ok(entry) = LLMQEntry::from_bytes(message, offset) {
                     added_quorums
                         .entry(entry.llmq_type)
                         .or_insert_with(BTreeMap::new)
@@ -132,7 +160,7 @@ impl MNListDiff {
             }
         }
 
-        Some(Self {
+        Ok(Self {
             base_block_hash,
             block_hash,
             total_transactions,

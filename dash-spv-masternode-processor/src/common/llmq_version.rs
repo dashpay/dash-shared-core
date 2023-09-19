@@ -1,8 +1,11 @@
+use std::io;
+use std::io::Read;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
-use crate::consensus::Encodable;
+use crate::consensus::{Decodable, Encodable};
+use crate::consensus::encode::Error;
 use crate::crypto::byte_util::BytesDecodable;
 
 #[warn(non_camel_case_types)]
@@ -55,11 +58,23 @@ impl From<LLMQVersion> for u16 {
     }
 }
 
+impl Encodable for LLMQVersion {
+    fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
+        u16::consensus_encode(&(*self).into(), &mut writer)
+    }
+}
+
+impl Decodable for LLMQVersion {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, Error> {
+        u16::consensus_decode(&mut d)
+            .map(LLMQVersion::from)
+    }
+}
+
 impl<'a> TryRead<'a, Endian> for LLMQVersion {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let orig = bytes.read_with::<u16>(offset, endian).unwrap();
-        Ok((LLMQVersion::from(orig), 2))
+        bytes.read_with::<u16>(&mut 0, endian)
+            .map(|orig| (LLMQVersion::from(orig), 2))
     }
 }
 
@@ -71,10 +86,7 @@ impl<'a> TryWrite<Endian> for LLMQVersion {
     }
 }
 impl<'a> BytesDecodable<'a, LLMQVersion> for LLMQVersion {
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<LLMQVersion> {
-        match bytes.read_with::<LLMQVersion>(offset, byte::LE) {
-            Ok(data) => Some(data),
-            Err(_err) => None,
-        }
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<Self> {
+        bytes.read_with::<LLMQVersion>(offset, byte::LE)
     }
 }

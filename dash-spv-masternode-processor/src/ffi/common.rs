@@ -31,10 +31,39 @@ impl From<[u8; 32]> for ByteArray {
     }
 }
 
+
+impl From<[u8; 48]> for ByteArray {
+    fn from(value: [u8; 48]) -> Self {
+        let vec = value.to_vec();
+        vec.into()
+    }
+}
+
+
 impl From<[u8; 65]> for ByteArray {
     fn from(value: [u8; 65]) -> Self {
         let vec = value.to_vec();
         vec.into()
+    }
+}
+
+impl From<Result<[u8; 48], bls_signatures::BlsError>> for ByteArray {
+    fn from(value: Result<[u8; 48], bls_signatures::BlsError>) -> Self {
+        if let Ok(v) = value {
+            v.into()
+        } else {
+            ByteArray::default()
+        }
+    }
+}
+
+impl From<byte::Result<[u8; 65]>> for ByteArray {
+    fn from(value: byte::Result<[u8; 65]>) -> Self {
+        if let Ok(v) = value {
+            v.into()
+        } else {
+            ByteArray::default()
+        }
     }
 }
 
@@ -57,14 +86,26 @@ impl From<Vec<u8>> for ByteArray {
     }
 }
 
+impl<T> From<Result<Vec<u8>, T>> for ByteArray {
+    fn from(value: Result<Vec<u8>, T>) -> Self {
+        value.map_or(ByteArray::default(), Vec::into)
+    }
+}
+
 impl From<Option<Vec<u8>>> for ByteArray {
     fn from(value: Option<Vec<u8>>) -> Self {
-        match value {
-            Some(vec) => {
-                vec.into()
-            }
-            None => ByteArray::default(),
-        }
+        value.map_or(ByteArray::default(), Vec::into)
+    }
+}
+
+impl<T> From<Result<SecVec, T>> for ByteArray {
+    fn from(value: Result<SecVec, T>) -> Self {
+        value.map_or(ByteArray::default(), |vec| {
+            let ptr = vec.as_ptr();
+            let len = vec.len();
+            mem::forget(vec);
+            ByteArray { ptr, len }
+        })
     }
 }
 

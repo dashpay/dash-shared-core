@@ -1,9 +1,12 @@
+use std::io;
+use std::io::{Error, Write};
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
 use crate::chain::params::TX_UNCONFIRMED;
+use crate::consensus;
 use crate::consensus::encode::VarInt;
-use crate::consensus::Encodable;
+use crate::consensus::{Decodable, Encodable, encode};
 use crate::crypto::{UInt256, VarBytes};
 
 pub static SIGHASH_ALL: u32 = 1;
@@ -28,6 +31,12 @@ pub enum TransactionType {
 
     /// TODO: find actual value for this type
     CreditFunding = 255,
+}
+impl consensus::Decodable for TransactionType {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        Ok(TransactionType::from(u16::consensus_decode(&mut d)?))
+    }
 }
 
 impl From<u16> for TransactionType {
@@ -75,6 +84,8 @@ pub struct TransactionInput {
     pub sequence: u32,
 }
 
+
+
 impl std::fmt::Debug for TransactionInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransactionInput")
@@ -96,6 +107,33 @@ impl std::fmt::Debug for TransactionInput {
             .finish()
     }
 }
+
+impl Encodable for TransactionInput {
+    #[inline]
+    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
+        let mut offset = 0;
+        offset += self.input_hash.consensus_encode(&mut writer)?;
+        offset += self.index.consensus_encode(&mut writer)?;
+        offset += match self.signature {
+            Some(ref signature) => signature.consensus_encode(&mut writer)?,
+            None => 0
+        };
+        offset += self.sequence.consensus_encode(&mut writer)?;
+        Ok(offset)
+    }
+}
+
+impl Decodable for TransactionInput {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let input_hash = UInt256::consensus_decode(&mut d)?;
+        let index = u32::consensus_decode(&mut d)?;
+        let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
+        let sequence = u32::consensus_decode(&mut d)?;
+        Ok(Self { input_hash, index, signature, sequence, script: None })
+    }
+}
+
 
 impl<'a> TryRead<'a, Endian> for TransactionInput {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
@@ -126,6 +164,7 @@ pub struct TransactionOutput {
     pub address: Option<Vec<u8>>,
 }
 
+
 impl std::fmt::Debug for TransactionOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransactionOutput")
@@ -133,6 +172,28 @@ impl std::fmt::Debug for TransactionOutput {
             .field("script", &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
             .field("address", &self.address.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
             .finish()
+    }
+}
+
+impl Encodable for TransactionOutput {
+    #[inline]
+    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
+        let mut offset = 0;
+        offset += self.amount.consensus_encode(&mut writer)?;
+        offset += match self.script {
+            Some(ref script) => script.consensus_encode(&mut writer)?,
+            None => 0
+        };
+        Ok(offset)
+    }
+}
+
+impl Decodable for TransactionOutput {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let amount = u64::consensus_decode(&mut d)?;
+        let script: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
+        Ok(TransactionOutput { amount, script, address: None })
     }
 }
 
@@ -285,6 +346,29 @@ impl Transaction {
 
     pub fn tx_type(&self) -> TransactionType {
         self.tx_type
+    }
+}
+
+impl consensus::Decodable for Transaction {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let version = u16::consensus_decode(&mut d)?;
+        let tx_type = TransactionType::consensus_decode(&mut d)?;
+        let inputs: Vec<TransactionInput> = Vec::consensus_decode(&mut d)?;
+        let outputs: Vec<TransactionOutput> = Vec::consensus_decode(&mut d)?;
+        let lock_time = u32::consensus_decode(&mut d)?;
+        let mut tx = Self {
+            inputs,
+            outputs,
+            version,
+            tx_type,
+            lock_time,
+            block_height: TX_UNCONFIRMED as u32,
+            tx_hash: None,
+            payload_offset: 0,
+        };
+        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()));
+        Ok(tx)
     }
 }
 

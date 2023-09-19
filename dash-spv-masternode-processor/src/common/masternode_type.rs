@@ -61,7 +61,7 @@ impl<'a> TryRead<'a, Endian> for MasternodeType {
 }
 
 impl<'a> BytesDecodable<'a, MasternodeType> for MasternodeType {
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<MasternodeType> {
-        bytes.read_with::<MasternodeType>(offset, byte::LE).ok()
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<Self> {
+        bytes.read_with::<MasternodeType>(offset, byte::LE)
     }
 }

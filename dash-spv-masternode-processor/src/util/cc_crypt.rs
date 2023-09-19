@@ -1,4 +1,5 @@
 use std::os::raw::c_void;
+use crate::keys::KeyError;
 
 // const K_CCENCRYPT: u32 = 0;
 // const K_CCDECRYPT: u32 = 1;
@@ -34,7 +35,7 @@ fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
     (0..size).map(|_| rng.sample(&range)).collect()
 }
 
-pub fn aes256_encrypt_decrypt(operation: Operation, data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Option<Vec<u8>> {
+pub fn aes256_encrypt_decrypt(operation: Operation, data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Result<Vec<u8>, KeyError> {
     let operation = match operation {
         Operation::Encrypt => 0, // kCCEncrypt
         Operation::Decrypt => 1, // kCCDecrypt
@@ -67,8 +68,8 @@ pub fn aes256_encrypt_decrypt(operation: Operation, data: impl AsRef<[u8]>, key:
     if result == 0 {
         // kCCSuccess
         data_out.truncate(bytes_written);
-        Some(data_out)
+        Ok(data_out)
     } else {
-        None
+        Err(KeyError::CCCrypt(result))
     }
 }

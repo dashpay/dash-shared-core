@@ -85,11 +85,8 @@ impl<'a> MerkleTree<'a> {
 }
 
 impl<'a> BytesDecodable<'a, MerkleTree<'a>> for MerkleTree<'a> {
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-        match bytes.read_with(offset, byte::LE) {
-            Ok(data) => Some(data),
-            Err(_err) => None
-        }
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<Self> {
+        bytes.read_with(offset, byte::LE)
     }
 }
 

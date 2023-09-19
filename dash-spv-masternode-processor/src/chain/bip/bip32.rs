@@ -5,6 +5,7 @@ use crate::consensus::Encodable;
 use crate::crypto::byte_util::clone_into_array;
 use crate::crypto::UInt256;
 use crate::chain::derivation::BIP32_HARD;
+use crate::keys::KeyError;
 use crate::util::{base58, endian};
 use crate::util::sec_vec::SecVec;
 
@@ -79,13 +80,13 @@ impl Key {
 
 // Decode base58-encoded string into bip32 private key
 impl TryInto<Key> for (&str, ChainType) {
-    type Error = Error;
+    type Error = KeyError;
 
     fn try_into(self) -> Result<Key, Self::Error> {
         base58::from(self.0)
-            .map_err(base58::Error::into)
+            .map_err(KeyError::from)
             .and_then(|message| message.read_with::<Key>(&mut 0, self.1)
-                .map_err(byte::Error::into))
+                .map_err(KeyError::from))
     }
 }
 

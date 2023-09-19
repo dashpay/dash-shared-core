@@ -37,7 +37,6 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
     let mut level = hashes;
     match length {
         0 => None,
-        1 => Some(level[0]),
         _ => {
             while level.len() != 1 {
                 let len = level.len();

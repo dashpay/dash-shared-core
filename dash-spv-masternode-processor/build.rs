@@ -1,32 +1,39 @@
 extern crate cbindgen;
 
+use std::process::Command;
+
 fn main() {
-    let crate_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    let mut config = cbindgen::Config::from_file("./cbindgen.toml").expect("Error config");
-    // Here we write down crate names (!) where we want to retrieve C-bindings
-    let includes = vec![/*"dash-spv-ffi".to_string(), "dash-spv-models".to_string()*/];
-    config.language = cbindgen::Language::C;
-    config.parse = cbindgen::ParseConfig {
-        parse_deps: true,
-        include: Some(includes.clone()),
-        extra_bindings: includes.clone(),
-        expand: cbindgen::ParseExpandConfig {
-            crates: includes.clone(),
-            // crates: vec!["ffi-proc-macro-derive".to_string()],
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    config.enumeration = cbindgen::EnumConfig {
-        prefix_with_name: true,
-        ..Default::default()
-    };
+    // let crate_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    // let mut config = cbindgen::Config::from_file("./cbindgen.toml").expect("Error config");
+    // // Here we write down crate names (!) where we want to retrieve C-bindings
+    // let includes = vec![/*"dash-spv-ffi".to_string(), "dash-spv-models".to_string()*/];
+    // config.language = cbindgen::Language::C;
+    // config.parse = cbindgen::ParseConfig {
+    //     parse_deps: true,
+    //     include: Some(includes.clone()),
+    //     extra_bindings: includes.clone(),
+    //     expand: cbindgen::ParseExpandConfig {
+    //         crates: includes.clone(),
+    //         // crates: vec!["ffi-proc-macro-derive".to_string()],
+    //         ..Default::default()
+    //     },
+    //     ..Default::default()
+    // };
+    // config.enumeration = cbindgen::EnumConfig {
+    //     prefix_with_name: true,
+    //     ..Default::default()
+    // };
+    //
+    // config.macro_expansion = cbindgen::MacroExpansionConfig {
+    //     bitflags: true,
+    // };
+    //
+    // cbindgen::generate_with_config(&crate_dir, config)
+    //     .unwrap()
+    //     .write_to_file("target/dash_spv_masternode_processor.h");
+    Command::new("cbindgen")
+        .args(&["--config", "cbindgen.toml", "-o", "target/example.h", "target/expanded_reduced.rs"])
+        .status()
+        .expect("Failed to run cbindgen");
 
-    config.macro_expansion = cbindgen::MacroExpansionConfig {
-        bitflags: true,
-    };
-
-    cbindgen::generate_with_config(&crate_dir, config)
-        .unwrap()
-        .write_to_file("target/dash_spv_masternode_processor.h");
 }

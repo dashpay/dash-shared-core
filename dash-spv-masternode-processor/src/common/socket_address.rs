@@ -1,6 +1,6 @@
 use std::io;
 use byte::{BytesExt, TryRead};
-use crate::consensus::Encodable;
+use crate::consensus::{Decodable, Encodable, encode};
 use crate::crypto::UInt128;
 
 #[repr(C)]
@@ -26,6 +26,16 @@ impl Encodable for SocketAddress {
         Ok(18)
     }
 }
+
+impl Decodable for SocketAddress {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let ip_address = UInt128::consensus_decode(&mut d)?;
+        let port = u16::consensus_decode(&mut d)?;
+        Ok(Self { ip_address, port })
+    }
+}
+
 
 impl<'a> TryRead<'a, ()> for SocketAddress {
     fn try_read(bytes: &'a [u8], context: ()) -> byte::Result<(Self, usize)> {

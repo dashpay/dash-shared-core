@@ -12,32 +12,32 @@ use crate::util::data_append::DataAppend;
 
 fn test_sign_key(secret: &str, message: &str, compressed: bool, test_signature: &str) {
     match ECDSAKey::key_with_secret_hex(secret, compressed) {
-        Some(mut key) => {
+        Ok(mut key) => {
             let message_digest = sha256::Hash::hash(message.as_bytes()).into_inner().to_vec();
             let sig = key.sign(&message_digest);
             let test_sig = Vec::from_hex(test_signature).unwrap();
             assert_eq!(sig, test_sig, "Signature don't match");
             assert!(key.verify(&message_digest, &sig), "Can't verify signature");
         },
-        None => panic!("key_with_secret_hex: Key is invalid"),
+        Err(err) => panic!("key_with_secret_hex: {}", err),
     }
 }
 
 fn test_compact_signature_recovery(signature: &[u8], md: UInt256, test_data: Vec<u8>) {
     match ECDSAKey::key_with_compact_sig(signature, md) {
-        Some(key) => assert_eq!(key.public_key_data(), test_data, "public key data doesn't match"),
-        _ => panic!("Key can't recovered")
+        Ok(key) => assert_eq!(key.public_key_data(), test_data, "public key data doesn't match"),
+        Err(err) => panic!("Key can't recovered: {}", err)
     }
 }
 
 fn test_compact_signature_key(secret: &str, message: &str, compressed: bool) {
     match ECDSAKey::key_with_secret_hex(secret, compressed) {
-        Some(key) => {
+        Ok(key) => {
             let message_digest = UInt256::sha256_str(message);
             let sig = key.compact_sign(message_digest);
             test_compact_signature_recovery(&sig, message_digest, key.public_key_data());
         },
-        None => panic!("key_with_secret_hex: Key is invalid")
+        Err(err) => panic!("key_with_secret_hex: Key is invalid {}", err)
     }
 }
 
@@ -54,26 +54,26 @@ pub fn test_key_with_private_key() {
     let chain_type = ChainType::MainNet;
     // wrong private key
     assert!(!is_valid_dash_private_key("7s18Ypj1scza76SPf56Jm9zraxSrv58TgzmxwuDXoauvV84ud61", &chain_type.script_map()), "valid when invalid");
-    assert!(ECDSAKey::key_with_private_key("hello", chain_type).is_none(), "valid when totally invalid");
+    assert!(ECDSAKey::key_with_private_key("hello", chain_type).is_err(), "valid when totally invalid");
     // uncompressed private key
     assert!(is_valid_dash_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", &chain_type.script_map()), "invalid when valid");
     match ECDSAKey::key_with_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", chain_type) {
-        Some(key) => {
+        Ok(key) => {
             let addr = key.address_with_public_key_data(&chain_type.script_map());
             assert_eq!("Xj74g7h8pZTzqudPSzVEL7dFxNZY95Emcy", addr.as_str(), "addresses don't match");
         },
-        None => { assert!(false, "Key is invalid"); }
+        Err(err) => assert!(false, "Key is invalid: {}", err)
     }
 
     // compressed private key
     match ECDSAKey::key_with_private_key("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", chain_type) {
-        Some(key) => {
+        Ok(key) => {
             let addr = key.address_with_public_key_data(&chain_type.script_map());
             assert_eq!("XbKPGyV1BpzzxNAggx6Q9a6o7GaBWTLhJS", addr.as_str(), "addresses don't match");
             // compressed private key export
             assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_script(&chain_type.script_map()).as_str(), "serialized_private_key_for_script");
         },
-        None => { assert!(false, "Key is invalid"); }
+        Err(err) => assert!(false, "Key is invalid: {}", err)
     };
 }
 
@@ -187,11 +187,11 @@ fn private_key_with_non_base_string() {
     let pk3 = ECDSAKey::key_with_private_key(ipk3, chain_type);
     let pk4 = ECDSAKey::key_with_private_key(ipk4, chain_type);
     let pk5 = ECDSAKey::key_with_private_key(ipk5, chain_type);
-    assert!(pk1.is_some(), "pk1 is none");
-    assert!(pk2.is_some(), "pk2 is none");
-    assert!(pk3.is_some(), "pk3 is none");
-    assert!(pk4.is_some(), "pk4 is none");
-    assert!(pk5.is_some(), "pk5 is none");
+    assert!(pk1.is_ok(), "pk1 is none");
+    assert!(pk2.is_ok(), "pk2 is none");
+    assert!(pk3.is_ok(), "pk3 is none");
+    assert!(pk4.is_ok(), "pk4 is none");
+    assert!(pk5.is_ok(), "pk5 is none");
     let ia1 = pk1.unwrap().address_with_public_key_data(&script_map);
     let ia2 = pk2.unwrap().address_with_public_key_data(&script_map);
     let ia3 = pk3.unwrap().address_with_public_key_data(&script_map);
