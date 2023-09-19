@@ -264,55 +264,51 @@ impl Transaction {
         let offset: &mut usize = &mut 0;
         let inputs_len = inputs.len();
         let outputs_len = outputs.len();
-        *offset += version.consensus_encode(&mut buffer).unwrap();
-        *offset += tx_type.raw_value().consensus_encode(&mut buffer).unwrap();
+        *offset += version.enc(&mut buffer);
+        *offset += tx_type.raw_value().enc(&mut buffer);
         *offset += VarInt(inputs_len as u64)
-            .consensus_encode(&mut buffer)
-            .unwrap();
+            .enc(&mut buffer);
         (0..inputs_len).into_iter().for_each(|i| {
             let input = &inputs[i];
-            *offset += input.input_hash.consensus_encode(&mut buffer).unwrap();
-            *offset += input.index.consensus_encode(&mut buffer).unwrap();
+            *offset += input.input_hash.enc(&mut buffer);
+            *offset += input.index.enc(&mut buffer);
             if subscript_index == u64::MAX && input.signature.is_some() {
                 *offset += input
                     .signature
                     .as_ref()
                     .unwrap()
-                    .consensus_encode(&mut buffer)
-                    .unwrap()
+                    .enc(&mut buffer);
                 // *offset += consensus_encode_with_size(input.signature.unwrap(), &mut buffer).unwrap()
             } else if subscript_index == i as u64 && input.script.is_some() {
                 *offset += input
                     .script
                     .as_ref()
                     .unwrap()
-                    .consensus_encode(&mut buffer)
-                    .unwrap()
+                    .enc(&mut buffer);
                 // *offset += consensus_encode_with_size(input.script.unwrap(), &mut buffer).unwrap()
             } else {
-                *offset += VarInt(0_u64).consensus_encode(&mut buffer).unwrap();
+                *offset += VarInt(0_u64).enc(&mut buffer);
             }
-            *offset += input.sequence.consensus_encode(&mut buffer).unwrap();
+            *offset += input.sequence.enc(&mut buffer);
         });
-        *offset += VarInt(outputs_len as u64)
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        *offset += VarInt(outputs_len as u64).enc(&mut buffer);
         (0..outputs_len).into_iter().for_each(|i| {
             let output = &outputs[i];
-            *offset += output.amount.consensus_encode(&mut buffer).unwrap();
+            *offset += output.amount.enc(&mut buffer);
             if let Some(script) = &output.script {
-                *offset += script.consensus_encode(&mut buffer).unwrap()
+                *offset += script.enc(&mut buffer);
                 //*offset += consensus_encode_with_size(script, &mut buffer).unwrap()
             }
         });
-        *offset += lock_time.consensus_encode(&mut buffer).unwrap();
+        *offset += lock_time.enc(&mut buffer);
         if subscript_index != u64::MAX {
-            *offset += SIGHASH_ALL.consensus_encode(&mut buffer).unwrap();
+            *offset += SIGHASH_ALL.enc(&mut buffer);
         }
         buffer
     }
 
     pub fn input_addresses(&self) -> Vec<Vec<u8>> {
+        // TODO: implement this after transactions migration from DashSync
         /*let script_map = ScriptMap::MAINNET;
         self.inputs.iter().filter_map(|input| {
             if let Some(script) = &input.script {
