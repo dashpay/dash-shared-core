@@ -1,6 +1,4 @@
 use crate::crypto::UInt256;
-use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
-use crate::types;
 use std::collections::BTreeMap;
 
 #[derive(Clone)]
@@ -27,7 +25,6 @@ pub struct MNListDiffResult {
 impl std::fmt::Debug for MNListDiffResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MNListDiffResult")
-            // .field("error_status", &self.error_status)
             .field("base_block_hash", &self.base_block_hash)
             .field("block_hash", &self.block_hash)
             .field(
@@ -66,42 +63,6 @@ impl Default for MNListDiffResult {
             added_quorums: Default::default(),
             needed_masternode_lists: vec![],
             quorums_cl_sigs: vec![],
-        }
-    }
-}
-
-impl MNListDiffResult {
-    pub fn encode(&self) -> types::MNListDiffResult {
-        types::MNListDiffResult {
-            // error_status: self.error_status.into(),
-            base_block_hash: rs_ffi_interfaces::boxed(self.base_block_hash.0),
-            block_hash: rs_ffi_interfaces::boxed(self.block_hash.0),
-            has_found_coinbase: self.has_found_coinbase,
-            has_valid_coinbase: self.has_valid_coinbase,
-            has_valid_mn_list_root: self.has_valid_mn_list_root,
-            has_valid_llmq_list_root: self.has_valid_llmq_list_root,
-            has_valid_quorums: self.has_valid_quorums,
-            masternode_list: rs_ffi_interfaces::boxed(self.masternode_list.encode()),
-            added_masternodes: encode_masternodes_map(&self.added_masternodes),
-            added_masternodes_count: self.added_masternodes.len(),
-            modified_masternodes: encode_masternodes_map(&self.modified_masternodes),
-            modified_masternodes_count: self.modified_masternodes.len(),
-            added_llmq_type_maps: encode_quorums_map(&self.added_quorums),
-            added_llmq_type_maps_count: self.added_quorums.len(),
-            needed_masternode_lists: rs_ffi_interfaces::boxed_vec(
-                self.needed_masternode_lists
-                    .iter()
-                    .map(|h| rs_ffi_interfaces::boxed(h.0))
-                    .collect(),
-            ),
-            needed_masternode_lists_count: self.needed_masternode_lists.len(),
-            quorums_cl_sigs_count: self.quorums_cl_sigs.len(),
-            quorums_cl_sigs: rs_ffi_interfaces::boxed_vec(
-                self.quorums_cl_sigs
-                    .iter()
-                    .map(|h| rs_ffi_interfaces::boxed(h.encode()))
-                    .collect(),
-            ),
         }
     }
 }

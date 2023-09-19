@@ -4,7 +4,7 @@ use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::processing::{FFICoreProvider, MasternodeProcessor};
 use crate::common::{processor_create_cache, register_processor};
-use crate::masternode::process_qrinfo_from_message;
+use crate::masternode::{process_mnlist_diff, process_qr_info, process_qrinfo_from_message};
 use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 
 unsafe extern "C" fn block_height_lookup_(
@@ -637,9 +637,9 @@ fn test_processor_devnet_333_2() {
         chain
     );
     let processor = MasternodeProcessor::new(provider);
-    let result = processor.process_mnlist_diff(&chain.load_message("mnlistdiff--1-25480.dat"), false, 70221, context.cache).unwrap();
+    let result = process_mnlist_diff(&processor, &chain.load_message("mnlistdiff--1-25480.dat"), false, 70221, context.cache).unwrap();
     context.is_dip_0024 = true;
-    let result = processor.process_qr_info(&chain.load_message("qrinfo--1-24868.dat"), false, 70221, true, context.cache).unwrap();
+    let result = process_qr_info(&processor, &chain.load_message("qrinfo--1-24868.dat"), false, 70221, true, context.cache).unwrap();
     println!("Result: {:#?}", &result);
     let result_at_h = unsafe { &*result.result_at_h };
     assert!(result_at_h.has_valid_mn_list_root, "Invalid masternodes root");
@@ -1312,8 +1312,8 @@ fn test_jack_daniels() {
         context,
         chain
     );
-    let result = MasternodeProcessor::new(provider)
-        .process_qr_info(&chain.load_message("QRINFO_1_107966.dat"), false, 70221, true, cache);
+    let processor = MasternodeProcessor::new(provider);
+    let result = process_qr_info(&processor, &chain.load_message("QRINFO_1_107966.dat"), false, 70221, true, cache);
 
     println!("Result: {:#?}", &result);
 }

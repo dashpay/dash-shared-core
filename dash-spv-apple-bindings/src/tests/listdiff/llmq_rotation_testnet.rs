@@ -7,6 +7,7 @@ use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::processing::{FFICoreProvider, MasternodeProcessor};
 use dash_spv_masternode_processor::test_helpers::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
 use crate::common::processor_create_cache;
+use crate::masternode::process_qr_info;
 use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 
 #[test]
@@ -105,9 +106,9 @@ fn mainnet_quorum_quarters() {
     processor.provider.save_snapshot(block_hash_8936_h_c, snapshot_8936_h_c);
     processor.provider.save_snapshot(block_hash_8936_h_2c, snapshot_8936_h_2c);
     processor.provider.save_snapshot(block_hash_8936_h_3c, snapshot_8936_h_3c);
-    let old_result = processor.process_qr_info(&old_bytes, true, 70221, true, context.cache);
-    let old_result2 = processor.process_qr_info(&old_bytes2, true, 70221, true, context.cache);
-    let result = processor.process_qr_info(&bytes, true, 70221, true, context.cache);
+    let old_result = process_qr_info(&processor, &old_bytes, true, 70221, true, context.cache);
+    let old_result2 = process_qr_info(&processor, &old_bytes2, true, 70221, true, context.cache);
+    let result = process_qr_info(&processor, &bytes, true, 70221, true, context.cache);
     let result = result.unwrap();
     let block_height = 1738944;
     let last_quorum_per_index = unsafe { *(&*result.last_quorum_per_index) };

@@ -1,5 +1,5 @@
 use byte::{BytesExt, TryRead};
-use crate::models;
+use crate::{models, processing};
 use crate::consensus::encode;
 use crate::crypto::byte_util::BytesDecodable;
 use crate::processing::CoreProvider;
@@ -142,5 +142,29 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
         //     quorum_snapshot_list,
         //     mn_list_diff_list
         // }, *offset))
+    }
+}
+
+impl QRInfo {
+    pub fn into_result<F: FnMut(models::MNListDiff, bool) -> processing::MNListDiffResult>(self, mut process_list_diff: F) -> processing::QRInfoResult {
+        processing::QRInfoResult {
+            result_at_h_4c: self.diff_h_4c.map(|list_diff| process_list_diff(list_diff, false)),
+            result_at_h_3c: process_list_diff(self.diff_h_3c, false),
+            result_at_h_2c: process_list_diff(self.diff_h_2c, false),
+            result_at_h_c: process_list_diff(self.diff_h_c, false),
+            result_at_h: process_list_diff(self.diff_h, true),
+            result_at_tip: process_list_diff(self.diff_tip, false),
+            snapshot_at_h_c: self.snapshot_h_c,
+            snapshot_at_h_2c: self.snapshot_h_2c,
+            snapshot_at_h_3c: self.snapshot_h_3c,
+            snapshot_at_h_4c: self.snapshot_h_4c,
+            extra_share: self.extra_share,
+            last_quorum_per_index: self.last_quorum_per_index,
+            quorum_snapshot_list: self.quorum_snapshot_list,
+            mn_list_diff_list: self.mn_list_diff_list
+                .into_iter()
+                .map(|list_diff| process_list_diff(list_diff, false))
+                .collect()
+        }
     }
 }

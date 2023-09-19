@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fmt::Debug;
 use rs_ffi_interfaces::boxed;
 use crate::chain::common::{ChainType, IHaveChainSettings};
 use crate::crypto::UInt256;
@@ -10,7 +9,7 @@ use crate::ffi::from::FromFFI;
 use crate::ffi::to::ToFFI;
 use crate::processing::ProcessingError;
 
-pub trait CoreProvider: Debug {
+pub trait CoreProvider: std::fmt::Debug {
     fn chain_type(&self) -> ChainType;
     fn find_masternode_list(&self, block_hash: UInt256, cached_lists: &BTreeMap<UInt256, models::MasternodeList>, unknown_lists: &mut Vec<UInt256>) -> Result<models::MasternodeList, CoreProviderError>;
     fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError>;
@@ -88,19 +87,19 @@ impl CoreProvider for FFICoreProvider {
             Err(CoreProviderError::BadBlockHash(block_hash))
         } else if block_hash.eq(&genesis_hash) {
             // If it's a genesis block we don't expect models list here
-            // println!("find {}: {} It's a genesis -> Some(EMPTY MNL)", self.lookup_block_height_by_hash(block_hash), block_hash);
+            // println!("find {}: {} It's a genesis -> Ok(EMPTY MNL)", self.lookup_block_height_by_hash(block_hash), block_hash);
             Ok(models::MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
             // None
         } else if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
-            // println!("find_masternode_list (cache) {}: {} -> Some({:?})", self.lookup_block_height_by_hash(block_hash), block_hash, cached);
+            // println!("find_masternode_list (cache) {}: {} -> Ok({:?})", self.lookup_block_height_by_hash(block_hash), block_hash, cached);
             Ok(cached.clone())
         } else if let Ok(looked) = self.lookup_masternode_list(block_hash) {
             // Getting it from FFI directly
-            // println!("find_masternode_list {}: {} (ffi) -> Some({:?})", self.lookup_block_height_by_hash(block_hash), block_hash, looked);
+            // println!("find_masternode_list {}: {} (ffi) -> Ok({:?})", self.lookup_block_height_by_hash(block_hash), block_hash, looked);
             Ok(looked)
         } else {
-            // println!("find {}: {} Unknown -> None", self.lookup_block_height_by_hash(block_hash), block_hash);
+            // println!("find {}: {} Unknown -> Err", self.lookup_block_height_by_hash(block_hash), block_hash);
             if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
                 unknown_lists.push(block_hash);
             } else if !self.chain_type().is_mainnet() {
@@ -113,24 +112,20 @@ impl CoreProvider for FFICoreProvider {
         }
     }
 
+    fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError> {
+        Self::lookup_merkle_root_by_hash_callback(
+            block_hash,
+            |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) },
+            |hash: *mut u8| unsafe { (self.destroy_hash)(hash) },
+        )
+    }
+
     fn lookup_masternode_list(&self, block_hash: UInt256) -> Result<models::MasternodeList, CoreProviderError> {
         // First look at the local cache
         Self::lookup_masternode_list_callback(
             block_hash,
             |h| unsafe { (self.get_masternode_list_by_block_hash)(boxed(h.0), self.opaque_context) },
             |list: *mut types::MasternodeList| unsafe { (self.destroy_masternode_list)(list) },
-        )
-    }
-
-    fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32 {
-        unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.opaque_context) }
-    }
-
-    fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError> {
-        Self::lookup_merkle_root_by_hash_callback(
-            block_hash,
-            |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) },
-            |hash: *mut u8| unsafe { (self.destroy_hash)(hash) },
         )
     }
 
@@ -150,6 +145,10 @@ impl CoreProvider for FFICoreProvider {
             |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.opaque_context) },
             |hash: *mut u8| unsafe { (self.destroy_hash)(hash) },
         )
+    }
+
+    fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32 {
+        unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.opaque_context) }
     }
 
     fn add_insight(&self, block_hash: UInt256) {
@@ -173,14 +172,6 @@ impl CoreProvider for FFICoreProvider {
         }
     }
 
-    fn find_snapshot(&self, block_hash: UInt256, cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>) -> Result<models::LLMQSnapshot, CoreProviderError> {
-        if let Some(cached) = cached_snapshots.get(&block_hash) {
-            // Getting it from local cache stored as opaque in FFI context
-            Ok(cached.clone())
-        } else {
-            self.lookup_snapshot_by_block_hash(block_hash)
-        }
-    }
     fn save_snapshot(&self, block_hash: UInt256, snapshot: models::LLMQSnapshot) -> bool {
         #[cfg(feature = "generate-dashj-tests")]
         crate::util::java::save_snapshot_to_json(&snapshot, self.lookup_block_height_by_hash(block_hash));
@@ -190,6 +181,14 @@ impl CoreProvider for FFICoreProvider {
                 boxed(snapshot.encode()),
                 self.opaque_context,
             )
+        }
+    }
+    fn find_snapshot(&self, block_hash: UInt256, cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>) -> Result<models::LLMQSnapshot, CoreProviderError> {
+        if let Some(cached) = cached_snapshots.get(&block_hash) {
+            // Getting it from local cache stored as opaque in FFI context
+            Ok(cached.clone())
+        } else {
+            self.lookup_snapshot_by_block_hash(block_hash)
         }
     }
     fn save_masternode_list(&self, block_hash: UInt256, masternode_list: &models::MasternodeList) -> bool {

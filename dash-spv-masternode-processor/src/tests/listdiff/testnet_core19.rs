@@ -842,5 +842,6 @@ fn test_verify_secure3() {
         },
     ];
 
-    quorum.validate(valid_masternodes.to_vec(), 869760);
+    let is_valid = quorum.validate(valid_masternodes.to_vec(), 869760);
+    assert_eq!(true, is_valid);
 }
