@@ -1,7 +1,5 @@
-use std::{mem, ptr, slice, os::raw::c_ulong};
-use crate::chain::derivation::{IIndexPath, IndexPath};
-use crate::crypto::UInt256;
-use crate::util::sec_vec::SecVec;
+use std::{mem, ptr};
+use dash_spv_masternode_processor::util::sec_vec::SecVec;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -47,8 +45,8 @@ impl From<[u8; 65]> for ByteArray {
     }
 }
 
-impl From<Result<[u8; 48], bls_signatures::BlsError>> for ByteArray {
-    fn from(value: Result<[u8; 48], bls_signatures::BlsError>) -> Self {
+impl<T> From<Result<[u8; 48], T>> for ByteArray {
+    fn from(value: Result<[u8; 48], T>) -> Self {
         if let Ok(v) = value {
             v.into()
         } else {
@@ -57,8 +55,8 @@ impl From<Result<[u8; 48], bls_signatures::BlsError>> for ByteArray {
     }
 }
 
-impl From<byte::Result<[u8; 65]>> for ByteArray {
-    fn from(value: byte::Result<[u8; 65]>) -> Self {
+impl<T> From<Result<[u8; 65], T>> for ByteArray {
+    fn from(value: Result<[u8; 65], T>) -> Self {
         if let Ok(v) = value {
             v.into()
         } else {
@@ -120,54 +118,5 @@ impl From<Option<SecVec>> for ByteArray {
             }
             None => ByteArray::default(),
         }
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct IndexPathData {
-    pub indexes: *const c_ulong,
-    pub len: usize,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct DerivationPathData {
-    pub indexes: *const [u8; 32],
-    pub hardened: *const u8,
-    pub len: usize,
-}
-
-
-impl From<*const IndexPathData> for IndexPath<u32> {
-    fn from(value: *const IndexPathData) -> Self {
-        let indexes_slice = unsafe { slice::from_raw_parts((*value).indexes, (*value).len) };
-        IndexPath::new(indexes_slice.iter().map(|&index| index as u32).collect())
-    }
-}
-
-impl From<*const DerivationPathData> for IndexPath<UInt256> {
-    fn from(value: *const DerivationPathData) -> Self {
-        let indexes_slice = unsafe { slice::from_raw_parts((*value).indexes, (*value).len) };
-        let hardened_slice = unsafe { slice::from_raw_parts((*value).hardened, (*value).len) };
-        IndexPath::new_hardened(
-            indexes_slice.iter().map(|&index| UInt256(index)).collect(),
-            hardened_slice.iter().map(|&index| index > 0).collect()
-        )
-    }
-}
-
-impl From<(*const u8, *const bool, usize)> for IndexPath<UInt256> {
-    fn from(value: (*const u8, *const bool, usize)) -> Self {
-        let len = value.2;
-        let hashes_len = len * 32;
-        let hashes = unsafe { slice::from_raw_parts(value.0, hashes_len) };
-        let hardened = unsafe { slice::from_raw_parts(value.1, len) };
-        let indexes = (0..hashes_len)
-            .into_iter()
-            .step_by(32)
-            .map(|pos| UInt256::from(&hashes[pos..pos+32]))
-            .collect::<Vec<_>>();
-        IndexPath::new_hardened(indexes, hardened.to_vec())
     }
 }

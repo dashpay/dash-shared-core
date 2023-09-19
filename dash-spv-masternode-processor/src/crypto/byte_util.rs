@@ -7,7 +7,6 @@ use secp256k1::rand::{Rng, thread_rng};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::chain::params::{BIP32_SEED_KEY, ED25519_SEED_KEY};
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
-use crate::ffi;
 use crate::hashes::{hex::{FromHex, ToHex}, hex};
 use crate::util::base58;
 use crate::util::data_ops::short_hex_string_from;
@@ -60,28 +59,6 @@ pub struct UInt768(pub [u8; 96]);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ECPoint(pub [u8; 33]);
-
-
-#[macro_export]
-macro_rules! impl_ffi_bytearray {
-    ($var_type: ident) => {
-        impl From<$var_type> for ffi::ByteArray {
-            fn from(value: $var_type) -> Self {
-                let vec = value.0.to_vec();
-                vec.into()
-            }
-        }
-        impl From<Option<$var_type>> for ffi::ByteArray {
-            fn from(value: Option<$var_type>) -> Self {
-                if let Some(v) = value {
-                    v.into()
-                } else {
-                    ffi::ByteArray::default()
-                }
-            }
-        }
-    }
-}
 
 #[macro_export]
 macro_rules! impl_from_const_ptr {
@@ -238,7 +215,7 @@ macro_rules! define_bytes_to_big_uint {
         impl_decodable!($uint_type, $byte_len);
         impl_from_const_ptr!($uint_type, $byte_len);
         define_try_from_bytes!($uint_type);
-        impl_ffi_bytearray!($uint_type);
+        // impl_ffi_bytearray!($uint_type);
         #[cfg(feature = "generate-dashj-tests")]
         define_serde_big_uint!($uint_type);
 

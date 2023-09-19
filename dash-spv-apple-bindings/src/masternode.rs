@@ -4,9 +4,8 @@ use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings
 use dash_spv_masternode_processor::consensus::encode;
 use dash_spv_masternode_processor::crypto::{UInt256, byte_util::ConstDecodable};
 use dash_spv_masternode_processor::crypto::byte_util::BytesDecodable;
-use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
-use crate::ffi::{from::FromFFI, to::ToFFI};
+use crate::ffi::{common::ByteArray, from::FromFFI, to::ToFFI};
 use crate::types;
 
 /// Read and process message received as a response for 'GETMNLISTDIFF' call

@@ -30,7 +30,6 @@ pub mod chain;
 pub mod common;
 pub mod consensus;
 pub mod crypto;
-pub mod ffi;
 pub mod hash_types;
 pub mod keys;
 pub mod models;

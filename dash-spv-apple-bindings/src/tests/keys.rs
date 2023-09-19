@@ -3,9 +3,9 @@ use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::derivation::{IIndexPath, IndexPath};
 use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
 use dash_spv_masternode_processor::crypto::{UInt256, UInt384};
-use dash_spv_masternode_processor::ffi::IndexPathData;
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::keys::KeyKind;
+use crate::ffi::IndexPathData;
 use crate::keys::{key_bls_chaincode, key_bls_public_key, key_bls_with_bip32_seed_data, key_create_from_extended_public_key_data, key_extended_public_key_data, key_private_key_at_index_path, key_with_private_key};
 use crate::types::opaque_key::OpaqueKey;
 

@@ -6,12 +6,11 @@ use rs_ffi_interfaces::{boxed, boxed_vec, unbox_any};
 use dash_spv_masternode_processor::chain::{bip::{bip32, bip38::BIP38}, common::{ChainType, IHaveChainSettings}, derivation::IndexPath};
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::{byte_util::{AsBytes, ConstDecodable, Reversable, Zeroable}, UInt160, UInt256, UInt384, UInt512, UInt768};
-use dash_spv_masternode_processor::ffi::{ByteArray, IndexPathData};
 use dash_spv_masternode_processor::keys::{BLSKey, crypto_data::{CryptoData, DHKey}, ECDSAKey, ED25519Key, IKey, KeyError, KeyKind};
 use dash_spv_masternode_processor::processing::{keys_cache::KeysCache, ProcessingError};
 use dash_spv_masternode_processor::util::{address::address, sec_vec::SecVec};
+use crate::ffi::{common::ByteArray, decode_derivation_path, IndexPathData, unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
-use crate::ffi::{unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 /// Destroys
 /// # Safety
 #[no_mangle]
@@ -273,7 +272,7 @@ pub unsafe extern "C" fn forget_private_key(key: *mut OpaqueKey) {
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_public_derive_to_256bit(key: *mut OpaqueKey, derivation_indexes: *const u8, derivation_hardened: *const bool, derivation_len: usize, offset: usize) -> *mut OpaqueKey {
-    let path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
+    let path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
     match *key {
         OpaqueKey::ECDSA(ptr) => (&mut *ptr).public_derive_to_256bit_derivation_path_with_offset(&path, offset).to_opaque_ptr(),
         OpaqueKey::BLSLegacy(ptr) |
@@ -330,10 +329,10 @@ pub unsafe extern "C" fn key_extended_private_key_data(key: *mut OpaqueKey) -> B
 #[no_mangle]
 pub unsafe extern "C" fn key_private_key_at_index_path(seed: *const u8, seed_length: usize, key_type: KeyKind, index_path: *const IndexPathData, derivation_indexes: *const u8, derivation_hardened: *const bool, derivation_len: usize) -> *mut OpaqueKey {
     let seed_bytes = slice::from_raw_parts(seed, seed_length);
-    let path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
+    let path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&path))
-        .and_then(|path_extended_key| path_extended_key.private_derive_to_path(&IndexPath::from(index_path)))
+        .and_then(|path_extended_key| path_extended_key.private_derive_to_path(&IndexPath::from(*index_path)))
         .to_opaque_ptr()
 }
 
@@ -341,7 +340,7 @@ pub unsafe extern "C" fn key_private_key_at_index_path(seed: *const u8, seed_len
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_public_key_at_index_path(key: *mut OpaqueKey, index_path: *const IndexPathData) -> *mut OpaqueKey {
-    let index_path = IndexPath::from(index_path);
+    let index_path = IndexPath::from(*index_path);
     match *key {
         OpaqueKey::ECDSA(ptr) => ECDSAKey::public_key_from_extended_public_key_data_at_index_path(&*ptr, &index_path).to_opaque_ptr(),
         OpaqueKey::BLSLegacy(ptr) |
@@ -354,7 +353,7 @@ pub unsafe extern "C" fn key_public_key_at_index_path(key: *mut OpaqueKey, index
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_public_key_data_at_index_path(key_ptr: *mut OpaqueKey, index_path: *const IndexPathData) -> ByteArray {
-    let path = IndexPath::from(index_path);
+    let path = IndexPath::from(*index_path);
     match *key_ptr {
         OpaqueKey::ECDSA(key) => (&*key).extended_public_key_data()
             .and_then(|data| ECDSAKey::public_key_from_extended_public_key_data(&data, &path)),
@@ -379,12 +378,12 @@ pub unsafe extern "C" fn key_private_keys_at_index_paths(
     derivation_len: usize) -> *mut OpaqueKeys {
     let seed_bytes = slice::from_raw_parts(seed, seed_len);
     let index_paths = slice::from_raw_parts(index_paths, index_paths_len);
-    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
+    let derivation_path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&derivation_path))
         .map_or(null_mut(), |derivation_path_extended_key| {
             let keys = index_paths.iter()
-                .map(|p| derivation_path_extended_key.private_derive_to_path(&IndexPath::from(p as *const IndexPathData))
+                .map(|p| derivation_path_extended_key.private_derive_to_path(&IndexPath::from(*p))
                     .map(|private_key| private_key.to_opaque_ptr()))
                 .flatten()
                 .collect::<Vec<_>>();
@@ -407,13 +406,13 @@ pub unsafe extern "C" fn serialized_key_private_keys_at_index_paths(
 ) -> *mut OpaqueSerializedKeys {
     let seed_bytes = slice::from_raw_parts(seed, seed_len);
     let index_paths = slice::from_raw_parts(index_paths, index_paths_len);
-    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
+    let derivation_path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&derivation_path))
         .map_or(null_mut(), |derivation_path_extended_key| {
             let script = chain_type.script_map();
             let keys = index_paths.iter()
-                .map(|p| derivation_path_extended_key.private_derive_to_path(&IndexPath::from(p as *const IndexPathData))
+                .map(|p| derivation_path_extended_key.private_derive_to_path(&IndexPath::from(*p))
                     .map(|private_key| CString::new(private_key.serialized_private_key_for_script(&script))
                         .unwrap()
                         .into_raw()))
@@ -428,7 +427,7 @@ pub unsafe extern "C" fn serialized_key_private_keys_at_index_paths(
 #[no_mangle]
 pub unsafe extern "C" fn key_bls_private_derive_to_path(key: *mut BLSKey, index_path: *const IndexPathData) -> *mut BLSKey {
     let key = &mut *key;
-    key.private_derive_to_path(&IndexPath::from(index_path))
+    key.private_derive_to_path(&IndexPath::from(*index_path))
         .map_or(null_mut(), boxed)
 }
 
@@ -436,7 +435,7 @@ pub unsafe extern "C" fn key_bls_private_derive_to_path(key: *mut BLSKey, index_
 #[no_mangle]
 pub unsafe extern "C" fn key_bls_public_derive_to_path(key: *mut BLSKey, index_path: *const IndexPathData) -> *mut BLSKey {
     let key = &mut *key;
-    key.public_derive_to_path(&IndexPath::from(index_path))
+    key.public_derive_to_path(&IndexPath::from(*index_path))
         .map_or(null_mut(), boxed)
 }
 
@@ -738,7 +737,7 @@ pub unsafe extern "C" fn key_serialized_extended_private_key_from_seed(
     derivation_len: usize,
     chain_type: ChainType) -> *mut c_char {
     let secret_slice = slice::from_raw_parts(secret, secret_len);
-    let index_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
+    let index_path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
     rs_ffi_interfaces::FFIConversion::ffi_to_opt(ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type).ok())
 }
 
@@ -837,7 +836,7 @@ pub unsafe extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len
 #[no_mangle]
 pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8, seed_length: usize, key_type: KeyKind, derivation_indexes: *const u8, derivation_hardened: *const bool, derivation_len: usize) -> *mut OpaqueKey {
     let seed_bytes = slice::from_raw_parts(seed, seed_length);
-    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
+    let derivation_path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|seed_key| seed_key.private_derive_to_256bit_derivation_path(&derivation_path))
         .to_opaque_ptr()
@@ -853,7 +852,7 @@ pub unsafe extern "C" fn deprecated_incorrect_extended_public_key_from_seed(seed
     let i = UInt512::bip32_seed_key(slice::from_raw_parts(seed, seed_len));
     let secret = &i.0[..32];
     let chaincode = &i.0[32..];
-    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
+    let derivation_path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
     let hashes = unsafe { slice::from_raw_parts(derivation_indexes, derivation_len * 32) };
     ECDSAKey::key_with_secret_data(secret, true)
         .and_then(|key| key.deprecated_incorrect_extended_public_key_from_seed(secret, chaincode, hashes, derivation_len))

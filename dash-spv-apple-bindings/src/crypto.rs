@@ -1,5 +1,5 @@
 use std::slice;
-use dash_spv_masternode_processor::ffi::ByteArray;
+use crate::ffi::common::ByteArray;
 
 /// # Safety
 #[no_mangle]

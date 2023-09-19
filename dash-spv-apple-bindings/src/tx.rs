@@ -2,9 +2,9 @@ use std::slice;
 use dash_spv_masternode_processor::chain::{common::ChainType, constants::DASH_MESSAGE_MAGIC};
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::{byte_util::{AsBytes, Reversable}, UInt160, UInt256};
-use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::keys::ECDSAKey;
 use dash_spv_masternode_processor::util::address::address;
+use crate::ffi::common::ByteArray;
 
 
 #[no_mangle]
