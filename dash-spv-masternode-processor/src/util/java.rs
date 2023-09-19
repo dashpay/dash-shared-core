@@ -3,11 +3,12 @@ use std::io;
 use std::io::Write;
 use hashes::hex::ToHex;
 use secp256k1::rand::{Rng, thread_rng};
-use crate::chain::common::{ChainType, DevnetType, LLMQType};
+use crate::chain::common::chain_type::DevnetType;
+use crate::common::{ChainType, LLMQType};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
-use crate::{models, processing};
-use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry, MasternodeList};
-use crate::processing::MNListDiffResult;
+use crate::ffi::from::FromFFI;
+use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry};
+use crate::{models, types};
 use crate::util::file::save_java_class;
 use crate::util::save_json_file;
 
@@ -387,7 +388,7 @@ fn put_masternode_list_from_json_into_cache(height: u32) -> String {
     format!("\t\tstate.mnListsCache.put({block_var}.getHeader().getHash(), masternodeListFromJson(params, \"{file_name}\"));\n")
 }
 
-fn extract_masternode_lists_and_snapshots(result: &processing::QRInfoResult) -> (u32, Vec<u32>, Vec<u32>) {
+fn extract_masternode_lists_and_snapshots(result: types::QRInfoResult) -> (u32, Vec<u32>, Vec<u32>) {
     // unsafe {
     //     let list_at_h_4c = (*(*result.result_at_h_4c).masternode_list).decode();
     //     let list_at_h_3c = (*(*result.result_at_h_3c).masternode_list).decode();
@@ -425,32 +426,34 @@ fn extract_masternode_lists_and_snapshots(result: &processing::QRInfoResult) -> 
     //         });
     //     (masternode_list_heights, snapshot_heights)
     // }
-
     unsafe {
-        let list_at_h_3c = &result.result_at_h_3c.masternode_list;
-        let list_at_h_2c = &result.result_at_h_2c.masternode_list;
-        let list_at_h_c = &result.result_at_h_c.masternode_list;
-        let list_at_h = &result.result_at_h.masternode_list;
-        let list_at_tip = &result.result_at_tip.masternode_list;
+        let list_at_h_4c = (*(*result.result_at_h_4c).masternode_list).decode();
+        let list_at_h_3c = (*(*result.result_at_h_3c).masternode_list).decode();
+        let list_at_h_2c = (*(*result.result_at_h_2c).masternode_list).decode();
+        let list_at_h_c = (*(*result.result_at_h_c).masternode_list).decode();
+        let list_at_h = (*(*result.result_at_h).masternode_list).decode();
+        let list_at_tip = (*(*result.result_at_tip).masternode_list).decode();
+        let h_4c = list_at_h_4c.known_height;
         let h_3c = list_at_h_3c.known_height;
         let h_2c = list_at_h_2c.known_height;
         let h_c = list_at_h_c.known_height;
         let h = list_at_h.known_height;
-        let mut masternode_lists = vec![h_3c, h_2c, h_c, h, list_at_tip.known_height];
-        let mut snapshots = vec![h_3c, h_2c, h_c];
-        if let Some(MNListDiffResult { masternode_list: MasternodeList { known_height: h, .. }, .. }) = result.result_at_h_4c {
-            snapshots.push(h);
-            masternode_lists.push(h);
-        }
-        result.mn_list_diff_list.into_iter().for_each(|MNListDiffResult { masternode_list: MasternodeList { known_height: h, .. }, .. }| {
-            snapshots.push(h);
-            masternode_lists.push(h);
-        });
+        let h_tip = list_at_tip.known_height;
+        let mut masternode_lists = vec![h_4c, h_3c, h_2c, h_c, h, h_tip];
+        let mut snapshots = vec![h_4c, h_3c, h_2c, h_c];
+        (0..result.mn_list_diff_list_count)
+            .into_iter()
+            .for_each(|i| {
+                let list = (*(*(*result.mn_list_diff_list.add(i))).masternode_list).decode();
+                let h = list.known_height;
+                snapshots.push(h);
+                masternode_lists.push(h);
+            });
         (h, masternode_lists, snapshots)
     }
 }
 
-pub fn generate_qr_state_test_file_json(chain_type: ChainType, result: &processing::QRInfoResult) {
+pub fn generate_qr_state_test_file_json(chain_type: ChainType, result: types::QRInfoResult) {
     let (quorum_base_block_height, lists, snapshots) = extract_masternode_lists_and_snapshots(result);
     let class_name = format!("QuorumRotationStateTest_{quorum_base_block_height}");
     let chain_name = get_chain_name_for_chain_type(chain_type);

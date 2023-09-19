@@ -640,15 +640,9 @@ impl MasternodeProcessor {
     pub fn qr_info_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, is_rotated_quorums_presented: bool, cache: &mut MasternodeProcessorCache) -> Result<processing::QRInfoResult, ProcessingError> {
         let process_list_diff = |list_diff, should_process_quorums|
             self.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache);
-        let result = message.read_with::<models::QRInfo>(&mut 0, (&*self.provider, is_from_snapshot, protocol_version, is_rotated_quorums_presented))
+        message.read_with::<models::QRInfo>(&mut 0, (&*self.provider, is_from_snapshot, protocol_version, is_rotated_quorums_presented))
             .map_err(ProcessingError::from)
-            .map(|qr_info| qr_info.into_result(process_list_diff));
-
-        #[cfg(feature = "generate-dashj-tests")]
-        if let Ok(ref result) = result {
-            crate::util::java::generate_qr_state_test_file_json(self.provider.chain_type(), result);
-        }
-        result
+            .map(|qr_info| qr_info.into_result(process_list_diff))
     }
 
 }
