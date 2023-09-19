@@ -5,9 +5,8 @@ use hashes::hex::ToHex;
 use secp256k1::rand::{Rng, thread_rng};
 use crate::chain::common::{ChainType, DevnetType, LLMQType};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
-use crate::{models, processing};
 use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry, MasternodeList};
-use crate::processing::MNListDiffResult;
+use crate::processing::{MNListDiffResult, QRInfoResult};
 use crate::util::file::save_java_class;
 use crate::util::save_json_file;
 
@@ -344,7 +343,7 @@ pub fn save_snapshot_to_json(snapshot: &LLMQSnapshot, block_height: u32) {
         .expect("Can't save snapshot");
 }
 
-pub fn save_masternode_list_to_json(masternode_list: &models::MasternodeList, block_height: u32) {
+pub fn save_masternode_list_to_json(masternode_list: &MasternodeList, block_height: u32) {
     let masternodes = serde_json::to_value(masternode_list.masternodes.values().collect::<Vec<_>>()).unwrap();
     let file_name = format!("masternodes_{}.json", block_height);
     save_json_file(file_name.as_str(), &masternodes)
@@ -387,7 +386,7 @@ fn put_masternode_list_from_json_into_cache(height: u32) -> String {
     format!("\t\tstate.mnListsCache.put({block_var}.getHeader().getHash(), masternodeListFromJson(params, \"{file_name}\"));\n")
 }
 
-fn extract_masternode_lists_and_snapshots(result: &processing::QRInfoResult) -> (u32, Vec<u32>, Vec<u32>) {
+fn extract_masternode_lists_and_snapshots(result: &QRInfoResult) -> (u32, Vec<u32>, Vec<u32>) {
     // unsafe {
     //     let list_at_h_4c = (*(*result.result_at_h_4c).masternode_list).decode();
     //     let list_at_h_3c = (*(*result.result_at_h_3c).masternode_list).decode();
@@ -450,7 +449,7 @@ fn extract_masternode_lists_and_snapshots(result: &processing::QRInfoResult) -> 
     }
 }
 
-pub fn generate_qr_state_test_file_json(chain_type: ChainType, result: &processing::QRInfoResult) {
+pub fn generate_qr_state_test_file_json(chain_type: ChainType, result: &QRInfoResult) {
     let (quorum_base_block_height, lists, snapshots) = extract_masternode_lists_and_snapshots(result);
     let class_name = format!("QuorumRotationStateTest_{quorum_base_block_height}");
     let chain_name = get_chain_name_for_chain_type(chain_type);
