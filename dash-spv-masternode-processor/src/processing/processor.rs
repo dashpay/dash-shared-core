@@ -20,7 +20,7 @@ impl MasternodeProcessor {
 
 impl MasternodeProcessor {
 
-    pub fn get_list_diff_result_internal_with_base_lookup(
+    pub fn get_list_diff_result_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
@@ -33,7 +33,7 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result_internal(base_list.ok(), list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
+        self.get_list_diff_result(base_list.ok(), list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
     }
 
     fn cache_masternode_list(
@@ -51,7 +51,7 @@ impl MasternodeProcessor {
         // self.save_masternode_list(block_hash, &masternode_list);
     }
 
-    pub fn get_list_diff_result_internal(
+    pub fn get_list_diff_result(
         &self,
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
@@ -631,7 +631,7 @@ impl MasternodeProcessor {
                 if !is_from_snapshot {
                     ok_or_return_processing_error!(self.provider.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash));
                 }
-                Ok(self.get_list_diff_result_internal_with_base_lookup(list_diff, true, false, false, cache))
+                Ok(self.get_list_diff_result_with_base_lookup(list_diff, true, false, false, cache))
             },
             Err(err) => Err(ProcessingError::from(err))
         }
@@ -639,7 +639,7 @@ impl MasternodeProcessor {
 
     pub fn qr_info_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, is_rotated_quorums_presented: bool, cache: &mut MasternodeProcessorCache) -> Result<processing::QRInfoResult, ProcessingError> {
         let process_list_diff = |list_diff, should_process_quorums|
-            self.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache);
+            self.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache);
         message.read_with::<models::QRInfo>(&mut 0, (&*self.provider, is_from_snapshot, protocol_version, is_rotated_quorums_presented))
             .map_err(ProcessingError::from)
             .map(|qr_info| qr_info.into_result(process_list_diff))

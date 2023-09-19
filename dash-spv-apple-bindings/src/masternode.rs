@@ -164,7 +164,7 @@ pub fn get_list_diff_result(
     is_rotated_quorums_presented: bool,
     cache: &mut MasternodeProcessorCache,
 ) -> types::MNListDiffResult {
-    let result = processor.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache);
+    let result = processor.get_list_diff_result(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache);
     // println!("get_list_diff_result: {:#?}", result);
     result.into()
 }
