@@ -28,10 +28,6 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     let processor = &mut *processor;
     let cache = &mut *cache;
     println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
-    // processor.provider = context;
-    // processor.use_insight_as_backup = use_insight_as_backup;
-    // processor.chain_type = chain_type;
-
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length);
     let result = process_mnlist_diff(&processor, message, is_from_snapshot, protocol_version, cache)
         .map_or(std::ptr::null_mut(), rs_ffi_interfaces::boxed);
@@ -61,14 +57,9 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let message: &[u8] = slice::from_raw_parts(message, message_length);
     let processor = &mut *processor;
     let cache = &mut *cache;
-    // processor.opaque_context = context;
-    // processor.use_insight_as_backup = use_insight_as_backup;
-    // processor.chain_type = chain_type;
     println!("process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     process_qr_info(&processor, message, is_from_snapshot, protocol_version, is_rotated_quorums_presented, cache)
         .map_or(std::ptr::null_mut(), |result | {
-            #[cfg(feature = "generate-dashj-tests")]
-            crate::util::java::generate_qr_state_test_file_json(chain_type, result);
             println!("process_qrinfo_from_message <- {:?} ms", instant.elapsed().as_millis());
             rs_ffi_interfaces::boxed(result)
         })
@@ -232,18 +223,10 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
     } else {
         (None, None)
     };
-    #[cfg(feature = "generate-dashj-tests")]
-    crate::util::java::save_snapshot_to_json(&snapshot_at_h_c, processor.provider.lookup_block_height_by_hash(block_hash));
     processor.provider.save_snapshot(diff_h_c.block_hash, snapshot_at_h_c.clone());
-    #[cfg(feature = "generate-dashj-tests")]
-    crate::util::java::save_snapshot_to_json(&snapshot_at_h_2c, processor.provider.lookup_block_height_by_hash(block_hash));
     processor.provider.save_snapshot(diff_h_2c.block_hash, snapshot_at_h_2c.clone());
-    #[cfg(feature = "generate-dashj-tests")]
-    crate::util::java::save_snapshot_to_json(&snapshot_at_h_3c, processor.provider.lookup_block_height_by_hash(block_hash));
     processor.provider.save_snapshot(diff_h_3c.block_hash, snapshot_at_h_3c.clone());
     if extra_share {
-        #[cfg(feature = "generate-dashj-tests")]
-        crate::util::java::save_snapshot_to_json(snapshot_at_h_4c.as_ref().unwrap(), processor.provider.lookup_block_height_by_hash(block_hash));
         processor.provider.save_snapshot(diff_h_4c.as_ref().unwrap().block_hash, snapshot_at_h_4c.clone().unwrap());
     }
 
