@@ -50,13 +50,13 @@ pub struct CoinbaseTransaction {
 impl Drop for CoinbaseTransaction {
     fn drop(&mut self) {
         unsafe {
-            rs_ffi_interfaces::unbox_any(self.base);
-            rs_ffi_interfaces::unbox_any(self.merkle_root_mn_list);
+            ferment_interfaces::unbox_any(self.base);
+            ferment_interfaces::unbox_any(self.merkle_root_mn_list);
             if !self.merkle_root_llmq_list.is_null() {
-                rs_ffi_interfaces::unbox_any(self.merkle_root_llmq_list);
+                ferment_interfaces::unbox_any(self.merkle_root_llmq_list);
             }
             if !self.best_cl_signature.is_null() {
-                rs_ffi_interfaces::unbox_any(self.best_cl_signature);
+                ferment_interfaces::unbox_any(self.best_cl_signature);
             }
         }
     }

@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
-use rs_ffi_interfaces::FFIConversion;
-use crate::chain::common;
+use ferment_interfaces::FFIConversion;
+use crate::chain::common::{llmq_type::LLMQType, };
 use crate::crypto::UInt256;
-use crate::models;
+use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 
 #[derive(Clone, Default)]
 pub struct MasternodeProcessorCache {
-    pub llmq_members: BTreeMap<common::LLMQType, BTreeMap<UInt256, Vec<models::MasternodeEntry>>>,
-    pub llmq_indexed_members: BTreeMap<common::LLMQType, BTreeMap<models::LLMQIndexedHash, Vec<models::MasternodeEntry>>>,
-    pub mn_lists: BTreeMap<UInt256, models::MasternodeList>,
-    pub llmq_snapshots: BTreeMap<UInt256, models::LLMQSnapshot>,
+    pub llmq_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<MasternodeEntry>>>,
+    pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<LLMQIndexedHash, Vec<MasternodeEntry>>>,
+    pub mn_lists: BTreeMap<UInt256, MasternodeList>,
+    pub llmq_snapshots: BTreeMap<UInt256, LLMQSnapshot>,
     pub needed_masternode_lists: Vec<UInt256>,
 }
 
@@ -33,13 +33,13 @@ impl MasternodeProcessorCache {
         self.llmq_snapshots.clear();
         self.needed_masternode_lists.clear();
     }
-    pub fn add_masternode_list(&mut self, block_hash: UInt256, list: models::MasternodeList) {
+    pub fn add_masternode_list(&mut self, block_hash: UInt256, list: MasternodeList) {
         self.mn_lists.insert(block_hash, list);
     }
     pub fn remove_masternode_list(&mut self, block_hash: &UInt256) {
         self.mn_lists.remove(block_hash);
     }
-    pub fn add_snapshot(&mut self, block_hash: UInt256, snapshot: models::LLMQSnapshot) {
+    pub fn add_snapshot(&mut self, block_hash: UInt256, snapshot: LLMQSnapshot) {
         self.llmq_snapshots.insert(block_hash, snapshot);
     }
     pub fn remove_snapshot(&mut self, block_hash: &UInt256) {
@@ -47,23 +47,23 @@ impl MasternodeProcessorCache {
     }
     pub fn get_quorum_members_of_type(
         &mut self,
-        r#type: common::LLMQType,
-    ) -> Option<&mut BTreeMap<UInt256, Vec<models::MasternodeEntry>>> {
+        r#type: LLMQType,
+    ) -> Option<&mut BTreeMap<UInt256, Vec<MasternodeEntry>>> {
         self.llmq_members.get_mut(&r#type)
     }
 
     pub fn get_indexed_quorum_members_of_type(
         &mut self,
-        r#type: common::LLMQType,
-    ) -> Option<&mut BTreeMap<models::LLMQIndexedHash, Vec<models::MasternodeEntry>>> {
+        r#type: LLMQType,
+    ) -> Option<&mut BTreeMap<LLMQIndexedHash, Vec<MasternodeEntry>>> {
         self.llmq_indexed_members.get_mut(&r#type)
     }
 
     pub fn get_quorum_members(
         &mut self,
-        r#type: common::LLMQType,
+        r#type: LLMQType,
         block_hash: UInt256,
-    ) -> Option<Vec<models::MasternodeEntry>> {
+    ) -> Option<Vec<MasternodeEntry>> {
         let map_by_type_opt = self.get_quorum_members_of_type(r#type);
         if map_by_type_opt.is_some() {
             if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&block_hash) {
@@ -101,17 +101,17 @@ impl FFIConversion<MasternodeProcessorCache> for MasternodeProcessorCacheFFI {
     }
 
     unsafe fn ffi_to_const(obj: MasternodeProcessorCache) -> *const Self {
-        rs_ffi_interfaces::boxed(obj)
+        ferment_interfaces::boxed(obj)
     }
 
     unsafe fn ffi_from(ffi: *mut Self) -> MasternodeProcessorCache {
         // After unboxing MasternodeProcessorCache we've taken back ownership of the memory in Rust
         // So we should not attempt to free or use the raw pointer in C again after this, as it would lead to undefined behavior
         // So we have to to re-box it and send it back to C again
-        *rs_ffi_interfaces::unbox_any(ffi)
+        *ferment_interfaces::unbox_any(ffi)
     }
 
     unsafe fn ffi_to(obj: MasternodeProcessorCache) -> *mut Self {
-        rs_ffi_interfaces::boxed(obj)
+        ferment_interfaces::boxed(obj)
     }
 }

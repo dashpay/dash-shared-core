@@ -1,7 +1,7 @@
 use crate::crypto::UInt256;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct Block {
     pub height: u32,
     pub hash: UInt256,

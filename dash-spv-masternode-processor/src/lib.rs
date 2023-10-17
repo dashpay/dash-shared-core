@@ -1,8 +1,5 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-#[macro_use]
-pub mod processing;
-
 pub extern crate bitcoin_hashes as hashes;
 pub extern crate secp256k1;
 #[macro_use] extern crate log;
@@ -34,9 +31,11 @@ pub mod hash_types;
 pub mod keys;
 pub mod models;
 pub mod network;
+pub mod processing;
 pub mod tx;
 pub mod util;
 pub mod logger;
+mod fermented;
 
 // Don't remove, it's for testing purposes (look at ${project_dir}/c/main.c)
 // #[no_mangle]

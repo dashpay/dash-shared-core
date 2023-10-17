@@ -7,10 +7,8 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
 use crate::crypto::UInt256;
-use crate::models::{LLMQEntry, MasternodeEntry};
-use crate::models::masternode_entry::MasternodeReadContext;
-use crate::models::quorums_cl_sigs_object::QuorumsCLSigsObject;
-use crate::tx::CoinbaseTransaction;
+use crate::models::{llmq_entry::LLMQEntry, masternode_entry::{MasternodeEntry, MasternodeReadContext}, quorums_cl_sigs_object::QuorumsCLSigsObject};
+use crate::tx::coinbase_transaction::CoinbaseTransaction;
 
 #[derive(Clone)]
 pub struct MNListDiff {

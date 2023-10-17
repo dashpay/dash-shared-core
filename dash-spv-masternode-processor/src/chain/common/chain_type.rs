@@ -24,7 +24,7 @@ pub trait IHaveChainSettings {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub enum ChainType {
     #[default]
     MainNet,
@@ -53,7 +53,7 @@ impl From<ChainType> for i16 {
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub enum DevnetType {
     JackDaniels = 0,
     Devnet333 = 1,

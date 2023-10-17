@@ -1,8 +1,10 @@
 use crate::crypto::UInt256;
 use std::collections::BTreeMap;
+use crate::chain::common::llmq_type::LLMQType;
+use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, quorums_cl_sigs_object::QuorumsCLSigsObject};
 
 #[derive(Clone)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct MNListDiffResult {
     pub base_block_hash: UInt256,
     pub block_hash: UInt256,
@@ -11,15 +13,12 @@ pub struct MNListDiffResult {
     pub has_valid_mn_list_root: bool,   //1 byte
     pub has_valid_llmq_list_root: bool, //1 byte
     pub has_valid_quorums: bool,        //1 byte
-    pub masternode_list: crate::models::masternode_list::MasternodeList,
-    pub added_masternodes: BTreeMap<UInt256, crate::models::masternode_entry::MasternodeEntry>,
-    pub modified_masternodes: BTreeMap<UInt256, crate::models::masternode_entry::MasternodeEntry>,
-    pub added_quorums: BTreeMap<
-        crate::chain::common::llmq_type::LLMQType,
-        BTreeMap<UInt256, crate::models::llmq_entry::LLMQEntry>,
-    >,
+    pub masternode_list: MasternodeList,
+    pub added_masternodes: BTreeMap<UInt256, MasternodeEntry>,
+    pub modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
+    pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
     pub needed_masternode_lists: Vec<UInt256>,
-    pub quorums_cl_sigs: Vec<crate::models::quorums_cl_sigs_object::QuorumsCLSigsObject>,
+    pub quorums_cl_sigs: Vec<QuorumsCLSigsObject>,
 }
 
 impl std::fmt::Debug for MNListDiffResult {

@@ -1,19 +1,21 @@
 use std::cmp::min;
 use std::collections::BTreeMap;
+use crate::chain::common::llmq_type::LLMQType;
 use crate::consensus::Encodable;
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
-use crate::tx::CoinbaseTransaction;
+use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry};
+use crate::tx::coinbase_transaction::CoinbaseTransaction;
 use crate::util::data_ops::merkle_root_from_hashes;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct MasternodeList {
     pub block_hash: UInt256,
     pub known_height: u32,
     pub masternode_merkle_root: Option<UInt256>,
     pub llmq_merkle_root: Option<UInt256>,
-    pub masternodes: BTreeMap<UInt256, crate::models::masternode_entry::MasternodeEntry>,
-    pub quorums: BTreeMap<crate::chain::common::llmq_type::LLMQType, BTreeMap<UInt256, crate::models::llmq_entry::LLMQEntry>>,
+    pub masternodes: BTreeMap<UInt256, MasternodeEntry>,
+    pub quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
 }
 
 impl Default for MasternodeList {
@@ -44,8 +46,8 @@ impl<'a> std::fmt::Debug for MasternodeList {
 
 impl MasternodeList {
     pub fn new(
-        masternodes: BTreeMap<UInt256, crate::models::MasternodeEntry>,
-        quorums: BTreeMap<crate::chain::common::LLMQType, BTreeMap<UInt256, crate::models::LLMQEntry>>,
+        masternodes: BTreeMap<UInt256, MasternodeEntry>,
+        quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
         block_hash: UInt256,
         block_height: u32,
         quorums_active: bool,
@@ -98,7 +100,7 @@ impl MasternodeList {
         llmq_commitment_hashes
     }
 
-    pub fn masternode_for(&self, registration_hash: UInt256) -> Option<&crate::models::MasternodeEntry> {
+    pub fn masternode_for(&self, registration_hash: UInt256) -> Option<&MasternodeEntry> {
         self.masternodes.get(&registration_hash)
     }
 
@@ -130,7 +132,7 @@ impl MasternodeList {
     }
 
     pub fn masternode_score(
-        entry: &crate::models::MasternodeEntry,
+        entry: &MasternodeEntry,
         modifier: UInt256,
         block_height: u32,
     ) -> Option<UInt256> {
@@ -151,8 +153,8 @@ impl MasternodeList {
     pub fn quorum_entry_for_platform_with_quorum_hash(
         &self,
         quorum_hash: UInt256,
-        llmq_type: crate::chain::common::LLMQType,
-    ) -> Option<&crate::models::LLMQEntry> {
+        llmq_type: LLMQType,
+    ) -> Option<&LLMQEntry> {
         self.quorums
             .get(&llmq_type)?
             .values()
@@ -162,9 +164,9 @@ impl MasternodeList {
     pub fn quorum_entry_for_lock_request_id(
         &self,
         request_id: UInt256,
-        llmq_type: crate::chain::common::LLMQType,
-    ) -> Option<&crate::models::LLMQEntry> {
-        let mut first_quorum: Option<&crate::models::LLMQEntry> = None;
+        llmq_type: LLMQType,
+    ) -> Option<&LLMQEntry> {
+        let mut first_quorum: Option<&LLMQEntry> = None;
         let mut lowest_value = UInt256::MAX;
         self.quorums.get(&llmq_type)?.values().for_each(|entry| {
             let ordering_hash = entry
@@ -202,11 +204,11 @@ impl MasternodeList {
 
 impl MasternodeList {
     pub fn score_masternodes_map(
-        masternodes: BTreeMap<UInt256, crate::models::MasternodeEntry>,
+        masternodes: BTreeMap<UInt256, MasternodeEntry>,
         quorum_modifier: UInt256,
         block_height: u32,
         hpmn_only: bool,
-    ) -> BTreeMap<UInt256, crate::models::MasternodeEntry> {
+    ) -> BTreeMap<UInt256, MasternodeEntry> {
         masternodes
             .into_iter()
             .filter_map(|(_, entry)|
@@ -220,13 +222,13 @@ impl MasternodeList {
             .collect()
     }
 
-    pub fn get_masternodes_for_quorum(llmq_type: crate::chain::common::LLMQType, masternodes: BTreeMap<UInt256, crate::models::MasternodeEntry>, quorum_modifier: UInt256, block_height: u32, hpmn_only: bool) -> Vec<crate::models::MasternodeEntry> {
+    pub fn get_masternodes_for_quorum(llmq_type: LLMQType, masternodes: BTreeMap<UInt256, MasternodeEntry>, quorum_modifier: UInt256, block_height: u32, hpmn_only: bool) -> Vec<MasternodeEntry> {
         let quorum_count = llmq_type.size();
         let masternodes_in_list_count = masternodes.len();
         let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
         let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
         scores.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
-        let mut valid_masternodes: Vec<crate::models::MasternodeEntry> = Vec::new();
+        let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
         let count = min(masternodes_in_list_count, scores.len());
         for score in scores.iter().take(count) {
             if let Some(masternode) = score_dictionary.get_mut(score) {

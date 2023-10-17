@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
-use rs_ffi_interfaces::{boxed, boxed_vec};
+use ferment_interfaces::{boxed, boxed_vec};
 use dash_spv_masternode_processor::{chain, common, models, tx};
 use dash_spv_masternode_processor::crypto::UInt256;
 use crate::ffi::from::FromFFI;

@@ -1,5 +1,5 @@
 use std::{fs, io::Read, ptr::null_mut};
-use rs_ffi_interfaces::boxed;
+use ferment_interfaces::boxed;
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings};
 use dash_spv_masternode_processor::crypto::byte_util::{BytesDecodable, Reversable};
 use dash_spv_masternode_processor::crypto::UInt256;

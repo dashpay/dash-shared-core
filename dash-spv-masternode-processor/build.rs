@@ -1,4 +1,5 @@
 extern crate cbindgen;
+extern crate ferment;
 
 use std::process::Command;
 
@@ -31,9 +32,26 @@ fn main() {
     // cbindgen::generate_with_config(&crate_dir, config)
     //     .unwrap()
     //     .write_to_file("target/dash_spv_masternode_processor.h");
-    Command::new("cbindgen")
-        .args(&["--config", "cbindgen.toml", "-o", "target/example.h", "target/expanded_reduced.rs"])
-        .status()
-        .expect("Failed to run cbindgen");
+    match ferment::Builder::new()
+        .with_crates(vec![])
+        .generate() {
+        Ok(()) => match Command::new("cbindgen")
+            .args(&["--config", "cbindgen.toml", "-o", "target/example.h"])
+            .status() {
+            Ok(status) => println!("Bindings generated into target/example.h with status: {status}"),
+            Err(err) => panic!("Can't generate bindings: {err}")
+        }
+        Err(err) => panic!("Can't create FFI expansion: {err}")
+    }
+
+
+    // let status = Command::new("cargo")
+    //     .args(&["fmt", output_path.to_str().unwrap()])
+    //     .status()
+    //     .expect("Failed to run cargo fmt");
+    //
+    // if !status.success() {
+    //     println!("cargo:warning=cargo fmt failed");
+    // }
 
 }

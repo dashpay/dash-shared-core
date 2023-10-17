@@ -5,6 +5,7 @@ mod address;
 mod chain;
 mod common;
 mod crypto;
+mod fermented;
 mod keys;
 mod masternode;
 mod tx;
@@ -17,7 +18,8 @@ mod types;
 
 pub extern crate dash_spv_masternode_processor;
 pub extern crate merk;
-pub extern crate rs_ffi_macro_derive;
+
+use dash_spv_masternode_processor::crypto::{UInt128, UInt160, UInt256, UInt384, UInt512, UInt768};
 
 #[macro_export]
 macro_rules! impl_ffi_bytearray {
@@ -40,7 +42,6 @@ macro_rules! impl_ffi_bytearray {
     }
 }
 
-use dash_spv_masternode_processor::crypto::{UInt128, UInt160, UInt256, UInt384, UInt512, UInt768};
 impl_ffi_bytearray!(UInt128);
 impl_ffi_bytearray!(UInt160);
 impl_ffi_bytearray!(UInt256);

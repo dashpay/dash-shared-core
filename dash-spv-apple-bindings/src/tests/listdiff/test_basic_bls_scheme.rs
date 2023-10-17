@@ -7,7 +7,7 @@ use dash_spv_masternode_processor::crypto::byte_util::Zeroable;
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::keys::BLSKey;
 use dash_spv_masternode_processor::block_store::{init_testnet_store, MerkleBlock};
-use rs_ffi_interfaces::boxed;
+use ferment_interfaces::boxed;
 use crate::common::{processor_create_cache, register_processor};
 use crate::ffi::to::ToFFI;
 use crate::masternode::process_mnlistdiff_from_message;

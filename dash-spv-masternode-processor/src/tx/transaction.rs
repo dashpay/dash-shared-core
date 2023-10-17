@@ -11,7 +11,7 @@ pub static SIGHASH_ALL: u32 = 1;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub enum TransactionType {
     Classic = 0,
     ProviderRegistration = 1,
@@ -73,7 +73,7 @@ impl TransactionType {
 }
 
 #[derive(Clone)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct TransactionInput {
     pub input_hash: UInt256,
     pub index: u32,
@@ -155,7 +155,7 @@ impl<'a> TryRead<'a, Endian> for TransactionInput {
 }
 
 #[derive(Clone)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct TransactionOutput {
     pub amount: u64,
     pub script: Option<Vec<u8>>,
@@ -224,7 +224,7 @@ pub trait ITransaction {
 }
 
 #[derive(Debug, Clone)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct Transaction {
     pub inputs: Vec<TransactionInput>,
     pub outputs: Vec<TransactionOutput>,

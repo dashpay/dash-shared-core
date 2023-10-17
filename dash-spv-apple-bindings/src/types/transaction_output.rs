@@ -1,7 +1,7 @@
 // use byte::ctx::Endian;
 // use byte::{BytesExt, TryRead, LE};
 // use std::ptr::null_mut;
-// use rs_ffi_interfaces::{boxed_vec, unbox_any};
+// use ferment_interfaces::{boxed_vec, unbox_any};
 
 #[repr(C)]
 #[derive(Clone, Debug)]
@@ -34,10 +34,10 @@ impl Drop for TransactionOutput {
     fn drop(&mut self) {
         unsafe {
             if !self.script.is_null() && self.script_length > 0 {
-                rs_ffi_interfaces::unbox_any(std::ptr::slice_from_raw_parts_mut(self.script, self.script_length));
+                ferment_interfaces::unbox_any(std::ptr::slice_from_raw_parts_mut(self.script, self.script_length));
             }
             if !self.address.is_null() && self.address_length > 0 {
-                rs_ffi_interfaces::unbox_any(std::ptr::slice_from_raw_parts_mut(self.address, self.address_length) as *mut [u8]);
+                ferment_interfaces::unbox_any(std::ptr::slice_from_raw_parts_mut(self.address, self.address_length) as *mut [u8]);
             }
         }
     }

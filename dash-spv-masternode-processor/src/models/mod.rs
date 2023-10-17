@@ -11,9 +11,10 @@ pub mod operator_public_key;
 pub mod quorums_cl_sigs_object;
 pub mod snapshot;
 pub mod qr_info;
+pub mod llmq_indexed_hash;
 
 pub use self::llmq_entry::LLMQEntry;
-pub use self::llmq_typed_hash::LLMQIndexedHash;
+pub use self::llmq_indexed_hash::LLMQIndexedHash;
 pub use self::llmq_typed_hash::LLMQTypedHash;
 pub use self::masternode_entry::MasternodeEntry;
 pub use self::masternode_list::MasternodeList;

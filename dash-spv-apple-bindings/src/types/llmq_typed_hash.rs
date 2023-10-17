@@ -8,7 +8,7 @@ pub struct LLMQTypedHash {
 impl Drop for LLMQTypedHash {
     fn drop(&mut self) {
         unsafe {
-            rs_ffi_interfaces::unbox_any(self.llmq_hash);
+            ferment_interfaces::unbox_any(self.llmq_hash);
         }
     }
 }

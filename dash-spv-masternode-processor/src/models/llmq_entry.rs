@@ -7,6 +7,8 @@ use hashes::hex::ToHex;
 use serde::ser::SerializeStruct;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
+use crate::chain::common::llmq_type::LLMQType;
+use crate::common::{bitset::Bitset, llmq_version::LLMQVersion};
 use crate::consensus::{encode::VarInt, Encodable, Decodable, encode};
 use crate::crypto::{byte_util::AsBytes, UInt256, UInt384, UInt768};
 use crate::keys::BLSKey;
@@ -14,18 +16,18 @@ use crate::models;
 
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct LLMQEntry {
-    pub version: crate::common::llmq_version::LLMQVersion,
+    pub version: LLMQVersion,
     pub llmq_hash: UInt256,
     pub index: Option<u16>,
     pub public_key: UInt384,
     pub threshold_signature: UInt768,
     pub verification_vector_hash: UInt256,
     pub all_commitment_aggregated_signature: UInt768,
-    pub llmq_type: crate::chain::common::llmq_type::LLMQType,
-    pub signers: crate::common::bitset::Bitset,
-    pub valid_members: crate::common::bitset::Bitset,
+    pub llmq_type: LLMQType,
+    pub signers: Bitset,
+    pub valid_members: Bitset,
     pub entry_hash: UInt256,
     pub verified: bool,
     pub saved: bool,
@@ -101,12 +103,12 @@ impl Encodable for LLMQEntry {
 impl Decodable for LLMQEntry {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let version = crate::common::LLMQVersion::consensus_decode(&mut d)?;
-        let llmq_type = crate::chain::common::LLMQType::consensus_decode(&mut d)?;
+        let version = LLMQVersion::consensus_decode(&mut d)?;
+        let llmq_type = LLMQType::consensus_decode(&mut d)?;
         let llmq_hash = UInt256::consensus_decode(&mut d)?;
         let index = version.use_rotated_quorums().then_some(u16::consensus_decode(&mut d)?);
-        let signers = crate::common::Bitset::consensus_decode(&mut d)?;
-        let valid_members = crate::common::Bitset::consensus_decode(&mut d)?;
+        let signers = Bitset::consensus_decode(&mut d)?;
+        let valid_members = Bitset::consensus_decode(&mut d)?;
         let public_key = UInt384::consensus_decode(&mut d)?;
         let verification_vector_hash = UInt256::consensus_decode(&mut d)?;
         let threshold_signature = UInt768::consensus_decode(&mut d)?;
@@ -132,16 +134,16 @@ impl Decodable for LLMQEntry {
 impl<'a> TryRead<'a, Endian> for LLMQEntry {
     fn try_read(bytes: &'a [u8], _ctx: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
-        let version = bytes.read_with::<crate::common::LLMQVersion>(offset, LE)?;
-        let llmq_type = bytes.read_with::<crate::chain::common::LLMQType>(offset, LE)?;
+        let version = bytes.read_with::<LLMQVersion>(offset, LE)?;
+        let llmq_type = bytes.read_with::<LLMQType>(offset, LE)?;
         let llmq_hash = bytes.read_with::<UInt256>(offset, LE)?;
         let index = if version.use_rotated_quorums() {
             Some(bytes.read_with::<u16>(offset, LE)?)
         } else {
             None
         };
-        let signers = bytes.read_with::<crate::common::Bitset>(offset, LE)?;
-        let valid_members = bytes.read_with::<crate::common::Bitset>(offset, LE)?;
+        let signers = bytes.read_with::<Bitset>(offset, LE)?;
+        let valid_members = bytes.read_with::<Bitset>(offset, LE)?;
         let public_key = bytes.read_with::<UInt384>(offset, LE)?;
         let verification_vector_hash = bytes.read_with::<UInt256>(offset, LE)?;
         let threshold_signature = bytes.read_with::<UInt768>(offset, LE)?;
@@ -165,12 +167,12 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry {
 impl LLMQEntry {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        version: crate::common::LLMQVersion,
-        llmq_type: crate::chain::common::LLMQType,
+        version: LLMQVersion,
+        llmq_type: LLMQType,
         llmq_hash: UInt256,
         index: Option<u16>,
-        signers: crate::common::Bitset,
-        valid_members: crate::common::Bitset,
+        signers: Bitset,
+        valid_members: Bitset,
         public_key: UInt384,
         verification_vector_hash: UInt256,
         threshold_signature: UInt768,

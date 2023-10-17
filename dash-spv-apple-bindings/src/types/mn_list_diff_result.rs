@@ -56,32 +56,32 @@ impl Default for MNListDiffResult {
 impl From<processing::MNListDiffResult> for MNListDiffResult {
     fn from(value: processing::MNListDiffResult) -> Self {
         MNListDiffResult {
-            base_block_hash: rs_ffi_interfaces::boxed(value.base_block_hash.0),
-            block_hash: rs_ffi_interfaces::boxed(value.block_hash.0),
+            base_block_hash: ferment_interfaces::boxed(value.base_block_hash.0),
+            block_hash: ferment_interfaces::boxed(value.block_hash.0),
             has_found_coinbase: value.has_found_coinbase,
             has_valid_coinbase: value.has_valid_coinbase,
             has_valid_mn_list_root: value.has_valid_mn_list_root,
             has_valid_llmq_list_root: value.has_valid_llmq_list_root,
             has_valid_quorums: value.has_valid_quorums,
-            masternode_list: rs_ffi_interfaces::boxed(value.masternode_list.encode()),
+            masternode_list: ferment_interfaces::boxed(value.masternode_list.encode()),
             added_masternodes: encode_masternodes_map(&value.added_masternodes),
             added_masternodes_count: value.added_masternodes.len(),
             modified_masternodes: encode_masternodes_map(&value.modified_masternodes),
             modified_masternodes_count: value.modified_masternodes.len(),
             added_llmq_type_maps: encode_quorums_map(&value.added_quorums),
             added_llmq_type_maps_count: value.added_quorums.len(),
-            needed_masternode_lists: rs_ffi_interfaces::boxed_vec(
+            needed_masternode_lists: ferment_interfaces::boxed_vec(
                 value.needed_masternode_lists
                     .iter()
-                    .map(|h| rs_ffi_interfaces::boxed(h.0))
+                    .map(|h| ferment_interfaces::boxed(h.0))
                     .collect(),
             ),
             needed_masternode_lists_count: value.needed_masternode_lists.len(),
             quorums_cl_sigs_count: value.quorums_cl_sigs.len(),
-            quorums_cl_sigs: rs_ffi_interfaces::boxed_vec(
+            quorums_cl_sigs: ferment_interfaces::boxed_vec(
                 value.quorums_cl_sigs
                     .iter()
-                    .map(|h| rs_ffi_interfaces::boxed(h.encode()))
+                    .map(|h| ferment_interfaces::boxed(h.encode()))
                     .collect(),
             ),
         }
@@ -101,44 +101,44 @@ impl Drop for MNListDiffResult {
     fn drop(&mut self) {
         unsafe {
             if !self.base_block_hash.is_null() {
-                rs_ffi_interfaces::unbox_any(self.base_block_hash);
+                ferment_interfaces::unbox_any(self.base_block_hash);
             }
             if !self.block_hash.is_null() {
-                rs_ffi_interfaces::unbox_any(self.block_hash);
+                ferment_interfaces::unbox_any(self.block_hash);
             }
             if !self.masternode_list.is_null() {
-                rs_ffi_interfaces::unbox_any(self.masternode_list);
+                ferment_interfaces::unbox_any(self.masternode_list);
             }
             if !self.needed_masternode_lists.is_null() {
-                rs_ffi_interfaces::unbox_any_vec_ptr(
+                ferment_interfaces::unbox_any_vec_ptr(
                     self.needed_masternode_lists,
                     self.needed_masternode_lists_count,
                 );
             }
             if !self.added_masternodes.is_null() {
-                rs_ffi_interfaces::unbox_any_vec_ptr(
+                ferment_interfaces::unbox_any_vec_ptr(
                     self.added_masternodes,
                     self.added_masternodes_count,
                 );
             }
             if !self.modified_masternodes.is_null() {
-                rs_ffi_interfaces::unbox_any_vec_ptr(
+                ferment_interfaces::unbox_any_vec_ptr(
                     self.modified_masternodes,
                     self.modified_masternodes_count,
                 );
             }
             if !self.added_llmq_type_maps.is_null() {
-                rs_ffi_interfaces::unbox_any_vec_ptr(
+                ferment_interfaces::unbox_any_vec_ptr(
                     self.added_llmq_type_maps,
                     self.added_llmq_type_maps_count,
                 );
             }
             if !self.quorums_cl_sigs.is_null() {
-                rs_ffi_interfaces::unbox_any_vec_ptr(
+                ferment_interfaces::unbox_any_vec_ptr(
                     self.quorums_cl_sigs,
                     self.quorums_cl_sigs_count,
                 );
-                rs_ffi_interfaces::unbox_any_vec_ptr(
+                ferment_interfaces::unbox_any_vec_ptr(
                     self.quorums_cl_sigs,
                     self.quorums_cl_sigs_count,
                 );

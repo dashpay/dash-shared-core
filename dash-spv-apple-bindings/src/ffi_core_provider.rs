@@ -43,7 +43,7 @@ impl CoreProvider for FFICoreProvider {
     fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError> {
         Self::lookup_merkle_root_by_hash_callback(
             block_hash,
-            |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(rs_ffi_interfaces::boxed(h.0), self.opaque_context) },
+            |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(ferment_interfaces::boxed(h.0), self.opaque_context) },
             |hash: *mut u8| unsafe { (self.destroy_hash)(hash) },
         )
     }
@@ -52,7 +52,7 @@ impl CoreProvider for FFICoreProvider {
         // First look at the local cache
         Self::lookup_masternode_list_callback(
             block_hash,
-            |h| unsafe { (self.get_masternode_list_by_block_hash)(rs_ffi_interfaces::boxed(h.0), self.opaque_context) },
+            |h| unsafe { (self.get_masternode_list_by_block_hash)(ferment_interfaces::boxed(h.0), self.opaque_context) },
             |list: *mut types::MasternodeList| unsafe { (self.destroy_masternode_list)(list) },
         )
     }
@@ -61,7 +61,7 @@ impl CoreProvider for FFICoreProvider {
         Self::lookup_snapshot_by_block_hash_callback(
             block_hash,
             |h: UInt256| unsafe {
-                (self.get_llmq_snapshot_by_block_hash)(rs_ffi_interfaces::boxed(h.0), self.opaque_context)
+                (self.get_llmq_snapshot_by_block_hash)(ferment_interfaces::boxed(h.0), self.opaque_context)
             },
             |snapshot: *mut types::LLMQSnapshot| unsafe { (self.destroy_snapshot)(snapshot) },
         )
@@ -76,11 +76,11 @@ impl CoreProvider for FFICoreProvider {
     }
 
     fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32 {
-        unsafe { (self.get_block_height_by_hash)(rs_ffi_interfaces::boxed(block_hash.0), self.opaque_context) }
+        unsafe { (self.get_block_height_by_hash)(ferment_interfaces::boxed(block_hash.0), self.opaque_context) }
     }
 
     fn add_insight(&self, block_hash: UInt256) {
-        unsafe { (self.add_insight)(rs_ffi_interfaces::boxed(block_hash.0), self.opaque_context) }
+        unsafe { (self.add_insight)(ferment_interfaces::boxed(block_hash.0), self.opaque_context) }
     }
 
     fn should_process_diff_with_range(
@@ -90,8 +90,8 @@ impl CoreProvider for FFICoreProvider {
     ) -> Result<(), ProcessingError> {
         unsafe {
             match (self.should_process_diff_with_range)(
-                rs_ffi_interfaces::boxed(base_block_hash.0),
-                rs_ffi_interfaces::boxed(block_hash.0),
+                ferment_interfaces::boxed(base_block_hash.0),
+                ferment_interfaces::boxed(block_hash.0),
                 self.opaque_context,
             ) {
                 ProcessingError::None => Ok(()),
@@ -103,8 +103,8 @@ impl CoreProvider for FFICoreProvider {
     fn save_snapshot(&self, block_hash: UInt256, snapshot: models::LLMQSnapshot) -> bool {
         unsafe {
             (self.save_llmq_snapshot)(
-                rs_ffi_interfaces::boxed(block_hash.0),
-                rs_ffi_interfaces::boxed(snapshot.encode()),
+                ferment_interfaces::boxed(block_hash.0),
+                ferment_interfaces::boxed(snapshot.encode()),
                 self.opaque_context,
             )
         }
@@ -112,8 +112,8 @@ impl CoreProvider for FFICoreProvider {
     fn save_masternode_list(&self, block_hash: UInt256, masternode_list: &models::MasternodeList) -> bool {
         unsafe {
             (self.save_masternode_list)(
-                rs_ffi_interfaces::boxed(block_hash.0),
-                rs_ffi_interfaces::boxed(masternode_list.encode()),
+                ferment_interfaces::boxed(block_hash.0),
+                ferment_interfaces::boxed(masternode_list.encode()),
                 self.opaque_context,
             )
         }

@@ -47,9 +47,9 @@ pub struct LLMQSnapshot {
 impl Drop for LLMQSnapshot {
     fn drop(&mut self) {
         unsafe {
-            let member_list = rs_ffi_interfaces::unbox_vec_ptr(self.member_list, self.member_list_length);
+            let member_list = ferment_interfaces::unbox_vec_ptr(self.member_list, self.member_list_length);
             drop(member_list);
-            let skip_list = rs_ffi_interfaces::unbox_vec_ptr(self.skip_list, self.skip_list_length);
+            let skip_list = ferment_interfaces::unbox_vec_ptr(self.skip_list, self.skip_list_length);
             drop(skip_list);
         }
     }

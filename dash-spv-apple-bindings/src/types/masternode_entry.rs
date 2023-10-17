@@ -32,19 +32,19 @@ impl Drop for MasternodeEntry {
     fn drop(&mut self) {
         unsafe {
             let entry = self;
-            rs_ffi_interfaces::unbox_any(entry.confirmed_hash);
+            ferment_interfaces::unbox_any(entry.confirmed_hash);
             if !entry.confirmed_hash_hashed_with_provider_registration_transaction_hash.is_null() {
-                rs_ffi_interfaces::unbox_any(entry.confirmed_hash_hashed_with_provider_registration_transaction_hash);
+                ferment_interfaces::unbox_any(entry.confirmed_hash_hashed_with_provider_registration_transaction_hash);
             }
-            rs_ffi_interfaces::unbox_any(entry.key_id_voting);
-            rs_ffi_interfaces::unbox_any(entry.entry_hash);
-            rs_ffi_interfaces::unbox_any(entry.operator_public_key);
-            rs_ffi_interfaces::unbox_vec_ptr(entry.previous_entry_hashes, entry.previous_entry_hashes_count);
-            rs_ffi_interfaces::unbox_vec_ptr(entry.previous_operator_public_keys, entry.previous_operator_public_keys_count);
-            rs_ffi_interfaces::unbox_vec_ptr(entry.previous_validity, entry.previous_validity_count);
-            rs_ffi_interfaces::unbox_any(entry.provider_registration_transaction_hash);
-            rs_ffi_interfaces::unbox_any(entry.ip_address);
-            rs_ffi_interfaces::unbox_any(entry.platform_node_id);
+            ferment_interfaces::unbox_any(entry.key_id_voting);
+            ferment_interfaces::unbox_any(entry.entry_hash);
+            ferment_interfaces::unbox_any(entry.operator_public_key);
+            ferment_interfaces::unbox_vec_ptr(entry.previous_entry_hashes, entry.previous_entry_hashes_count);
+            ferment_interfaces::unbox_vec_ptr(entry.previous_operator_public_keys, entry.previous_operator_public_keys_count);
+            ferment_interfaces::unbox_vec_ptr(entry.previous_validity, entry.previous_validity_count);
+            ferment_interfaces::unbox_any(entry.provider_registration_transaction_hash);
+            ferment_interfaces::unbox_any(entry.ip_address);
+            ferment_interfaces::unbox_any(entry.platform_node_id);
 
         }
     }

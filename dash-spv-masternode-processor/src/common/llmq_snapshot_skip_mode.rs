@@ -6,7 +6,7 @@ use serde::{Serialize, Serializer};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub enum LLMQSnapshotSkipMode {
     // No skipping. The skip list is empty.
     NoSkipping = 0,

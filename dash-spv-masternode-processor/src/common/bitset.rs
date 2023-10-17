@@ -7,6 +7,7 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::data_ops::Data;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[ferment_macro::export]
 pub struct Bitset {
     pub count: usize,
     pub bitset: Vec<u8>

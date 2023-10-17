@@ -82,7 +82,7 @@ pub unsafe extern "C" fn register_processor(
     );
     let processor = MasternodeProcessor::new(provider);
     println!("register_processor: {:?}", processor);
-    rs_ffi_interfaces::boxed(processor)
+    ferment_interfaces::boxed(processor)
 }
 
 /// Unregister all the callbacks for use across FFI
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn register_processor(
 #[no_mangle]
 pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor) {
     println!("unregister_processor: {:?}", processor);
-    let unboxed = rs_ffi_interfaces::unbox_any(processor);
+    let unboxed = ferment_interfaces::unbox_any(processor);
 }
 
 /// Initialize opaque cache to store needed information between FFI calls
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcesso
 pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCache {
     let cache = MasternodeProcessorCache::default();
     println!("processor_create_cache: {:?}", cache);
-    rs_ffi_interfaces::boxed(cache)
+    ferment_interfaces::boxed(cache)
 }
 
 /// Destroy opaque cache
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCac
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
     println!("processor_destroy_cache: {:?}", cache);
-    let cache = rs_ffi_interfaces::unbox_any(cache);
+    let cache = ferment_interfaces::unbox_any(cache);
 }
 
 /// Remove models list from cache
@@ -154,42 +154,42 @@ pub unsafe extern "C" fn processor_clear_cache(cache: *mut MasternodeProcessorCa
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
-    rs_ffi_interfaces::unbox_any(block_hash);
+    ferment_interfaces::unbox_any(block_hash);
 }
 
 /// Destroys anonymous internal holder for UInt256
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_byte_array(data: *const u8, len: usize) {
-    rs_ffi_interfaces::unbox_vec_ptr(data as *mut u8, len);
+    ferment_interfaces::unbox_vec_ptr(data as *mut u8, len);
 }
 
 /// # Safety
 /// Destroys types::MNListDiffResult
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
-    rs_ffi_interfaces::unbox_any(list);
+    ferment_interfaces::unbox_any(list);
 }
 
 /// Destroys types::MNListDiffResult
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
-    rs_ffi_interfaces::unbox_any(result);
+    ferment_interfaces::unbox_any(result);
 }
 
 /// Destroys types::LLMQRotationInfoResult
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
-    rs_ffi_interfaces::unbox_any(result);
+    ferment_interfaces::unbox_any(result);
 }
 
 /// Destroys types::LLMQSnapshot
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
-    rs_ffi_interfaces::unbox_any(result);
+    ferment_interfaces::unbox_any(result);
 }
 
 // Here we have temporary replacement for DSKey from the DashSync
@@ -207,6 +207,6 @@ pub unsafe extern "C" fn processor_destroy_string(ptr: *mut c_char) {
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_uint160(ptr: *mut [u8; 20]) {
-    rs_ffi_interfaces::unbox_any(ptr);
+    ferment_interfaces::unbox_any(ptr);
 }
 

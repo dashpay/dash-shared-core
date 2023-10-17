@@ -1,4 +1,4 @@
-use rs_ffi_interfaces::boxed;
+use ferment_interfaces::boxed;
 use dash_spv_masternode_processor::chain::common::chain_type::{ChainType, DevnetType};
 use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;

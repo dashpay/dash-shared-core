@@ -10,8 +10,8 @@ impl Drop for QuorumsCLSigsObject {
     fn drop(&mut self) {
         unsafe {
             let ffi_ref = self;
-            rs_ffi_interfaces::unbox_any(ffi_ref.signature);
-            let index_set = rs_ffi_interfaces::unbox_vec_ptr(ffi_ref.index_set, ffi_ref.index_set_count);
+            ferment_interfaces::unbox_any(ffi_ref.signature);
+            let index_set = ferment_interfaces::unbox_vec_ptr(ffi_ref.index_set, ffi_ref.index_set_count);
             drop(index_set);
         }
     }

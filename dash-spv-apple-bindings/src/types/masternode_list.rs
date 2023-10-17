@@ -16,15 +16,15 @@ pub struct MasternodeList {
 impl Drop for MasternodeList {
     fn drop(&mut self) {
         unsafe {
-            rs_ffi_interfaces::unbox_any(self.block_hash);
+            ferment_interfaces::unbox_any(self.block_hash);
             if !self.masternode_merkle_root.is_null() {
-                rs_ffi_interfaces::unbox_any(self.masternode_merkle_root);
+                ferment_interfaces::unbox_any(self.masternode_merkle_root);
             }
             if !self.llmq_merkle_root.is_null() {
-                rs_ffi_interfaces::unbox_any(self.llmq_merkle_root);
+                ferment_interfaces::unbox_any(self.llmq_merkle_root);
             }
-            rs_ffi_interfaces::unbox_any_vec_ptr(self.masternodes, self.masternodes_count);
-            rs_ffi_interfaces::unbox_any_vec_ptr(self.llmq_type_maps, self.llmq_type_maps_count);
+            ferment_interfaces::unbox_any_vec_ptr(self.masternodes, self.masternodes_count);
+            ferment_interfaces::unbox_any_vec_ptr(self.llmq_type_maps, self.llmq_type_maps_count);
 
         }
     }

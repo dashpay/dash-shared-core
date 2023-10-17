@@ -39,22 +39,22 @@ pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct UInt128(pub [u8; 16]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct UInt160(pub [u8; 20]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct UInt256(pub [u8; 32]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct UInt384(pub [u8; 48]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct UInt512(pub [u8; 64]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+#[ferment_macro::export]
 pub struct UInt768(pub [u8; 96]);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

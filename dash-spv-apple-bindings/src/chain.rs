@@ -91,7 +91,7 @@ pub extern "C" fn chain_devnet_version(devnet_type: DevnetType) -> u16 {
 #[no_mangle]
 pub unsafe extern "C" fn chain_devnet_identifier(devnet_type: DevnetType) -> *mut c_char {
 
-    rs_ffi_interfaces::FFIConversion::ffi_to(devnet_type.identifier())
+    ferment_interfaces::FFIConversion::ffi_to(devnet_type.identifier())
 }
 
 /// # Safety
@@ -116,7 +116,7 @@ pub extern "C" fn chain_type_is_devnet_any(chain_type: ChainType) -> bool {
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn devnet_identifier_for_chain_type(chain_type: ChainType) -> *mut c_char {
-    rs_ffi_interfaces::FFIConversion::ffi_to_opt(chain_type.devnet_identifier())
+    ferment_interfaces::FFIConversion::ffi_to_opt(chain_type.devnet_identifier())
 }
 
 /// # Safety

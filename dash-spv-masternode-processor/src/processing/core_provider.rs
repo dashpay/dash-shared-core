@@ -73,7 +73,7 @@ pub trait CoreProvider: std::fmt::Debug {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[rs_ffi_macro_derive::impl_ffi_conv]
+// #[ferment_macro::export]
 pub enum CoreProviderError {
     NullResult,
     ByteError(byte::Error),
@@ -91,5 +91,95 @@ impl std::error::Error for CoreProviderError {}
 impl From<byte::Error> for CoreProviderError {
     fn from(value: byte::Error) -> Self {
         CoreProviderError::ByteError(value)
+    }
+}
+
+
+#[derive(Clone)]
+pub enum byte_Error_FFI {
+    Incomplete,
+    BadOffset(usize),
+    BadInput { err: *mut std::os::raw::c_char },
+}
+
+#[derive(Clone)]
+pub enum CoreProviderError_FFI {
+    NullResult,
+    ByteError(*mut byte_Error_FFI),
+    BadBlockHash(*mut [u8; 32]),
+    NoMasternodeList,
+}
+
+impl ferment_interfaces::FFIConversion<byte::Error> for byte_Error_FFI {
+    unsafe fn ffi_from_const(ffi: *const byte_Error_FFI) -> byte::Error {
+        let ffi_ref = &*ffi;
+        match ffi_ref {
+            byte_Error_FFI::Incomplete =>
+                byte::Error::Incomplete,
+            byte_Error_FFI::BadOffset(o_0) => byte::Error::BadOffset(*o_0),
+            byte_Error_FFI::BadInput { err} =>
+                byte::Error::BadInput { err: ferment_interfaces::FFIConversion::ffi_from_const(*err) },
+        }
+    }
+    unsafe fn ffi_to_const(obj: byte::Error) -> *const byte_Error_FFI {
+        ferment_interfaces::boxed(match obj {
+            byte::Error::Incomplete => byte_Error_FFI::Incomplete,
+            byte::Error::BadOffset(o_0) => byte_Error_FFI::BadOffset(o_0),
+            byte::Error::BadInput { err } => byte_Error_FFI::BadInput { err: ferment_interfaces::FFIConversion::ffi_to(err) },
+        })
+    }
+    unsafe fn destroy(ffi: *mut byte_Error_FFI) {
+        ferment_interfaces::unbox_any(ffi);
+    }
+}
+impl Drop for byte_Error_FFI {
+    fn drop(&mut self) {
+        unsafe {
+            match self {
+                byte_Error_FFI::BadInput { err } =>
+                    <std::os::raw::c_char as ferment_interfaces::FFIConversion<&str>>::destroy(*err),
+                _ => {},
+            }
+        }
+    }
+}
+
+impl ferment_interfaces::FFIConversion<CoreProviderError> for CoreProviderError_FFI {
+    unsafe fn ffi_from_const(ffi: *const CoreProviderError_FFI) -> CoreProviderError {
+        let ffi_ref = &*ffi;
+        match ffi_ref {
+            CoreProviderError_FFI::NullResult =>
+                CoreProviderError::NullResult,
+            CoreProviderError_FFI::ByteError(o_0) =>
+                CoreProviderError::ByteError(ferment_interfaces::FFIConversion::ffi_from_const(*o_0)),
+            CoreProviderError_FFI::BadBlockHash(o_0) =>
+                CoreProviderError::BadBlockHash(ferment_interfaces::FFIConversion::ffi_from_const(*o_0)),
+            CoreProviderError_FFI::NoMasternodeList =>
+                CoreProviderError::NoMasternodeList,
+        }
+    }
+    unsafe fn ffi_to_const(obj: CoreProviderError) -> *const CoreProviderError_FFI {
+        ferment_interfaces::boxed(match obj {
+            CoreProviderError::NullResult => CoreProviderError_FFI::NullResult,
+            CoreProviderError::ByteError(o_0) => CoreProviderError_FFI::ByteError(ferment_interfaces::FFIConversion::ffi_to(o_0)),
+            CoreProviderError::BadBlockHash(o_0) => CoreProviderError_FFI::BadBlockHash(ferment_interfaces::FFIConversion::ffi_to(o_0)),
+            CoreProviderError::NoMasternodeList => CoreProviderError_FFI::NoMasternodeList,
+        })
+    }
+    unsafe fn destroy(ffi: *mut CoreProviderError_FFI) {
+        ferment_interfaces::unbox_any(ffi);
+    }
+}
+impl Drop for CoreProviderError_FFI {
+    fn drop(&mut self) {
+        unsafe {
+            match self {
+                CoreProviderError_FFI::ByteError(o_0) =>
+                    <byte_Error_FFI as ferment_interfaces::FFIConversion<byte::Error>>::destroy(o_0.to_owned()),
+                CoreProviderError_FFI::BadBlockHash(o_0) =>
+                    <[u8; 32] as ferment_interfaces::FFIConversion<UInt256>>::destroy(o_0.to_owned()),
+                _ => {},
+            }
+        }
     }
 }
