@@ -21,6 +21,7 @@ pub mod tests {
     use crate::models;
     use crate::processing::{MasternodeProcessorCache, MasternodeProcessor, MNListDiffResult, ProcessingError, QRInfoResult};
     use crate::{unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return, types};
+    use crate::crypto::UInt768;
     use crate::tests::block_store::{init_mainnet_store, init_testnet_store};
 
     // This regex can be used to omit timestamp etc. while replacing after paste from xcode console log
@@ -328,20 +329,23 @@ pub mod tests {
                 get_block_hash_by_height_from_context,
                 get_llmq_snapshot_by_block_hash_from_context,
                 save_llmq_snapshot_in_cache,
+                get_cl_signature_by_block_hash_from_context,
+                save_cl_signature_in_cache,
                 get_masternode_list_by_block_hash_from_cache,
                 masternode_list_save_in_cache,
                 masternode_list_destroy_default,
                 add_insight_lookup_default,
                 hash_destroy_default,
                 snapshot_destroy_default,
+                destroy_cl_signature_in_cache,
                 should_process_diff_with_range_default,
             )
         }
     }
 
-    pub fn process_mnlistdiff(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, protocol_version: u32, use_insight: bool, is_from_snapshot: bool) -> types::MNListDiffResult {
+    pub fn process_mnlistdiff(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, protocol_version: u32, use_insight: bool, is_from_snapshot: bool) -> *mut types::MNListDiffResult {
         unsafe {
-            *process_mnlistdiff_from_message(
+            process_mnlistdiff_from_message(
                 bytes.as_ptr(),
                 bytes.len(),
                 context.chain,
@@ -355,9 +359,9 @@ pub mod tests {
         }
     }
 
-    pub fn process_qrinfo(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, version: u32, use_insight: bool, is_from_snapshot: bool) -> types::QRInfoResult {
+    pub fn process_qrinfo(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, version: u32, use_insight: bool, is_from_snapshot: bool) -> *mut types::QRInfoResult {
         unsafe {
-            *process_qrinfo_from_message(
+            process_qrinfo_from_message(
                 bytes.as_ptr(),
                 bytes.len(),
                 context.chain,
@@ -379,8 +383,9 @@ pub mod tests {
         get_file_as_byte_vec(&filepath)
     }
 
-    pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
-        let masternode_list = unsafe { (*result.masternode_list).decode() };
+    pub fn assert_diff_result(context: &mut FFIContext, result: *mut types::MNListDiffResult) {
+        let result = unsafe { &*result };
+        let masternode_list = unsafe { (&*result.masternode_list).decode() };
         //print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.reversed());
         let bh = context.block_for_hash(masternode_list.block_hash).unwrap().height;
         assert!(result.has_found_coinbase, "has no coinbase {}", bh);
@@ -392,19 +397,20 @@ pub mod tests {
         println!("Diff is ok at {}", bh);
     }
 
-    pub fn assert_qrinfo_result(context: &mut FFIContext, result: types::QRInfoResult) {
+    pub fn assert_qrinfo_result(context: &mut FFIContext, result: *mut types::QRInfoResult) {
+        let result = unsafe { &*result };
         if result.mn_list_diff_list_count > 0 {
-            let diff_result = unsafe { **result.mn_list_diff_list };
+            let diff_result = unsafe { *result.mn_list_diff_list };
             assert_diff_result(context, diff_result);
         }
         if result.extra_share {
-            assert_diff_result(context, unsafe { *result.result_at_h_4c });
+            assert_diff_result(context, result.result_at_h_4c);
         }
-        assert_diff_result(context, unsafe { *result.result_at_h_3c });
-        assert_diff_result(context, unsafe { *result.result_at_h_2c });
-        assert_diff_result(context, unsafe { *result.result_at_h_c });
-        assert_diff_result(context, unsafe { *result.result_at_h });
-        assert_diff_result(context, unsafe { *result.result_at_tip });
+        assert_diff_result(context, result.result_at_h_3c);
+        assert_diff_result(context, result.result_at_h_2c);
+        assert_diff_result(context, result.result_at_h_c);
+        assert_diff_result(context, result.result_at_h);
+        assert_diff_result(context, result.result_at_tip);
     }
 
     pub unsafe extern "C" fn get_block_height_by_hash_from_context(
@@ -472,6 +478,19 @@ pub mod tests {
         }
     }
 
+    pub unsafe extern "C" fn get_cl_signature_by_block_hash_from_context(
+        block_hash: *mut [u8; 32],
+        context: *const std::ffi::c_void,
+    ) -> *mut [u8; 96] {
+        let h = UInt256(*(block_hash));
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        if let Some(sig) = data.cache.cl_signatures.get(&h) {
+            boxed(sig.0)
+        } else {
+            null_mut()
+        }
+    }
+
     pub unsafe extern "C" fn get_masternode_list_by_block_hash_default(
         _block_hash: *mut [u8; 32],
         _context: *const std::ffi::c_void,
@@ -511,7 +530,7 @@ pub mod tests {
     ) -> bool {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let masternode_list = *masternode_list;
+        let masternode_list = &*masternode_list;
         let masternode_list_decoded = masternode_list.decode();
         //println!("masternode_list_save_in_cache: {}", h);
         data.cache.mn_lists.insert(h, masternode_list_decoded);
@@ -532,6 +551,7 @@ pub mod tests {
         ProcessingError::None
     }
     pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *mut types::LLMQSnapshot) {}
+    pub unsafe extern "C" fn destroy_cl_signature_in_cache(_cl_signature: *mut [u8; 96]) {}
     pub unsafe extern "C" fn add_insight_lookup_default(
         _hash: *mut [u8; 32],
         _context: *const std::ffi::c_void,
@@ -552,6 +572,16 @@ pub mod tests {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         data.cache.add_snapshot(h, (*snapshot).decode());
+        true
+    }
+    pub unsafe extern "C" fn save_cl_signature_in_cache(
+        block_hash: *mut [u8; 32],
+        cl_signature: *mut [u8; 96],
+        context: *const std::ffi::c_void,
+    ) -> bool {
+        let h = UInt256(*(block_hash));
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        data.cache.add_cl_signature(h, UInt768(*cl_signature));
         true
     }
 
@@ -659,12 +689,15 @@ pub mod tests {
                 get_block_hash_by_height_default,
                 get_llmq_snapshot_by_block_hash_default,
                 save_llmq_snapshot_default,
+                get_cl_signature_by_block_hash_from_context,
+                save_cl_signature_in_cache,
                 get_masternode_list_by_block_hash_default,
                 masternode_list_save_default,
                 masternode_list_destroy_default,
                 add_insight_lookup_default,
                 hash_destroy_default,
                 snapshot_destroy_default,
+                destroy_cl_signature_in_cache,
                 should_process_diff_with_range_default,
             )
         };

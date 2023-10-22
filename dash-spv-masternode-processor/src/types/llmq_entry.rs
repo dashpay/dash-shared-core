@@ -6,9 +6,10 @@ use crate::common::LLMQVersion;
 use crate::consensus;
 use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
 use crate::ffi::boxer::{boxed, boxed_vec};
+use crate::ffi::unboxer::unbox_any;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct LLMQEntry {
     // 144 bytes
     pub all_commitment_aggregated_signature: *mut [u8; 96],
@@ -30,6 +31,25 @@ pub struct LLMQEntry {
     pub verified: bool,
     pub version: LLMQVersion,
 }
+
+impl Drop for LLMQEntry {
+    fn drop(&mut self) {
+        unsafe {
+            unbox_any(self.all_commitment_aggregated_signature);
+            if !self.commitment_hash.is_null() {
+                unbox_any(self.commitment_hash);
+            }
+            unbox_any(self.entry_hash);
+            unbox_any(self.llmq_hash);
+            unbox_any(self.public_key);
+            unbox_any(self.threshold_signature);
+            unbox_any(self.verification_vector_hash);
+            unbox_any(std::ptr::slice_from_raw_parts_mut::<u8>(self.signers_bitset, self.signers_bitset_length));
+            unbox_any(std::ptr::slice_from_raw_parts_mut::<u8>(self.valid_members_bitset, self.valid_members_bitset_length));
+        }
+    }
+}
+
 impl<'a> TryRead<'a, Endian> for LLMQEntry {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
         let length = bytes.len();

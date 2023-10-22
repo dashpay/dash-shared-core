@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use hashes::hex::FromHex;
 use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::chain::common::LLMQType;
@@ -463,6 +463,17 @@ impl ChainType {
             ChainType::TestNet => 850100,
             ChainType::DevNet(_) => 0
         }
+    }
+
+    pub fn core20_activation_height(&self) -> u32 {
+        match self {
+            ChainType::MainNet => 2000000,
+            ChainType::TestNet => 2000000,
+            ChainType::DevNet(_) => 2000000
+        }
+    }
+    pub fn core20_is_active_at(&self, height: u32) -> bool {
+        height >= self.core20_activation_height()
     }
 
 }

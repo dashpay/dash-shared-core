@@ -5,7 +5,6 @@ pub mod llmq_indexed_hash;
 pub mod llmq_map;
 pub mod llmq_snapshot;
 pub mod llmq_typed_hash;
-pub mod llmq_validation_data;
 /// This types reflected for FFI
 pub mod masternode_entry;
 pub mod masternode_entry_hash;
@@ -30,7 +29,6 @@ pub use self::llmq_indexed_hash::LLMQIndexedHash;
 pub use self::llmq_map::LLMQMap;
 pub use self::llmq_snapshot::LLMQSnapshot;
 pub use self::llmq_typed_hash::LLMQTypedHash;
-pub use self::llmq_validation_data::LLMQValidationData;
 pub use self::masternode_entry::MasternodeEntry;
 pub use self::masternode_entry_hash::MasternodeEntryHash;
 pub use self::masternode_list::MasternodeList;

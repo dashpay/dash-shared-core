@@ -1,9 +1,9 @@
 use std::cmp::min;
 use std::collections::BTreeMap;
-use crate::chain::common::LLMQType;
+use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::common::MasternodeType;
 use crate::consensus::Encodable;
-use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
+use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::models::{LLMQEntry, MasternodeEntry};
 use crate::tx::CoinbaseTransaction;
 use crate::util::data_ops::merkle_root_from_hashes;
@@ -221,8 +221,10 @@ impl MasternodeList {
             )
             .collect()
     }
-
-    pub fn get_masternodes_for_quorum(llmq_type: LLMQType, masternodes: BTreeMap<UInt256, MasternodeEntry>, quorum_modifier: UInt256, block_height: u32, hpmn_only: bool) -> Vec<MasternodeEntry> {
+    pub fn get_masternodes_for_quorum(quorum: &LLMQEntry, chain_type: ChainType, masternodes: BTreeMap<UInt256, MasternodeEntry>, block_height: u32, best_cl_signature: Option<UInt768>) -> Vec<MasternodeEntry> {
+        let llmq_type = quorum.llmq_type;
+        let hpmn_only = llmq_type == chain_type.platform_type() && !quorum.version.use_bls_legacy();
+        let quorum_modifier = quorum.llmq_quorum_hash(best_cl_signature);
         let quorum_count = llmq_type.size();
         let masternodes_in_list_count = masternodes.len();
         let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);

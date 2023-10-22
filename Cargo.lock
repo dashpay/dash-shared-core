@@ -529,7 +529,7 @@ dependencies = [
 
 [[package]]
 name = "dash_spv_apple_bindings"
-version = "0.4.10"
+version = "0.4.11"
 dependencies = [
  "cbindgen 0.24.5",
  "dash-spv-masternode-processor",

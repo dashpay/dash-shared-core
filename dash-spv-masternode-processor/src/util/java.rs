@@ -5,9 +5,9 @@ use hashes::hex::ToHex;
 use secp256k1::rand::{Rng, thread_rng};
 use crate::chain::common::chain_type::DevnetType;
 use crate::common::{ChainType, LLMQType};
-use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
+use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::ffi::from::FromFFI;
-use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry};
+use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry, QuorumsCLSigsObject};
 use crate::{models, types};
 use crate::util::file::save_java_class;
 use crate::util::save_json_file;
@@ -342,6 +342,12 @@ fn generate_commitment_verify<W: Write>(commitment_var: &str, block_var: &str, q
 pub fn save_snapshot_to_json(snapshot: &LLMQSnapshot, block_height: u32) {
     let file_name = format!("snapshot_{}.json", block_height);
     save_json_file(file_name.as_str(), snapshot)
+        .expect("Can't save snapshot");
+}
+
+pub fn save_cl_signature_to_json(cl_signature: &UInt768, block_height: u32) {
+    let file_name = format!("cl_signature_{}.json", block_height);
+    save_json_file(file_name.as_str(), cl_signature)
         .expect("Can't save snapshot");
 }
 

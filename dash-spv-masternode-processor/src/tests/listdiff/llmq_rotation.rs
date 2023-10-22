@@ -1,5 +1,5 @@
 use crate::ffi::boxer::boxed;
-use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, FFIContext};
+use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, FFIContext, get_cl_signature_by_block_hash_from_context, save_cl_signature_in_cache, destroy_cl_signature_in_cache};
 use crate::chain::common::chain_type::{ChainType, DevnetType};
 use crate::crypto::byte_util::{Reversable, UInt256};
 use crate::hashes::hex::{FromHex, ToHex};
@@ -28,12 +28,15 @@ fn test_llmq_rotation() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_default,
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -50,8 +53,8 @@ fn test_llmq_rotation() {
         context,
     )};
     println!("{:?}", result);
-    let result_5078 = unsafe { *result };
-    let result_at_h = unsafe { *result_5078.result_at_h };
+    let result_5078 = unsafe { &*result };
+    let result_at_h = unsafe { &*result_5078.result_at_h };
     assert!(
         result_at_h.has_found_coinbase,
         "Did not find coinbase at height 5078"
@@ -89,12 +92,15 @@ fn test_llmq_rotation_2() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_default,
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -470,12 +476,15 @@ fn test_devnet_333() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_default,
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -503,12 +512,15 @@ fn test_processor_devnet_333() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_default,
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -722,12 +734,15 @@ fn test_processor_devnet_333_2() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -1419,12 +1434,15 @@ fn test_jack_daniels() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };

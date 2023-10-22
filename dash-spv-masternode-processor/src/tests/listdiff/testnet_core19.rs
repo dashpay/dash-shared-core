@@ -19,6 +19,7 @@ fn test_core19rc10() {
     let processor = register_default_processor();
     let result = process_mnlistdiff(message_from_file("testnet/MNT530000.dat"), processor, context, 70219, false, true);
     assert_diff_result(context, result);
+    let result = unsafe { &*result };
     unsafe {
         context.cache.mn_lists.insert(UInt256(*result.block_hash), (*result.masternode_list).decode());
     }
@@ -35,6 +36,7 @@ fn test_core19_70224() {
     let processor = register_default_processor();
     let result = process_mnlistdiff(message_from_file("testnet/MNT530000.dat"), processor, context, 70219, false, true);
     assert_diff_result(context, result);
+    let result = unsafe { &*result };
     unsafe {
         context.cache.mn_lists.insert(UInt256(*result.block_hash), (*result.masternode_list).decode());
     }
@@ -49,6 +51,7 @@ fn test_core19_70227() {
     let context = &mut create_default_context(ChainType::TestNet, false, cache);
     let processor = register_default_processor();
     let result = process_mnlistdiff(message_from_file("testnet/MNT530000.dat"), processor, context, 70219, false, true);
+    let result = unsafe { &*result };
     // assert_diff_result(context, result);
     unsafe {
         let list = (*result.masternode_list).decode();
@@ -110,12 +113,13 @@ fn test_mnlistdiff_and_qrinfo_core19() {
     });
     context.is_dip_0024 = true;
     let result = process_qrinfo(message_from_file("QRINFO_0_870235.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    //assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
+    let result = unsafe { &*result };
+    assert_diff_result(context, result.result_at_h_4c);
+    assert_diff_result(context, result.result_at_h_3c);
+    assert_diff_result(context, result.result_at_h_2c);
+    assert_diff_result(context, result.result_at_h_c);
+    //assert_diff_result(context, result.result_at_h);
+    assert_diff_result(context, result.result_at_tip);
 }
 
 // #[test]
@@ -125,12 +129,13 @@ fn test_qrinfo_core19() {
     let context = &mut create_default_context(ChainType::TestNet, true, cache);
     let processor = register_default_processor();
     let result = process_qrinfo(message_from_file("QRINFO_0_870235.dat"), processor, context, 70227, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
+    let result = unsafe { &*result };
+    assert_diff_result(context, result.result_at_h_4c);
+    assert_diff_result(context, result.result_at_h_3c);
+    assert_diff_result(context, result.result_at_h_2c);
+    assert_diff_result(context, result.result_at_h_c);
+    assert_diff_result(context, result.result_at_h);
+    assert_diff_result(context, result.result_at_tip);
 
 }
 
@@ -1153,11 +1158,9 @@ fn test_core19_2() {
     let cache = register_cache();
     let context = &mut create_default_context(ChainType::TestNet, false, cache);
     let processor = register_default_processor();
-    let diffs = vec![
-        "MNL_0_530000_70228.dat",
-        "MNL_530000_852596.dat",
-    ].iter().for_each(|name| {
-        let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, version, false, true);
-        assert_diff_result(context, result);
-    });
+    ["MNL_0_530000_70228.dat", "MNL_530000_852596.dat"].iter()
+        .for_each(|name| {
+            let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, version, false, true);
+            assert_diff_result(context, result);
+        });
 }

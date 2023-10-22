@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
 use crate::bindings::common::{processor_create_cache, register_processor};
 use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::hashes::hex::FromHex;
-use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, process_qrinfo_from_message_internal, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, destroy_cl_signature_in_cache, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, process_qrinfo_from_message_internal, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::models;
 use crate::tests::block_store::init_mainnet_store;
 use crate::tests::json_from_core_snapshot::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
@@ -30,9 +31,30 @@ fn testnet_quorum_quarters() {
     let block_hash_8792 = list_diff_8792.block_hash;
     let block_hash_8840 = list_diff_8840.block_hash;
     let block_hash_8888 = list_diff_8888.block_hash;
-    let masternode_list_8792 = models::MasternodeList::new(list_diff_8792.added_or_modified_masternodes, list_diff_8792.added_quorums, block_hash_8792, block_height_8792, true);
-    let masternode_list_8840 = models::MasternodeList::new(list_diff_8840.added_or_modified_masternodes, list_diff_8840.added_quorums, block_hash_8840, block_height_8840, true);
-    let masternode_list_8888 = models::MasternodeList::new(list_diff_8888.added_or_modified_masternodes, list_diff_8888.added_quorums, block_hash_8888, block_height_8888, true);
+    let added_quorums_8792 = list_diff_8792.added_quorums.iter()
+        .fold(BTreeMap::new(), |mut acc, entry| {
+            acc.entry(entry.llmq_type)
+                .or_insert_with(BTreeMap::new)
+                .insert(entry.llmq_hash, entry.clone());
+            acc
+        });
+    let added_quorums_8840 = list_diff_8840.added_quorums.iter()
+        .fold(BTreeMap::new(), |mut acc, entry| {
+            acc.entry(entry.llmq_type)
+                .or_insert_with(BTreeMap::new)
+                .insert(entry.llmq_hash, entry.clone());
+            acc
+        });
+    let added_quorums_8888 = list_diff_8888.added_quorums.iter()
+        .fold(BTreeMap::new(), |mut acc, entry| {
+            acc.entry(entry.llmq_type)
+                .or_insert_with(BTreeMap::new)
+                .insert(entry.llmq_hash, entry.clone());
+            acc
+    });
+    let masternode_list_8792 = models::MasternodeList::new(list_diff_8792.added_or_modified_masternodes, added_quorums_8792, block_hash_8792, block_height_8792, true);
+    let masternode_list_8840 = models::MasternodeList::new(list_diff_8840.added_or_modified_masternodes, added_quorums_8840, block_hash_8840, block_height_8840, true);
+    let masternode_list_8888 = models::MasternodeList::new(list_diff_8888.added_or_modified_masternodes, added_quorums_8888, block_hash_8888, block_height_8888, true);
 
     let processor = unsafe {
         &mut *register_processor(
@@ -41,12 +63,15 @@ fn testnet_quorum_quarters() {
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_from_context,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -142,6 +167,7 @@ fn testnet_quorum_quarters() {
         &mut context.cache.llmq_indexed_members,
         &context.cache.mn_lists,
         &context.cache.llmq_snapshots,
+        &mut context.cache.cl_signatures,
         &mut context.cache.needed_masternode_lists,
         true
     );

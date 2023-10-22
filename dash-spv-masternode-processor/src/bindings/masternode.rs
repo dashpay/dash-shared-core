@@ -4,7 +4,7 @@ use byte::BytesExt;
 use crate::{models, types};
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::consensus::encode;
-use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}};
+use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}, UInt768};
 use crate::ffi::{boxer::{boxed, boxed_vec}, ByteArray, from::FromFFI, to::ToFFI};
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 
@@ -194,15 +194,14 @@ pub unsafe extern "C" fn processor_cache_masternode_list(block_hash: *const u8, 
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn validate_masternode_list(list: *const types::MasternodeList, quorum: *const types::LLMQEntry, block_height: u32, chain_type: ChainType) -> bool {
+pub unsafe extern "C" fn validate_masternode_list(list: *const types::MasternodeList, quorum: *const types::LLMQEntry, block_height: u32, chain_type: ChainType, best_cl_signature: *const u8) -> bool {
     let list = (*list).decode();
     let mut quorum = (*quorum).decode();
     let is_valid_payload = quorum.validate_payload();
     if !is_valid_payload {
         return false;
     }
-    let hpmn_only = quorum.llmq_type == chain_type.platform_type() && !quorum.version.use_bls_legacy();
-    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(quorum.llmq_type, list.masternodes, quorum.llmq_quorum_hash(), block_height, hpmn_only);
+    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, UInt768::from_const(best_cl_signature));
     return quorum.validate(valid_masternodes, block_height);
 }
 
@@ -219,10 +218,12 @@ pub extern "C" fn quorum_threshold_for_type(llmq_type: LLMQType) -> u32 {
     llmq_type.threshold()
 }
 
+/// quorum_hash: u256
+/// best_cl_signature: Option<u768>
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_build_llmq_hash(llmq_type: LLMQType, quorum_hash: *const u8) -> ByteArray {
-    models::LLMQEntry::build_llmq_quorum_hash(llmq_type, UInt256::from_const(quorum_hash).unwrap()).into()
+pub extern "C" fn quorum_build_llmq_hash(llmq_type: LLMQType, quorum_hash: *const u8, best_cl_signature: *const u8) -> ByteArray {
+    models::LLMQEntry::build_llmq_quorum_hash(llmq_type, UInt256::from_const(quorum_hash).unwrap(), UInt768::from_const(best_cl_signature)).into()
 }
 
 /// # Safety

@@ -231,15 +231,18 @@ impl LLMQEntry {
         )
     }
 
-    pub fn build_llmq_quorum_hash(llmq_type: LLMQType, llmq_hash: UInt256) -> UInt256 {
-        let mut writer: Vec<u8> = Vec::with_capacity(33);
+    pub fn build_llmq_quorum_hash(llmq_type: LLMQType, llmq_hash: UInt256, best_cl_signature: Option<UInt768>) -> UInt256 {
+        let mut writer = vec![];
         VarInt(llmq_type as u64).enc(&mut writer);
         llmq_hash.enc(&mut writer);
+        if let Some(best_cl_signature) = best_cl_signature {
+            best_cl_signature.enc(&mut writer);
+        }
         UInt256::sha256d(writer)
     }
 
-    pub fn llmq_quorum_hash(&self) -> UInt256 {
-        Self::build_llmq_quorum_hash(self.llmq_type, self.llmq_hash)
+    pub fn llmq_quorum_hash(&self, best_cl_signature: Option<UInt768>) -> UInt256 {
+        Self::build_llmq_quorum_hash(self.llmq_type, self.llmq_hash, best_cl_signature)
     }
 
     pub fn commitment_data(&self) -> Vec<u8> {

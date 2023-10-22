@@ -100,7 +100,8 @@ impl FromFFI for types::CoinbaseTransaction {
                 None
             } else {
                 Some(UInt768(*self.best_cl_signature))
-            }
+            },
+            credit_pool_balance: Some(self.credit_pool_balance)
         }
     }
 }
@@ -134,12 +135,12 @@ impl FromFFI for types::MasternodeList {
             quorums: (0..self.llmq_type_maps_count).into_iter().fold(
                 BTreeMap::new(),
                 |mut acc, i| {
-                    let llmq_map = *(*self.llmq_type_maps.add(i));
+                    let llmq_map = &*(*self.llmq_type_maps.add(i));
                     let key = chain::common::LLMQType::from(llmq_map.llmq_type);
                     let value: BTreeMap<UInt256, models::LLMQEntry> = (0..llmq_map.count)
                         .into_iter()
                         .fold(BTreeMap::new(), |mut acc, j| {
-                            let raw_value = *(*llmq_map.values.add(j));
+                            let raw_value = &*(*llmq_map.values.add(j));
                             let value = raw_value.decode();
                             let key = value.llmq_hash;
                             acc.insert(key, value);
@@ -204,7 +205,7 @@ impl FromFFI for types::MasternodeEntry {
             previous_entry_hashes: (0..self.previous_entry_hashes_count).into_iter().fold(
                 BTreeMap::new(),
                 |mut acc, i| {
-                    let obj = *self.previous_entry_hashes.add(i);
+                    let obj = &*self.previous_entry_hashes.add(i);
                     let key = common::Block {
                         height: obj.block_height,
                         hash: UInt256(obj.block_hash),

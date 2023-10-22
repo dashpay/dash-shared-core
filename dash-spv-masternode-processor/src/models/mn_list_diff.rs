@@ -2,7 +2,7 @@ use byte::BytesExt;
 use hashes::hex::ToHex;
 use std::collections::BTreeMap;
 use crate::chain::common::LLMQType;
-use crate::chain::constants::{CORE_PROTO_20, CORE_PROTO_BLS_BASIC};
+use crate::chain::constants::{CORE_PROTO_20, CORE_PROTO_BLS_BASIC, CORE_PROTO_DIFF_VERSION_ORDER};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
@@ -23,7 +23,7 @@ pub struct MNListDiff {
     pub deleted_masternode_hashes: Vec<UInt256>,
     pub added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
     pub deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
-    pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
+    pub added_quorums: Vec<LLMQEntry>,
     pub base_block_height: u32,
     pub block_height: u32,
     // 0: protocol_version < 70225
@@ -33,7 +33,8 @@ pub struct MNListDiff {
 
     // protocol_version > 70228
     // 19.2 goes with 70228
-    // 20.0 goes with 70228+?
+    // 19.3 goes with 70229?
+    // 20.0 goes with 70230+
     pub quorums_cls_sigs: Vec<QuorumsCLSigsObject>,
 }
 
@@ -54,6 +55,7 @@ impl std::fmt::Debug for MNListDiff {
             .field("base_block_height", &self.base_block_height)
             .field("block_height", &self.block_height)
             .field("version", &self.version)
+            .field("quorums_cls_sigs", &self.quorums_cls_sigs)
             .finish()
     }
 }
@@ -65,6 +67,11 @@ impl MNListDiff {
         block_height_lookup: F,
         protocol_version: u32,
     ) -> Option<Self> {
+        let version = if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
+            u16::from_bytes(message, offset)?
+        } else {
+            1
+        };
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
         let base_block_height = block_height_lookup(base_block_hash);
@@ -77,7 +84,7 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        let version = if protocol_version >= CORE_PROTO_BLS_BASIC {
+        let version = if (CORE_PROTO_BLS_BASIC..CORE_PROTO_DIFF_VERSION_ORDER).contains(&protocol_version) {
             // BLS Basic
             u16::from_bytes(message, offset)?
         } else {
@@ -101,7 +108,8 @@ impl MNListDiff {
             });
 
         let mut deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>> = BTreeMap::new();
-        let mut added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
+        let mut added_quorums = Vec::<LLMQEntry>::new();
+        // let mut added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         if quorums_active {
             let deleted_quorums_count = VarInt::from_bytes(message, offset)?.0;
@@ -115,13 +123,23 @@ impl MNListDiff {
             }
             let added_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..added_quorums_count {
-                if let Some(entry) = LLMQEntry::from_bytes(message, offset) {
-                    added_quorums
-                        .entry(entry.llmq_type)
-                        .or_insert_with(BTreeMap::new)
-                        .insert(entry.llmq_hash, entry);
-                }
+                added_quorums.push(LLMQEntry::from_bytes(message, offset)?);
             }
+
+            // new_quorums.iter().for_each(|entry| {
+            //     added_quorums
+            //         .entry(entry.llmq_type)
+            //         .or_insert_with(BTreeMap::new)
+            //         .insert(entry.llmq_hash, *entry)
+            // });
+
+            // for _i in 0..added_quorums_count {
+            //     let entry = LLMQEntry::from_bytes(message, offset)?;
+            //     added_quorums
+            //         .entry(entry.llmq_type)
+            //         .or_insert_with(BTreeMap::new)
+            //         .insert(entry.llmq_hash, entry);
+            // }
         }
         let mut quorums_cls_sigs = Vec::new();
         if protocol_version >= CORE_PROTO_20 { // Core v0.20

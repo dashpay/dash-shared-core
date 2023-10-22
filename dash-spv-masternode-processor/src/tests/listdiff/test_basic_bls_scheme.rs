@@ -11,7 +11,7 @@ use crate::crypto::byte_util::Zeroable;
 use crate::ffi::boxer::boxed;
 use crate::ffi::to::ToFFI;
 use crate::keys::BLSKey;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_height_by_hash_from_context, get_block_hash_by_height_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, register_logger};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_height_by_hash_from_context, get_block_hash_by_height_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, register_logger, get_cl_signature_by_block_hash_from_context, save_cl_signature_in_cache, destroy_cl_signature_in_cache};
 use crate::models::OperatorPublicKey;
 use crate::tests::block_store::init_testnet_store;
 
@@ -79,12 +79,15 @@ fn test_basic_bls_scheme() {
             get_block_hash_by_height_chacha,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_at_9192,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -190,12 +193,15 @@ fn test_core_19_beta_6() {
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_mojito,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -221,7 +227,6 @@ fn test_core_19_beta_6() {
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
     )};
-    let result = unsafe { *result };
     assert_diff_result(context, result);
 }
 
@@ -252,12 +257,15 @@ fn test_core_19_rc_2_testnet() {
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_mojito,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
+            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -280,7 +288,7 @@ fn test_core_19_rc_2_testnet() {
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
     )};
-    let result = unsafe { *result };
+    let result = unsafe { &*result };
     println!("Result: {:#?}", &result);
     // todo: need add new blocks to the testnet store
     //assert_diff_result(context, result);

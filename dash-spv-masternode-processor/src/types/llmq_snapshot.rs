@@ -4,10 +4,11 @@ use crate::common::LLMQSnapshotSkipMode;
 use crate::consensus::encode;
 use crate::crypto::byte_util::BytesDecodable;
 use crate::ffi::boxer::boxed_vec;
+use crate::ffi::unboxer::unbox_vec_ptr;
 use crate::impl_bytes_decodable;
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct LLMQSnapshot {
     pub member_list_length: usize,
     pub member_list: *mut u8,
@@ -19,6 +20,18 @@ pub struct LLMQSnapshot {
 }
 
 impl_bytes_decodable!(LLMQSnapshot);
+
+impl Drop for LLMQSnapshot {
+    fn drop(&mut self) {
+        unsafe {
+            let member_list = unbox_vec_ptr(self.member_list, self.member_list_length);
+            drop(member_list);
+            let skip_list = unbox_vec_ptr(self.skip_list, self.skip_list_length);
+            drop(skip_list);
+
+        }
+    }
+}
 
 impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
