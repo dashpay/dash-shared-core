@@ -467,9 +467,9 @@ impl ChainType {
 
     pub fn core20_activation_height(&self) -> u32 {
         match self {
-            ChainType::MainNet => 2000000,
-            ChainType::TestNet => 2000000,
-            ChainType::DevNet(_) => 2000000
+            ChainType::MainNet => 2899072,
+            ChainType::TestNet => 2899072,
+            ChainType::DevNet(_) => 2899072
         }
     }
     pub fn core20_is_active_at(&self, height: u32) -> bool {
