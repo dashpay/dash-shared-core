@@ -28,13 +28,13 @@
 //! # Example: encoding a network's magic bytes
 //!
 //! ```rust
-//! use bitcoin::network::constants::Network;
-//! use bitcoin::consensus::encode::serialize;
+//! use dash_spv_masternode_processor::consensus::encode::serialize;
+//! use dash_spv_masternode_processor::chain::common::ChainType;
 //!
-//! let network = Network::Bitcoin;
+//! let network = ChainType::MainNet;
 //! let bytes = serialize(&network.magic());
 //!
-//! assert_eq!(&bytes[..], &[0xF9, 0xBE, 0xB4, 0xD9]);
+//! assert_eq!(&bytes[..], &[191, 12, 107, 189]);
 //! ```
 
 use core::{fmt, ops, convert::From};
@@ -78,10 +78,10 @@ impl Network {
     /// # Examples
     ///
     /// ```rust
-    /// use bitcoin::network::constants::Network;
+    /// use dash_spv_masternode_processor::chain::common::ChainType;
     ///
-    /// assert_eq!(Some(Network::Bitcoin), Network::from_magic(0xD9B4BEF9));
-    /// assert_eq!(None, Network::from_magic(0xFFFFFFFF));
+    /// let network = ChainType::from_magic(0xbd6b0cbf);
+    /// assert_eq!(network, Some(ChainType::MainNet));
     /// ```
     pub fn from_magic(magic: u32) -> Option<Network> {
         // Note: any new entries here must be added to `magic` below
@@ -100,10 +100,10 @@ impl Network {
     /// # Examples
     ///
     /// ```rust
-    /// use bitcoin::network::constants::Network;
+    /// use dash_spv_masternode_processor::chain::common::ChainType;
     ///
-    /// let network = Network::Bitcoin;
-    /// assert_eq!(network.magic(), 0xD9B4BEF9);
+    /// let network = ChainType::MainNet;
+    /// assert_eq!(network.magic(), 0xbd6b0cbf);
     /// ```
     pub fn magic(self) -> u32 {
         // Note: any new entries here must be added to `from_magic` above
@@ -383,4 +383,3 @@ mod tests {
         assert_eq!("ServiceFlags(WITNESS|COMPACT_FILTERS|0xb0)", flag.to_string());
     }
 }
-
