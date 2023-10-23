@@ -160,6 +160,13 @@ pub unsafe extern "C" fn processor_destroy_block_hash(block_hash: *mut [u8; 32])
     unbox_any(block_hash);
 }
 
+/// Destroys anonymous internal holder for UInt768
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_cl_signature(cl_signature: *mut [u8; 96]) {
+    unbox_any(cl_signature);
+}
+
 /// Destroys anonymous internal holder for UInt256
 /// # Safety
 #[no_mangle]
