@@ -7,7 +7,7 @@ use crate::ffi::from::FromFFI;
 use crate::ffi::to::ToFFI;
 use crate::chain::common::{ChainType, LLMQType};
 use crate::crypto::UInt256;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default, FFIContext, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, save_cl_signature_in_cache, destroy_cl_signature_in_cache};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default, FFIContext, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, save_cl_signature_in_cache};
 use crate::tests::block_store::init_testnet_store;
 
 #[test]
@@ -39,7 +39,6 @@ fn testnet_llmq_verification() {
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
-            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -168,7 +167,6 @@ fn testnet_llmq_verification_using_processor_and_cache() {
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
-            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };

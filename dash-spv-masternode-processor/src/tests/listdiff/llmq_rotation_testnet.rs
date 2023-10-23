@@ -4,7 +4,7 @@ use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::hashes::hex::FromHex;
-use crate::lib_tests::tests::{add_insight_lookup_default, destroy_cl_signature_in_cache, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, process_qrinfo_from_message_internal, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, process_qrinfo_from_message_internal, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::models;
 use crate::tests::block_store::init_mainnet_store;
 use crate::tests::json_from_core_snapshot::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
@@ -71,7 +71,6 @@ fn testnet_quorum_quarters() {
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
-            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };

@@ -5,7 +5,7 @@ use simplelog::{ColorChoice, CombinedLogger, ConfigBuilder, LevelFilter, Termina
 use crate::crypto::byte_util::ConstDecodable;
 use crate::crypto::UInt256;
 use crate::ffi::boxer::boxed;
-use crate::ffi::callbacks::{AddInsightBlockingLookup, CLSignatureDestroy, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
+use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::unboxer::{unbox_any, unbox_vec_ptr};
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use crate::types;
@@ -64,7 +64,6 @@ pub unsafe extern "C" fn register_processor(
     add_insight: AddInsightBlockingLookup,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
-    destroy_cl_signature: CLSignatureDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
@@ -81,7 +80,6 @@ pub unsafe extern "C" fn register_processor(
         add_insight,
         destroy_hash,
         destroy_snapshot,
-        destroy_cl_signature,
         should_process_diff_with_range,
     );
     println!("register_processor: {:?}", processor);

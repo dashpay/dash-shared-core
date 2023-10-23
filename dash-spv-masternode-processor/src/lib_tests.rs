@@ -336,7 +336,6 @@ pub mod tests {
                 add_insight_lookup_default,
                 hash_destroy_default,
                 snapshot_destroy_default,
-                destroy_cl_signature_in_cache,
                 should_process_diff_with_range_default,
             )
         }
@@ -480,11 +479,11 @@ pub mod tests {
     pub unsafe extern "C" fn get_cl_signature_by_block_hash_from_context(
         block_hash: *mut [u8; 32],
         context: *const std::ffi::c_void,
-    ) -> *mut [u8; 96] {
+    ) -> *mut u8 {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         if let Some(sig) = data.cache.cl_signatures.get(&h) {
-            boxed(sig.0)
+            boxed(sig.0) as *mut _
         } else {
             null_mut()
         }
@@ -696,7 +695,6 @@ pub mod tests {
                 add_insight_lookup_default,
                 hash_destroy_default,
                 snapshot_destroy_default,
-                destroy_cl_signature_in_cache,
                 should_process_diff_with_range_default,
             )
         };

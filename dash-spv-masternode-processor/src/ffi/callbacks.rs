@@ -42,7 +42,7 @@ pub type SaveLLMQSnapshot = unsafe extern "C" fn(
 pub type GetCLSignatureByBlockHash = unsafe extern "C" fn(
     block_hash: *mut [u8; 32],
     context: *const c_void,
-) -> *mut [u8; 96];
+) -> *mut u8;
 pub type SaveCLSignature = unsafe extern "C" fn(
     block_hash: *mut [u8; 32],
     cl_signature: *mut [u8; 96],
@@ -50,7 +50,6 @@ pub type SaveCLSignature = unsafe extern "C" fn(
 ) -> bool;
 pub type HashDestroy = unsafe extern "C" fn(hash: *mut u8);
 pub type LLMQSnapshotDestroy = unsafe extern "C" fn(snapshot: *mut types::LLMQSnapshot);
-pub type CLSignatureDestroy = unsafe extern "C" fn(cl_signature: *mut [u8; 96]);
 
 pub fn lookup_masternode_list<MNL, MND>(
     block_hash: UInt256,
@@ -135,14 +134,14 @@ pub fn lookup_cl_signature_by_block_hash<SL, SD>(
     cl_signature_destroy: SD,
 ) -> Option<UInt768>
     where
-        SL: Fn(UInt256) -> *mut [u8; 96] + Copy,
-        SD: Fn(*mut [u8; 96]),
+        SL: Fn(UInt256) -> *mut u8 + Copy,
+        SD: Fn(*mut u8),
 {
     let lookup_result = cl_signature_lookup(block_hash);
     if !lookup_result.is_null() {
-        let data = unsafe { UInt768(*lookup_result) };
+        let data = UInt768::from_mut(lookup_result);
         cl_signature_destroy(lookup_result);
-        Some(data)
+        data
     } else {
         None
     }

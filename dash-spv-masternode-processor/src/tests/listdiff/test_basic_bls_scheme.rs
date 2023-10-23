@@ -11,7 +11,7 @@ use crate::crypto::byte_util::Zeroable;
 use crate::ffi::boxer::boxed;
 use crate::ffi::to::ToFFI;
 use crate::keys::BLSKey;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_height_by_hash_from_context, get_block_hash_by_height_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, register_logger, get_cl_signature_by_block_hash_from_context, save_cl_signature_in_cache, destroy_cl_signature_in_cache};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_height_by_hash_from_context, get_block_hash_by_height_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, register_logger, get_cl_signature_by_block_hash_from_context, save_cl_signature_in_cache};
 use crate::models::OperatorPublicKey;
 use crate::tests::block_store::init_testnet_store;
 
@@ -87,7 +87,6 @@ fn test_basic_bls_scheme() {
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
-            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -201,7 +200,6 @@ fn test_core_19_beta_6() {
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
-            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };
@@ -265,7 +263,6 @@ fn test_core_19_rc_2_testnet() {
             add_insight_lookup_default,
             hash_destroy_default,
             snapshot_destroy_default,
-            destroy_cl_signature_in_cache,
             should_process_diff_with_range_default,
         )
     };

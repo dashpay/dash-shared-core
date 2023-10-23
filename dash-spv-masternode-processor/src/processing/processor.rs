@@ -5,7 +5,7 @@ use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
-use crate::ffi::callbacks::{AddInsightBlockingLookup, CLSignatureDestroy, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
+use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::to::ToFFI;
 use crate::models::QuorumsCLSigsObject;
 use crate::processing::{MasternodeProcessorCache, MNListDiffResult, ProcessingError};
@@ -30,7 +30,6 @@ pub struct MasternodeProcessor {
     add_insight: AddInsightBlockingLookup,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
-    destroy_cl_signature: CLSignatureDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
 }
 impl std::fmt::Debug for MasternodeProcessor {
@@ -57,7 +56,6 @@ impl MasternodeProcessor {
         add_insight: AddInsightBlockingLookup,
         destroy_hash: HashDestroy,
         destroy_snapshot: LLMQSnapshotDestroy,
-        destroy_cl_signature: CLSignatureDestroy,
         should_process_diff_with_range: ShouldProcessDiffWithRange,
     ) -> Self {
         Self {
@@ -74,7 +72,6 @@ impl MasternodeProcessor {
             add_insight,
             destroy_hash,
             destroy_snapshot,
-            destroy_cl_signature,
             should_process_diff_with_range,
             opaque_context: null(),
             chain_type: ChainType::MainNet,
@@ -886,7 +883,7 @@ impl MasternodeProcessor {
             |h: UInt256| unsafe {
                 (self.get_cl_signature_by_block_hash)(boxed(h.0), self.opaque_context)
             },
-            |obj: *mut [u8; 96]| unsafe { (self.destroy_cl_signature)(obj) },
+            |obj: *mut u8| unsafe { (self.destroy_hash)(obj) },
         )
     }
 
