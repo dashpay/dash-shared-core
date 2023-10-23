@@ -24,8 +24,8 @@ cbindgen = "0.24.3"
 name = "dash_spv_apple_bindings"
 crate-type = ["staticlib", "cdylib"]
 
-#[profile.release]
-#lto = "thin"
-#opt-level = 3
-##debug = true
+[profile.release]
+lto = "thin"
+opt-level = 3
+debug = true
 
