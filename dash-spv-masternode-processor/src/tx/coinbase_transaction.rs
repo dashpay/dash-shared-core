@@ -44,7 +44,6 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             (u32::MAX, None, None)
         };
         base.tx_type = Coinbase;
-        base.payload_offset = *offset;
         let mut tx = Self {
             base,
             coinbase_transaction_version,

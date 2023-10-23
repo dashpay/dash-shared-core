@@ -82,7 +82,6 @@ impl ToFFI for tx::Transaction {
                 boxed(self.tx_hash.unwrap().0)
             },
             tx_type: self.tx_type,
-            payload_offset: self.payload_offset,
             block_height: self.block_height,
         }
     }
