@@ -14,7 +14,6 @@ pub mod tests {
     use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
-    use crate::ffi::unboxer::unbox_any;
     use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384};
@@ -714,8 +713,10 @@ pub mod tests {
             context,
         )};
         println!("result: {:?}", result);
-        let result = unsafe { unbox_any(result) };
-        let masternode_list = unsafe { (*unbox_any(result.masternode_list)).decode() };
+
+
+        let result = unsafe { &*result };
+        let masternode_list = unsafe { (&*result.masternode_list).decode() };
         let masternodes = masternode_list.masternodes;
         let mut pro_tx_hashes: Vec<UInt256> = masternodes.clone().into_keys().collect();
         pro_tx_hashes.sort();
@@ -747,13 +748,7 @@ pub mod tests {
             })
             .collect();
         verify_smle_hashes.sort();
-        assert_eq!(
-            masternode_list_hashes, verify_smle_hashes,
-            "SMLE transaction hashes"
-        );
-        assert!(
-            result.has_found_coinbase,
-            "The coinbase was not part of provided hashes"
-        );
+        assert_eq!(masternode_list_hashes, verify_smle_hashes, "SMLE transaction hashes");
+        assert!(result.has_found_coinbase, "The coinbase was not part of provided hashes");
     }
 }
