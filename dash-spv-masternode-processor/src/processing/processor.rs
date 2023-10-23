@@ -397,13 +397,12 @@ impl MasternodeProcessor {
                     llmq_map.remove(key);
                 }
             }
-            added_quorums.iter()
-                .for_each(|llmq_entry| {
-                    base_quorums.entry((*llmq_entry).llmq_type)
-                        .or_insert_with(BTreeMap::new)
-                        .insert(llmq_entry.entry_hash, llmq_entry.clone());
-                });
         }
+        added_quorums.iter().for_each(|llmq_entry| {
+            base_quorums.entry(llmq_entry.llmq_type.clone())
+                .or_insert_with(BTreeMap::new)
+                .insert(llmq_entry.llmq_hash, llmq_entry.clone());
+        });
         (added_quorums, base_quorums, signatures, has_valid_quorums)
     }
 
