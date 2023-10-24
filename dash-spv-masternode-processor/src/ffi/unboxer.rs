@@ -30,7 +30,7 @@ pub unsafe fn unbox_any_vec_ptr<T>(ptr: *mut *mut T, count: usize) {
     unbox_any_vec(unbox_vec_ptr(ptr, count));
 }
 
-/// # Safety
+///// # Safety
 // pub unsafe fn unbox_masternode_entry(x: *mut types::MasternodeEntry) {
 //     let entry = unbox_any(x);
 //     unbox_any(entry.confirmed_hash);

@@ -18,6 +18,7 @@ pub struct Transaction {
     pub version: u16,
     pub tx_hash: *mut [u8; 32],
     pub tx_type: TransactionType,
+    pub payload_offset: usize,
     pub block_height: u32,
 }
 
@@ -69,6 +70,7 @@ impl<'a> TryRead<'a, Endian> for Transaction {
                 version,
                 tx_type,
                 lock_time,
+                payload_offset: *offset,
                 block_height: TX_UNCONFIRMED as u32,
             },
             *offset,

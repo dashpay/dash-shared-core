@@ -170,6 +170,7 @@ pub struct Transaction {
     pub version: u16,
     pub tx_hash: Option<UInt256>,
     pub tx_type: TransactionType,
+    pub payload_offset: usize,
     pub block_height: u32,
 }
 
@@ -310,10 +311,11 @@ impl<'a> TryRead<'a, Endian> for Transaction {
         let mut tx = Self {
             inputs,
             outputs,
-            tx_hash: None,
             version,
             tx_type,
             lock_time,
+            payload_offset: *offset,
+            tx_hash: None,
             block_height: TX_UNCONFIRMED as u32,
         };
         tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()));

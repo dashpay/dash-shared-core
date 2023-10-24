@@ -44,6 +44,7 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             (u32::MAX, None, None)
         };
         base.tx_type = Coinbase;
+        base.payload_offset = *offset;
         let mut tx = Self {
             base,
             coinbase_transaction_version,
@@ -70,14 +71,14 @@ impl CoinbaseTransaction {
             if let Some(llmq_root) = self.merkle_root_llmq_list {
                 llmq_root.enc(&mut buffer);
             }
-        }
-        if self.coinbase_transaction_version >= COINBASE_TX_CORE_20 {
-            self.best_cl_height_diff.enc(&mut buffer);
-            if let Some(cl_sig) = self.best_cl_signature {
-                cl_sig.enc(&mut buffer);
-            }
-            if let Some(credit_pool_balance) = self.credit_pool_balance {
-                credit_pool_balance.enc(&mut buffer);
+            if self.coinbase_transaction_version >= COINBASE_TX_CORE_20 {
+                self.best_cl_height_diff.enc(&mut buffer);
+                if let Some(cl_sig) = self.best_cl_signature {
+                    cl_sig.enc(&mut buffer);
+                }
+                if let Some(credit_pool_balance) = self.credit_pool_balance {
+                    credit_pool_balance.enc(&mut buffer);
+                }
             }
         }
         buffer

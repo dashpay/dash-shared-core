@@ -75,6 +75,7 @@ impl FromFFI for types::Transaction {
                 Some(UInt256(*self.tx_hash))
             },
             tx_type: self.tx_type,
+            payload_offset: self.payload_offset,
             block_height: self.block_height,
         }
     }

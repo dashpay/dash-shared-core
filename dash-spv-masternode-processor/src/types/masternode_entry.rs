@@ -43,7 +43,9 @@ impl Drop for MasternodeEntry {
             unbox_vec_ptr(self.previous_validity, self.previous_validity_count);
             unbox_any(self.provider_registration_transaction_hash);
             unbox_any(self.ip_address);
-            unbox_any(self.platform_node_id);
+            if !self.platform_node_id.is_null() {
+                unbox_any(self.platform_node_id);
+            }
 
         }
     }
