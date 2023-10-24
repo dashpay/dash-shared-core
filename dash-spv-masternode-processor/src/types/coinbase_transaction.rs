@@ -11,7 +11,7 @@ pub struct CoinbaseTransaction {
     pub merkle_root_llmq_list: *mut [u8; 32],
     pub best_cl_height_diff: u32,
     pub best_cl_signature: *mut [u8; 96],
-    pub credit_pool_balance: i64,
+    pub credit_pool_balance: u64,
 }
 
 impl Drop for CoinbaseTransaction {

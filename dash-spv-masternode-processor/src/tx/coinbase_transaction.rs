@@ -18,7 +18,7 @@ pub struct CoinbaseTransaction {
     pub merkle_root_llmq_list: Option<UInt256>,
     pub best_cl_height_diff: u32,
     pub best_cl_signature: Option<UInt768>,
-    pub credit_pool_balance: Option<i64>,
+    pub credit_pool_balance: Option<u64>,
 }
 
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
@@ -39,7 +39,7 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             // TODO: VarInt or u32??
             (bytes.read_with::<u32>(offset, byte::LE)?,
             bytes.read_with::<UInt768>(offset, byte::LE).ok(),
-            bytes.read_with::<i64>(offset, byte::LE).ok())
+            bytes.read_with::<VarInt>(offset, byte::LE).ok().map(|var_int| var_int.0))
         } else {
             (u32::MAX, None, None)
         };

@@ -107,7 +107,7 @@ impl ToFFI for tx::CoinbaseTransaction {
             } else {
                 boxed(self.best_cl_signature.unwrap().0)
             },
-            credit_pool_balance: self.credit_pool_balance.unwrap_or(i64::MIN)
+            credit_pool_balance: self.credit_pool_balance.unwrap_or(u64::MIN)
         }
     }
 }
