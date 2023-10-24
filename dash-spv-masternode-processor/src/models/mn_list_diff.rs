@@ -109,7 +109,6 @@ impl MNListDiff {
 
         let mut deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>> = BTreeMap::new();
         let mut added_quorums = Vec::<LLMQEntry>::new();
-        // let mut added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         if quorums_active {
             let deleted_quorums_count = VarInt::from_bytes(message, offset)?.0;
@@ -125,21 +124,6 @@ impl MNListDiff {
             for _i in 0..added_quorums_count {
                 added_quorums.push(LLMQEntry::from_bytes(message, offset)?);
             }
-
-            // new_quorums.iter().for_each(|entry| {
-            //     added_quorums
-            //         .entry(entry.llmq_type)
-            //         .or_insert_with(BTreeMap::new)
-            //         .insert(entry.llmq_hash, *entry)
-            // });
-
-            // for _i in 0..added_quorums_count {
-            //     let entry = LLMQEntry::from_bytes(message, offset)?;
-            //     added_quorums
-            //         .entry(entry.llmq_type)
-            //         .or_insert_with(BTreeMap::new)
-            //         .insert(entry.llmq_hash, entry);
-            // }
         }
         let mut quorums_cls_sigs = Vec::new();
         if protocol_version >= CORE_PROTO_20 { // Core v0.20
