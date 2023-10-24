@@ -17,7 +17,6 @@ pub struct MNListDiffResult {
     pub masternode_list: models::MasternodeList,
     pub added_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
     pub modified_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
-    // pub added_quorums: BTreeMap<common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
     pub added_quorums: Vec<models::LLMQEntry>,
     pub needed_masternode_lists: Vec<UInt256>,
     pub cl_signatures: BTreeMap<UInt256, UInt768>,
