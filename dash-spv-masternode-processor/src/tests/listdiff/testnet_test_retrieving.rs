@@ -5,7 +5,7 @@ use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::ffi::from::FromFFI;
-use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::tests::block_store::init_testnet_store;
 use crate::util::data_ops::merkle_root_from_hashes;
 
@@ -355,6 +355,8 @@ fn testnet_test_retrieve_saved_hashes() {
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_from_context,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
@@ -365,7 +367,7 @@ fn testnet_test_retrieve_saved_hashes() {
         )
     };
     let result_122064 = unsafe {
-        *process_mnlistdiff_from_message(
+        &*process_mnlistdiff_from_message(
             bytes_122064.as_ptr(),
             bytes_122064.len(),
             chain,
@@ -379,7 +381,7 @@ fn testnet_test_retrieve_saved_hashes() {
     assert!(result_122064.is_valid(), "Result must be valid");
     let bytes_122088 = message_from_file("MNL_122064_122088.dat");
     let result_122088 = unsafe {
-        *process_mnlistdiff_from_message(
+        &*process_mnlistdiff_from_message(
             bytes_122088.as_ptr(),
             bytes_122088.len(),
             chain,

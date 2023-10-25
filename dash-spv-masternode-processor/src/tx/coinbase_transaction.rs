@@ -5,6 +5,10 @@ use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt768};
 use crate::tx::{Transaction, TransactionType::Coinbase};
 
+
+pub const COINBASE_TX_CORE_19: u16 = 2;
+pub const COINBASE_TX_CORE_20: u16 = 3;
+
 #[derive(Debug, Clone)]
 pub struct CoinbaseTransaction {
     pub base: Transaction,
@@ -14,6 +18,7 @@ pub struct CoinbaseTransaction {
     pub merkle_root_llmq_list: Option<UInt256>,
     pub best_cl_height_diff: u32,
     pub best_cl_signature: Option<UInt768>,
+    pub credit_pool_balance: Option<u64>,
 }
 
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
@@ -24,17 +29,19 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
         let coinbase_transaction_version = bytes.read_with::<u16>(offset, endian)?;
         let height = bytes.read_with::<u32>(offset, endian)?;
         let merkle_root_mn_list = bytes.read_with::<UInt256>(offset, endian)?;
-        let merkle_root_llmq_list = if coinbase_transaction_version >= 2 {
+        let merkle_root_llmq_list = if coinbase_transaction_version >= COINBASE_TX_CORE_19 {
             let root = bytes.read_with::<UInt256>(offset, endian)?;
             Some(root)
         } else {
             None
         };
-        let (best_cl_height_diff, best_cl_signature) = if coinbase_transaction_version >= 3 {
+        let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= COINBASE_TX_CORE_20 {
+            // TODO: VarInt or u32??
             (bytes.read_with::<u32>(offset, byte::LE)?,
-            bytes.read_with::<UInt768>(offset, byte::LE).ok())
+            bytes.read_with::<UInt768>(offset, byte::LE).ok(),
+            bytes.read_with::<VarInt>(offset, byte::LE).ok().map(|var_int| var_int.0))
         } else {
-            (u32::MAX, None)
+            (u32::MAX, None, None)
         };
         base.tx_type = Coinbase;
         base.payload_offset = *offset;
@@ -45,7 +52,8 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             merkle_root_mn_list,
             merkle_root_llmq_list,
             best_cl_height_diff,
-            best_cl_signature
+            best_cl_signature,
+            credit_pool_balance
         };
         tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()));
         Ok((tx, *offset))
@@ -58,15 +66,19 @@ impl CoinbaseTransaction {
         self.coinbase_transaction_version.enc(&mut buffer);
         self.height.enc(&mut buffer);
         self.merkle_root_mn_list.enc(&mut buffer);
-        if self.coinbase_transaction_version >= 2 {
-            if let Some(llmq_list) = self.merkle_root_llmq_list {
-                llmq_list.enc(&mut buffer);
+
+        if self.coinbase_transaction_version >= COINBASE_TX_CORE_19 {
+            if let Some(llmq_root) = self.merkle_root_llmq_list {
+                llmq_root.enc(&mut buffer);
             }
-        }
-        if self.coinbase_transaction_version >= 3 {
-            self.best_cl_height_diff.enc(&mut buffer);
-            if let Some(sig) = self.best_cl_signature {
-                sig.enc(&mut buffer);
+            if self.coinbase_transaction_version >= COINBASE_TX_CORE_20 {
+                self.best_cl_height_diff.enc(&mut buffer);
+                if let Some(cl_sig) = self.best_cl_signature {
+                    cl_sig.enc(&mut buffer);
+                }
+                if let Some(credit_pool_balance) = self.credit_pool_balance {
+                    credit_pool_balance.enc(&mut buffer);
+                }
             }
         }
         buffer

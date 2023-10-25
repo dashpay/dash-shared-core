@@ -42,12 +42,13 @@ fn test_verify_chained_rotation2() {
     });
     context.is_dip_0024 = true;
     let result = process_qrinfo(message_from_file("mainnet/QRINFO_0_1871755.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { *result.result_at_h_4c });
-    assert_diff_result(context, unsafe { *result.result_at_h_3c });
-    assert_diff_result(context, unsafe { *result.result_at_h_2c });
-    assert_diff_result(context, unsafe { *result.result_at_h_c });
-    assert_diff_result(context, unsafe { *result.result_at_h });
-    assert_diff_result(context, unsafe { *result.result_at_tip });
+    let result = unsafe { &*result };
+    assert_diff_result(context, result.result_at_h_4c);
+    assert_diff_result(context, result.result_at_h_3c);
+    assert_diff_result(context, result.result_at_h_2c);
+    assert_diff_result(context, result.result_at_h_c);
+    assert_diff_result(context, result.result_at_h);
+    assert_diff_result(context, result.result_at_tip);
 }
 
 // #[test]

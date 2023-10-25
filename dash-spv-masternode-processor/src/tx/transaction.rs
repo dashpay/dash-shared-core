@@ -20,13 +20,12 @@ pub enum TransactionType {
     ProviderUpdateRevocation = 4,
     Coinbase = 5,
     QuorumCommitment = 6,
-    SubscriptionRegistration = 8,
-    SubscriptionTopUp = 9,
-    SubscriptionResetKey = 10,
+    AssetLock = 8,
+    AssetUnlock = 9,
+    TypeMax = 10,
     SubscriptionCloseAccount = 11,
     Transition = 12,
     // tmp
-
     /// TODO: find actual value for this type
     CreditFunding = 255,
 }
@@ -41,9 +40,9 @@ impl From<u16> for TransactionType {
             0x0004 => TransactionType::ProviderUpdateRevocation,
             0x0005 => TransactionType::Coinbase,
             0x0006 => TransactionType::QuorumCommitment,
-            0x0008 => TransactionType::SubscriptionRegistration,
-            0x0009 => TransactionType::SubscriptionTopUp,
-            0x000A => TransactionType::SubscriptionResetKey,
+            0x0008 => TransactionType::AssetLock,
+            0x0009 => TransactionType::AssetUnlock,
+            0x000A => TransactionType::TypeMax,
             0x000B => TransactionType::SubscriptionCloseAccount,
             0x000C => TransactionType::Transition,
             _ => TransactionType::Classic,
@@ -312,11 +311,11 @@ impl<'a> TryRead<'a, Endian> for Transaction {
         let mut tx = Self {
             inputs,
             outputs,
-            tx_hash: None,
             version,
             tx_type,
             lock_time,
             payload_offset: *offset,
+            tx_hash: None,
             block_height: TX_UNCONFIRMED as u32,
         };
         tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()));

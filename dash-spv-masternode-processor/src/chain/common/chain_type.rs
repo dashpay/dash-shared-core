@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use hashes::hex::FromHex;
 use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::chain::common::LLMQType;
@@ -334,6 +334,15 @@ impl IHaveChainSettings for DevnetType {
 }
 // Params
 impl ChainType {
+    pub fn from_magic(magic: u32) -> Option<ChainType> {
+        // Note: any new entries here must be added to `magic` below
+        match magic {
+            0xbd6b0cbf => Some(Self::MainNet),
+            0xffcae2ce => Some(Self::TestNet),
+            _ => None
+        }
+    }
+
     pub fn magic(&self) -> u32 {
         match self {
             ChainType::MainNet => 0xbd6b0cbf,
@@ -369,8 +378,8 @@ impl ChainType {
     pub fn protocol_version(&self) -> u32 {
         match self {
             ChainType::MainNet => 70228,
-            ChainType::TestNet => 70228,
-            ChainType::DevNet(_) => 70228
+            ChainType::TestNet => 70230,
+            ChainType::DevNet(_) => 70230
         }
     }
 
@@ -463,6 +472,17 @@ impl ChainType {
             ChainType::TestNet => 850100,
             ChainType::DevNet(_) => 0
         }
+    }
+
+    pub fn core20_activation_height(&self) -> u32 {
+        // TODO: make this real when aware
+        match self {
+            ChainType::TestNet => 899770,
+            _ => u32::MAX
+        }
+    }
+    pub fn core20_is_active_at(&self, height: u32) -> bool {
+        height >= self.core20_activation_height()
     }
 
 }

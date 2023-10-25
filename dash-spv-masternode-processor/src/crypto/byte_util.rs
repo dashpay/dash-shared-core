@@ -122,15 +122,23 @@ macro_rules! impl_decodable {
         impl<'a> ConstDecodable<'a, $var_type> for $var_type {
             #[allow(clippy::not_unsafe_ptr_arg_deref)]
             fn from_const(bytes: *const u8) -> Option<Self> {
-                let safe_bytes = unsafe { slice::from_raw_parts(bytes, $byte_len) };
-                safe_bytes.read_with::<Self>(&mut 0, LE).ok()
+                if bytes.is_null() {
+                    None
+                } else {
+                    let safe_bytes = unsafe { slice::from_raw_parts(bytes, $byte_len) };
+                    safe_bytes.read_with::<Self>(&mut 0, LE).ok()
+                }
             }
         }
         impl<'a> MutDecodable<'a, $var_type> for $var_type {
             #[allow(clippy::not_unsafe_ptr_arg_deref)]
             fn from_mut(bytes: *mut u8) -> Option<Self> {
-                let safe_bytes = unsafe { slice::from_raw_parts_mut(bytes, $byte_len) };
-                safe_bytes.read_with::<Self>(&mut 0, LE).ok()
+                if bytes.is_null() {
+                    None
+                } else {
+                    let safe_bytes = unsafe { slice::from_raw_parts_mut(bytes, $byte_len) };
+                    safe_bytes.read_with::<Self>(&mut 0, LE).ok()
+                }
             }
         }
     }

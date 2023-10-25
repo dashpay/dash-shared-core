@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
 use crate::{models, types};
-use crate::chain::common;
-use crate::crypto::UInt256;
+use crate::crypto::{UInt256, UInt768};
 use crate::ffi::boxer::{boxed, boxed_vec};
-use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
+use crate::ffi::to::{encode_masternodes_map, ToFFI};
 use crate::processing::ProcessingError;
 
 pub struct MNListDiffResult {
@@ -18,9 +17,9 @@ pub struct MNListDiffResult {
     pub masternode_list: models::MasternodeList,
     pub added_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
     pub modified_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
-    pub added_quorums: BTreeMap<common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+    pub added_quorums: Vec<models::LLMQEntry>,
     pub needed_masternode_lists: Vec<UInt256>,
-    pub quorums_cl_sigs: Vec<models::QuorumsCLSigsObject>,
+    pub cl_signatures: BTreeMap<UInt256, UInt768>,
 }
 
 impl std::fmt::Debug for MNListDiffResult {
@@ -63,9 +62,9 @@ impl Default for MNListDiffResult {
             masternode_list: Default::default(),
             added_masternodes: Default::default(),
             modified_masternodes: Default::default(),
-            added_quorums: Default::default(),
+            added_quorums: vec![],
             needed_masternode_lists: vec![],
-            quorums_cl_sigs: vec![],
+            cl_signatures: Default::default()
         }
     }
 }
@@ -92,8 +91,11 @@ impl MNListDiffResult {
             added_masternodes_count: self.added_masternodes.len(),
             modified_masternodes: encode_masternodes_map(&self.modified_masternodes),
             modified_masternodes_count: self.modified_masternodes.len(),
-            added_llmq_type_maps: encode_quorums_map(&self.added_quorums),
-            added_llmq_type_maps_count: self.added_quorums.len(),
+            added_quorums_count: self.added_quorums.len(),
+            added_quorums: boxed_vec(self.added_quorums
+                .iter()
+                .map(|quorum| boxed(quorum.encode()))
+                .collect()),
             needed_masternode_lists: boxed_vec(
                 self.needed_masternode_lists
                     .iter()
@@ -101,11 +103,16 @@ impl MNListDiffResult {
                     .collect(),
             ),
             needed_masternode_lists_count: self.needed_masternode_lists.len(),
-            quorums_cl_sigs_count: self.quorums_cl_sigs.len(),
-            quorums_cl_sigs: boxed_vec(
-                self.quorums_cl_sigs
-                    .iter()
-                    .map(|h| boxed(h.encode()))
+            quorums_cl_sigs_count: self.cl_signatures.len(),
+            quorums_cl_signatures_hashes: boxed_vec(
+                self.cl_signatures
+                    .keys()
+                    .map(|h| boxed(h.0))
+                    .collect()),
+            quorums_cl_signatures: boxed_vec(
+                self.cl_signatures
+                    .values()
+                    .map(|h| boxed(h.0))
                     .collect())
         }
     }

@@ -3,11 +3,12 @@ use byte::{BytesExt, TryRead, LE};
 use std::ptr::null_mut;
 use crate::consensus;
 use crate::ffi::boxer::{boxed, boxed_vec};
+use crate::ffi::unboxer::{unbox_any, unbox_any_vec_ptr};
 use crate::tx::{TransactionType, TX_UNCONFIRMED};
 use crate::types::{TransactionInput, TransactionOutput};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Transaction {
     pub inputs: *mut *mut TransactionInput,
     pub inputs_count: usize,
@@ -19,6 +20,22 @@ pub struct Transaction {
     pub tx_type: TransactionType,
     pub payload_offset: usize,
     pub block_height: u32,
+}
+
+impl Drop for Transaction {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.inputs.is_null() {
+                unbox_any_vec_ptr(self.inputs, self.inputs_count);
+            }
+            if !self.outputs.is_null() {
+                unbox_any_vec_ptr(self.outputs, self.outputs_count);
+            }
+            if !self.tx_hash.is_null() {
+                unbox_any(self.tx_hash);
+            }
+        }
+    }
 }
 impl<'a> TryRead<'a, Endian> for Transaction {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {

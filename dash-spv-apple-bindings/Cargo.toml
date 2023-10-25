@@ -1,6 +1,6 @@
 [package]
 name = "dash_spv_apple_bindings"
-version = "0.4.11"
+version = "0.4.12"
 description = "C-bindings for using and interoperating with Dash SPV"
 readme = "README.md"
 edition = "2021"
@@ -24,8 +24,8 @@ cbindgen = "0.24.3"
 name = "dash_spv_apple_bindings"
 crate-type = ["staticlib", "cdylib"]
 
-#[profile.release]
-#lto = "thin"
-#opt-level = 3
-##debug = true
+[profile.release]
+lto = "thin"
+opt-level = 3
+#debug = true
 

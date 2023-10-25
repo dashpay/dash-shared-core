@@ -1,7 +1,7 @@
 extern crate libc;
 use std::ffi::c_void;
 use crate::{models, types};
-use crate::crypto::{byte_util::MutDecodable, UInt256};
+use crate::crypto::{byte_util::MutDecodable, UInt256, UInt768};
 use crate::ffi::from::FromFFI;
 use crate::processing::ProcessingError;
 
@@ -37,6 +37,15 @@ pub type GetLLMQSnapshotByBlockHash = unsafe extern "C" fn(
 pub type SaveLLMQSnapshot = unsafe extern "C" fn(
     block_hash: *mut [u8; 32],
     snapshot: *mut types::LLMQSnapshot,
+    context: *const c_void,
+) -> bool;
+pub type GetCLSignatureByBlockHash = unsafe extern "C" fn(
+    block_hash: *mut [u8; 32],
+    context: *const c_void,
+) -> *mut u8;
+pub type SaveCLSignature = unsafe extern "C" fn(
+    block_hash: *mut [u8; 32],
+    cl_signature: *mut [u8; 96],
     context: *const c_void,
 ) -> bool;
 pub type HashDestroy = unsafe extern "C" fn(hash: *mut u8);
@@ -114,6 +123,25 @@ where
         let data = unsafe { (*lookup_result).decode() };
         snapshot_destroy(lookup_result);
         Some(data)
+    } else {
+        None
+    }
+}
+
+pub fn lookup_cl_signature_by_block_hash<SL, SD>(
+    block_hash: UInt256,
+    cl_signature_lookup: SL,
+    cl_signature_destroy: SD,
+) -> Option<UInt768>
+    where
+        SL: Fn(UInt256) -> *mut u8 + Copy,
+        SD: Fn(*mut u8),
+{
+    let lookup_result = cl_signature_lookup(block_hash);
+    if !lookup_result.is_null() {
+        let data = UInt768::from_mut(lookup_result);
+        cl_signature_destroy(lookup_result);
+        data
     } else {
         None
     }

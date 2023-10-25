@@ -1,7 +1,8 @@
+use crate::ffi::unboxer::{unbox_any, unbox_vec_ptr};
 use crate::types::{BlockOperatorPublicKey, MasternodeEntryHash, OperatorPublicKey, Validity};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct MasternodeEntry {
     pub confirmed_hash: *mut [u8; 32],
     pub confirmed_hash_hashed_with_provider_registration_transaction_hash: *mut [u8; 32], // nullable
@@ -25,4 +26,27 @@ pub struct MasternodeEntry {
     pub mn_type: u16,
     pub platform_http_port: u16,
     pub platform_node_id: *mut [u8; 20],
+}
+
+impl Drop for MasternodeEntry {
+    fn drop(&mut self) {
+        unsafe {
+            unbox_any(self.confirmed_hash);
+            if !self.confirmed_hash_hashed_with_provider_registration_transaction_hash.is_null() {
+                unbox_any(self.confirmed_hash_hashed_with_provider_registration_transaction_hash);
+            }
+            unbox_any(self.key_id_voting);
+            unbox_any(self.entry_hash);
+            unbox_any(self.operator_public_key);
+            unbox_vec_ptr(self.previous_entry_hashes, self.previous_entry_hashes_count);
+            unbox_vec_ptr(self.previous_operator_public_keys, self.previous_operator_public_keys_count);
+            unbox_vec_ptr(self.previous_validity, self.previous_validity_count);
+            unbox_any(self.provider_registration_transaction_hash);
+            unbox_any(self.ip_address);
+            if !self.platform_node_id.is_null() {
+                unbox_any(self.platform_node_id);
+            }
+
+        }
+    }
 }

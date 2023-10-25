@@ -94,6 +94,25 @@ pub struct Llmq {
     pub members_sig: String,
 }
 
+impl From<Llmq> for models::LLMQEntry {
+    fn from(llmq: Llmq) -> Self {
+        models::LLMQEntry::new(
+            LLMQVersion::from(llmq.version as u16),
+            LLMQType::from(llmq.llmq_type as u8),
+            block_hash_to_block_hash(llmq.quorum_hash),
+            Some(llmq.quorum_index as u16),
+            VarInt(llmq.signers_count as u64),
+            VarInt(llmq.valid_members_count as u64),
+            llmq.signers.as_bytes().to_vec(),
+            llmq.valid_members.as_bytes().to_vec(),
+            UInt384::from_hex(llmq.quorum_public_key.as_str()).unwrap(),
+            UInt256::from_hex(llmq.quorum_vvec_hash.as_str()).unwrap(),
+            UInt768::from_hex(llmq.quorum_sig.as_str()).unwrap(),
+            UInt768::from_hex(llmq.members_sig.as_str()).unwrap()
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Node {
     #[serde(rename = "proRegTxHash")]
@@ -169,7 +188,7 @@ pub fn list_to_list(value: MNList) -> models::MasternodeList {
     let masternode_merkle_root = Some(block_hash_to_block_hash(value.masternode_merkle_root));
     let llmq_merkle_root = Some(block_hash_to_block_hash(value.quorum_merkle_root));
     let masternodes = nodes_to_masternodes(value.mn_list);
-    let quorums = quorums_to_quorums(value.new_quorums);
+    let quorums = quorums_to_quorums_map(value.new_quorums);
     models::MasternodeList {
         block_hash,
         known_height,
@@ -212,23 +231,14 @@ pub fn value_to_masternode_list(value: &serde_json::Value) -> models::Masternode
     }
 }
 
-pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> {
+pub fn quorums_to_quorums_vec(value: Vec<Llmq>) -> Vec<models::LLMQEntry> {
+    value.into_iter().map(models::LLMQEntry::from).collect()
+}
+
+pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> {
     let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = BTreeMap::new();
-    value.into_iter()/*.filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == LLMQType::Llmqtype60_75)*/.for_each(|llmq| {
-        let entry = models::LLMQEntry::new(
-            LLMQVersion::from(llmq.version as u16),
-            LLMQType::from(llmq.llmq_type as u8),
-            block_hash_to_block_hash(llmq.quorum_hash),
-            Some(llmq.quorum_index as u16),
-            VarInt(llmq.signers_count as u64),
-            VarInt(llmq.valid_members_count as u64),
-            llmq.signers.as_bytes().to_vec(),
-            llmq.valid_members.as_bytes().to_vec(),
-            UInt384::from_hex(llmq.quorum_public_key.as_str()).unwrap(),
-            UInt256::from_hex(llmq.quorum_vvec_hash.as_str()).unwrap(),
-            UInt768::from_hex(llmq.quorum_sig.as_str()).unwrap(),
-            UInt768::from_hex(llmq.members_sig.as_str()).unwrap()
-        );
+    value.into_iter().for_each(|llmq| {
+        let entry = models::LLMQEntry::from(llmq);
         quorums
             .entry(entry.llmq_type)
             .or_insert_with(BTreeMap::new)
@@ -377,7 +387,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     let added_or_modified_masternodes = nodes_to_masternodes(diff.mn_list);
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
-    let added_quorums = quorums_to_quorums(diff.new_quorums);
+    let added_quorums = quorums_to_quorums_vec(diff.new_quorums);
     println!("block_hash_tip: {}", block_hash);
     models::MNListDiff {
         base_block_hash,

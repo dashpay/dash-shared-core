@@ -6,3 +6,4 @@ pub mod keys;
 pub mod listdiff;
 pub mod test_testnet_checkpoints;
 pub mod bindings;
+pub mod tx;
