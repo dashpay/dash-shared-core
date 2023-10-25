@@ -476,7 +476,10 @@ impl ChainType {
 
     pub fn core20_activation_height(&self) -> u32 {
         // TODO: make this real when aware
-        u32::MAX
+        match self {
+            ChainType::TestNet => 899770,
+            _ => u32::MAX
+        }
     }
     pub fn core20_is_active_at(&self, height: u32) -> bool {
         height >= self.core20_activation_height()
