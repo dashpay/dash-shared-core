@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use hashes::hex::ToHex;
 use crate::keys::IKey;
 use crate::util::cc_crypt::{aes256_encrypt_decrypt, Operation};
 
@@ -22,16 +21,12 @@ pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: Crypto
     }
 
     fn encrypt(data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Option<Vec<u8>> {
-        println!("encrypt: data: {} key: {} iv: {}", data.as_ref().to_hex(), key.as_ref().to_hex(), iv.as_ref().to_hex());
         let result = aes256_encrypt_decrypt(Operation::Encrypt, data, key, iv);
-        println!("encrypt: result: {}", result.as_ref().map_or(String::new(), |result| result.to_hex()));
         result
     }
 
     fn decrypt(data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Option<Vec<u8>> {
-        println!("decrypt: data: {} key: {} iv: {}", data.as_ref().to_hex(), key.as_ref().to_hex(), iv.as_ref().to_hex());
         let result = aes256_encrypt_decrypt(Operation::Decrypt, data, key, iv);
-        println!("decrypt: result: {}", result.as_ref().map_or(String::new(), |result| result.to_hex()));
         result
     }
 
