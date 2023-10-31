@@ -179,7 +179,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     };
 
     #[cfg(feature = "generate-dashj-tests")]
-    crate::util::java::generate_qr_state_test_file_json(chain_type, result);
+    crate::util::java::generate_qr_state_test_file_json(chain_type, &result);
     println!("process_qrinfo_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }

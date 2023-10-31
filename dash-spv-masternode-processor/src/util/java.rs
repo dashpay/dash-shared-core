@@ -4,11 +4,11 @@ use std::io::Write;
 use hashes::hex::ToHex;
 use secp256k1::rand::{Rng, thread_rng};
 use crate::chain::common::chain_type::DevnetType;
-use crate::common::{ChainType, LLMQType};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::ffi::from::FromFFI;
-use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry, QuorumsCLSigsObject};
+use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry};
 use crate::{models, types};
+use crate::chain::common::{ChainType, LLMQType};
 use crate::util::file::save_java_class;
 use crate::util::save_json_file;
 
@@ -394,7 +394,7 @@ fn put_masternode_list_from_json_into_cache(height: u32) -> String {
     format!("\t\tstate.mnListsCache.put({block_var}.getHeader().getHash(), masternodeListFromJson(params, \"{file_name}\"));\n")
 }
 
-fn extract_masternode_lists_and_snapshots(result: types::QRInfoResult) -> (u32, Vec<u32>, Vec<u32>) {
+fn extract_masternode_lists_and_snapshots(result: &types::QRInfoResult) -> (u32, Vec<u32>, Vec<u32>) {
     // unsafe {
     //     let list_at_h_4c = (*(*result.result_at_h_4c).masternode_list).decode();
     //     let list_at_h_3c = (*(*result.result_at_h_3c).masternode_list).decode();
@@ -459,7 +459,7 @@ fn extract_masternode_lists_and_snapshots(result: types::QRInfoResult) -> (u32, 
     }
 }
 
-pub fn generate_qr_state_test_file_json(chain_type: ChainType, result: types::QRInfoResult) {
+pub fn generate_qr_state_test_file_json(chain_type: ChainType, result: &types::QRInfoResult) {
     let (quorum_base_block_height, lists, snapshots) = extract_masternode_lists_and_snapshots(result);
     let class_name = format!("QuorumRotationStateTest_{quorum_base_block_height}");
     let chain_name = get_chain_name_for_chain_type(chain_type);
