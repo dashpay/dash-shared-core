@@ -84,11 +84,10 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        let version = if (CORE_PROTO_BLS_BASIC..CORE_PROTO_DIFF_VERSION_ORDER).contains(&protocol_version) {
+        let version = if protocol_version >= CORE_PROTO_BLS_BASIC && protocol_version < CORE_PROTO_DIFF_VERSION_ORDER {
             // BLS Basic
             u16::from_bytes(message, offset)?
         } else {
-            // BLS Legacy
             1
         };
         let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
