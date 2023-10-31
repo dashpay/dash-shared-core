@@ -8,7 +8,7 @@ use crate::ffi::callbacks;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::to::ToFFI;
 use crate::models::QuorumsCLSigsObject;
-use crate::processing::{MasternodeProcessorCache, MNListDiffResult, ProcessingError};
+use crate::processing::{LLMQValidationStatus, MasternodeProcessorCache, MNListDiffResult, ProcessingError};
 
 // https://github.com/rust-lang/rfcs/issues/2770
 #[repr(C)]
@@ -384,7 +384,8 @@ impl MasternodeProcessor {
                         }
                     }
                     if self.should_process_quorum(quorum.llmq_type, is_dip_0024, is_rotated_quorums_presented) {
-                        has_valid_quorums &= self.validate_quorum(quorum, skip_removed_masternodes, cache);
+                        let status = self.validate_quorum(quorum, skip_removed_masternodes, cache);
+                        has_valid_quorums &= status.is_not_critical();
                     }
             })
         }
@@ -403,16 +404,13 @@ impl MasternodeProcessor {
         (added_quorums, base_quorums, signatures, has_valid_quorums)
     }
 
-    pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> bool {
+    pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> LLMQValidationStatus {
         let llmq_block_hash = quorum.llmq_hash;
-        if let Some(models::MasternodeList { masternodes, .. }) = self.find_masternode_list(
-            llmq_block_hash,
-            &cache.mn_lists,
-            &mut cache.needed_masternode_lists) {
-            self.validate_quorum_with_masternodes(quorum, skip_removed_masternodes, llmq_block_hash, masternodes, cache)
-        } else {
-            true
-        }
+        self.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists)
+            .map_or(
+                LLMQValidationStatus::NoMasternodeList,
+                |models::MasternodeList { masternodes, .. }|
+                    self.validate_quorum_with_masternodes(quorum, skip_removed_masternodes, llmq_block_hash, masternodes, cache))
     }
 
     pub fn validate_quorum_with_masternodes(
@@ -422,7 +420,7 @@ impl MasternodeProcessor {
         block_hash: UInt256,
         masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
         cache: &mut MasternodeProcessorCache,
-    ) -> bool {
+    ) -> LLMQValidationStatus {
         let block_height = self.lookup_block_height_by_hash(block_hash);
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(

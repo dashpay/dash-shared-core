@@ -313,17 +313,15 @@ fn testnet_quorum_quarters() {
         UInt256::from_hex("21173e00737bac467d09effb15959d0459b853160805057a3975436d3e206591").unwrap().reverse(),
         UInt256::from_hex("321a1300b3ec63b3082d1626c7377d3c9e4e332eadefe12073f5e17b5099a49e").unwrap().reverse(),
     ];
-    let payload_valid = last_quorum.validate_payload();
-    println!("quorum payload valid: {}", payload_valid);
-    assert!(payload_valid, "Invalid payload");
-    let signature_valid = last_quorum.validate(nodes, block_height);
-    println!("quorum signature valid: {}", signature_valid);
-    assert!(payload_valid, "Invalid signature");
+    let payload_validation_status = last_quorum.validate_payload();
+    assert!(payload_validation_status.is_ok(), "Invalid payload");
+    let signature_validation_status = last_quorum.validate(nodes, block_height);
+    assert!(payload_validation_status.is_ok(), "Invalid signature");
 
 
     // println!("node_hashes: {:#?}", node_hashes);
     // println!("new_quarter_members: {:#?}", new_quarter_members);
-    // assert_eq!(node_hashes, new_quarter_members, "New quorum quarter members should be equal");
+    assert_eq!(node_hashes, new_quarter_members, "New quorum quarter members should be equal");
 
     //([0-9A-Fa-f]{64})
     //UInt256::from_hex("($1)").unwrap().reverse()

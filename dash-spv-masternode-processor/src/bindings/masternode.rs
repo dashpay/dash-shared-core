@@ -197,12 +197,12 @@ pub unsafe extern "C" fn processor_cache_masternode_list(block_hash: *const u8, 
 pub unsafe extern "C" fn validate_masternode_list(list: *const types::MasternodeList, quorum: *const types::LLMQEntry, block_height: u32, chain_type: ChainType, best_cl_signature: *const u8) -> bool {
     let list = (*list).decode();
     let mut quorum = (*quorum).decode();
-    let is_valid_payload = quorum.validate_payload();
-    if !is_valid_payload {
+    let payload_validation_status = quorum.validate_payload();
+    if !payload_validation_status.is_ok() {
         return false;
     }
     let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, UInt768::from_const(best_cl_signature));
-    return quorum.validate(valid_masternodes, block_height);
+    return quorum.validate(valid_masternodes, block_height).is_not_critical();
 }
 
 
