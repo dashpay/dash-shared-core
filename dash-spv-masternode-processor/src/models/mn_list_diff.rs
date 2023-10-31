@@ -67,11 +67,10 @@ impl MNListDiff {
         block_height_lookup: F,
         protocol_version: u32,
     ) -> Option<Self> {
-        let mut version = if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
-            u16::from_bytes(message, offset)?
-        } else {
-            1
-        };
+        let mut version = 1;
+        if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
+            version = u16::from_bytes(message, offset)?
+        }
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
         let base_block_height = block_height_lookup(base_block_hash);
@@ -84,12 +83,10 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        version = if protocol_version >= CORE_PROTO_BLS_BASIC && protocol_version < CORE_PROTO_DIFF_VERSION_ORDER {
+        if protocol_version >= CORE_PROTO_BLS_BASIC && protocol_version < CORE_PROTO_DIFF_VERSION_ORDER {
             // BLS Basic
-            u16::from_bytes(message, offset)?
-        } else {
-            1
-        };
+            version = u16::from_bytes(message, offset)?
+        }
         let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
