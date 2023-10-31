@@ -67,7 +67,7 @@ impl MNListDiff {
         block_height_lookup: F,
         protocol_version: u32,
     ) -> Option<Self> {
-        let version = if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
+        let mut version = if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
             u16::from_bytes(message, offset)?
         } else {
             1
@@ -84,7 +84,7 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        let version = if protocol_version >= CORE_PROTO_BLS_BASIC && protocol_version < CORE_PROTO_DIFF_VERSION_ORDER {
+        version = if protocol_version >= CORE_PROTO_BLS_BASIC && protocol_version < CORE_PROTO_DIFF_VERSION_ORDER {
             // BLS Basic
             u16::from_bytes(message, offset)?
         } else {
