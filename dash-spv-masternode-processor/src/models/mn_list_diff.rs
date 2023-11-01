@@ -87,6 +87,7 @@ impl MNListDiff {
             // BLS Basic
             version = u16::from_bytes(message, offset)?
         }
+        println!("MNListDiff::new: {protocol_version}: {base_block_height}..{block_height} => {version}");
         let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
