@@ -129,6 +129,15 @@ impl MasternodeProcessor {
             self.lookup_snapshot_by_block_hash(block_hash)
         }
     }
+    pub(crate) fn find_cl_signature_if_need(&self, block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> Option<UInt768> {
+        if self.chain_type.core20_is_active_at(block_height) {
+            self.lookup_block_hash_by_height(block_height)
+                .and_then(|work_block_hash|
+                    self.find_cl_signature(work_block_hash, cached_cl_signatures))
+        } else {
+            None
+        }
+    }
 
     pub(crate) fn find_cl_signature(
         &self,
@@ -428,14 +437,13 @@ impl MasternodeProcessor {
                 skip_removed_masternodes,
             )
         } else {
+            let work_block_height = block_height - 8;
             models::MasternodeList::get_masternodes_for_quorum(
                 quorum,
                 self.chain_type,
                 masternodes,
                 block_height,
-                self.lookup_block_hash_by_height(block_height - 8)
-                    .and_then(|work_block_hash| self.find_cl_signature(work_block_hash, &cache.cl_signatures))
-            )
+                self.find_cl_signature_if_need(work_block_height, &cache.cl_signatures))
         };
         //crate::util::java::generate_final_commitment_test_file(self.chain_type, block_height, &quorum, &valid_masternodes);
         quorum.verify(valid_masternodes, block_height)
@@ -491,11 +499,7 @@ impl MasternodeProcessor {
                         // java::generate_snapshot(&snapshot, work_block_height);
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
                         // java::generate_masternode_list_from_map(&masternode_list.masternodes);
-                        let best_cl_signature = if self.chain_type.core20_is_active_at(work_block_height) {
-                            self.find_cl_signature(work_block_hash, cached_cl_signatures)
-                        } else {
-                            None
-                        };
+                        let best_cl_signature = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures);
                         let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(llmq_type, work_block_hash, best_cl_signature);
                         // println!("quorum_modifier: {}", quorum_modifier);
                         // println!("snapshot: {:?}", snapshot);
