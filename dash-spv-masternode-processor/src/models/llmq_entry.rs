@@ -35,7 +35,7 @@ pub struct LLMQEntry {
 
 #[cfg(feature = "generate-dashj-tests")]
 impl Serialize for LLMQEntry {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> where S: Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut state = serializer.serialize_struct("LLMQEntry", 10 + usize::from(self.index.is_some()))?;
         state.serialize_field("version", &self.version)?;
         if let Some(index) = self.index {
@@ -240,10 +240,6 @@ impl LLMQEntry {
             best_cl_signature.enc(&mut writer);
         }
         UInt256::sha256d(writer)
-    }
-
-    pub fn llmq_quorum_hash(&self, best_cl_signature: Option<UInt768>) -> UInt256 {
-        Self::build_llmq_quorum_hash(self.llmq_type, self.llmq_hash, best_cl_signature)
     }
 
     pub fn commitment_data(&self) -> Vec<u8> {

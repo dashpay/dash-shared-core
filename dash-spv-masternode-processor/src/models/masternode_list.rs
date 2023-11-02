@@ -224,7 +224,7 @@ impl MasternodeList {
     pub fn get_masternodes_for_quorum(quorum: &LLMQEntry, chain_type: ChainType, masternodes: BTreeMap<UInt256, MasternodeEntry>, block_height: u32, best_cl_signature: Option<UInt768>) -> Vec<MasternodeEntry> {
         let llmq_type = quorum.llmq_type;
         let hpmn_only = llmq_type == chain_type.platform_type() && !quorum.version.use_bls_legacy();
-        let quorum_modifier = quorum.llmq_quorum_hash(best_cl_signature);
+        let quorum_modifier = LLMQEntry::build_llmq_quorum_hash(quorum.llmq_type, quorum.llmq_hash, best_cl_signature);
         let quorum_count = llmq_type.size();
         let masternodes_in_list_count = masternodes.len();
         let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);

@@ -148,7 +148,7 @@ impl MasternodeProcessor {
         &self,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
-        context: ProcessingContext,
+        processing_context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
@@ -158,14 +158,14 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result(base_list, list_diff, should_process_quorums, context, cache)
+        self.get_list_diff_result(base_list, list_diff, should_process_quorums, processing_context, cache)
     }
 
     pub(crate) fn get_list_diff_result_internal_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
-        context: ProcessingContext,
+        processing_context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, list_diff.base_block_hash);
@@ -174,7 +174,7 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, context, cache)
+        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, processing_context, cache)
     }
 
     pub(crate) fn get_list_diff_result(
@@ -182,10 +182,10 @@ impl MasternodeProcessor {
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
-        context: ProcessingContext,
+        processing_context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
-        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, context, cache);
+        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, processing_context, cache);
         // println!("get_list_diff_result: {:#?}", result);
         result.encode()
     }
@@ -433,7 +433,8 @@ impl MasternodeProcessor {
                 self.chain_type,
                 masternodes,
                 block_height,
-                self.lookup_cl_signature_by_block_hash(block_hash)
+                self.lookup_block_hash_by_height(block_height - 8)
+                    .and_then(|work_block_hash| self.find_cl_signature(work_block_hash, &cache.cl_signatures))
             )
         };
         //crate::util::java::generate_final_commitment_test_file(self.chain_type, block_height, &quorum, &valid_masternodes);
@@ -491,7 +492,7 @@ impl MasternodeProcessor {
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
                         // java::generate_masternode_list_from_map(&masternode_list.masternodes);
                         let best_cl_signature = if self.chain_type.core20_is_active_at(work_block_height) {
-                            self.lookup_cl_signature_by_block_hash(work_block_hash)
+                            self.find_cl_signature(work_block_hash, cached_cl_signatures)
                         } else {
                             None
                         };
@@ -556,6 +557,7 @@ impl MasternodeProcessor {
         quorum_base_block_height: u32,
         previous_quarters: [&Vec<Vec<models::MasternodeEntry>>; 3],
         cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
+        cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
         unknown_lists: &mut Vec<UInt256>,
         skip_removed_masternodes: bool,
     ) -> Vec<Vec<models::MasternodeEntry>> {
@@ -609,7 +611,7 @@ impl MasternodeProcessor {
                         });
                         //Self::log_masternodes(&used_at_h_masternodes, format!("••••• USED AT H {} ••••••• ", work_block_height));
                         //Self::log_masternodes(&unused_at_h_masternodes, format!("••••• UNUSED AT H {} •••••••", work_block_height));
-                        let best_cl_signature = self.lookup_cl_signature_by_block_hash(work_block_hash);
+                        let best_cl_signature = self.find_cl_signature(work_block_hash, cached_cl_signatures);
                         let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(params.r#type, work_block_hash, best_cl_signature);
                         let sorted_used_mns_list = Self::valid_masternodes_for_rotated_quorum_map(used_at_h_masternodes, quorum_modifier, work_block_height);
                         let sorted_unused_mns_list = Self::valid_masternodes_for_rotated_quorum_map(unused_at_h_masternodes, quorum_modifier, work_block_height);
@@ -719,6 +721,7 @@ impl MasternodeProcessor {
                 &prev_q_h_m_3c,
             ],
             cached_lists,
+            cached_cl_signatures,
             unknown_lists,
             skip_removed_masternodes,
         );
