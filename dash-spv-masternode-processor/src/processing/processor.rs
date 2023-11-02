@@ -131,10 +131,16 @@ impl MasternodeProcessor {
     }
     pub(crate) fn find_cl_signature_if_need(&self, block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> Option<UInt768> {
         if self.chain_type.core20_is_active_at(block_height) {
-            self.lookup_block_hash_by_height(block_height)
-                .and_then(|work_block_hash|
-                    self.find_cl_signature(work_block_hash, cached_cl_signatures))
+            if let Some(work_block_hash) = self.lookup_block_hash_by_height(block_height) {
+                let signature = self.find_cl_signature(work_block_hash, cached_cl_signatures);
+                println!("find_cl_signature_if_need: {} {:?}", block_height, signature);
+                signature
+            } else {
+                println!("find_cl_signature_if_need: core 20 is active at {} but block is not fetched", block_height);
+                None
+            }
         } else {
+            println!("find_cl_signature_if_need: core 20 is not active at {}", block_height);
             None
         }
     }
