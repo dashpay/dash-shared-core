@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::ptr::null;
 use crate::{common, models, types};
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams};
+use crate::chain::common::chain_type::ProcessingContext;
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
@@ -147,27 +148,24 @@ impl MasternodeProcessor {
         &self,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
-        is_dip_0024: bool,
-        is_rotated_quorums_presented: bool,
+        context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
         //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, base_block_hash);
-
         let base_list = self.find_masternode_list(
             base_block_hash,
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
+        self.get_list_diff_result(base_list, list_diff, should_process_quorums, context, cache)
     }
 
     pub(crate) fn get_list_diff_result_internal_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
-        is_dip_0024: bool,
-        is_rotated_quorums_presented: bool,
+        context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, list_diff.base_block_hash);
@@ -176,7 +174,7 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
+        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, context, cache)
     }
 
     pub(crate) fn get_list_diff_result(
@@ -184,11 +182,10 @@ impl MasternodeProcessor {
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
-        is_dip_0024: bool,
-        is_rotated_quorums_presented: bool,
+        context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
-        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache);
+        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, context, cache);
         // println!("get_list_diff_result: {:#?}", result);
         result.encode()
     }
@@ -222,8 +219,7 @@ impl MasternodeProcessor {
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
-        is_dip_0024: bool,
-        is_rotated_quorums_presented: bool,
+        processing_context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         let skip_removed_masternodes = list_diff.version >= 2;
@@ -245,8 +241,6 @@ impl MasternodeProcessor {
             block_hash,
         );
 
-
-
         // self.cache_cl_signatures(block_hash, quorums_cl_sigs.clone(), cache);
         let (added_quorums,
             quorums,
@@ -258,8 +252,7 @@ impl MasternodeProcessor {
             quorums_cl_sigs.clone(),
             should_process_quorums,
             skip_removed_masternodes,
-            is_dip_0024,
-            is_rotated_quorums_presented,
+            processing_context,
             cache,
         );
         let masternode_list = models::MasternodeList::new(
@@ -361,8 +354,7 @@ impl MasternodeProcessor {
         cl_signatures: Vec<QuorumsCLSigsObject>,
         should_process_quorums: bool,
         skip_removed_masternodes: bool,
-        is_dip_0024: bool,
-        is_rotated_quorums_presented: bool,
+        processing_context: ProcessingContext,
         cache: &mut MasternodeProcessorCache,
     ) -> (
         Vec<models::LLMQEntry>,
@@ -383,7 +375,7 @@ impl MasternodeProcessor {
                             signatures.insert(quorum.llmq_hash, sigs_obj.signature);
                         }
                     }
-                    if self.should_process_quorum(quorum.llmq_type, is_dip_0024, is_rotated_quorums_presented) {
+                    if processing_context.should_validate_quorum(quorum.llmq_type, self.chain_type) {
                         let status = self.validate_quorum(quorum, skip_removed_masternodes, cache);
                         has_valid_quorums &= status.is_not_critical();
                     }
@@ -903,18 +895,6 @@ impl MasternodeProcessor {
             |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) },
             |hash: *mut u8| unsafe { (self.destroy_hash)(hash) },
         )
-    }
-
-    pub fn should_process_quorum(&self, llmq_type: LLMQType, is_dip_0024: bool, is_rotated_quorums_presented: bool) -> bool {
-        // TODO: what we really wants here for platform quorum type?
-        //is_dip_0024 && llmq_type == LLMQType::Llmqtype60_75
-        if self.chain_type.isd_llmq_type() == llmq_type {
-            is_dip_0024 && is_rotated_quorums_presented
-        } else if !is_dip_0024 { /*skip old quorums here for now*/
-            false
-        } else {
-            self.chain_type.should_process_llmq_of_type(llmq_type)
-        }
     }
 
     pub fn should_process_diff_with_range(

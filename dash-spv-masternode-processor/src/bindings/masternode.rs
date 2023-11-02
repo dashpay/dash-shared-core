@@ -3,6 +3,7 @@ use std::slice;
 use byte::BytesExt;
 use crate::{models, types};
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
+use crate::chain::common::chain_type::ProcessingContext;
 use crate::consensus::encode;
 use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}, UInt768};
 use crate::ffi::{boxer::{boxed, boxed_vec}, ByteArray, from::FromFFI, to::ToFFI};
@@ -42,7 +43,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
     }
-    let result = processor.get_list_diff_result_with_base_lookup(list_diff, true, false, false, cache);
+    let result = processor.get_list_diff_result_with_base_lookup(list_diff, true, ProcessingContext::MNListDiff, cache);
     println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }
@@ -75,7 +76,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let offset = &mut 0;
     let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
-        processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache)
+        processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, ProcessingContext::QRInfo(is_rotated_quorums_presented), cache)
     };
     let read_list_diff =
         |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);

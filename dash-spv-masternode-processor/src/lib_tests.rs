@@ -14,7 +14,7 @@ pub mod tests {
     use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
-    use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
+    use crate::chain::common::chain_type::{ChainType, IHaveChainSettings, ProcessingContext};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384};
     use crate::models;
@@ -170,7 +170,7 @@ pub mod tests {
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
             unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), protocol_version));
-        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, false, false, cache);
+        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, ProcessingContext::MNListDiff, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
             std::time::Instant::now(),
@@ -206,7 +206,7 @@ pub mod tests {
         let read_list_diff =
             |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);
         let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
-            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache)
+            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, ProcessingContext::QRInfo(is_rotated_quorums_presented), cache)
         };
         let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
         let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
