@@ -157,7 +157,7 @@ fn testnet_quorum_quarters() {
         context as *mut _ as *mut std::ffi::c_void
     );
     let block_height = 1738944;
-    let mut last_quorum = result.last_quorum_per_index.first().cloned().unwrap();
+    let last_quorum = result.last_quorum_per_index.first().cloned().unwrap();
     let nodes = processor.get_rotated_masternodes_for_quorum(
         last_quorum.llmq_type,
         last_quorum.llmq_hash,
