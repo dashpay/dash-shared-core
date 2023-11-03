@@ -198,10 +198,10 @@ pub mod tests {
         processor.use_insight_as_backup = use_insight_as_backup;
         processor.chain_type = chain_type;
         let cache = unsafe { &mut *cache };
-        println!(
-            "process_qrinfo_from_message --: {:?} {:?} {:?}",
-            processor, processor.opaque_context, cache
-        );
+        // println!(
+        //     "process_qrinfo_from_message --: {:?} {:?} {:?}",
+        //     processor, processor.opaque_context, cache
+        // );
         let offset = &mut 0;
         let read_list_diff =
             |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);

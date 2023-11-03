@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use crate::{common, models, types};
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams};
@@ -8,7 +8,7 @@ use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::to::ToFFI;
-use crate::models::QuorumsCLSigsObject;
+use crate::models::llmq_entry::LLMQModifierType;
 use crate::processing::{LLMQValidationStatus, MasternodeProcessorCache, MNListDiffResult, ProcessingError};
 
 // https://github.com/rust-lang/rfcs/issues/2770
@@ -132,15 +132,12 @@ impl MasternodeProcessor {
     pub(crate) fn find_cl_signature_if_need(&self, block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> Option<UInt768> {
         if self.chain_type.core20_is_active_at(block_height) {
             if let Some(work_block_hash) = self.lookup_block_hash_by_height(block_height) {
-                let signature = self.find_cl_signature(work_block_hash, cached_cl_signatures);
-                println!("find_cl_signature_if_need: {} {:?}", block_height, signature);
-                signature
+                self.find_cl_signature(work_block_hash, cached_cl_signatures)
             } else {
                 println!("find_cl_signature_if_need: core 20 is active at {} but block is not fetched", block_height);
                 None
             }
         } else {
-            println!("find_cl_signature_if_need: core 20 is not active at {}", block_height);
             None
         }
     }
@@ -256,7 +253,6 @@ impl MasternodeProcessor {
             block_hash,
         );
 
-        // self.cache_cl_signatures(block_hash, quorums_cl_sigs.clone(), cache);
         let (added_quorums,
             quorums,
             cl_signatures,
@@ -270,6 +266,8 @@ impl MasternodeProcessor {
             processing_context,
             cache,
         );
+        // self.cache_cl_signatures(block_hash, quorums_cl_sigs.clone(), cache);
+        cache.cl_signatures.extend(cl_signatures.clone());
         let masternode_list = models::MasternodeList::new(
             masternodes,
             quorums,
@@ -366,7 +364,7 @@ impl MasternodeProcessor {
         mut base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
         mut added_quorums: Vec<models::LLMQEntry>,
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
-        cl_signatures: Vec<QuorumsCLSigsObject>,
+        cl_signatures: BTreeMap<UInt768, HashSet<u16>>,
         should_process_quorums: bool,
         skip_removed_masternodes: bool,
         processing_context: ProcessingContext,
@@ -384,10 +382,13 @@ impl MasternodeProcessor {
                 .iter_mut()
                 .enumerate()
                 .for_each(|(index, quorum)| {
-                    if let Some(sigs_obj) = cl_signatures.get(index) {
-                        let idx = index as u16;
-                        if sigs_obj.index_set.contains(&idx) {
-                            signatures.insert(quorum.llmq_hash, sigs_obj.signature);
+                    if let Some(signature) = cl_signatures.iter().find_map(|(signature, index_set)|
+                        if index_set.iter().any(|i| *i == index as u16) { Some(signature) } else { None }) {
+                        let llmq_height = self.lookup_block_height_by_hash(quorum.llmq_hash);
+                        if llmq_height != u32::MAX {
+                            if let Some(llmq_hash_minus_8) = self.lookup_block_hash_by_height(llmq_height - 8) {
+                                signatures.insert(llmq_hash_minus_8, signature.clone());
+                            }
                         }
                     }
                     if processing_context.should_validate_quorum(quorum.llmq_type, self.chain_type) {
@@ -505,8 +506,11 @@ impl MasternodeProcessor {
                         // java::generate_snapshot(&snapshot, work_block_height);
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
                         // java::generate_masternode_list_from_map(&masternode_list.masternodes);
-                        let best_cl_signature = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures);
-                        let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(llmq_type, work_block_hash, best_cl_signature);
+                        let quorum_modifier = if let Some(best_cl_signature) = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures) {
+                            LLMQModifierType::CoreV20(llmq_type, work_block_height, best_cl_signature)
+                        } else {
+                            LLMQModifierType::PreCoreV20(llmq_type, work_block_hash)
+                        }.build_llmq_hash();
                         // println!("quorum_modifier: {}", quorum_modifier);
                         // println!("snapshot: {:?}", snapshot);
                         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height, false);
@@ -621,8 +625,15 @@ impl MasternodeProcessor {
                         });
                         //Self::log_masternodes(&used_at_h_masternodes, format!("••••• USED AT H {} ••••••• ", work_block_height));
                         //Self::log_masternodes(&unused_at_h_masternodes, format!("••••• UNUSED AT H {} •••••••", work_block_height));
-                        let best_cl_signature = self.find_cl_signature(work_block_hash, cached_cl_signatures);
-                        let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(params.r#type, work_block_hash, best_cl_signature);
+                        // let best_cl_signature = self.find_cl_signature(work_block_hash, cached_cl_signatures);
+                        // let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(params.r#type, work_block_hash, best_cl_signature);
+                        let quorum_modifier = if let Some(best_cl_signature) = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures) {
+                            LLMQModifierType::CoreV20(params.r#type, work_block_height, best_cl_signature)
+                        } else {
+                            LLMQModifierType::PreCoreV20(params.r#type, work_block_hash)
+                        }.build_llmq_hash();
+
+
                         let sorted_used_mns_list = Self::valid_masternodes_for_rotated_quorum_map(used_at_h_masternodes, quorum_modifier, work_block_height);
                         let sorted_unused_mns_list = Self::valid_masternodes_for_rotated_quorum_map(unused_at_h_masternodes, quorum_modifier, work_block_height);
                         //Self::log_masternodes(&sorted_unused_mns_list, format!("••••• SORTED UNUSED AT H {} ••••••• ", work_block_height));

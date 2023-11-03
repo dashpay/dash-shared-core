@@ -13,6 +13,29 @@ use crate::keys::BLSKey;
 use crate::models;
 use crate::processing::llmq_validation_status::{LLMQValidationStatus, LLMQPayloadValidationStatus};
 
+pub enum LLMQModifierType {
+    PreCoreV20(LLMQType, UInt256),
+    CoreV20(LLMQType, u32, UInt768),
+}
+
+impl LLMQModifierType {
+    pub fn build_llmq_hash(&self) -> UInt256 {
+        let mut writer = vec![];
+        match *self {
+            LLMQModifierType::PreCoreV20(llmq_type, block_hash) => {
+                VarInt(llmq_type as u64).enc(&mut writer);
+                block_hash.enc(&mut writer);
+            },
+            LLMQModifierType::CoreV20(llmq_type, block_height, cl_signature) => {
+                VarInt(llmq_type as u64).enc(&mut writer);
+                block_height.enc(&mut writer);
+                cl_signature.enc(&mut writer);
+            }
+        }
+        UInt256::sha256d(writer)
+    }
+}
+
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
 pub struct LLMQEntry {
     pub version: LLMQVersion,
@@ -230,16 +253,6 @@ impl LLMQEntry {
             self.threshold_signature,
             self.all_commitment_aggregated_signature,
         )
-    }
-
-    pub fn build_llmq_quorum_hash(llmq_type: LLMQType, llmq_hash: UInt256, best_cl_signature: Option<UInt768>) -> UInt256 {
-        let mut writer = vec![];
-        VarInt(llmq_type as u64).enc(&mut writer);
-        llmq_hash.enc(&mut writer);
-        if let Some(best_cl_signature) = best_cl_signature {
-            best_cl_signature.enc(&mut writer);
-        }
-        UInt256::sha256d(writer)
     }
 
     pub fn commitment_data(&self) -> Vec<u8> {

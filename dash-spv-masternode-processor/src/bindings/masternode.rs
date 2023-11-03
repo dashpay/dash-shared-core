@@ -7,6 +7,7 @@ use crate::chain::common::chain_type::ProcessingContext;
 use crate::consensus::encode;
 use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}, UInt768};
 use crate::ffi::{boxer::{boxed, boxed_vec}, ByteArray, from::FromFFI, to::ToFFI};
+use crate::models::llmq_entry::LLMQModifierType;
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
@@ -131,10 +132,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let mn_list_diff_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> =
         Vec::with_capacity(mn_list_diff_list_count);
-    assert_eq!(
-        quorum_snapshot_list_count, mn_list_diff_list_count,
-        "'quorum_snapshot_list_count' must be equal 'mn_list_diff_list_count'"
-    );
+    assert_eq!(quorum_snapshot_list_count, mn_list_diff_list_count, "number of snapshots should be equal to number of diffs");
     for i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
         let block_hash = list_diff.block_hash;
@@ -220,11 +218,22 @@ pub extern "C" fn quorum_threshold_for_type(llmq_type: LLMQType) -> u32 {
 }
 
 /// quorum_hash: u256
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_build_llmq_hash(llmq_type: LLMQType, quorum_hash: *const u8) -> ByteArray {
+    LLMQModifierType::PreCoreV20(llmq_type, UInt256::from_const(quorum_hash).unwrap())
+        .build_llmq_hash()
+        .into()
+}
+
+/// height: u32
 /// best_cl_signature: Option<u768>
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_build_llmq_hash(llmq_type: LLMQType, quorum_hash: *const u8, best_cl_signature: *const u8) -> ByteArray {
-    models::LLMQEntry::build_llmq_quorum_hash(llmq_type, UInt256::from_const(quorum_hash).unwrap(), UInt768::from_const(best_cl_signature)).into()
+pub extern "C" fn quorum_build_llmq_hash_v20(llmq_type: LLMQType, height: u32, best_cl_signature: *const u8) -> ByteArray {
+    LLMQModifierType::CoreV20(llmq_type, height, UInt768::from_const(best_cl_signature).unwrap())
+        .build_llmq_hash()
+        .into()
 }
 
 /// # Safety

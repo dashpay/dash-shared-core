@@ -320,18 +320,6 @@ impl ToFFI for common::Block {
     }
 }
 
-impl ToFFI for models::QuorumsCLSigsObject {
-    type Item = types::QuorumsCLSigsObject;
-
-    fn encode(&self) -> Self::Item {
-        Self::Item {
-            signature: boxed(self.signature.0),
-            index_set_count: self.index_set.len(),
-            index_set: boxed_vec(self.index_set.clone()),
-        }
-    }
-}
-
 pub fn encode_quorums_map(
     quorums: &BTreeMap<chain::common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
 ) -> *mut *mut types::LLMQMap {

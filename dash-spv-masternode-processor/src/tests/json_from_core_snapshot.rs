@@ -403,6 +403,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
         base_block_height: block_height_lookup(base_block_hash),
         block_height: block_height_lookup(block_hash),
         version,
-        quorums_cls_sigs: vec![],
+        // TODO: update json
+        quorums_cls_sigs: BTreeMap::new(),
     }
 }

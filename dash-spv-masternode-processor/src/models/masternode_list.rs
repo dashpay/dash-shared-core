@@ -5,6 +5,7 @@ use crate::common::MasternodeType;
 use crate::consensus::Encodable;
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::models::{LLMQEntry, MasternodeEntry};
+use crate::models::llmq_entry::LLMQModifierType;
 use crate::tx::CoinbaseTransaction;
 use crate::util::data_ops::merkle_root_from_hashes;
 
@@ -224,7 +225,12 @@ impl MasternodeList {
     pub fn get_masternodes_for_quorum(quorum: &LLMQEntry, chain_type: ChainType, masternodes: BTreeMap<UInt256, MasternodeEntry>, block_height: u32, best_cl_signature: Option<UInt768>) -> Vec<MasternodeEntry> {
         let llmq_type = quorum.llmq_type;
         let hpmn_only = llmq_type == chain_type.platform_type() && !quorum.version.use_bls_legacy();
-        let quorum_modifier = LLMQEntry::build_llmq_quorum_hash(quorum.llmq_type, quorum.llmq_hash, best_cl_signature);
+        let quorum_modifier = if let Some(best_cl_signature) = best_cl_signature {
+            LLMQModifierType::CoreV20(llmq_type, block_height - 8, best_cl_signature)
+        } else {
+            LLMQModifierType::PreCoreV20(llmq_type, quorum.llmq_hash)
+        }.build_llmq_hash();
+        // let quorum_modifier = LLMQEntry::build_llmq_quorum_hash(quorum.llmq_type, quorum.llmq_hash, best_cl_signature);
         let quorum_count = llmq_type.size();
         let masternodes_in_list_count = masternodes.len();
         let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
