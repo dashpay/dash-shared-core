@@ -266,7 +266,6 @@ impl MasternodeProcessor {
             processing_context,
             cache,
         );
-        // self.cache_cl_signatures(block_hash, quorums_cl_sigs.clone(), cache);
         cache.cl_signatures.extend(cl_signatures.clone());
         let masternode_list = models::MasternodeList::new(
             masternodes,
