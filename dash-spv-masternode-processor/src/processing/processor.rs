@@ -443,22 +443,18 @@ impl MasternodeProcessor {
                 skip_removed_masternodes,
             )
         } else {
-            let work_block_height = block_height - 8;
             models::MasternodeList::get_masternodes_for_quorum(
                 quorum,
                 self.chain_type,
                 masternodes,
                 block_height,
-                self.find_cl_signature_if_need(work_block_height, &cache.cl_signatures))
+                self.find_cl_signature_if_need(block_height - 8, &cache.cl_signatures))
         };
         //crate::util::java::generate_final_commitment_test_file(self.chain_type, block_height, &quorum, &valid_masternodes);
         quorum.verify(valid_masternodes, block_height)
     }
 
     fn sort_scored_masternodes(scored_masternodes: BTreeMap<UInt256, models::MasternodeEntry>) -> Vec<models::MasternodeEntry> {
-        // let mut v: Vec<_> = scored_masternodes.clone().into_iter().collect::<Vec<_>>();
-        // v.sort_unstable_by_key(|(s, _)| std::cmp::Reverse(s.reversed()));
-        // v.into_iter().map(|(_, node)| node).collect()
         let mut v = Vec::from_iter(scored_masternodes);
         v.sort_by(|(s1, _), (s2, _)| s2.reversed().cmp(&s1.reversed()));
         v.into_iter().map(|(s, node)| node).collect()
@@ -624,8 +620,6 @@ impl MasternodeProcessor {
                         });
                         //Self::log_masternodes(&used_at_h_masternodes, format!("••••• USED AT H {} ••••••• ", work_block_height));
                         //Self::log_masternodes(&unused_at_h_masternodes, format!("••••• UNUSED AT H {} •••••••", work_block_height));
-                        // let best_cl_signature = self.find_cl_signature(work_block_hash, cached_cl_signatures);
-                        // let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(params.r#type, work_block_hash, best_cl_signature);
                         let quorum_modifier = if let Some(best_cl_signature) = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures) {
                             LLMQModifierType::CoreV20(params.r#type, work_block_height, best_cl_signature)
                         } else {
