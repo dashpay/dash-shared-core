@@ -2,12 +2,11 @@ use std::ptr::null_mut;
 use std::slice;
 use byte::BytesExt;
 use crate::{models, types};
-use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
-use crate::chain::common::chain_type::ProcessingContext;
+use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, ProcessingContext};
 use crate::consensus::encode;
 use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}, UInt768};
 use crate::ffi::{boxer::{boxed, boxed_vec}, ByteArray, from::FromFFI, to::ToFFI};
-use crate::models::llmq_entry::LLMQModifierType;
+use crate::models::LLMQModifierType;
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 
 /// Read and process message received as a response for 'GETMNLISTDIFF' call

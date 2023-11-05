@@ -1,14 +1,13 @@
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use crate::{common, models, types};
-use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams};
-use crate::chain::common::chain_type::ProcessingContext;
+use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams, ProcessingContext};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::to::ToFFI;
-use crate::models::llmq_entry::LLMQModifierType;
+use crate::models::LLMQModifierType;
 use crate::processing::{LLMQValidationStatus, MasternodeProcessorCache, MNListDiffResult, ProcessingError};
 
 // https://github.com/rust-lang/rfcs/issues/2770

@@ -10,7 +10,7 @@ pub mod mn_list_diff;
 pub mod operator_public_key;
 pub mod snapshot;
 
-pub use self::llmq_entry::LLMQEntry;
+pub use self::llmq_entry::{LLMQEntry, LLMQModifierType};
 pub use self::llmq_typed_hash::LLMQIndexedHash;
 pub use self::llmq_typed_hash::LLMQTypedHash;
 pub use self::masternode_entry::MasternodeEntry;
