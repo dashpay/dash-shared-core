@@ -21,13 +21,11 @@ pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: Crypto
     }
 
     fn encrypt(data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Option<Vec<u8>> {
-        let result = aes256_encrypt_decrypt(Operation::Encrypt, data, key, iv);
-        result
+        aes256_encrypt_decrypt(Operation::Encrypt, data, key, iv)
     }
 
     fn decrypt(data: impl AsRef<[u8]>, key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>) -> Option<Vec<u8>> {
-        let result = aes256_encrypt_decrypt(Operation::Decrypt, data, key, iv);
-        result
+        aes256_encrypt_decrypt(Operation::Decrypt, data, key, iv)
     }
 
     fn encrypt_with_secret_key(&mut self, secret_key: &K, public_key: &K) -> Option<Vec<u8>> {
