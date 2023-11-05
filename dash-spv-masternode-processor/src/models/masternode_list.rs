@@ -191,7 +191,6 @@ impl MasternodeList {
     }
 
     pub fn has_masternode(&self, provider_registration_transaction_hash: UInt256) -> bool {
-        // self.masternodes.contains_key(provider_registration_transaction_hash)
         self.masternodes.values().any(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
     }
 
@@ -199,7 +198,6 @@ impl MasternodeList {
         self.masternodes.values()
             .find(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
             .map_or(false, |node| node.is_valid)
-        // self.masternodes.values().any(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
     }
 }
 
@@ -230,7 +228,6 @@ impl MasternodeList {
         } else {
             LLMQModifierType::PreCoreV20(llmq_type, quorum.llmq_hash)
         }.build_llmq_hash();
-        // let quorum_modifier = LLMQEntry::build_llmq_quorum_hash(quorum.llmq_type, quorum.llmq_hash, best_cl_signature);
         let quorum_count = llmq_type.size();
         let masternodes_in_list_count = masternodes.len();
         let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
