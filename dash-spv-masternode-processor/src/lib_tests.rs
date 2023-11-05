@@ -259,9 +259,9 @@ pub mod tests {
         let mut mn_list_diff_list: Vec<MNListDiffResult> =
             Vec::with_capacity(mn_list_diff_list_count);
         for _i in 0..mn_list_diff_list_count {
-            mn_list_diff_list.push(process_list_diff(unwrap_or_qr_processing_failure!(
-                read_list_diff(offset)
-            ), LLMQVerificationContext::QRInfo(is_rotated_quorums_presented)));
+            let list_diff = unwrap_or_qr_processing_failure!(read_list_diff(offset));
+            let verification_context = LLMQVerificationContext::QRInfo(is_rotated_quorums_presented);
+            mn_list_diff_list.push(process_list_diff(list_diff, verification_context));
         }
         // The order is important since the each new one dependent on previous
         #[allow(clippy::manual_map)]
