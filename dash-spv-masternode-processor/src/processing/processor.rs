@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use crate::{common, models, types};
-use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams, ProcessingContext};
+use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType, LLMQParams};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::to::ToFFI;
-use crate::models::LLMQModifierType;
+use crate::models::{LLMQModifierType, LLMQVerificationContext};
 use crate::processing::{LLMQValidationStatus, MasternodeProcessorCache, MNListDiffResult, ProcessingError};
 
 // https://github.com/rust-lang/rfcs/issues/2770
@@ -158,8 +158,7 @@ impl MasternodeProcessor {
     pub(crate) fn get_list_diff_result_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
-        should_process_quorums: bool,
-        processing_context: ProcessingContext,
+        verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
@@ -169,14 +168,13 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result(base_list, list_diff, should_process_quorums, processing_context, cache)
+        self.get_list_diff_result(base_list, list_diff, verification_context, cache)
     }
 
     pub(crate) fn get_list_diff_result_internal_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
-        should_process_quorums: bool,
-        processing_context: ProcessingContext,
+        verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         //println!("get base list: find_masternode_list for {}: {}", list_diff.base_block_height, list_diff.base_block_hash);
@@ -185,18 +183,17 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, processing_context, cache)
+        self.get_list_diff_result_internal(base_list, list_diff, verification_context, cache)
     }
 
     pub(crate) fn get_list_diff_result(
         &self,
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
-        should_process_quorums: bool,
-        processing_context: ProcessingContext,
+        verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
-        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, processing_context, cache);
+        let result = self.get_list_diff_result_internal(base_list, list_diff, verification_context, cache);
         // println!("get_list_diff_result: {:#?}", result);
         result.encode()
     }
@@ -229,8 +226,7 @@ impl MasternodeProcessor {
         &self,
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
-        should_process_quorums: bool,
-        processing_context: ProcessingContext,
+        verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         let skip_removed_masternodes = list_diff.version >= 2;
@@ -260,9 +256,8 @@ impl MasternodeProcessor {
             list_diff.added_quorums,
             list_diff.deleted_quorums,
             quorums_cl_sigs.clone(),
-            should_process_quorums,
             skip_removed_masternodes,
-            processing_context,
+            verification_context,
             cache,
         );
         cache.cl_signatures.extend(cl_signatures.clone());
@@ -363,9 +358,8 @@ impl MasternodeProcessor {
         mut added_quorums: Vec<models::LLMQEntry>,
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
         cl_signatures: BTreeMap<UInt768, HashSet<u16>>,
-        should_process_quorums: bool,
         skip_removed_masternodes: bool,
-        processing_context: ProcessingContext,
+        verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
     ) -> (
         Vec<models::LLMQEntry>,
@@ -375,7 +369,7 @@ impl MasternodeProcessor {
     ) {
         let mut has_valid_quorums = true;
         let mut signatures = BTreeMap::<UInt256, UInt768>::new();
-        if should_process_quorums {
+        if verification_context.should_validate_quorums() {
             added_quorums
                 .iter_mut()
                 .enumerate()
@@ -389,7 +383,7 @@ impl MasternodeProcessor {
                             }
                         }
                     }
-                    if processing_context.should_validate_quorum(quorum.llmq_type, self.chain_type) {
+                    if verification_context.should_validate_quorum_of_type(quorum.llmq_type, self.chain_type) {
                         let status = self.validate_quorum(quorum, skip_removed_masternodes, cache);
                         has_valid_quorums &= status.is_not_critical();
                     }

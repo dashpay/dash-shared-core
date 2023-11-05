@@ -14,13 +14,14 @@ pub mod tests {
     use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
-    use crate::chain::common::chain_type::{ChainType, IHaveChainSettings, ProcessingContext};
+    use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384};
     use crate::models;
     use crate::processing::{MasternodeProcessorCache, MasternodeProcessor, MNListDiffResult, ProcessingError, QRInfoResult};
     use crate::{unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return, types};
     use crate::crypto::UInt768;
+    use crate::models::LLMQVerificationContext;
     use crate::tests::block_store::{init_mainnet_store, init_testnet_store};
 
     // This regex can be used to omit timestamp etc. while replacing after paste from xcode console log
@@ -167,10 +168,10 @@ pub mod tests {
         processor.opaque_context = context;
         processor.use_insight_as_backup = use_insight_as_backup;
         processor.chain_type = chain_type;
-        let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+        let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length) };
         let list_diff =
             unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), protocol_version));
-        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, ProcessingContext::MNListDiff, cache);
+        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, LLMQVerificationContext::MNListDiff, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
             std::time::Instant::now(),
@@ -192,7 +193,7 @@ pub mod tests {
         context: *const std::ffi::c_void,
     ) -> QRInfoResult {
         println!("process_qrinfo_from_message: {:?} {:?}", processor, cache);
-        let message: &[u8] = unsafe { slice::from_raw_parts(message, message_length as usize) };
+        let message: &[u8] = unsafe { slice::from_raw_parts(message, message_length) };
         let processor = unsafe { &mut *processor };
         processor.opaque_context = context;
         processor.use_insight_as_backup = use_insight_as_backup;
@@ -205,8 +206,8 @@ pub mod tests {
         let offset = &mut 0;
         let read_list_diff =
             |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);
-        let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
-            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, ProcessingContext::QRInfo(is_rotated_quorums_presented), cache)
+        let mut process_list_diff = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext| {
+            processor.get_list_diff_result_internal_with_base_lookup(list_diff, verification_context, cache)
         };
         let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
         let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
@@ -260,20 +261,20 @@ pub mod tests {
         for _i in 0..mn_list_diff_list_count {
             mn_list_diff_list.push(process_list_diff(unwrap_or_qr_processing_failure!(
                 read_list_diff(offset)
-            ), true));
+            ), LLMQVerificationContext::QRInfo(is_rotated_quorums_presented)));
         }
         // The order is important since the each new one dependent on previous
         #[allow(clippy::manual_map)]
         let result_at_h_4c = if let Some(diff) = diff_h_4c {
-            Some(process_list_diff(diff, false))
+            Some(process_list_diff(diff, LLMQVerificationContext::None))
         } else {
             None
         };
-        let result_at_h_3c = process_list_diff(diff_h_3c, false);
-        let result_at_h_2c = process_list_diff(diff_h_2c, false);
-        let result_at_h_c = process_list_diff(diff_h_c, false);
-        let result_at_h = process_list_diff(diff_h, true);
-        let result_at_tip = process_list_diff(diff_tip, false);
+        let result_at_h_3c = process_list_diff(diff_h_3c, LLMQVerificationContext::None);
+        let result_at_h_2c = process_list_diff(diff_h_2c, LLMQVerificationContext::None);
+        let result_at_h_c = process_list_diff(diff_h_c, LLMQVerificationContext::None);
+        let result_at_h = process_list_diff(diff_h, LLMQVerificationContext::QRInfo(is_rotated_quorums_presented));
+        let result_at_tip = process_list_diff(diff_tip, LLMQVerificationContext::None);
         QRInfoResult {
             error_status: ProcessingError::None,
             result_at_tip,

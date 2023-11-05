@@ -5,22 +5,6 @@ use crate::chain::common::LLMQType;
 use crate::chain::params::DUFFS;
 use crate::crypto::{byte_util::Reversable, UInt256};
 
-pub enum ProcessingContext {
-    MNListDiff,
-    QRInfo(bool),
-}
-
-impl ProcessingContext {
-    pub fn should_validate_quorum(&self, llmq_type: LLMQType, chain_type: ChainType) -> bool {
-        match self {
-            ProcessingContext::MNListDiff =>
-                chain_type.isd_llmq_type() != llmq_type && chain_type.should_process_llmq_of_type(llmq_type),
-            ProcessingContext::QRInfo(is_quorum_rotation_activated) =>
-                chain_type.isd_llmq_type() == llmq_type && *is_quorum_rotation_activated == true
-        }
-    }
-}
-
 pub trait IHaveChainSettings {
     fn genesis_hash(&self) -> UInt256;
     fn genesis_height(&self) -> u32;

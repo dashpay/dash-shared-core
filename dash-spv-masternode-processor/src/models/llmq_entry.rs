@@ -5,13 +5,35 @@ use std::convert::Into;
 use serde::ser::SerializeStruct;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
-use crate::chain::common::LLMQType;
+use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::common::LLMQVersion;
 use crate::consensus::{encode::VarInt, Encodable, WriteExt};
 use crate::crypto::{byte_util::AsBytes, data_ops::Data, UInt256, UInt384, UInt768};
 use crate::keys::BLSKey;
 use crate::models;
 use crate::processing::llmq_validation_status::{LLMQValidationStatus, LLMQPayloadValidationStatus};
+
+#[derive(PartialEq)]
+pub enum LLMQVerificationContext {
+    None,
+    MNListDiff,
+    QRInfo(bool),
+}
+
+impl LLMQVerificationContext {
+    pub fn should_validate_quorums(&self) -> bool {
+        *self != Self::None
+    }
+    pub fn should_validate_quorum_of_type(&self, llmq_type: LLMQType, chain_type: ChainType) -> bool {
+        match self {
+            LLMQVerificationContext::None => false,
+            LLMQVerificationContext::MNListDiff =>
+                chain_type.isd_llmq_type() != llmq_type && chain_type.should_process_llmq_of_type(llmq_type),
+            LLMQVerificationContext::QRInfo(is_quorum_rotation_activated) =>
+                chain_type.isd_llmq_type() == llmq_type && *is_quorum_rotation_activated == true
+        }
+    }
+}
 
 pub enum LLMQModifierType {
     PreCoreV20(LLMQType, UInt256),
