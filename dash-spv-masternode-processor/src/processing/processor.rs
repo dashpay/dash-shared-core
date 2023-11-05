@@ -590,10 +590,8 @@ impl MasternodeProcessor {
                                     //Self::log_masternodes(quarter_nodes, format!("••••• PREV QUARTER {} ••••••• ", i));
                                     for node in quarter_nodes {
                                         let hash = node.provider_registration_transaction_hash;
-                                        // let skip = skip_removed_masternodes && !masternode_list.has_masternode(node.provider_registration_transaction_hash);
                                         if (!skip_removed_masternodes || masternode_list.has_masternode(hash)) &&
                                             masternode_list.has_valid_masternode(hash) {
-                                            // node.is_valid {
                                             if !used_at_h_masternodes.iter().any(|m| m.provider_registration_transaction_hash == hash) {
                                                 used_at_h_masternodes.push(node.clone());
                                             }
@@ -606,8 +604,7 @@ impl MasternodeProcessor {
                             }
                         }
                         masternode_list.masternodes.values().for_each(|mn| {
-                            if mn.is_valid && !used_at_h_masternodes.iter()
-                                .any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash) {
+                            if mn.is_valid && !used_at_h_masternodes.iter().any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash) {
                                 unused_at_h_masternodes.push(mn.clone());
                             }
                         });

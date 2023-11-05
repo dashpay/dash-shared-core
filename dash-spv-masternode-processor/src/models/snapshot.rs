@@ -103,7 +103,7 @@ impl LLMQSnapshot {
         match self.skip_list_mode {
             LLMQSnapshotSkipMode::NoSkipping => {
                 let mut iter = sorted_combined_mns_list.iter();
-                (0..quorum_count).for_each(|_i| {
+                (0..quorum_count).for_each(|i| {
                     let mut quarter = Vec::<MasternodeEntry>::new();
                     while quarter.len() < quarter_size {
                         if let Some(node) = iter.next() {
@@ -112,7 +112,7 @@ impl LLMQSnapshot {
                             iter = sorted_combined_mns_list.iter();
                         }
                     }
-                    quarter_quorum_members.push(quarter);
+                    quarter_quorum_members[i] = quarter;
                 });
             }
             LLMQSnapshotSkipMode::SkipFirst => {
@@ -143,7 +143,7 @@ impl LLMQSnapshot {
                 }
             }
             LLMQSnapshotSkipMode::SkipExcept => {
-                (0..quorum_count).for_each(|_i| {
+                (0..quorum_count).for_each(|i| {
                     let mut quarter = Vec::<MasternodeEntry>::new();
                     self.skip_list.iter().for_each(|unskipped| {
                         if let Some(node) = sorted_combined_mns_list.get(*unskipped as usize) {
@@ -152,7 +152,7 @@ impl LLMQSnapshot {
                             }
                         }
                     });
-                    quarter_quorum_members.push(quarter);
+                    quarter_quorum_members[i] = quarter;
                 });
             }
             LLMQSnapshotSkipMode::SkipAll => {
