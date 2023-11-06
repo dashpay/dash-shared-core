@@ -16,3 +16,4 @@ pub mod testnet_core19;
 pub mod migration_core19;
 pub mod mainnet_core19;
 pub mod absinthe_core20;
+pub mod core20_testnet;

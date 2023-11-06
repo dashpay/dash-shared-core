@@ -6,6 +6,7 @@ use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::consensus::encode;
 use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}, UInt768};
 use crate::ffi::{boxer::{boxed, boxed_vec}, ByteArray, from::FromFFI, to::ToFFI};
+use crate::models::{LLMQModifierType, LLMQVerificationContext};
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
@@ -31,7 +32,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.chain_type = chain_type;
-    let message: &[u8] = slice::from_raw_parts(message_arr, message_length as usize);
+    let message: &[u8] = slice::from_raw_parts(message_arr, message_length);
     let list_diff = unwrap_or_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor
         .lookup_block_height_by_hash(hash), protocol_version));
     if !is_from_snapshot {
@@ -42,7 +43,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
     }
-    let result = processor.get_list_diff_result_with_base_lookup(list_diff, true, false, false, cache);
+    let result = processor.get_list_diff_result_with_base_lookup(list_diff, LLMQVerificationContext::MNListDiff, cache);
     println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }
@@ -66,7 +67,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     context: *const std::ffi::c_void,
 ) -> *mut types::QRInfoResult {
     let instant = std::time::Instant::now();
-    let message: &[u8] = slice::from_raw_parts(message, message_length as usize);
+    let message: &[u8] = slice::from_raw_parts(message, message_length);
     let processor = &mut *processor;
     let cache = &mut *cache;
     processor.opaque_context = context;
@@ -74,15 +75,15 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     processor.chain_type = chain_type;
     println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let offset = &mut 0;
-    let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
-        processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache)
+    let mut process_list_diff = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext| {
+        processor.get_list_diff_result_with_base_lookup(list_diff, verification_context, cache)
     };
     let read_list_diff =
         |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);
     let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
     let mut get_list_diff_result =
-        |list_diff: models::MNListDiff, verify_quorums: bool| boxed(process_list_diff(list_diff, verify_quorums));
+        |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext| boxed(process_list_diff(list_diff, verification_context));
     let snapshot_at_h_c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
@@ -130,29 +131,26 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let mn_list_diff_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> =
         Vec::with_capacity(mn_list_diff_list_count);
-    assert_eq!(
-        quorum_snapshot_list_count, mn_list_diff_list_count,
-        "'quorum_snapshot_list_count' must be equal 'mn_list_diff_list_count'"
-    );
+    assert_eq!(quorum_snapshot_list_count, mn_list_diff_list_count, "number of snapshots should be equal to number of diffs");
     for i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
         let block_hash = list_diff.block_hash;
-        mn_list_diff_list_vec.push(get_list_diff_result(list_diff, false));
+        mn_list_diff_list_vec.push(get_list_diff_result(list_diff, LLMQVerificationContext::None));
         let snapshot = snapshots.get(i).unwrap();
         quorum_snapshot_list_vec.push(boxed(snapshot.encode()));
         processor.save_snapshot(block_hash, snapshot.clone());
     }
 
     let result_at_h_4c = if extra_share {
-        get_list_diff_result(diff_h_4c.unwrap(), false)
+        get_list_diff_result(diff_h_4c.unwrap(), LLMQVerificationContext::None)
     } else {
         null_mut()
     };
-    let result_at_h_3c = get_list_diff_result(diff_h_3c, false);
-    let result_at_h_2c = get_list_diff_result(diff_h_2c, false);
-    let result_at_h_c = get_list_diff_result(diff_h_c, false);
-    let result_at_h = get_list_diff_result(diff_h, true);
-    let result_at_tip = get_list_diff_result(diff_tip, false);
+    let result_at_h_3c = get_list_diff_result(diff_h_3c, LLMQVerificationContext::None);
+    let result_at_h_2c = get_list_diff_result(diff_h_2c, LLMQVerificationContext::None);
+    let result_at_h_c = get_list_diff_result(diff_h_c, LLMQVerificationContext::None);
+    let result_at_h = get_list_diff_result(diff_h, LLMQVerificationContext::QRInfo(is_rotated_quorums_presented));
+    let result_at_tip = get_list_diff_result(diff_tip, LLMQVerificationContext::None);
     let result = types::QRInfoResult {
         error_status: ProcessingError::None,
         result_at_tip,
@@ -179,7 +177,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     };
 
     #[cfg(feature = "generate-dashj-tests")]
-    crate::util::java::generate_qr_state_test_file_json(chain_type, result);
+    crate::util::java::generate_qr_state_test_file_json(chain_type, &result);
     println!("process_qrinfo_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }
@@ -197,12 +195,17 @@ pub unsafe extern "C" fn processor_cache_masternode_list(block_hash: *const u8, 
 pub unsafe extern "C" fn validate_masternode_list(list: *const types::MasternodeList, quorum: *const types::LLMQEntry, block_height: u32, chain_type: ChainType, best_cl_signature: *const u8) -> bool {
     let list = (*list).decode();
     let mut quorum = (*quorum).decode();
-    let is_valid_payload = quorum.validate_payload();
-    if !is_valid_payload {
+    let payload_validation_status = quorum.validate_payload();
+    if !payload_validation_status.is_ok() {
         return false;
     }
-    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, UInt768::from_const(best_cl_signature));
-    return quorum.validate(valid_masternodes, block_height);
+    let quorum_modifier_type = if let Some(best_cl_signature) = UInt768::from_const(best_cl_signature) {
+        LLMQModifierType::CoreV20(quorum.llmq_type, block_height - 8, best_cl_signature)
+    } else {
+        LLMQModifierType::PreCoreV20(quorum.llmq_type, quorum.llmq_hash)
+    };
+    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, quorum_modifier_type);
+    return quorum.validate(valid_masternodes, block_height).is_not_critical();
 }
 
 
@@ -219,11 +222,22 @@ pub extern "C" fn quorum_threshold_for_type(llmq_type: LLMQType) -> u32 {
 }
 
 /// quorum_hash: u256
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_build_llmq_hash(llmq_type: LLMQType, quorum_hash: *const u8) -> ByteArray {
+    LLMQModifierType::PreCoreV20(llmq_type, UInt256::from_const(quorum_hash).unwrap())
+        .build_llmq_hash()
+        .into()
+}
+
+/// height: u32
 /// best_cl_signature: Option<u768>
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_build_llmq_hash(llmq_type: LLMQType, quorum_hash: *const u8, best_cl_signature: *const u8) -> ByteArray {
-    models::LLMQEntry::build_llmq_quorum_hash(llmq_type, UInt256::from_const(quorum_hash).unwrap(), UInt768::from_const(best_cl_signature)).into()
+pub extern "C" fn quorum_build_llmq_hash_v20(llmq_type: LLMQType, height: u32, best_cl_signature: *const u8) -> ByteArray {
+    LLMQModifierType::CoreV20(llmq_type, height, UInt768::from_const(best_cl_signature).unwrap())
+        .build_llmq_hash()
+        .into()
 }
 
 /// # Safety

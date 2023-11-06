@@ -1,15 +1,14 @@
 use byte::BytesExt;
 use hashes::hex::ToHex;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use crate::chain::common::LLMQType;
 use crate::chain::constants::{CORE_PROTO_20, CORE_PROTO_BLS_BASIC, CORE_PROTO_DIFF_VERSION_ORDER};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
-use crate::crypto::UInt256;
+use crate::crypto::{UInt256, UInt768};
 use crate::models::{LLMQEntry, MasternodeEntry};
 use crate::models::masternode_entry::MasternodeReadContext;
-use crate::models::quorums_cl_sigs_object::QuorumsCLSigsObject;
 use crate::tx::CoinbaseTransaction;
 
 #[derive(Clone)]
@@ -35,7 +34,8 @@ pub struct MNListDiff {
     // 19.2 goes with 70228
     // 19.3 goes with 70229?
     // 20.0 goes with 70230+
-    pub quorums_cls_sigs: Vec<QuorumsCLSigsObject>,
+    // clsig, heights
+    pub quorums_cls_sigs: BTreeMap<UInt768, HashSet<u16>>,
 }
 
 impl std::fmt::Debug for MNListDiff {
@@ -67,11 +67,10 @@ impl MNListDiff {
         block_height_lookup: F,
         protocol_version: u32,
     ) -> Option<Self> {
-        let version = if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
-            u16::from_bytes(message, offset)?
-        } else {
-            1
-        };
+        let mut version = 1;
+        if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
+            version = u16::from_bytes(message, offset)?
+        }
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
         let base_block_height = block_height_lookup(base_block_hash);
@@ -84,13 +83,10 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        let version = if (CORE_PROTO_BLS_BASIC..CORE_PROTO_DIFF_VERSION_ORDER).contains(&protocol_version) {
+        if protocol_version >= CORE_PROTO_BLS_BASIC && protocol_version < CORE_PROTO_DIFF_VERSION_ORDER {
             // BLS Basic
-            u16::from_bytes(message, offset)?
-        } else {
-            // BLS Legacy
-            1
-        };
+            version = u16::from_bytes(message, offset)?
+        }
         let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
@@ -125,12 +121,17 @@ impl MNListDiff {
                 added_quorums.push(LLMQEntry::from_bytes(message, offset)?);
             }
         }
-        let mut quorums_cls_sigs = Vec::new();
-        if protocol_version >= CORE_PROTO_20 { // Core v0.20
+        let mut quorums_cls_sigs = BTreeMap::new();
+        if protocol_version >= CORE_PROTO_20 {
             let quorums_cl_sigs_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..quorums_cl_sigs_count {
-                let sig = QuorumsCLSigsObject::from_bytes(message, offset)?;
-                quorums_cls_sigs.push(sig);
+                let signature = UInt768::from_bytes(message, offset)?;
+                let index_set_length = VarInt::from_bytes(message, offset)?.0 as usize;
+                let mut index_set = HashSet::with_capacity(index_set_length);
+                for _i in 0..index_set_length {
+                    index_set.insert(u16::from_bytes(message, offset)?);
+                }
+                quorums_cls_sigs.insert(signature, index_set);
             }
         }
 

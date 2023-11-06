@@ -16,9 +16,9 @@ pub struct CoinbaseTransaction {
     pub height: u32,
     pub merkle_root_mn_list: UInt256,
     pub merkle_root_llmq_list: Option<UInt256>,
-    pub best_cl_height_diff: u32,
+    pub best_cl_height_diff: u64,
     pub best_cl_signature: Option<UInt768>,
-    pub credit_pool_balance: Option<u64>,
+    pub credit_pool_balance: Option<i64>,
 }
 
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
@@ -36,12 +36,12 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             None
         };
         let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= COINBASE_TX_CORE_20 {
-            // TODO: VarInt or u32??
-            (bytes.read_with::<u32>(offset, byte::LE)?,
+            (bytes.read_with::<VarInt>(offset, byte::LE)?.0,
             bytes.read_with::<UInt768>(offset, byte::LE).ok(),
-            bytes.read_with::<VarInt>(offset, byte::LE).ok().map(|var_int| var_int.0))
+            bytes.read_with::<i64>(offset, byte::LE).ok())
+
         } else {
-            (u32::MAX, None, None)
+            (u64::MAX, None, None)
         };
         base.tx_type = Coinbase;
         base.payload_offset = *offset;
@@ -72,7 +72,7 @@ impl CoinbaseTransaction {
                 llmq_root.enc(&mut buffer);
             }
             if self.coinbase_transaction_version >= COINBASE_TX_CORE_20 {
-                self.best_cl_height_diff.enc(&mut buffer);
+                VarInt(self.best_cl_height_diff).enc(&mut buffer);
                 if let Some(cl_sig) = self.best_cl_signature {
                     cl_sig.enc(&mut buffer);
                 }

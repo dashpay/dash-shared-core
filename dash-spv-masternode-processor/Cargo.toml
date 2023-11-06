@@ -1,6 +1,6 @@
 [package]
 name = "dash-spv-masternode-processor"
-version = "0.4.12"
+version = "0.4.13"
 description = "Library for processing masternodes and quorums (SPV)"
 
 edition = "2021"
@@ -8,7 +8,7 @@ build = "build.rs"
 publish = false
 
 [features]
-default = ["std", "secp-recovery"]
+default = ["std", "secp-recovery", "generate-dashj-tests"]
 unstable = []
 rand = ["secp256k1/rand-std"]
 secp-lowmemory = ["secp256k1/lowmemory"]

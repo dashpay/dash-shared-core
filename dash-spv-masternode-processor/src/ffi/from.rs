@@ -302,17 +302,3 @@ impl FromFFI for types::Block {
         }
     }
 }
-
-impl FromFFI for types::QuorumsCLSigsObject {
-    type Item = models::QuorumsCLSigsObject;
-
-    unsafe fn decode(&self) -> Self::Item {
-        Self::Item {
-            signature: UInt768(*self.signature),
-            index_set: (0..self.index_set_count)
-                .into_iter()
-                .map(|i| *self.index_set.add(i))
-                .collect()
-        }
-    }
-}
