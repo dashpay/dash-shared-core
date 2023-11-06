@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::common::MasternodeType;
 use crate::consensus::Encodable;
-use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
+use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
 use crate::models::{LLMQEntry, LLMQModifierType, MasternodeEntry};
 use crate::tx::CoinbaseTransaction;
 use crate::util::data_ops::merkle_root_from_hashes;

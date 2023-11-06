@@ -199,7 +199,12 @@ pub unsafe extern "C" fn validate_masternode_list(list: *const types::Masternode
     if !payload_validation_status.is_ok() {
         return false;
     }
-    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, UInt768::from_const(best_cl_signature));
+    let quorum_modifier_type = if let Some(best_cl_signature) = UInt768::from_const(best_cl_signature) {
+        LLMQModifierType::CoreV20(quorum.llmq_type, block_height - 8, best_cl_signature)
+    } else {
+        LLMQModifierType::PreCoreV20(quorum.llmq_type, quorum.llmq_hash)
+    };
+    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, quorum_modifier_type);
     return quorum.validate(valid_masternodes, block_height).is_not_critical();
 }
 

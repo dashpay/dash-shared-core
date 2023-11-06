@@ -128,6 +128,15 @@ impl MasternodeProcessor {
             self.lookup_snapshot_by_block_hash(block_hash)
         }
     }
+
+    pub fn llmq_modifier_type_for(&self, llmq_type: LLMQType, work_block_hash: UInt256, work_block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> LLMQModifierType {
+        if let Some(best_cl_signature) = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures) {
+            LLMQModifierType::CoreV20(llmq_type, work_block_height, best_cl_signature)
+        } else {
+            LLMQModifierType::PreCoreV20(llmq_type, work_block_hash)
+        }
+    }
+
     pub(crate) fn find_cl_signature_if_need(&self, block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> Option<UInt768> {
         if self.chain_type.core20_is_active_at(block_height) {
             if let Some(work_block_hash) = self.lookup_block_hash_by_height(block_height) {
@@ -422,9 +431,10 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> LLMQValidationStatus {
         let block_height = self.lookup_block_height_by_hash(block_hash);
+        let llmq_type = quorum.llmq_type;
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(
-                quorum.llmq_type,
+                llmq_type,
                 block_hash,
                 block_height,
                 &mut cache.llmq_members,
@@ -441,7 +451,8 @@ impl MasternodeProcessor {
                 self.chain_type,
                 masternodes,
                 block_height,
-                self.find_cl_signature_if_need(block_height - 8, &cache.cl_signatures))
+                self.llmq_modifier_type_for(llmq_type, quorum.llmq_hash, block_height - 8, &cache.cl_signatures)
+            )
         };
         //crate::util::java::generate_final_commitment_test_file(self.chain_type, block_height, &quorum, &valid_masternodes);
         quorum.verify(valid_masternodes, block_height)
@@ -494,11 +505,8 @@ impl MasternodeProcessor {
                         // java::generate_snapshot(&snapshot, work_block_height);
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
                         // java::generate_masternode_list_from_map(&masternode_list.masternodes);
-                        let quorum_modifier = if let Some(best_cl_signature) = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures) {
-                            LLMQModifierType::CoreV20(llmq_type, work_block_height, best_cl_signature)
-                        } else {
-                            LLMQModifierType::PreCoreV20(llmq_type, work_block_hash)
-                        }.build_llmq_hash();
+                        let quorum_modifier_type =  self.llmq_modifier_type_for(llmq_type, work_block_hash, work_block_height, cached_cl_signatures);
+                        let quorum_modifier = quorum_modifier_type.build_llmq_hash();
                         // println!("quorum_modifier: {}", quorum_modifier);
                         // println!("snapshot: {:?}", snapshot);
                         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height, false);
@@ -610,13 +618,8 @@ impl MasternodeProcessor {
                         });
                         //Self::log_masternodes(&used_at_h_masternodes, format!("••••• USED AT H {} ••••••• ", work_block_height));
                         //Self::log_masternodes(&unused_at_h_masternodes, format!("••••• UNUSED AT H {} •••••••", work_block_height));
-                        let quorum_modifier = if let Some(best_cl_signature) = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures) {
-                            LLMQModifierType::CoreV20(params.r#type, work_block_height, best_cl_signature)
-                        } else {
-                            LLMQModifierType::PreCoreV20(params.r#type, work_block_hash)
-                        }.build_llmq_hash();
-
-
+                        let quorum_modifier_type = self.llmq_modifier_type_for(params.r#type, work_block_hash, work_block_height, cached_cl_signatures);
+                        let quorum_modifier = quorum_modifier_type.build_llmq_hash();
                         let sorted_used_mns_list = Self::valid_masternodes_for_rotated_quorum_map(used_at_h_masternodes, quorum_modifier, work_block_height);
                         let sorted_unused_mns_list = Self::valid_masternodes_for_rotated_quorum_map(unused_at_h_masternodes, quorum_modifier, work_block_height);
                         //Self::log_masternodes(&sorted_unused_mns_list, format!("••••• SORTED UNUSED AT H {} ••••••• ", work_block_height));
