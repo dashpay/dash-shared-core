@@ -130,24 +130,18 @@ impl MasternodeProcessor {
     }
 
     pub fn llmq_modifier_type_for(&self, llmq_type: LLMQType, work_block_hash: UInt256, work_block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> LLMQModifierType {
-        if let Some(best_cl_signature) = self.find_cl_signature_if_need(work_block_height, cached_cl_signatures) {
-            LLMQModifierType::CoreV20(llmq_type, work_block_height, best_cl_signature)
-        } else {
-            LLMQModifierType::PreCoreV20(llmq_type, work_block_hash)
-        }
-    }
-
-    pub(crate) fn find_cl_signature_if_need(&self, block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> Option<UInt768> {
-        if self.chain_type.core20_is_active_at(block_height) {
-            if let Some(work_block_hash) = self.lookup_block_hash_by_height(block_height) {
-                self.find_cl_signature(work_block_hash, cached_cl_signatures)
+        if self.chain_type.core20_is_active_at(work_block_height) {
+            if let Some(work_block_hash) = self.lookup_block_hash_by_height(work_block_height) {
+                if let Some(best_cl_signature) = self.find_cl_signature(work_block_hash, cached_cl_signatures) {
+                    return LLMQModifierType::CoreV20(llmq_type, work_block_height, best_cl_signature);
+                } else {
+                    println!("llmq_modifier_type: clsig not found for block hash: {}", work_block_hash);
+                }
             } else {
-                println!("find_cl_signature_if_need: core 20 is active at {} but block is not fetched", block_height);
-                None
+                println!("llmq_modifier_type: block not found for height: {}", work_block_height);
             }
-        } else {
-            None
         }
+        LLMQModifierType::PreCoreV20(llmq_type, work_block_hash)
     }
 
     pub(crate) fn find_cl_signature(
@@ -220,15 +214,6 @@ impl MasternodeProcessor {
         cache.add_masternode_list(block_hash, list);
         // Here we just store it in the C-side ()
         // self.save_masternode_list(block_hash, &masternode_list);
-    }
-
-    fn cache_cl_signatures(
-        &self,
-        block_hash: UInt256,
-        cl_signature: UInt768,
-        cache: &mut MasternodeProcessorCache,
-    ) {
-        cache.cl_signatures.insert(block_hash, cl_signature);
     }
 
     pub(crate) fn get_list_diff_result_internal(
@@ -388,6 +373,7 @@ impl MasternodeProcessor {
                         let llmq_height = self.lookup_block_height_by_hash(quorum.llmq_hash);
                         if llmq_height != u32::MAX {
                             if let Some(llmq_hash_minus_8) = self.lookup_block_hash_by_height(llmq_height - 8) {
+                                println!("classify_quorums: add signature: {}: {}", llmq_hash_minus_8, signature.clone());
                                 signatures.insert(llmq_hash_minus_8, signature.clone());
                             }
                         }
