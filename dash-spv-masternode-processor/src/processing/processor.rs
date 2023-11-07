@@ -254,7 +254,6 @@ impl MasternodeProcessor {
             verification_context,
             cache,
         );
-        cache.cl_signatures.extend(cl_signatures.clone());
         let masternode_list = models::MasternodeList::new(
             masternodes,
             quorums,
@@ -373,8 +372,8 @@ impl MasternodeProcessor {
                         let llmq_height = self.lookup_block_height_by_hash(quorum.llmq_hash);
                         if llmq_height != u32::MAX {
                             if let Some(llmq_hash_minus_8) = self.lookup_block_hash_by_height(llmq_height - 8) {
-                                println!("classify_quorums: add signature: {}: {}", llmq_hash_minus_8, signature.clone());
                                 signatures.insert(llmq_hash_minus_8, signature.clone());
+                                cache.cl_signatures.insert(llmq_hash_minus_8, signature.clone());
                             } else {
                                 println!("unknown hash for {}", llmq_height - 8);
                             }
