@@ -220,3 +220,37 @@ pub fn test_core20_activated_testnet2() {
     let result = process_qrinfo(message_from_file("testnet/QRINFO_LAST_X.dat"), processor, &mut context, 70230, false, true);
     assert_qrinfo_result(&mut context, result);
 }
+
+#[test]
+pub fn core20_quorum_signatures() {
+    register_logger();
+    let cache = register_cache();
+    let mut context = create_default_context(ChainType::TestNet, false, cache);
+    let processor = register_default_processor();
+    let version = 70230;
+    let name = format!("testnet/MNL_0_530000_70228.dat");
+    let result = process_mnlistdiff(message_from_file(name.as_str()), processor, &mut context, 70228, false, true);
+    assert_diff_result(&mut context, result);
+
+    let diffs = [
+        "530000_907104",
+        "907104_907128",
+        "907128_907152",
+        "907152_907176",
+        "907176_907200",
+        "907200_907224",
+        "907224_907248",
+        "907248_907272",
+        "907272_907296",
+    ];
+    diffs.iter().for_each(|diff| {
+        let name = format!("testnet/MNL_{diff}__{version}.dat");
+        let result = process_mnlistdiff(message_from_file(name.as_str()), processor, &mut context, version, false, true);
+        assert_diff_result(&mut context, result);
+    });
+
+    // context.is_dip_0024 = true;
+    // let result = process_qrinfo(message_from_file("testnet/QRINFO_0_907770__70230.dat"), processor, &mut context, 70230, false, true);
+    // assert_qrinfo_result(&mut context, result);
+
+}
