@@ -43,8 +43,8 @@ jobs:
         working-directory: ./dash-shared-core
         run: |
           GMP_PREFIX=$(brew --prefix gmp 2>/dev/null)
-          export CGO_LDFLAGS=$CGO_LDFLAGS:$(GMP_PREFIX)/lib
-          export CGO_CXXFLAGS=$CGO_CXXFLAGS:$(GMP_PREFIX)/include
+          export CGO_LDFLAGS="$CGO_LDFLAGS -L${GMP_PREFIX}/lib"
+          export CGO_CXXFLAGS="$CGO_CXXFLAGS -I${GMP_PREFIX}/include"
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/homebrew/lib/
           cargo test --lib --verbose
       - name: Build Apple frameworks
