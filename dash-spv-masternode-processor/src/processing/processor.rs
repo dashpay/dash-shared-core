@@ -135,7 +135,7 @@ impl MasternodeProcessor {
                 if let Some(best_cl_signature) = self.find_cl_signature(work_block_hash, cached_cl_signatures) {
                     return LLMQModifierType::CoreV20(llmq_type, work_block_height, best_cl_signature);
                 } else {
-                    println!("llmq_modifier_type: clsig not found for block hash: {}", work_block_hash);
+                    println!("llmq_modifier_type: clsig not found for block hash: {} ({})", work_block_hash, work_block_hash.reversed());
                 }
             } else {
                 println!("llmq_modifier_type: block not found for height: {}", work_block_height);

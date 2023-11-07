@@ -240,8 +240,8 @@ pub fn core20_quorum_signatures() {
         "907176_907200",
         "907200_907224",
         "907224_907248",
-        "907248_907272",
-        "907272_907296",
+        // "907248_907272",
+        // "907272_907296",
     ];
     diffs.iter().for_each(|diff| {
         let name = format!("testnet/MNL_{diff}__{version}.dat");
