@@ -95,6 +95,7 @@ impl From<byte::Error> for CoreProviderError {
 }
 
 
+#[allow(non_camel_case_types)]
 #[derive(Clone)]
 pub enum byte_Error_FFI {
     Incomplete,
@@ -102,6 +103,7 @@ pub enum byte_Error_FFI {
     BadInput { err: *mut std::os::raw::c_char },
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Clone)]
 pub enum CoreProviderError_FFI {
     NullResult,

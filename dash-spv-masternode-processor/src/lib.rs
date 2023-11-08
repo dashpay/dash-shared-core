@@ -27,6 +27,7 @@ pub mod chain;
 pub mod common;
 pub mod consensus;
 pub mod crypto;
+pub mod fermented;
 pub mod hash_types;
 pub mod keys;
 pub mod models;
@@ -35,7 +36,6 @@ pub mod processing;
 pub mod tx;
 pub mod util;
 pub mod logger;
-mod fermented;
 
 // Don't remove, it's for testing purposes (look at ${project_dir}/c/main.c)
 // #[no_mangle]

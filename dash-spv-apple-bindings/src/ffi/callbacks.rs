@@ -1,8 +1,8 @@
-// extern crate libc;
 use std::ffi::c_void;
 use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::models::{LLMQSnapshot, MasternodeList};
-use dash_spv_masternode_processor::processing::ProcessingError;
+use dash_spv_masternode_processor::models::masternode_list::MasternodeList;
+use dash_spv_masternode_processor::models::snapshot::LLMQSnapshot;
+use dash_spv_masternode_processor::processing::processing_error::ProcessingError;
 use crate::types;
 
 #[ferment_macro::export]
