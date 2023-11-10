@@ -375,10 +375,10 @@ impl MasternodeProcessor {
                                 signatures.insert(llmq_hash_minus_8, signature.clone());
                                 cache.cl_signatures.insert(llmq_hash_minus_8, signature.clone());
                             } else {
-                                println!("unknown hash for {}", llmq_height - 8);
+                                println!("WARN: unknown hash for {}", llmq_height - 8);
                             }
                         } else {
-                            println!("unknown height for {}", quorum.llmq_hash);
+                            println!("WARN: unknown height for {}", quorum.llmq_hash);
                         }
                     }
                     if verification_context.should_validate_quorum_of_type(quorum.llmq_type, self.chain_type) {
