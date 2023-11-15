@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use ferment_interfaces::FFIConversion;
-use crate::chain::common::{llmq_type::LLMQType, };
-use crate::crypto::UInt256;
+use crate::chain::common::llmq_type::LLMQType;
+use crate::crypto::{UInt256, UInt768};
 use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 
 #[derive(Clone, Default)]
@@ -10,6 +10,7 @@ pub struct MasternodeProcessorCache {
     pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<LLMQIndexedHash, Vec<MasternodeEntry>>>,
     pub mn_lists: BTreeMap<UInt256, MasternodeList>,
     pub llmq_snapshots: BTreeMap<UInt256, LLMQSnapshot>,
+    pub cl_signatures: BTreeMap<UInt256, UInt768>,
     pub needed_masternode_lists: Vec<UInt256>,
 }
 
@@ -20,6 +21,7 @@ impl std::fmt::Debug for MasternodeProcessorCache {
             .field("llmq_indexed_members", &self.llmq_indexed_members)
             .field("llmq_snapshots", &self.llmq_snapshots)
             .field("mn_lists", &self.mn_lists)
+            .field("cl_signatures", &self.cl_signatures)
             .field("needed_masternode_lists", &self.needed_masternode_lists)
             .finish()
     }
@@ -32,6 +34,7 @@ impl MasternodeProcessorCache {
         self.mn_lists.clear();
         self.llmq_snapshots.clear();
         self.needed_masternode_lists.clear();
+        self.cl_signatures.clear();
     }
     pub fn add_masternode_list(&mut self, block_hash: UInt256, list: MasternodeList) {
         self.mn_lists.insert(block_hash, list);
@@ -44,6 +47,12 @@ impl MasternodeProcessorCache {
     }
     pub fn remove_snapshot(&mut self, block_hash: &UInt256) {
         self.llmq_snapshots.remove(block_hash);
+    }
+    pub fn add_cl_signature(&mut self, block_hash: UInt256, cl_signature: UInt768) {
+        self.cl_signatures.insert(block_hash, cl_signature);
+    }
+    pub fn remove_cl_signature(&mut self, block_hash: &UInt256) {
+        self.cl_signatures.remove(block_hash);
     }
     pub fn get_quorum_members_of_type(
         &mut self,

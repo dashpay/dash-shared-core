@@ -7,12 +7,60 @@ use hashes::hex::ToHex;
 use serde::ser::SerializeStruct;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
+use crate::chain::common::chain_type::ChainType;
+use crate::chain::common::IHaveChainSettings;
 use crate::chain::common::llmq_type::LLMQType;
 use crate::common::{bitset::Bitset, llmq_version::LLMQVersion};
 use crate::consensus::{encode::VarInt, Encodable, Decodable, encode};
 use crate::crypto::{byte_util::AsBytes, UInt256, UInt384, UInt768};
 use crate::keys::BLSKey;
 use crate::models;
+use crate::processing::llmq_validation_status::{LLMQValidationStatus, LLMQPayloadValidationStatus};
+
+#[derive(PartialEq)]
+pub enum LLMQVerificationContext {
+    None,
+    MNListDiff,
+    QRInfo(bool),
+}
+
+impl LLMQVerificationContext {
+    pub fn should_validate_quorums(&self) -> bool {
+        *self != Self::None
+    }
+    pub fn should_validate_quorum_of_type(&self, llmq_type: LLMQType, chain_type: ChainType) -> bool {
+        match self {
+            LLMQVerificationContext::None => false,
+            LLMQVerificationContext::MNListDiff =>
+                chain_type.isd_llmq_type() != llmq_type && chain_type.should_process_llmq_of_type(llmq_type),
+            LLMQVerificationContext::QRInfo(is_quorum_rotation_activated) =>
+                chain_type.isd_llmq_type() == llmq_type && *is_quorum_rotation_activated == true
+        }
+    }
+}
+
+pub enum LLMQModifierType {
+    PreCoreV20(LLMQType, UInt256),
+    CoreV20(LLMQType, u32, UInt768),
+}
+
+impl LLMQModifierType {
+    pub fn build_llmq_hash(&self) -> UInt256 {
+        let mut writer = vec![];
+        match *self {
+            LLMQModifierType::PreCoreV20(llmq_type, block_hash) => {
+                VarInt(llmq_type as u64).enc(&mut writer);
+                block_hash.enc(&mut writer);
+            },
+            LLMQModifierType::CoreV20(llmq_type, block_height, cl_signature) => {
+                VarInt(llmq_type as u64).enc(&mut writer);
+                block_height.enc(&mut writer);
+                cl_signature.enc(&mut writer);
+            }
+        }
+        UInt256::sha256d(writer)
+    }
+}
 
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
@@ -210,12 +258,12 @@ impl LLMQEntry {
 
     #[allow(clippy::too_many_arguments)]
     pub fn generate_data(
-        version: crate::common::LLMQVersion,
-        llmq_type: crate::chain::common::LLMQType,
+        version: LLMQVersion,
+        llmq_type: LLMQType,
         llmq_hash: UInt256,
         index: Option<u16>,
-        signers: &crate::common::Bitset,
-        valid_members: &crate::common::Bitset,
+        signers: &Bitset,
+        valid_members: &Bitset,
         public_key: UInt384,
         verification_vector_hash: UInt256,
         threshold_signature: UInt768,
@@ -240,18 +288,19 @@ impl LLMQEntry {
         buffer
     }
 
-    pub fn build_llmq_quorum_hash(
-        llmq_type: crate::chain::common::LLMQType,
-        llmq_hash: UInt256,
-    ) -> UInt256 {
-        let mut writer: Vec<u8> = Vec::with_capacity(33);
-        VarInt(llmq_type as u64).enc(&mut writer);
-        llmq_hash.enc(&mut writer);
-        UInt256::sha256d(writer)
-    }
-
-    pub fn llmq_quorum_hash(&self) -> UInt256 {
-        Self::build_llmq_quorum_hash(self.llmq_type, self.llmq_hash)
+    pub fn to_data(&self) -> Vec<u8> {
+        Self::generate_data(
+            self.version,
+            self.llmq_type,
+            self.llmq_hash,
+            self.index,
+            &self.signers,
+            &self.valid_members,
+            self.public_key,
+            self.verification_vector_hash,
+            self.threshold_signature,
+            self.all_commitment_aggregated_signature,
+        )
     }
 
     pub fn commitment_data(&self) -> Vec<u8> {
@@ -269,7 +318,7 @@ impl LLMQEntry {
     pub fn ordering_hash_for_request_id(
         &self,
         request_id: UInt256,
-        llmq_type: crate::chain::common::LLMQType,
+        llmq_type: LLMQType,
     ) -> UInt256 {
         let llmq_type = VarInt(llmq_type as u64);
         let mut buffer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
@@ -285,54 +334,80 @@ impl LLMQEntry {
         }
         self.commitment_hash.unwrap()
     }
-   pub fn validate_payload(&self) -> bool {
-        // The quorumHash must match the current DKG session
-        // todo
-        if !self.signers.is_valid() {
-            warn!("Error: signers_bitset is invalid {:?}", self.signers);
+
+    fn validate_bitset(bitset: &Bitset) -> bool {
+        let Bitset { bitset, count } = bitset;
+        if bitset.len() != (count + 7) / 8 {
+            warn!(
+                "Error: The byte size of the bitvectors ({}) must match “(quorumSize + 7) / 8 ({})",
+                bitset.len(),
+                (count + 7) / 8
+            );
             return false;
         }
-        if !self.valid_members.is_valid() {
-            warn!("Error: valid_members_bitset is invalid {:?}", self.valid_members);
-            return false;
+        let len = (bitset.len() * 8) as i32;
+        let size = *count as i32;
+        if len != size {
+            let rem = len - size;
+            let mask = !(0xff >> rem);
+            let last_byte = match bitset.last() {
+                Some(&last) => last as i32,
+                None => 0,
+            };
+            if last_byte & mask != 0 {
+                warn!("Error: No out-of-range bits should be set in byte representation of the bitvector");
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn validate_payload(&self) -> LLMQPayloadValidationStatus {
+        // The quorumHash must match the current DKG session
+        // todo
+        let is_valid_signers =
+            Self::validate_bitset(&self.signers);
+        if !is_valid_signers {
+            warn!("Error: signers_bitset is invalid ({:?})", self.signers);
+            return LLMQPayloadValidationStatus::InvalidSigners(self.signers.bitset.to_hex());
+        }
+        let is_valid_members =
+            Self::validate_bitset(&self.valid_members);
+        if !is_valid_members {
+            warn!("Error: valid_members_bitset is invalid ({:?})", self.valid_members);
+            return LLMQPayloadValidationStatus::InvalidMembers(self.valid_members.bitset.to_hex());
         }
         let quorum_threshold = self.llmq_type.threshold() as u64;
         // The number of set bits in the signers and validMembers bitvectors must be at least >= quorumThreshold
         let signers_bitset_true_bits_count = self.signers.true_bits_count();
         if signers_bitset_true_bits_count < quorum_threshold {
-            warn!("Error: The number of set bits in the signers bitvector {} must be at least >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
-            return false;
+            warn!("Error: The number of set bits in the signers {} must be >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
+            return LLMQPayloadValidationStatus::SignersBelowThreshold { actual: signers_bitset_true_bits_count, threshold: quorum_threshold };
         }
         let valid_members_bitset_true_bits_count = self.valid_members.true_bits_count();
         if valid_members_bitset_true_bits_count < quorum_threshold {
-            warn!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
-            return false;
+            warn!("Error: The number of set bits in the valid members bitvector {} must be >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
+            return LLMQPayloadValidationStatus::SignersBelowThreshold { actual: valid_members_bitset_true_bits_count, threshold: quorum_threshold };
         }
-        true
+        LLMQPayloadValidationStatus::Ok
     }
 }
 
 impl LLMQEntry {
-    pub fn verify(
-        &mut self,
-        valid_masternodes: Vec<models::MasternodeEntry>,
-        block_height: u32,
-    ) -> bool {
-        if !self.validate_payload() {
-            return false;
+
+    pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
+        let payload_status = self.validate_payload();
+        if !payload_status.is_ok() {
+            return LLMQValidationStatus::InvalidPayload(payload_status);
         }
-        self.verified = self.validate(valid_masternodes, block_height);
-        self.verified
+        let status = self.validate(valid_masternodes, block_height);
+        self.verified = status == LLMQValidationStatus::Verified;
+        status
     }
 
-    pub fn validate(
-        &mut self,
-        valid_masternodes: Vec<models::MasternodeEntry>,
-        block_height: u32,
-    ) -> bool {
+    pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
         let commitment_hash = self.generate_commitment_hash();
         let use_legacy = self.version.use_bls_legacy();
-
         let operator_keys = valid_masternodes
             .iter()
             .enumerate()
@@ -348,12 +423,8 @@ impl LLMQEntry {
             use_legacy,
         );
         if !all_commitment_aggregated_signature_validated {
-            // warn!("••• Issue with all_commitment_aggregated_signature_validated: {}", self.all_commitment_aggregated_signature);
-            println!(
-                "••• INVALID AGGREGATED SIGNATURE {}: {:?} ({})",
-                block_height, self.llmq_type, self.all_commitment_aggregated_signature
-            );
-            return false;
+            println!("••• INVALID AGGREGATED SIGNATURE {}: {:?} ({})", block_height, self.llmq_type, self.all_commitment_aggregated_signature);
+            return LLMQValidationStatus::InvalidAggregatedSignature;
         }
         // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
         // This is an aggregated BLS signature verification.
@@ -364,17 +435,10 @@ impl LLMQEntry {
             use_legacy,
         );
         if !quorum_signature_validated {
-            println!(
-                "••• INVALID QUORUM SIGNATURE {}: {:?} ({})",
-                block_height, self.llmq_type, self.threshold_signature
-            );
-            // warn!("••• Issue with quorum_signature_validated");
-            return false;
+            println!("••• INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, self.llmq_type, self.threshold_signature);
+            return LLMQValidationStatus::InvalidQuorumSignature;
         }
-        println!(
-            "••• quorum {:?} validated at {}",
-            self.llmq_type, block_height
-        );
-        true
+        println!("••• quorum {:?} validated at {}", self.llmq_type, block_height);
+        LLMQValidationStatus::Verified
     }
 }

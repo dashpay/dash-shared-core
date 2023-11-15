@@ -1,7 +1,6 @@
-use crate::crypto::UInt256;
 use std::collections::BTreeMap;
-use crate::chain::common::llmq_type::LLMQType;
-use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, quorums_cl_sigs_object::QuorumsCLSigsObject};
+use crate::crypto::{UInt256, UInt768};
+use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry, masternode_list::MasternodeList};
 
 #[derive(Clone)]
 #[ferment_macro::export]
@@ -16,9 +15,9 @@ pub struct MNListDiffResult {
     pub masternode_list: MasternodeList,
     pub added_masternodes: BTreeMap<UInt256, MasternodeEntry>,
     pub modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
-    pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
+    pub added_quorums: Vec<LLMQEntry>,
     pub needed_masternode_lists: Vec<UInt256>,
-    pub quorums_cl_sigs: Vec<QuorumsCLSigsObject>,
+    pub cl_signatures: BTreeMap<UInt256, UInt768>,
 }
 
 impl std::fmt::Debug for MNListDiffResult {
@@ -59,9 +58,9 @@ impl Default for MNListDiffResult {
             masternode_list: Default::default(),
             added_masternodes: Default::default(),
             modified_masternodes: Default::default(),
-            added_quorums: Default::default(),
+            added_quorums: vec![],
             needed_masternode_lists: vec![],
-            quorums_cl_sigs: vec![],
+            cl_signatures: Default::default()
         }
     }
 }

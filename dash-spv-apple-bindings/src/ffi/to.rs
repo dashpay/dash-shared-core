@@ -107,7 +107,8 @@ impl ToFFI for tx::CoinbaseTransaction {
                 null_mut()
             } else {
                 boxed(self.best_cl_signature.unwrap().0)
-            }
+            },
+            credit_pool_balance: self.credit_pool_balance.unwrap_or(i64::MIN)
         }
     }
 }
@@ -324,18 +325,6 @@ impl ToFFI for common::Block {
         Self::Item {
             height: self.height,
             hash: boxed(self.hash.0),
-        }
-    }
-}
-
-impl ToFFI for models::QuorumsCLSigsObject {
-    type Item = types::QuorumsCLSigsObject;
-
-    fn encode(&self) -> Self::Item {
-        Self::Item {
-            signature: boxed(self.signature.0),
-            index_set_count: self.index_set.len(),
-            index_set: boxed_vec(self.index_set.clone()),
         }
     }
 }

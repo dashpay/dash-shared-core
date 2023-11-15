@@ -11,7 +11,7 @@ use ferment_interfaces::boxed;
 use crate::common::{processor_create_cache, register_processor};
 use crate::ffi::to::ToFFI;
 use crate::masternode::process_mnlistdiff_from_message;
-use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, register_logger, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, register_logger, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::types;
 
 unsafe extern "C" fn get_merkle_root_for_chacha(
@@ -86,6 +86,8 @@ fn test_basic_bls_scheme() {
             get_block_hash_by_height_chacha,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_at_9192,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
@@ -202,6 +204,8 @@ fn test_core_19_beta_6() {
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_mojito,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
@@ -263,6 +267,8 @@ fn test_core_19_rc_2_testnet() {
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_mojito,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,

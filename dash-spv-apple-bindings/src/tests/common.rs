@@ -2,7 +2,7 @@ use std::{fs, io::Read, ptr::null_mut};
 use ferment_interfaces::boxed;
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings};
 use dash_spv_masternode_processor::crypto::byte_util::{BytesDecodable, Reversable};
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::{UInt256, UInt768};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::logger::register_rust_logger;
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
@@ -116,6 +116,8 @@ pub fn register_default_processor(context: &mut FFIContext) -> *mut MasternodePr
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_from_context,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
@@ -278,6 +280,19 @@ pub unsafe extern "C" fn get_llmq_snapshot_by_block_hash_from_context(
     }
 }
 
+pub unsafe extern "C" fn get_cl_signature_by_block_hash_from_context(
+    block_hash: *mut [u8; 32],
+    context: *const std::ffi::c_void,
+) -> *mut u8 {
+    let h = UInt256(*(block_hash));
+    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+    if let Some(sig) = data.cache.cl_signatures.get(&h) {
+        boxed(sig.0) as *mut _
+    } else {
+        null_mut()
+    }
+}
+
 pub unsafe extern "C" fn get_masternode_list_by_block_hash_default(
     _block_hash: *mut [u8; 32],
     _context: *const std::ffi::c_void,
@@ -357,6 +372,16 @@ pub unsafe extern "C" fn save_llmq_snapshot_in_cache(
     let h = UInt256(*(block_hash));
     let data: &mut FFIContext = &mut *(context as *mut FFIContext);
     data.cache.add_snapshot(h, (*snapshot).decode());
+    true
+}
+pub unsafe extern "C" fn save_cl_signature_in_cache(
+    block_hash: *mut [u8; 32],
+    cl_signature: *mut [u8; 96],
+    context: *const std::ffi::c_void,
+) -> bool {
+    let h = UInt256(*(block_hash));
+    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+    data.cache.add_cl_signature(h, UInt768(*cl_signature));
     true
 }
 
@@ -461,6 +486,8 @@ pub fn perform_mnlist_diff_test_for_message(
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_default,
             masternode_list_save_default,
             masternode_list_destroy_default,

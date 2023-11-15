@@ -1,11 +1,15 @@
 use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
-use crate::{consensus, tx};
+use crate::consensus;
 use crate::consensus::encode::VarInt;
 use crate::consensus::{Encodable, encode};
 use crate::crypto::{UInt256, UInt768};
 use crate::tx::transaction::{Transaction, TransactionType};
+
+
+pub const COINBASE_TX_CORE_19: u16 = 2;
+pub const COINBASE_TX_CORE_20: u16 = 3;
 
 #[derive(Debug, Clone)]
 #[ferment_macro::export]
@@ -15,14 +19,15 @@ pub struct CoinbaseTransaction {
     pub height: u32,
     pub merkle_root_mn_list: UInt256,
     pub merkle_root_llmq_list: Option<UInt256>,
-    pub best_cl_height_diff: u32,
+    pub best_cl_height_diff: u64,
     pub best_cl_signature: Option<UInt768>,
+    pub credit_pool_balance: Option<i64>,
 }
 
 impl consensus::Decodable for CoinbaseTransaction {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let mut base = tx::Transaction::consensus_decode(&mut d)?;
+        let mut base = Transaction::consensus_decode(&mut d)?;
         let _extra_payload_size = VarInt::consensus_decode(&mut d)?;
         let coinbase_transaction_version = u16::consensus_decode(&mut d)?;
         let height = u32::consensus_decode(&mut d)?;
@@ -33,10 +38,13 @@ impl consensus::Decodable for CoinbaseTransaction {
         } else {
             None
         };
-        let (best_cl_height_diff, best_cl_signature) = if coinbase_transaction_version >= 3 {
-            (u32::consensus_decode(&mut d)?, UInt768::consensus_decode(&mut d).ok())
+        let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= 3 {
+            (
+                VarInt::consensus_decode(&mut d)?.0,
+                UInt768::consensus_decode(&mut d).ok(),
+                i64::consensus_decode(&mut d).ok())
         } else {
-            (u32::MAX, None)
+            (u64::MAX, None, None)
         };
         base.tx_type = TransactionType::Coinbase;
         let mut tx = Self {
@@ -46,7 +54,8 @@ impl consensus::Decodable for CoinbaseTransaction {
             merkle_root_mn_list,
             merkle_root_llmq_list,
             best_cl_height_diff,
-            best_cl_signature
+            best_cl_signature,
+            credit_pool_balance,
         };
         tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()));
         Ok(tx)
@@ -61,17 +70,19 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
         let coinbase_transaction_version = bytes.read_with::<u16>(offset, endian)?;
         let height = bytes.read_with::<u32>(offset, endian)?;
         let merkle_root_mn_list = bytes.read_with::<UInt256>(offset, endian)?;
-        let merkle_root_llmq_list = if coinbase_transaction_version >= 2 {
+        let merkle_root_llmq_list = if coinbase_transaction_version >= COINBASE_TX_CORE_19 {
             let root = bytes.read_with::<UInt256>(offset, endian)?;
             Some(root)
         } else {
             None
         };
-        let (best_cl_height_diff, best_cl_signature) = if coinbase_transaction_version >= 3 {
-            (bytes.read_with::<u32>(offset, byte::LE)?,
-            bytes.read_with::<UInt768>(offset, byte::LE).ok())
+        let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= COINBASE_TX_CORE_20 {
+            (bytes.read_with::<VarInt>(offset, byte::LE)?.0,
+             bytes.read_with::<UInt768>(offset, byte::LE).ok(),
+             bytes.read_with::<i64>(offset, byte::LE).ok())
+
         } else {
-            (u32::MAX, None)
+            (u64::MAX, None, None)
         };
         base.tx_type = TransactionType::Coinbase;
         base.payload_offset = *offset;
@@ -82,7 +93,8 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             merkle_root_mn_list,
             merkle_root_llmq_list,
             best_cl_height_diff,
-            best_cl_signature
+            best_cl_signature,
+            credit_pool_balance
         };
         tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()));
         Ok((tx, *offset))
@@ -95,15 +107,19 @@ impl CoinbaseTransaction {
         self.coinbase_transaction_version.enc(&mut buffer);
         self.height.enc(&mut buffer);
         self.merkle_root_mn_list.enc(&mut buffer);
-        if self.coinbase_transaction_version >= 2 {
-            if let Some(llmq_list) = self.merkle_root_llmq_list {
-                llmq_list.enc(&mut buffer);
+
+        if self.coinbase_transaction_version >= COINBASE_TX_CORE_19 {
+            if let Some(llmq_root) = self.merkle_root_llmq_list {
+                llmq_root.enc(&mut buffer);
             }
-        }
-        if self.coinbase_transaction_version >= 3 {
-            self.best_cl_height_diff.enc(&mut buffer);
-            if let Some(sig) = self.best_cl_signature {
-                sig.enc(&mut buffer);
+            if self.coinbase_transaction_version >= COINBASE_TX_CORE_20 {
+                VarInt(self.best_cl_height_diff).enc(&mut buffer);
+                if let Some(cl_sig) = self.best_cl_signature {
+                    cl_sig.enc(&mut buffer);
+                }
+                if let Some(credit_pool_balance) = self.credit_pool_balance {
+                    credit_pool_balance.enc(&mut buffer);
+                }
             }
         }
         buffer

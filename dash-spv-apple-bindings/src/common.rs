@@ -4,7 +4,7 @@ use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache};
-use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
+use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi_core_provider::FFICoreProvider;
 use crate::types;
 
@@ -55,6 +55,8 @@ pub unsafe extern "C" fn register_processor(
     get_block_hash_by_height: GetBlockHashByHeight,
     get_llmq_snapshot_by_block_hash: GetLLMQSnapshotByBlockHash,
     save_llmq_snapshot: SaveLLMQSnapshot,
+    get_cl_signature_by_block_hash: GetCLSignatureByBlockHash,
+    save_cl_signature: SaveCLSignature,
     get_masternode_list_by_block_hash: MasternodeListLookup,
     save_masternode_list: MasternodeListSave,
     destroy_masternode_list: MasternodeListDestroy,
@@ -69,7 +71,9 @@ pub unsafe extern "C" fn register_processor(
         get_block_height_by_hash,
         get_block_hash_by_height,
         get_llmq_snapshot_by_block_hash,
+        get_cl_signature_by_block_hash,
         save_llmq_snapshot,
+        save_cl_signature,
         get_masternode_list_by_block_hash,
         save_masternode_list,
         destroy_masternode_list,
@@ -157,6 +161,13 @@ pub unsafe extern "C" fn processor_destroy_block_hash(block_hash: *mut [u8; 32])
     ferment_interfaces::unbox_any(block_hash);
 }
 
+/// Destroys anonymous internal holder for UInt768
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_cl_signature(cl_signature: *mut [u8; 96]) {
+    ferment_interfaces::unbox_any(cl_signature);
+}
+
 /// Destroys anonymous internal holder for UInt256
 /// # Safety
 #[no_mangle]
@@ -189,6 +200,13 @@ pub unsafe extern "C" fn processor_destroy_qr_info_result(result: *mut types::QR
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
+    ferment_interfaces::unbox_any(result);
+}
+
+/// Destroys types::Block
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_block(result: *mut types::Block) {
     ferment_interfaces::unbox_any(result);
 }
 

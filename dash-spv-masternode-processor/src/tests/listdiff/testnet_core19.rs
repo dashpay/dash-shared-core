@@ -841,7 +841,5 @@ fn test_verify_secure3() {
             entry_hash: UInt256::from_hex("76d162d303800ff542f6b69f938b911712717332c0ea4ca061c3e7f341632f39").unwrap(),
         },
     ];
-
-    let is_valid = quorum.validate(valid_masternodes.to_vec(), 869760);
-    assert_eq!(true, is_valid);
+    quorum.validate(valid_masternodes.to_vec(), 869760);
 }

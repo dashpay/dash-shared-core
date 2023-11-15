@@ -6,7 +6,7 @@ use dash_spv_masternode_processor::models;
 use crate::common::{processor_create_cache, register_processor};
 use crate::ffi::from::FromFFI;
 use crate::masternode::process_mnlistdiff_from_message;
-use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_default, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_default, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
 
 #[test]
 fn test_mainnet_reload_with_processor() {
@@ -71,6 +71,8 @@ pub fn load_masternode_lists_for_files(
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,

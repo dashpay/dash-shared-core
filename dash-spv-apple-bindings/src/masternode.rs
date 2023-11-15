@@ -2,8 +2,9 @@ use std::slice;
 use dash_spv_masternode_processor::{models, ok_or_return_processing_error};
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_masternode_processor::consensus::encode;
-use dash_spv_masternode_processor::crypto::{UInt256, byte_util::ConstDecodable};
+use dash_spv_masternode_processor::crypto::{UInt256, byte_util::ConstDecodable, UInt768};
 use dash_spv_masternode_processor::crypto::byte_util::BytesDecodable;
+use dash_spv_masternode_processor::models::{LLMQModifierType, LLMQVerificationContext};
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 use crate::ffi::{common::ByteArray, from::FromFFI, to::ToFFI};
 use crate::types;
@@ -75,16 +76,20 @@ pub unsafe extern "C" fn processor_cache_masternode_list(block_hash: *const u8, 
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn validate_masternode_list(list: *const types::MasternodeList, quorum: *const types::LLMQEntry, block_height: u32, chain_type: ChainType) -> bool {
+pub unsafe extern "C" fn validate_masternode_list(list: *const types::MasternodeList, quorum: *const types::LLMQEntry, block_height: u32, chain_type: ChainType, best_cl_signature: *const u8) -> bool {
     let list = (*list).decode();
     let mut quorum = (*quorum).decode();
-    let is_valid_payload = quorum.validate_payload();
-    if !is_valid_payload {
+    let payload_validation_status = quorum.validate_payload();
+    if !payload_validation_status.is_ok() {
         return false;
     }
-    let hpmn_only = quorum.llmq_type == chain_type.platform_type() && !quorum.version.use_bls_legacy();
-    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(quorum.llmq_type, list.masternodes, quorum.llmq_quorum_hash(), block_height, hpmn_only);
-    return quorum.validate(valid_masternodes, block_height);
+    let quorum_modifier_type = if let Ok(best_cl_signature) = UInt768::from_const(best_cl_signature) {
+        LLMQModifierType::CoreV20(quorum.llmq_type, block_height - 8, best_cl_signature)
+    } else {
+        LLMQModifierType::PreCoreV20(quorum.llmq_type, quorum.llmq_hash)
+    };
+    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, quorum_modifier_type);
+    return quorum.validate(valid_masternodes, block_height).is_not_critical();
 }
 
 
@@ -100,10 +105,23 @@ pub extern "C" fn quorum_threshold_for_type(llmq_type: LLMQType) -> u32 {
     llmq_type.threshold()
 }
 
+/// quorum_hash: u256
 /// # Safety
 #[no_mangle]
 pub extern "C" fn quorum_build_llmq_hash(llmq_type: LLMQType, quorum_hash: *const u8) -> ByteArray {
-    models::LLMQEntry::build_llmq_quorum_hash(llmq_type, UInt256::from_const(quorum_hash).unwrap()).into()
+    LLMQModifierType::PreCoreV20(llmq_type, UInt256::from_const(quorum_hash).unwrap())
+        .build_llmq_hash()
+        .into()
+}
+
+/// height: u32
+/// best_cl_signature: Option<u768>
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_build_llmq_hash_v20(llmq_type: LLMQType, height: u32, best_cl_signature: *const u8) -> ByteArray {
+    LLMQModifierType::CoreV20(llmq_type, height, UInt768::from_const(best_cl_signature).unwrap())
+        .build_llmq_hash()
+        .into()
 }
 
 /// # Safety
@@ -150,12 +168,10 @@ pub fn get_list_diff_result(
     processor: &MasternodeProcessor,
     base_list: Option<models::MasternodeList>,
     list_diff: models::MNListDiff,
-    should_process_quorums: bool,
-    is_dip_0024: bool,
-    is_rotated_quorums_presented: bool,
+    verification_context: LLMQVerificationContext,
     cache: &mut MasternodeProcessorCache,
 ) -> types::MNListDiffResult {
-    let result = processor.get_list_diff_result(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache);
+    let result = processor.get_list_diff_result(base_list, list_diff, verification_context, cache);
     // println!("get_list_diff_result: {:#?}", result);
     result.into()
 }
@@ -163,9 +179,7 @@ pub fn get_list_diff_result(
 pub fn get_list_diff_result_with_base_lookup(
     processor: &MasternodeProcessor,
     list_diff: models::MNListDiff,
-    should_process_quorums: bool,
-    is_dip_0024: bool,
-    is_rotated_quorums_presented: bool,
+    verification_context: LLMQVerificationContext,
     cache: &mut MasternodeProcessorCache,
 ) -> types::MNListDiffResult {
     let base_block_hash = list_diff.base_block_hash;
@@ -174,7 +188,7 @@ pub fn get_list_diff_result_with_base_lookup(
         &cache.mn_lists,
         &mut cache.needed_masternode_lists,
     );
-    get_list_diff_result(&processor, base_list.ok(), list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
+    get_list_diff_result(&processor, base_list.ok(), list_diff, verification_context, cache)
 }
 
 pub fn process_mnlist_diff(processor: &MasternodeProcessor, message: &[u8], is_from_snapshot: bool, protocol_version: u32, cache: &mut MasternodeProcessorCache) -> Result<types::MNListDiffResult, ProcessingError> {
@@ -183,23 +197,23 @@ pub fn process_mnlist_diff(processor: &MasternodeProcessor, message: &[u8], is_f
             if !is_from_snapshot {
                 ok_or_return_processing_error!(processor.provider.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash));
             }
-            Ok(get_list_diff_result_with_base_lookup(processor, list_diff, true, false, false, cache))
+            Ok(get_list_diff_result_with_base_lookup(processor, list_diff, LLMQVerificationContext::MNListDiff, cache))
         },
         Err(err) => Err(ProcessingError::from(err))
     }
 }
 
 pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_snapshot: bool, protocol_version: u32, is_rotated_quorums_presented: bool, cache: &mut MasternodeProcessorCache) -> Result<types::QRInfoResult, ProcessingError> {
-    let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool|
-        get_list_diff_result_with_base_lookup(&processor, list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache);
+    let mut process_list_diff = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext|
+        get_list_diff_result_with_base_lookup(&processor, list_diff, verification_context, cache);
     let read_list_diff = |offset: &mut usize|
         processor.read_list_diff_from_message(message, offset, protocol_version);
     let read_snapshot = |offset: &mut usize|
         models::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize|
         encode::VarInt::from_bytes(message, offset);
-    let mut get_list_diff_result = |list_diff: models::MNListDiff, verify_quorums: bool|
-        ferment_interfaces::boxed(process_list_diff(list_diff, verify_quorums));
+    let mut get_list_diff_result = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext|
+        ferment_interfaces::boxed(process_list_diff(list_diff, verification_context));
 
     let offset = &mut 0;
     let snapshot_at_h_c = ok_or_return_processing_error!(read_snapshot(offset));
@@ -252,22 +266,22 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
     for i in 0..mn_list_diff_list_count {
         let list_diff = ok_or_return_processing_error!(read_list_diff(offset));
         let block_hash = list_diff.block_hash;
-        mn_list_diff_list_vec.push(get_list_diff_result(list_diff, false));
+        mn_list_diff_list_vec.push(get_list_diff_result(list_diff, LLMQVerificationContext::None));
         let snapshot = snapshots.get(i).unwrap();
         quorum_snapshot_list_vec.push(ferment_interfaces::boxed(snapshot.encode()));
         processor.provider.save_snapshot(block_hash, snapshot.clone());
     }
 
     let result_at_h_4c = if extra_share {
-        get_list_diff_result(diff_h_4c.unwrap(), false)
+        get_list_diff_result(diff_h_4c.unwrap(), LLMQVerificationContext::None)
     } else {
         std::ptr::null_mut()
     };
-    let result_at_h_3c = get_list_diff_result(diff_h_3c, false);
-    let result_at_h_2c = get_list_diff_result(diff_h_2c, false);
-    let result_at_h_c = get_list_diff_result(diff_h_c, false);
-    let result_at_h = get_list_diff_result(diff_h, true);
-    let result_at_tip = get_list_diff_result(diff_tip, false);
+    let result_at_h_3c = get_list_diff_result(diff_h_3c, LLMQVerificationContext::None);
+    let result_at_h_2c = get_list_diff_result(diff_h_2c, LLMQVerificationContext::None);
+    let result_at_h_c = get_list_diff_result(diff_h_c, LLMQVerificationContext::None);
+    let result_at_h = get_list_diff_result(diff_h, LLMQVerificationContext::QRInfo(is_rotated_quorums_presented));
+    let result_at_tip = get_list_diff_result(diff_tip, LLMQVerificationContext::None);
     let result = types::QRInfoResult {
         error_status: ProcessingError::None,
         result_at_tip,

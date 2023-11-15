@@ -3,7 +3,7 @@ use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::test_helpers::masternode_list_from_json;
 use crate::common::register_processor;
 use crate::masternode::process_mnlistdiff_from_message;
-use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 
 #[test]
 fn mainnet_test_invalid_mn_list_root() {
@@ -26,6 +26,8 @@ fn mainnet_test_invalid_mn_list_root() {
             get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_from_context,
             save_llmq_snapshot_in_cache,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,

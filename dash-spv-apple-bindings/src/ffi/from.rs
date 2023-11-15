@@ -101,7 +101,8 @@ impl FromFFI for types::CoinbaseTransaction {
                 None
             } else {
                 Some(UInt768(*self.best_cl_signature))
-            }
+            },
+            credit_pool_balance: Some(self.credit_pool_balance)
         }
     }
 }
@@ -205,7 +206,7 @@ impl FromFFI for types::MasternodeEntry {
             previous_entry_hashes: (0..self.previous_entry_hashes_count).into_iter().fold(
                 BTreeMap::new(),
                 |mut acc, i| {
-                    let obj = *self.previous_entry_hashes.add(i);
+                    let obj = &*self.previous_entry_hashes.add(i);
                     let key = common::Block {
                         height: obj.block_height,
                         hash: UInt256(obj.block_hash),
@@ -301,20 +302,6 @@ impl FromFFI for types::Block {
         Self::Item {
             height: self.height,
             hash: UInt256(*self.hash),
-        }
-    }
-}
-
-impl FromFFI for types::QuorumsCLSigsObject {
-    type Item = models::QuorumsCLSigsObject;
-
-    unsafe fn decode(&self) -> Self::Item {
-        Self::Item {
-            signature: UInt768(*self.signature),
-            index_set: (0..self.index_set_count)
-                .into_iter()
-                .map(|i| *self.index_set.add(i))
-                .collect()
         }
     }
 }

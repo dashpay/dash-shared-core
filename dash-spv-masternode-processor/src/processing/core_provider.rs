@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use crate::chain::common::{ChainType, IHaveChainSettings};
 use crate::crypto::byte_util::Zeroable;
-use crate::crypto::UInt256;
+use crate::crypto::{UInt256, UInt768};
 use crate::models;
 use crate::processing::ProcessingError;
 
@@ -39,8 +39,21 @@ pub trait CoreProvider: std::fmt::Debug {
             }
             Err(CoreProviderError::NoMasternodeList)
         }
-
     }
+
+    fn find_cl_signature(
+        &self,
+        block_hash: UInt256,
+        cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
+    ) -> Result<UInt768, CoreProviderError> {
+        if let Some(cached) = cached_cl_signatures.get(&block_hash) {
+            // Getting it from local cache stored as opaque in FFI context
+            Ok(cached.clone())
+        } else {
+            self.lookup_cl_signature_by_block_hash(block_hash)
+        }
+    }
+
     fn find_snapshot(&self, block_hash: UInt256, cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>) -> Result<models::LLMQSnapshot, CoreProviderError> {
         if let Some(cached) = cached_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
@@ -61,6 +74,7 @@ pub trait CoreProvider: std::fmt::Debug {
 
     fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError>;
     fn lookup_masternode_list(&self, block_hash: UInt256) -> Result<models::MasternodeList, CoreProviderError>;
+    fn lookup_cl_signature_by_block_hash(&self, block_hash: UInt256) -> Result<UInt768, CoreProviderError>;
     fn lookup_snapshot_by_block_hash(&self, block_hash: UInt256) -> Result<models::LLMQSnapshot, CoreProviderError>;
     fn lookup_block_hash_by_height(&self, block_height: u32) -> Result<UInt256, CoreProviderError>;
     fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32;

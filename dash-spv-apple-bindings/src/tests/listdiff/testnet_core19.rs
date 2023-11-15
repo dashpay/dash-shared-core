@@ -1,5 +1,6 @@
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::test_helpers::message_from_file;
 use crate::ffi::from::FromFFI;
 use crate::tests::common::{assert_diff_result, create_default_context, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
 
@@ -318,11 +319,9 @@ fn test_core19_2() {
     let cache = register_cache();
     let context = &mut create_default_context(chain, false, cache);
     let processor = register_default_processor(context);
-    let diffs = vec![
-        "MNL_0_530000_70228.dat",
-        "MNL_530000_852596.dat",
-    ].iter().for_each(|filename| {
-        let result = process_mnlistdiff(chain.load_message(filename), processor, context, protocol_version, false, true);
-        assert_diff_result(context, unsafe { &*result });
-    });
+    ["MNL_0_530000_70228.dat", "MNL_530000_852596.dat"].iter()
+        .for_each(|name| {
+            let result = process_mnlistdiff(message_from_file(format!("testnet/{}", name).as_str()), processor, context, protocol_version, false, true);
+            assert_diff_result(context, unsafe { &*result });
+        });
 }

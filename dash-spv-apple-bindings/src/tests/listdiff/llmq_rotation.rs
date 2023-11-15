@@ -6,7 +6,7 @@ use dash_spv_masternode_processor::processing::MasternodeProcessor;
 use crate::common::{processor_create_cache, register_processor};
 use crate::ffi_core_provider::FFICoreProvider;
 use crate::masternode::{process_mnlist_diff, process_qr_info, process_qrinfo_from_message};
-use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_default, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 
 unsafe extern "C" fn block_height_lookup_(
     block_hash: *mut [u8; 32],
@@ -367,6 +367,8 @@ fn test_devnet_333() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_default,
             masternode_list_save_default,
             masternode_list_destroy_default,
@@ -410,6 +412,8 @@ fn test_processor_devnet_333() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_default,
             masternode_list_save_default,
             masternode_list_destroy_default,
@@ -626,7 +630,9 @@ fn test_processor_devnet_333_2() {
         block_height_lookup_333_2,
         get_block_hash_by_height_default,
         get_llmq_snapshot_by_block_hash_default,
+        get_cl_signature_by_block_hash_from_context,
         save_llmq_snapshot_in_cache,
+        save_cl_signature_in_cache,
         get_masternode_list_by_block_hash_from_cache,
         masternode_list_save_in_cache,
         masternode_list_destroy_default,
@@ -1302,7 +1308,9 @@ fn test_jack_daniels() {
         block_height_lookup_jack_daniels,
         get_block_hash_by_height_default,
         get_llmq_snapshot_by_block_hash_default,
+        get_cl_signature_by_block_hash_from_context,
         save_llmq_snapshot_in_cache,
+        save_cl_signature_in_cache,
         get_masternode_list_by_block_hash_from_cache,
         masternode_list_save_in_cache,
         masternode_list_destroy_default,

@@ -1,9 +1,9 @@
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::byte_util::{MutDecodable};
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::{UInt256, UInt768};
 use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::processing::{CoreProvider, CoreProviderError, ProcessingError};
-use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
+use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::ToFFI;
 use crate::types;
@@ -16,7 +16,9 @@ pub struct FFICoreProvider {
     pub get_merkle_root_by_hash: MerkleRootLookup,
     get_block_hash_by_height: GetBlockHashByHeight,
     get_llmq_snapshot_by_block_hash: GetLLMQSnapshotByBlockHash,
+    get_cl_signature_by_block_hash: GetCLSignatureByBlockHash,
     save_llmq_snapshot: SaveLLMQSnapshot,
+    save_cl_signature: SaveCLSignature,
     get_masternode_list_by_block_hash: MasternodeListLookup,
     save_masternode_list: MasternodeListSave,
     destroy_masternode_list: MasternodeListDestroy,
@@ -57,12 +59,18 @@ impl CoreProvider for FFICoreProvider {
         )
     }
 
+    fn lookup_cl_signature_by_block_hash(&self, block_hash: UInt256) -> Result<UInt768, CoreProviderError> {
+        Self::lookup_cl_signature_by_block_hash_callback(
+            block_hash,
+            |h: UInt256| unsafe { (self.get_cl_signature_by_block_hash)(ferment_interfaces::boxed(h.0), self.opaque_context) },
+            |obj: *mut u8| unsafe { (self.destroy_hash)(obj) }
+        )
+    }
+
     fn lookup_snapshot_by_block_hash(&self, block_hash: UInt256) -> Result<models::LLMQSnapshot, CoreProviderError> {
         Self::lookup_snapshot_by_block_hash_callback(
             block_hash,
-            |h: UInt256| unsafe {
-                (self.get_llmq_snapshot_by_block_hash)(ferment_interfaces::boxed(h.0), self.opaque_context)
-            },
+            |h: UInt256| unsafe { (self.get_llmq_snapshot_by_block_hash)(ferment_interfaces::boxed(h.0), self.opaque_context) },
             |snapshot: *mut types::LLMQSnapshot| unsafe { (self.destroy_snapshot)(snapshot) },
         )
     }
@@ -129,7 +137,9 @@ impl FFICoreProvider {
         get_block_height_by_hash: GetBlockHeightByHash,
         get_block_hash_by_height: GetBlockHashByHeight,
         get_llmq_snapshot_by_block_hash: GetLLMQSnapshotByBlockHash,
+        get_cl_signature_by_block_hash: GetCLSignatureByBlockHash,
         save_llmq_snapshot: SaveLLMQSnapshot,
+        save_cl_signature: SaveCLSignature,
         get_masternode_list_by_block_hash: MasternodeListLookup,
         save_masternode_list: MasternodeListSave,
         destroy_masternode_list: MasternodeListDestroy,
@@ -145,7 +155,9 @@ impl FFICoreProvider {
             get_block_height_by_hash,
             get_block_hash_by_height,
             get_llmq_snapshot_by_block_hash,
+            get_cl_signature_by_block_hash,
             save_llmq_snapshot,
+            save_cl_signature,
             get_masternode_list_by_block_hash,
             save_masternode_list,
             destroy_masternode_list,
@@ -189,6 +201,20 @@ impl FFICoreProvider {
             |result| Ok(unsafe { (&*result).decode() }))
     }
 
+    pub fn lookup_cl_signature_by_block_hash_callback<L, D>(
+        block_hash: UInt256,
+        lookup_callback: L,
+        destroy_callback: D,
+    ) -> Result<UInt768, CoreProviderError>
+        where
+            L: Fn(UInt256) -> *mut u8 + Copy,
+            D: Fn(*mut u8) {
+        Self::lookup(
+            block_hash,
+            lookup_callback,
+            destroy_callback,
+            |result| UInt768::from_mut(result).map_err(CoreProviderError::from))
+    }
 
     pub fn lookup_snapshot_by_block_hash_callback<L, D>(
         block_hash: UInt256,

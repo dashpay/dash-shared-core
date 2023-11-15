@@ -1,14 +1,15 @@
 use byte::BytesExt;
 use hashes::hex::ToHex;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use crate::chain::common::LLMQType;
-use crate::chain::constants::{CORE_PROTO_20, CORE_PROTO_BLS_BASIC};
+use crate::chain::constants::{CORE_PROTO_20, CORE_PROTO_BLS_BASIC, CORE_PROTO_DIFF_VERSION_ORDER};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
-use crate::crypto::UInt256;
-use crate::models::{llmq_entry::LLMQEntry, masternode_entry::{MasternodeEntry, MasternodeReadContext}, quorums_cl_sigs_object::QuorumsCLSigsObject};
-use crate::tx::coinbase_transaction::CoinbaseTransaction;
+use crate::crypto::{UInt256, UInt768};
+use crate::models::{LLMQEntry, MasternodeEntry};
+use crate::models::masternode_entry::MasternodeReadContext;
+use crate::tx::CoinbaseTransaction;
 
 #[derive(Clone)]
 pub struct MNListDiff {
@@ -21,7 +22,7 @@ pub struct MNListDiff {
     pub deleted_masternode_hashes: Vec<UInt256>,
     pub added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
     pub deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
-    pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
+    pub added_quorums: Vec<LLMQEntry>,
     pub base_block_height: u32,
     pub block_height: u32,
     // 0: protocol_version < 70225
@@ -31,8 +32,10 @@ pub struct MNListDiff {
 
     // protocol_version > 70228
     // 19.2 goes with 70228
-    // 20.0 goes with 70228+?
-    pub quorums_cls_sigs: Vec<QuorumsCLSigsObject>,
+    // 19.3 goes with 70229?
+    // 20.0 goes with 70230+
+    // clsig, heights
+    pub quorums_cls_sigs: BTreeMap<UInt768, HashSet<u16>>,
 }
 
 impl std::fmt::Debug for MNListDiff {
@@ -52,6 +55,7 @@ impl std::fmt::Debug for MNListDiff {
             .field("base_block_height", &self.base_block_height)
             .field("block_height", &self.block_height)
             .field("version", &self.version)
+            .field("quorums_cls_sigs", &self.quorums_cls_sigs)
             .finish()
     }
 }
@@ -89,11 +93,15 @@ impl std::fmt::Debug for MNListDiff {
 
 impl MNListDiff {
     pub fn new<F: Fn(UInt256) -> u32>(
-        protocol_version: u32,
         message: &[u8],
         offset: &mut usize,
         block_height_lookup: F,
-    ) -> Result<Self, byte::Error> {
+        protocol_version: u32,
+) -> Result<Self, byte::Error> {
+        let mut version = 1;
+        if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
+            version = u16::from_bytes(message, offset)?
+        }
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
         let base_block_height = block_height_lookup(base_block_hash);
@@ -103,13 +111,11 @@ impl MNListDiff {
         let merkle_flags_count = VarInt::from_bytes(message, offset)?.0 as usize;
         let merkle_flags: &[u8] = message.read_with(offset, byte::ctx::Bytes::Len(merkle_flags_count))?;
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        let version = if protocol_version >= CORE_PROTO_BLS_BASIC {
+        if protocol_version >= CORE_PROTO_BLS_BASIC && protocol_version < CORE_PROTO_DIFF_VERSION_ORDER {
             // BLS Basic
-            u16::from_bytes(message, offset)?
-        } else {
-            // BLS Legacy
-            1
-        };
+            version = u16::from_bytes(message, offset)?
+        }
+        let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
             Vec::with_capacity(deleted_masternode_count as usize);
@@ -117,7 +123,6 @@ impl MNListDiff {
             deleted_masternode_hashes.push(UInt256::from_bytes(message, offset)?);
         }
         let added_masternode_count = VarInt::from_bytes(message, offset)?.0;
-        let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
             .fold(BTreeMap::new(), |mut acc, _| {
                 if let Ok(entry) = message.read_with::<MasternodeEntry>(offset, masternode_read_ctx) {
@@ -127,7 +132,7 @@ impl MNListDiff {
             });
 
         let mut deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>> = BTreeMap::new();
-        let mut added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
+        let mut added_quorums = Vec::<LLMQEntry>::new();
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         if quorums_active {
             let deleted_quorums_count = VarInt::from_bytes(message, offset)?.0;
@@ -141,20 +146,20 @@ impl MNListDiff {
             }
             let added_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..added_quorums_count {
-                if let Ok(entry) = LLMQEntry::from_bytes(message, offset) {
-                    added_quorums
-                        .entry(entry.llmq_type)
-                        .or_insert_with(BTreeMap::new)
-                        .insert(entry.llmq_hash, entry);
-                }
+                added_quorums.push(LLMQEntry::from_bytes(message, offset)?);
             }
         }
-        let mut quorums_cls_sigs = Vec::new();
-        if protocol_version >= CORE_PROTO_20 { // Core v0.20
+        let mut quorums_cls_sigs = BTreeMap::new();
+        if protocol_version >= CORE_PROTO_20 {
             let quorums_cl_sigs_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..quorums_cl_sigs_count {
-                let sig = QuorumsCLSigsObject::from_bytes(message, offset)?;
-                quorums_cls_sigs.push(sig);
+                let signature = UInt768::from_bytes(message, offset)?;
+                let index_set_length = VarInt::from_bytes(message, offset)?.0 as usize;
+                let mut index_set = HashSet::with_capacity(index_set_length);
+                for _i in 0..index_set_length {
+                    index_set.insert(u16::from_bytes(message, offset)?);
+                }
+                quorums_cls_sigs.insert(signature, index_set);
             }
         }
 

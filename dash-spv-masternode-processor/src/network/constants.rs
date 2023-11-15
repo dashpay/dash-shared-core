@@ -383,4 +383,3 @@ mod tests {
         assert_eq!("ServiceFlags(WITNESS|COMPACT_FILTERS|0xb0)", flag.to_string());
     }
 }
-

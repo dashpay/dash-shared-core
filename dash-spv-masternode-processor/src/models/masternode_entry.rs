@@ -38,7 +38,7 @@ pub struct MasternodeEntry {
 
 #[cfg(feature = "generate-dashj-tests")]
 impl Serialize for MasternodeEntry {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> where S: Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut state = serializer.serialize_struct("MasternodeEntry", 10)?;
         state.serialize_field("provider_registration_transaction_hash", &self.provider_registration_transaction_hash)?;
         state.serialize_field("confirmed_hash", &self.confirmed_hash)?;
@@ -50,7 +50,6 @@ impl Serialize for MasternodeEntry {
         state.serialize_field("mn_type", &self.mn_type)?;
         state.serialize_field("platform_http_port", &self.platform_http_port)?;
         state.serialize_field("platform_node_id", &self.platform_node_id)?;
-        state.serialize_field("version", &self.version)?;
         state.end()
 
     }

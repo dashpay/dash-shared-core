@@ -7,7 +7,7 @@ use dash_spv_masternode_processor::crypto::UInt256;
 use crate::common::{processor_create_cache, register_processor};
 use crate::ffi::{from::FromFFI, to::ToFFI};
 use crate::masternode::process_mnlistdiff_from_message;
-use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_default, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_default, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::types;
 
 #[test]
@@ -32,6 +32,8 @@ fn testnet_llmq_verification() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
@@ -80,22 +82,16 @@ fn testnet_llmq_verification() {
         assert_diff_result(context, result_119200);
         let masternode_list_119200 = unsafe { &*result_119200.masternode_list };
         let masternode_list_119200_decoded = unsafe { masternode_list_119200.decode() };
-        let added_quorums = (0..result_119200.added_llmq_type_maps_count)
+        let added_quorums = (0..result_119200.added_quorums_count)
             .into_iter()
+
             .fold(BTreeMap::new(), |mut acc, i| unsafe {
-                let added_llmq_type_maps = result_119200.added_llmq_type_maps;
-                let map_ptr = *(result_119200.added_llmq_type_maps.add(i));
-                let map = &*map_ptr;
-                let llmq_type = LLMQType::from(map.llmq_type);
-                let entry_map = (0..map.count)
-                    .into_iter()
-                    .fold(BTreeMap::new(), |mut hacc, j| {
-                        let raw_entry = *(&*(map.values.add(j)));
-                        let entry = (&*raw_entry).decode();
-                        hacc.insert(entry.llmq_hash, entry);
-                        hacc
-                    });
-                acc.insert(llmq_type, entry_map);
+                let map = &*(*(result_119200.added_quorums.add(i)));
+                let llmq_type = map.llmq_type;
+                let llmq_hash = UInt256(*map.llmq_hash);
+                acc.entry(llmq_type)
+                    .or_insert_with(BTreeMap::new)
+                    .insert(llmq_hash, map.decode());
                 acc
             });
         let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = added_quorums
@@ -156,6 +152,8 @@ fn testnet_llmq_verification_using_processor_and_cache() {
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
+            get_cl_signature_by_block_hash_from_context,
+            save_cl_signature_in_cache,
             get_masternode_list_by_block_hash_from_cache,
             masternode_list_save_119064,
             masternode_list_destroy_default,
@@ -208,20 +206,15 @@ fn testnet_llmq_verification_using_processor_and_cache() {
         assert_diff_result(context, result_119200);
         let masternode_list_119200 = unsafe { &*result_119200.masternode_list };
         let masternode_list_119200_decoded = unsafe { masternode_list_119200.decode() };
-        let added_quorums = (0..result_119200.added_llmq_type_maps_count)
+        let added_quorums = (0..result_119200.added_quorums_count)
             .into_iter()
             .fold(BTreeMap::new(), |mut acc, i| unsafe {
-                let map = &*(*(&*(result_119200.added_llmq_type_maps.add(i))));
-                let llmq_type = LLMQType::from(map.llmq_type);
-                let entry_map = (0..map.count)
-                    .into_iter()
-                    .fold(BTreeMap::new(), |mut hacc, j| {
-                        let raw_value = *map.values.add(j);
-                        let entry = (&*raw_value).decode();
-                        hacc.insert(entry.llmq_hash, entry);
-                        hacc
-                    });
-                acc.insert(llmq_type, entry_map);
+                let map = &*(*(result_119200.added_quorums.add(i)));
+                let llmq_type = map.llmq_type;
+                let llmq_hash = UInt256(*map.llmq_hash);
+                acc.entry(llmq_type)
+                    .or_insert_with(BTreeMap::new)
+                    .insert(llmq_hash, map.decode());
                 acc
             });
         let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = added_quorums

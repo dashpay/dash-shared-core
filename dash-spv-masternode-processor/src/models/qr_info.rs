@@ -2,6 +2,7 @@ use byte::{BytesExt, TryRead};
 use crate::{models, processing};
 use crate::consensus::encode;
 use crate::crypto::byte_util::BytesDecodable;
+use crate::models::LLMQVerificationContext;
 use crate::processing::CoreProvider;
 
 pub struct QRInfo {
@@ -34,7 +35,7 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
         let block_height_lookup = |block_hash|
             provider.lookup_block_height_by_hash(block_hash);
         let read_list_diff = |offset: &mut usize|
-            models::MNListDiff::new(protocol_version, bytes, offset, block_height_lookup);
+            models::MNListDiff::new( bytes, offset, block_height_lookup, protocol_version);
         let read_snapshot = |offset: &mut usize|
             models::LLMQSnapshot::from_bytes(bytes, offset);
         let read_var_int = |offset: &mut usize|
@@ -157,14 +158,14 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
 }
 
 impl QRInfo {
-    pub fn into_result<F: FnMut(models::MNListDiff, bool) -> processing::MNListDiffResult>(self, mut process_list_diff: F) -> processing::QRInfoResult {
+    pub fn into_result<F: FnMut(models::MNListDiff, LLMQVerificationContext) -> processing::MNListDiffResult>(self, mut process_list_diff: F, is_rotated_quorums_presented: bool) -> processing::QRInfoResult {
         processing::QRInfoResult {
-            result_at_h_4c: self.diff_h_4c.map(|list_diff| process_list_diff(list_diff, false)),
-            result_at_h_3c: process_list_diff(self.diff_h_3c, false),
-            result_at_h_2c: process_list_diff(self.diff_h_2c, false),
-            result_at_h_c: process_list_diff(self.diff_h_c, false),
-            result_at_h: process_list_diff(self.diff_h, true),
-            result_at_tip: process_list_diff(self.diff_tip, false),
+            result_at_h_4c: self.diff_h_4c.map(|list_diff| process_list_diff(list_diff, LLMQVerificationContext::None)),
+            result_at_h_3c: process_list_diff(self.diff_h_3c, LLMQVerificationContext::None),
+            result_at_h_2c: process_list_diff(self.diff_h_2c, LLMQVerificationContext::None),
+            result_at_h_c: process_list_diff(self.diff_h_c, LLMQVerificationContext::None),
+            result_at_h: process_list_diff(self.diff_h, LLMQVerificationContext::QRInfo(is_rotated_quorums_presented)),
+            result_at_tip: process_list_diff(self.diff_tip, LLMQVerificationContext::None),
             snapshot_at_h_c: self.snapshot_h_c,
             snapshot_at_h_2c: self.snapshot_h_2c,
             snapshot_at_h_3c: self.snapshot_h_3c,
@@ -174,7 +175,7 @@ impl QRInfo {
             quorum_snapshot_list: self.quorum_snapshot_list,
             mn_list_diff_list: self.mn_list_diff_list
                 .into_iter()
-                .map(|list_diff| process_list_diff(list_diff, false))
+                .map(|list_diff| process_list_diff(list_diff, LLMQVerificationContext::None))
                 .collect()
         }
     }
