@@ -118,42 +118,6 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
             quorum_snapshot_list,
             mn_list_diff_list,
         }, offset))
-
-        // let version = bytes.read_with::<crate::common::LLMQVersion>(offset, LE)?;
-        // let llmq_type = bytes.read_with::<crate::chain::common::LLMQType>(offset, LE)?;
-        // let llmq_hash = bytes.read_with::<UInt256>(offset, LE)?;
-        // let index = if version.use_rotated_quorums() {
-        //     Some(bytes.read_with::<u16>(offset, LE)?)
-        // } else {
-        //     None
-        // };
-        // let signers_count = bytes.read_with::<VarInt>(offset, LE)?;
-        // let signers_buffer_length: usize = ((signers_count.0 as usize) + 7) / 8;
-        // let signers_bitset: &[u8] = bytes.read_with(offset, Bytes::Len(signers_buffer_length))?;
-        // let valid_members_count = bytes.read_with::<VarInt>(offset, LE)?;
-        // let valid_members_count_buffer_length: usize = ((valid_members_count.0 as usize) + 7) / 8;
-        // let valid_members_bitset: &[u8] =
-        //     bytes.read_with(offset, Bytes::Len(valid_members_count_buffer_length))?;
-        // let public_key = bytes.read_with::<UInt384>(offset, LE)?;
-        // let verification_vector_hash = bytes.read_with::<UInt256>(offset, LE)?;
-        // let threshold_signature = bytes.read_with::<UInt768>(offset, LE)?;
-        // let all_commitment_aggregated_signature = bytes.read_with::<UInt768>(offset, LE)?;
-        // Ok((QRInfoResult {
-        //     result_at_tip,
-        //     result_at_h,
-        //     result_at_h_c,
-        //     result_at_h_2c,
-        //     result_at_h_3c,
-        //     result_at_h_4c,
-        //     snapshot_at_h_c,
-        //     snapshot_at_h_2c,
-        //     snapshot_at_h_3c,
-        //     snapshot_at_h_4c,
-        //     extra_share,
-        //     last_quorum_per_index,
-        //     quorum_snapshot_list,
-        //     mn_list_diff_list
-        // }, *offset))
     }
 }
 
