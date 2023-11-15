@@ -50,18 +50,6 @@ impl MasternodeProcessor {
         self.get_list_diff_result(base_list.ok(), list_diff, verification_context, cache)
     }
 
-    // pub(crate) fn get_list_diff_result(
-    //     &self,
-    //     base_list: Option<models::MasternodeList>,
-    //     list_diff: models::MNListDiff,
-    //     verification_context: LLMQVerificationContext,
-    //     cache: &mut MasternodeProcessorCache,
-    // ) -> types::MNListDiffResult {
-    //     let result = self.get_list_diff_result_internal(base_list, list_diff, verification_context, cache);
-    //     // println!("get_list_diff_result: {:#?}", result);
-    //     result.encode()
-    // }
-
     fn cache_masternode_list(
         &self,
         block_hash: UInt256,
