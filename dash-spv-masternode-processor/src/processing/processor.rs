@@ -29,26 +29,6 @@ pub enum LLMQQuarterReconstructionInfo {
     New(models::MasternodeList, UInt256)
 }
 
-// impl<'a> LLMQQuarterReconstructionInfo<'a> {
-//     pub fn find_members(
-//         self,
-//         llmq_params: &LLMQParams,
-//         work_block_height: u32,
-//         reconstruction_type: LLMQQuarterReconstructionType,
-//         cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
-//         cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
-//         unknown_lists: &mut Vec<UInt256>,
-//     ) -> Vec<Vec<models::MasternodeEntry>> {
-//         match self {
-//             LLMQQuarterReconstructionInfo::Snapshot(masternode_list, snapshot, work_block_hash) => {
-//
-//             },
-//             LLMQQuarterReconstructionInfo::New(masternode_list, work_block_hash, previous_quarters, skip_removed_masternodes) => {
-//             }
-//         }
-//     }
-// }
-
 // https://github.com/rust-lang/rfcs/issues/2770
 #[repr(C)]
 #[derive(Debug)]
