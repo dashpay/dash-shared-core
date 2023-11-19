@@ -1,4 +1,3 @@
-pub mod absinthe_core20;
 pub mod core20_testnet;
 pub mod llmq_rotation;
 pub mod llmq_rotation_testnet;

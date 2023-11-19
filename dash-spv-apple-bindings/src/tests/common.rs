@@ -1,4 +1,5 @@
 use std::{fs, io::Read, ptr::null_mut};
+use std::collections::BTreeMap;
 use ferment_interfaces::boxed;
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings};
 use dash_spv_masternode_processor::crypto::byte_util::{BytesDecodable, Reversable};
@@ -7,6 +8,7 @@ use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::logger::register_rust_logger;
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 use dash_spv_masternode_processor::block_store::{init_mainnet_store, init_testnet_store, MerkleBlock};
+use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::test_helpers::Block;
 use crate::common::{processor_create_cache, register_processor};
 use crate::ffi::{from::FromFFI, to::ToFFI};
@@ -162,6 +164,9 @@ pub fn process_qrinfo(bytes: Vec<u8>, processor: *mut MasternodeProcessor, conte
         )
     }
 }
+pub fn create_default_context_and_cache<'a>(chain: ChainType, is_dip_0024: bool) -> FFIContext<'a> {
+    create_default_context(chain, is_dip_0024, register_cache())
+}
 
 pub fn create_default_context(chain: ChainType, is_dip_0024: bool, cache: &mut MasternodeProcessorCache) -> FFIContext {
     let blocks = match chain {
@@ -175,7 +180,7 @@ pub fn create_default_context(chain: ChainType, is_dip_0024: bool, cache: &mut M
 pub fn assert_diff_result(context: &mut FFIContext, result: &types::MNListDiffResult) {
     let masternode_list = unsafe { (*result.masternode_list).decode() };
     //print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.reversed());
-    let bh = context.block_for_hash(masternode_list.block_hash).unwrap().height;
+    let bh = context.block_for_hash(masternode_list.block_hash).map_or(u32::MAX, |b| b.height);
     assert!(result.has_found_coinbase, "has no coinbase {}", bh);
     //turned off on purpose as we don't have the coinbase block
     //assert!(result.has_valid_coinbase, "Coinbase not valid at height {}", bh);
@@ -542,4 +547,82 @@ pub fn perform_mnlist_diff_test_for_message(
         result.has_found_coinbase,
         "The coinbase was not part of provided hashes"
     );
+}
+
+pub fn load_masternode_lists_for_files(
+    files: Vec<String>,
+    assert_validity: bool,
+    context: &mut FFIContext,
+) -> (bool, BTreeMap<UInt256, models::MasternodeList>) {
+    let processor = register_default_processor(context);
+    for file in files {
+        let bytes = context.chain.load_message(file.as_str());
+        let result = unsafe { process_mnlistdiff_from_message(
+            bytes.as_ptr(),
+            bytes.len(),
+            context.chain,
+            false,
+            false,
+            70221,
+            processor,
+            context.cache,
+            context as *mut _ as *mut std::ffi::c_void,
+        )};
+        let result = unsafe { &*result };
+        if assert_validity {
+            assert_diff_result(context, result);
+        }
+        let block_hash = UInt256(unsafe { *result.block_hash });
+        let masternode_list = unsafe { &*result.masternode_list };
+        let masternode_list_decoded = unsafe { masternode_list.decode() };
+    }
+    let lists = context.cache.mn_lists.clone();
+    (true, lists)
+}
+pub fn extract_protocol_version_from_filename(filename: &str) -> Option<u32> {
+    filename.split("__")
+        .nth(1)
+        .and_then(|s| s.split('.').next())
+        .and_then(|s| s.parse::<u32>().ok())
+}
+
+pub fn assert_diff_chain(chain: ChainType, diff_files: &[&'static str], qrinfo_files: &[&'static str], block_store: Option<Vec<MerkleBlock>>) {
+    register_logger();
+    let context = &mut create_default_context_and_cache(chain, false);
+    if let Some(blocks) = block_store {
+        context.blocks = blocks;
+    }
+    let processor = register_default_processor(context);
+    diff_files.iter().for_each(|filename| {
+        let protocol_version = extract_protocol_version_from_filename(filename).unwrap_or(70219);
+        let result = process_mnlistdiff(chain.load_message(filename), processor, context, protocol_version, false, true);
+        let result = unsafe { &*result };
+        assert_diff_result(context, result);
+        unsafe {
+            context.cache.mn_lists.insert(UInt256(*result.block_hash), (*result.masternode_list).decode());
+        }
+    });
+    context.is_dip_0024 = true;
+    qrinfo_files.iter().for_each(|filename| {
+        let protocol_version = extract_protocol_version_from_filename(filename).unwrap_or(70219);
+        let result = process_qrinfo(chain.load_message(filename), processor, context, protocol_version, false, true);
+        let result = unsafe { &*result };
+        assert_qrinfo_result(context, result);
+        unsafe {
+            if !result.result_at_h_4c.is_null() {
+                let result_at_h_4c = &*result.result_at_h_4c;
+                context.cache.mn_lists.insert(UInt256(*result_at_h_4c.block_hash), (*result_at_h_4c.masternode_list).decode());
+            }
+            let result_at_h_3c = &*result.result_at_h_3c;
+            context.cache.mn_lists.insert(UInt256(*result_at_h_3c.block_hash), (*result_at_h_3c.masternode_list).decode());
+            let result_at_h_2c = &*result.result_at_h_2c;
+            context.cache.mn_lists.insert(UInt256(*result_at_h_2c.block_hash), (*result_at_h_2c.masternode_list).decode());
+            let result_at_h_c = &*result.result_at_h_c;
+            context.cache.mn_lists.insert(UInt256(*result_at_h_c.block_hash), (*result_at_h_c.masternode_list).decode());
+            let result_at_h = &*result.result_at_h;
+            context.cache.mn_lists.insert(UInt256(*result_at_h.block_hash), (*result_at_h.masternode_list).decode());
+            let result_at_tip = &*result.result_at_tip;
+            context.cache.mn_lists.insert(UInt256(*result_at_tip.block_hash), (*result_at_tip.masternode_list).decode());
+        }
+    });
 }

@@ -1,14 +1,13 @@
 use dash_spv_masternode_processor::chain::common::{ChainType, DevnetType};
 use dash_spv_masternode_processor::block_store::MerkleBlock;
-use crate::tests::common::{assert_diff_result, assert_qrinfo_result, create_default_context, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
+use crate::tests::common::{assert_diff_result, assert_qrinfo_result, create_default_context_and_cache, process_mnlistdiff, process_qrinfo, register_default_processor, register_logger};
 
 #[test]
 fn test_verify_chained_rotation() {
     register_logger();
     let version = 70224;
     let chain = ChainType::DevNet(DevnetType::Screwdriver);
-    let cache = register_cache();
-    let context = &mut create_default_context(chain, false, cache);
+    let context = &mut create_default_context_and_cache(chain, false);
     context.blocks = vec![
         MerkleBlock::reversed(4840, "0000012768da68f985b294c80ee5f8077d29aa418fc66f68589069c8c21c0b33", "1debef742e21db3326716c265ffee6fe0883020d4b7d04986c8003affe5e7e8e"),
         MerkleBlock::reversed(4872, "0000029d25df5aff9374c87e303da6032c7e8ec6517842e637a79b9d6d433e46", "149d92e7610e03ea62767a1cea6305aa97e7097ceadbe7ef6c34e01c065aee08"),
@@ -34,38 +33,34 @@ fn test_verify_chained_rotation() {
         MerkleBlock::reversed(5140, "000001321487a80eefd7f6137da9bb9b06f19143cbdaa15cfda63753bd8eee46", "c344d520890dc4e1f16be687e359b13578e74ae14d01183ca417650d7498eb81"),
     ];
     let processor = register_default_processor(context);
-    let result = process_mnlistdiff(chain.load_message("MNL_1_4968.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_4968_4992.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_4992_4993.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_4993_4994.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_4994_4995.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_4995_4996.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_4996_5016.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_5016_5032.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_5032_5040.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
+    let listdiffs = [
+        "MNL_1_4968.dat",
+        "MNL_4968_4992.dat",
+        "MNL_4992_4993.dat",
+        "MNL_4993_4994.dat",
+        "MNL_4994_4995.dat",
+        "MNL_4995_4996.dat",
+        "MNL_4996_5016.dat",
+        "MNL_5016_5032.dat",
+        "MNL_5032_5040.dat",
+        "MNL_5040_5064.dat",
+        "MNL_5064_5088.dat",
+        "MNL_5088_5112.dat",
+        "MNL_5112_5140.dat",
+    ];
+    let qrinfos = [
+        "QRINFO_1_5140.dat",
+        "QRINFO_5032_5140.dat",
+    ];
 
-    let result = process_mnlistdiff(chain.load_message("MNL_5040_5064.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_5064_5088.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_5088_5112.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-    let result = process_mnlistdiff(chain.load_message("MNL_5112_5140.dat"), processor, context, version, false, true);
-    assert_diff_result(context, unsafe { &*result });
-
+    listdiffs.iter().for_each(|filename| {
+        let result = process_mnlistdiff(chain.load_message(filename), processor, context, version, false, true);
+        assert_diff_result(context, unsafe { &*result });
+    });
 
     context.is_dip_0024 = true;
-    let result = process_qrinfo(chain.load_message("QRINFO_1_5140.dat"), processor, context, version, false, true);
-    assert_qrinfo_result(context, unsafe { &*result });
-    let result = process_qrinfo(chain.load_message("QRINFO_5032_5140.dat"), processor, context, version, false, true);
-    assert_qrinfo_result(context, unsafe { &*result });
+    qrinfos.iter().for_each(|filename| {
+        let result = process_qrinfo(chain.load_message(filename), processor, context, version, false, true);
+        assert_qrinfo_result(context, unsafe { &*result });
+    });
 }

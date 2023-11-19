@@ -1,107 +1,84 @@
 use dash_spv_masternode_processor::chain::common::ChainType;
-use crate::tests::common::{assert_diff_result, assert_qrinfo_result, create_default_context, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
+use crate::tests::common::assert_diff_chain;
 
-// #[test]
-fn test_verify_chained_rotation2() {
-    register_logger();
-    let version = 70227;
-    let chain = ChainType::MainNet;
-    let cache = register_cache();
-    let context = &mut create_default_context(chain, false, cache);
-    let processor = register_default_processor(context);
-    let diffs = vec![
-        "MNL_0_1870848.dat",
-        "MNL_1870848_1871136.dat",
-        "MNL_1871136_1871184.dat",
-        "MNL_1871184_1871208.dat",
-        "MNL_1871208_1871232.dat",
-        "MNL_1871232_1871256.dat",
-        "MNL_1871256_1871280.dat",
-        "MNL_1871280_1871304.dat",
-        "MNL_1871304_1871328.dat",
-        "MNL_1871328_1871352.dat",
-        "MNL_1871352_1871376.dat",
-        "MNL_1871376_1871400.dat",
-        "MNL_1871400_1871424.dat",
-        "MNL_1871424_1871448.dat",
-        "MNL_1871448_1871472.dat",
-        "MNL_1871472_1871496.dat",
-        "MNL_1871496_1871520.dat",
-        "MNL_1871520_1871544.dat",
-        "MNL_1871544_1871568.dat",
-        "MNL_1871568_1871592.dat",
-        "MNL_1871592_1871616.dat",
-        "MNL_1871616_1871640.dat",
-        "MNL_1871640_1871664.dat",
-        "MNL_1871664_1871688.dat",
-        "MNL_1871688_1871712.dat",
-        "MNL_1871712_1871736.dat",
-        "MNL_1871736_1871755.dat",
-    ].iter()
-        .for_each(|name| {
-            let result = process_mnlistdiff(chain.load_message(name), processor, context, version, false, true);
-            assert_diff_result(context, unsafe { &*result })
-        });
-    context.is_dip_0024 = true;
-    let result = process_qrinfo(chain.load_message("QRINFO_0_1871755.dat"), processor, context, version, false, true);
-    unsafe {
-        let result = &*result;
-        assert_diff_result(context, &*result.result_at_h_4c);
-        assert_diff_result(context, &*result.result_at_h_3c);
-        assert_diff_result(context, &*result.result_at_h_2c);
-        assert_diff_result(context, &*result.result_at_h_c);
-        assert_diff_result(context, &*result.result_at_h);
-        assert_diff_result(context, &*result.result_at_tip);
-    }
+#[test]
+fn test_verify_chained_rotation_1() {
+    assert_diff_chain(
+        ChainType::MainNet,
+        &[
+            "MNL_0_1870848__70227.dat",
+            "MNL_1870848_1871136__70227.dat",
+            "MNL_1871136_1871184__70227.dat",
+            "MNL_1871184_1871208__70227.dat",
+            "MNL_1871208_1871232__70227.dat",
+            "MNL_1871232_1871256__70227.dat",
+            "MNL_1871256_1871280__70227.dat",
+            "MNL_1871280_1871304__70227.dat",
+            "MNL_1871304_1871328__70227.dat",
+            "MNL_1871328_1871352__70227.dat",
+            "MNL_1871352_1871376__70227.dat",
+            "MNL_1871376_1871400__70227.dat",
+            "MNL_1871400_1871424__70227.dat",
+            "MNL_1871424_1871448__70227.dat",
+            "MNL_1871448_1871472__70227.dat",
+            "MNL_1871472_1871496__70227.dat",
+            "MNL_1871496_1871520__70227.dat",
+            "MNL_1871520_1871544__70227.dat",
+            "MNL_1871544_1871568__70227.dat",
+            "MNL_1871568_1871592__70227.dat",
+            "MNL_1871592_1871616__70227.dat",
+            "MNL_1871616_1871640__70227.dat",
+            "MNL_1871640_1871664__70227.dat",
+            "MNL_1871664_1871688__70227.dat",
+            "MNL_1871688_1871712__70227.dat",
+            "MNL_1871712_1871736__70227.dat",
+            "MNL_1871736_1871755__70227.dat",
+        ],
+        &[
+            "QRINFO_0_1871755__70227.dat"
+        ],
+        None);
 }
 
-// #[test]
-fn test_verify_chained_rotation() {
-    register_logger();
-    let version = 70227;
-    let chain = ChainType::MainNet;
-    let cache = register_cache();
-    let context = &mut create_default_context(chain, false, cache);
-    let processor = register_default_processor(context);
-    let diffs = vec![
-        "0_1870840",
-        "1870840_1871712",
-        "1871712_1871722",
-        "1871722_1871724",
-        "1871724_1871726",
-        "1871726_1871727",
-        "1871727_1871730",
-        "1871730_1871733",
-        "1871733_1871734",
-        "1871734_1871738",
-        "1871738_1872001",
-        "1872001_1872002",
-        "1872002_1872003",
-        "1872003_1872004",
-        "1872004_1872005",
-        "1872005_1872006",
-        "1872006_1872007",
-        "1872007_1872008",
-        "1872008_1872009",
-        "1872009_1872011",
-        "1872011_1872013",
-        "1872013_1872016",
-        "1872016_1872017",
-        "1872017_1872019",
-        "1872019_1872020",
-        "1872020_1872023",
-        "1872023_1872024",
-        "1872024_1872025",
-        "1872025_1872027",
-        "1872027_1872028",
-        "1872028_1872029",
-        "1872029_1872030",
-        "1872030_1872031",
-    ].iter().for_each(|name| {
-        let result = process_mnlistdiff(chain.load_message(format!("MNL_{}.dat", name).as_str()), processor, context, version, false, true);
-        assert_diff_result(context, unsafe { &*result });
-    });
-    context.is_dip_0024 = true;
-    let result = process_qrinfo(chain.load_message("QRINFO_0_1872425.dat"), processor, context, version, false, true);
-    assert_qrinfo_result(context, unsafe { &*result });
+#[test]
+fn test_verify_chained_rotation_2() {
+    assert_diff_chain(
+        ChainType::MainNet,
+        &[
+            "MNL_0_1870840__70227.dat",
+            "MNL_1870840_1871712__70227.dat",
+            "MNL_1871712_1871722__70227.dat",
+            "MNL_1871722_1871724__70227.dat",
+            "MNL_1871724_1871726__70227.dat",
+            "MNL_1871726_1871727__70227.dat",
+            "MNL_1871727_1871730__70227.dat",
+            "MNL_1871730_1871733__70227.dat",
+            "MNL_1871733_1871734__70227.dat",
+            "MNL_1871734_1871738__70227.dat",
+            "MNL_1871738_1872001__70227.dat",
+            "MNL_1872001_1872002__70227.dat",
+            "MNL_1872002_1872003__70227.dat",
+            "MNL_1872003_1872004__70227.dat",
+            "MNL_1872004_1872005__70227.dat",
+            "MNL_1872005_1872006__70227.dat",
+            "MNL_1872006_1872007__70227.dat",
+            "MNL_1872007_1872008__70227.dat",
+            "MNL_1872008_1872009__70227.dat",
+            "MNL_1872009_1872011__70227.dat",
+            "MNL_1872011_1872013__70227.dat",
+            "MNL_1872013_1872016__70227.dat",
+            "MNL_1872016_1872017__70227.dat",
+            "MNL_1872017_1872019__70227.dat",
+            "MNL_1872019_1872020__70227.dat",
+            "MNL_1872020_1872023__70227.dat",
+            "MNL_1872023_1872024__70227.dat",
+            "MNL_1872024_1872025__70227.dat",
+            "MNL_1872025_1872027__70227.dat",
+            "MNL_1872027_1872028__70227.dat",
+            "MNL_1872028_1872029__70227.dat",
+            "MNL_1872029_1872030__70227.dat",
+            "MNL_1872030_1872031__70227.dat",
+        ],
+    &["QRINFO_0_1872425__70227.dat"],
+        None);
 }

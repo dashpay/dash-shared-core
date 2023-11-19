@@ -1,12 +1,5 @@
-use std::collections::BTreeMap;
-use dash_spv_masternode_processor::block_store::init_mainnet_store;
 use dash_spv_masternode_processor::chain::common::chain_type::ChainType;
-use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::models;
-use crate::common::{processor_create_cache, register_processor};
-use crate::ffi::from::FromFFI;
-use crate::masternode::process_mnlistdiff_from_message;
-use crate::tests::common::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_default, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{create_default_context_and_cache, load_masternode_lists_for_files};
 
 #[test]
 fn test_mainnet_reload_with_processor() {
@@ -44,71 +37,8 @@ fn test_mainnet_reload_with_processor() {
     ]
         .map(Into::into)
         .to_vec();
-
-    let context = &mut (FFIContext {
-        chain,
-        is_dip_0024: false,
-        cache: &mut Default::default(),
-        blocks: init_mainnet_store()
-    });
-
-    let (success, lists) = load_masternode_lists_for_files(files, true, context);
+    let mut context = create_default_context_and_cache(chain, false);
+    let (success, lists) = load_masternode_lists_for_files(files, true, &mut context);
     assert!(success, "Unsuccessful");
     assert_eq!(lists.len(), 29, "There should be 29 models lists");
-}
-
-pub fn load_masternode_lists_for_files(
-    files: Vec<String>,
-    assert_validity: bool,
-    context: &mut FFIContext,
-) -> (bool, BTreeMap<UInt256, models::MasternodeList>) {
-    let cache = unsafe { &mut *processor_create_cache() };
-    let processor = unsafe {
-        register_processor(
-            context.chain,
-            get_merkle_root_by_hash_default,
-            get_block_height_by_hash_from_context,
-            get_block_hash_by_height_default,
-            get_llmq_snapshot_by_block_hash_default,
-            save_llmq_snapshot_default,
-            get_cl_signature_by_block_hash_from_context,
-            save_cl_signature_in_cache,
-            get_masternode_list_by_block_hash_from_cache,
-            masternode_list_save_in_cache,
-            masternode_list_destroy_default,
-            add_insight_lookup_default,
-            hash_destroy_default,
-            snapshot_destroy_default,
-            should_process_diff_with_range_default,
-            context as *mut _ as *mut std::ffi::c_void
-        )
-    };
-    context.cache = cache;
-
-    for file in files {
-        println!("load_masternode_lists_for_files: [{}]", file);
-        let bytes = context.chain.load_message(file.as_str());
-        let result = unsafe { process_mnlistdiff_from_message(
-            bytes.as_ptr(),
-            bytes.len(),
-            context.chain,
-            false,
-            false,
-            70221,
-            processor,
-            context.cache,
-            context as *mut _ as *mut std::ffi::c_void,
-        )};
-        let result = unsafe { &*result };
-        println!("result: [{:?}]", result);
-        //println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);
-        if assert_validity {
-            assert_diff_result(context, result);
-        }
-        let block_hash = UInt256(unsafe { *result.block_hash });
-        let masternode_list = unsafe { &*result.masternode_list };
-        let masternode_list_decoded = unsafe { masternode_list.decode() };
-    }
-    let lists = context.cache.mn_lists.clone();
-    (true, lists)
 }
