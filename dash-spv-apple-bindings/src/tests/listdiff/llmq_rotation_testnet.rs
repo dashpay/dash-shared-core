@@ -152,7 +152,7 @@ fn mainnet_quorum_quarters() {
         &mut context.cache.cl_signatures,
         &mut context.cache.needed_masternode_lists,
         false
-    );
+    ).unwrap();
     let node_hashes = nodes.iter().map(|m| m.provider_registration_transaction_hash.clone()).collect::<Vec<UInt256>>();
     let needed_hashes = [
         UInt256::from_hex("d2426992844e311149b2962f4ea991656ea5d1b36541e314e251915a6ffa1316").unwrap().reverse(),

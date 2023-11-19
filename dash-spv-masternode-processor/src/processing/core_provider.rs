@@ -4,6 +4,7 @@ use crate::crypto::byte_util::Zeroable;
 use crate::crypto::{UInt256, UInt768};
 use crate::models;
 use crate::processing::ProcessingError;
+use crate::processing::processor::{LLMQQuarterReconstructionInfo, LLMQQuarterReconstructionType};
 
 
 pub trait CoreProvider: std::fmt::Debug {
@@ -63,13 +64,25 @@ pub trait CoreProvider: std::fmt::Debug {
         }
     }
 
-    fn masternode_list_info_for_height(&self, work_block_height: u32, cached_lists: &BTreeMap<UInt256, models::MasternodeList>, cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>, unknown_lists: &mut Vec<UInt256>) -> Result<(models::MasternodeList, models::LLMQSnapshot, UInt256), CoreProviderError> {
+    // TODO: avoid panic && impl find_masternode_list by height
+    fn masternode_list_info_for_height(
+        &self,
+        work_block_height: u32,
+        cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
+        unknown_lists: &mut Vec<UInt256>,
+        r#type: LLMQQuarterReconstructionType) -> Result<LLMQQuarterReconstructionInfo, CoreProviderError> {
         self.lookup_block_hash_by_height(work_block_height)
-            .map_err(|err| panic!("MISSING: block for height: {}: error: {}", work_block_height, err))
-            .and_then(|work_block_hash| self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
-                .and_then(|masternode_list| self.find_snapshot(work_block_hash, cached_snapshots)
-                    .map(|snapshot| (masternode_list, snapshot, work_block_hash))))
-        // .ok_or(CoreProviderError::NullResult)
+            .map_err(|err|
+                panic!("MISSING: block for height: {}: error: {}", work_block_height, err))
+            .and_then(|work_block_hash|
+                self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
+                    .and_then(|masternode_list| match r#type {
+                        LLMQQuarterReconstructionType::New { .. } => Ok(LLMQQuarterReconstructionInfo::New(masternode_list, work_block_hash)),
+                        LLMQQuarterReconstructionType::Snapshot { cached_snapshots } =>
+                            self.find_snapshot(work_block_hash, cached_snapshots)
+                                .map(|snapshot|
+                                    LLMQQuarterReconstructionInfo::Snapshot(masternode_list, snapshot, work_block_hash))
+                    }))
     }
 
     fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError>;
@@ -92,11 +105,18 @@ pub enum CoreProviderError {
     NullResult,
     ByteError(byte::Error),
     BadBlockHash(UInt256),
+    BlockHashNotFoundAt(u32),
     NoMasternodeList,
 }
 impl std::fmt::Display for CoreProviderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{}", match self {
+            CoreProviderError::NullResult => format!("CoreProviderError::NullResult"),
+            CoreProviderError::ByteError(err) => format!("CoreProviderError::ByteError({err:?})"),
+            CoreProviderError::BadBlockHash(h) => format!("CoreProviderError::BadBlockHash({h})"),
+            CoreProviderError::BlockHashNotFoundAt(h) => format!("CoreProviderError::BlockHashNotFound({h})"),
+            CoreProviderError::NoMasternodeList => format!("CoreProviderError::NoMasternodeList"),
+        })
     }
 }
 
@@ -123,6 +143,7 @@ pub enum CoreProviderError_FFI {
     NullResult,
     ByteError(*mut byte_Error_FFI),
     BadBlockHash(*mut [u8; 32]),
+    BlockHashNotFoundAt(u32),
     NoMasternodeList,
 }
 
@@ -170,6 +191,8 @@ impl ferment_interfaces::FFIConversion<CoreProviderError> for CoreProviderError_
                 CoreProviderError::ByteError(ferment_interfaces::FFIConversion::ffi_from_const(*o_0)),
             CoreProviderError_FFI::BadBlockHash(o_0) =>
                 CoreProviderError::BadBlockHash(ferment_interfaces::FFIConversion::ffi_from_const(*o_0)),
+            CoreProviderError_FFI::BlockHashNotFoundAt(o_0) =>
+                CoreProviderError::BlockHashNotFoundAt(*o_0),
             CoreProviderError_FFI::NoMasternodeList =>
                 CoreProviderError::NoMasternodeList,
         }
@@ -179,6 +202,7 @@ impl ferment_interfaces::FFIConversion<CoreProviderError> for CoreProviderError_
             CoreProviderError::NullResult => CoreProviderError_FFI::NullResult,
             CoreProviderError::ByteError(o_0) => CoreProviderError_FFI::ByteError(ferment_interfaces::FFIConversion::ffi_to(o_0)),
             CoreProviderError::BadBlockHash(o_0) => CoreProviderError_FFI::BadBlockHash(ferment_interfaces::FFIConversion::ffi_to(o_0)),
+            CoreProviderError::BlockHashNotFoundAt(o_0) => CoreProviderError_FFI::BlockHashNotFoundAt(o_0),
             CoreProviderError::NoMasternodeList => CoreProviderError_FFI::NoMasternodeList,
         })
     }

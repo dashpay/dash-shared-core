@@ -1,9 +1,12 @@
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+use crate::processing::CoreProviderError;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LLMQValidationStatus {
     Verified,
     InvalidPayload(LLMQPayloadValidationStatus),
     InvalidAggregatedSignature,
     InvalidQuorumSignature,
+    ProviderError(CoreProviderError),
     NoMasternodeList
 }
 
