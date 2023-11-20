@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use crate::crypto::{UInt256, UInt768};
+use crate::crypto::UInt256;
 use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry, masternode_list::MasternodeList};
 
 #[derive(Clone)]
@@ -17,7 +17,6 @@ pub struct MNListDiffResult {
     pub modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
     pub added_quorums: Vec<LLMQEntry>,
     pub needed_masternode_lists: Vec<UInt256>,
-    pub cl_signatures: BTreeMap<UInt256, UInt768>,
 }
 
 impl std::fmt::Debug for MNListDiffResult {
@@ -60,7 +59,6 @@ impl Default for MNListDiffResult {
             modified_masternodes: Default::default(),
             added_quorums: vec![],
             needed_masternode_lists: vec![],
-            cl_signatures: Default::default()
         }
     }
 }

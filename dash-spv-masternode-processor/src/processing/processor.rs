@@ -114,18 +114,13 @@ impl MasternodeProcessor {
             block_height,
             block_hash,
         );
+        let mut added_quorums = list_diff.added_quorums;
 
-        let (added_quorums,
-            quorums,
-            cl_signatures,
-            has_valid_quorums) = self.classify_quorums(
+        let has_valid_quorums = self.verify_added_quorums(verification_context, &mut added_quorums, skip_removed_masternodes, &quorums_cl_sigs, cache);
+        let (added_quorums, quorums) = self.process_quorums(
             base_quorums,
-            list_diff.added_quorums,
+            added_quorums,
             list_diff.deleted_quorums,
-            &quorums_cl_sigs,
-            skip_removed_masternodes,
-            verification_context,
-            cache,
         );
         let masternode_list = models::MasternodeList::new(
             masternodes,
@@ -160,11 +155,12 @@ impl MasternodeProcessor {
             modified_masternodes,
             added_quorums,
             needed_masternode_lists,
-            cl_signatures,
+            // cl_signatures,
         };
         result
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn classify_masternodes(
         &self,
         base_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
@@ -222,23 +218,15 @@ impl MasternodeProcessor {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn classify_quorums(
+    fn verify_added_quorums(
         &self,
-        mut base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
-        mut added_quorums: Vec<models::LLMQEntry>,
-        deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
-        quorums_cl_sigs: &BTreeMap<UInt768, HashSet<u16>>,
-        skip_removed_masternodes: bool,
         verification_context: LLMQVerificationContext,
+        added_quorums: &mut Vec<models::LLMQEntry>,
+        skip_removed_masternodes: bool,
+        quorums_cl_sigs: &BTreeMap<UInt768, HashSet<u16>>,
         cache: &mut MasternodeProcessorCache,
-    ) -> (
-        Vec<models::LLMQEntry>,
-        BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
-        BTreeMap<UInt256, UInt768>,
-        bool,
-    ) {
+    ) -> bool {
         let mut has_valid_quorums = true;
-        let mut signatures = BTreeMap::<UInt256, UInt768>::new();
         if verification_context.should_validate_quorums() {
             added_quorums
                 .iter_mut()
@@ -246,15 +234,15 @@ impl MasternodeProcessor {
                 .for_each(|(index, quorum)| {
                     if let Some(signature) = Self::find_cl_signature_at_index(quorums_cl_sigs, index as u16) {
                         let llmq_height = self.provider.lookup_block_height_by_hash(quorum.llmq_hash);
+                        let work_block_height = llmq_height - 8;
                         if llmq_height != u32::MAX {
-                            if let Ok(llmq_hash_minus_8) = self.provider.lookup_block_hash_by_height(llmq_height - 8) {
-                                signatures.insert(llmq_hash_minus_8, signature);
-                                cache.cl_signatures.insert(llmq_hash_minus_8, signature);
+                            if let Ok(work_block_hash) = self.provider.lookup_block_hash_by_height(work_block_height) {
+                                cache.cl_signatures.insert(work_block_hash, signature);
                             } else {
-                                println!("WARN: unknown hash for {}", llmq_height - 8);
+                                warn!("unknown hash for {}", work_block_height);
                             }
                         } else {
-                            println!("WARN: unknown height for {}", quorum.llmq_hash);
+                            warn!("unknown height for {}", quorum.llmq_hash);
                         }
                     }
                     if verification_context.should_validate_quorum_of_type(quorum.llmq_type, self.provider.chain_type()) {
@@ -277,8 +265,20 @@ impl MasternodeProcessor {
                             }
                         }
                     }
-            })
+                })
         }
+        has_valid_quorums
+    }
+
+    pub fn process_quorums(
+        &self,
+        mut base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+        added_quorums: Vec<models::LLMQEntry>,
+        deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
+    ) -> (
+        Vec<models::LLMQEntry>,
+        BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+    ) {
         for (llmq_type, keys_to_delete) in &deleted_quorums {
             if let Some(llmq_map) = base_quorums.get_mut(llmq_type) {
                 for key in keys_to_delete {
@@ -291,7 +291,7 @@ impl MasternodeProcessor {
                 .or_insert_with(BTreeMap::new)
                 .insert(llmq_entry.llmq_hash, llmq_entry.clone());
         });
-        (added_quorums, base_quorums, signatures, has_valid_quorums)
+        (added_quorums, base_quorums)
     }
 
     pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> Result<LLMQValidationStatus, CoreProviderError> {

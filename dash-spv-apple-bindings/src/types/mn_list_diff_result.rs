@@ -24,9 +24,9 @@ pub struct MNListDiffResult {
     pub added_quorums_count: usize,
     pub needed_masternode_lists: *mut *mut [u8; 32],
     pub needed_masternode_lists_count: usize,
-    pub quorums_cl_signatures_hashes: *mut *mut [u8; 32],
-    pub quorums_cl_signatures: *mut *mut [u8; 96],
-    pub quorums_cl_sigs_count: usize,
+    // pub quorums_cl_signatures_hashes: *mut *mut [u8; 32],
+    // pub quorums_cl_signatures: *mut *mut [u8; 96],
+    // pub quorums_cl_sigs_count: usize,
 }
 
 impl Default for MNListDiffResult {
@@ -49,9 +49,9 @@ impl Default for MNListDiffResult {
             added_quorums_count: 0,
             needed_masternode_lists: null_mut(),
             needed_masternode_lists_count: 0,
-            quorums_cl_signatures_hashes: null_mut(),
-            quorums_cl_signatures: null_mut(),
-            quorums_cl_sigs_count: 0,
+            // quorums_cl_signatures_hashes: null_mut(),
+            // quorums_cl_signatures: null_mut(),
+            // quorums_cl_sigs_count: 0,
         }
     }
 }
@@ -84,17 +84,17 @@ impl From<processing::MNListDiffResult> for MNListDiffResult {
                     .collect(),
             ),
             needed_masternode_lists_count: value.needed_masternode_lists.len(),
-            quorums_cl_sigs_count: value.cl_signatures.len(),
-            quorums_cl_signatures_hashes: boxed_vec(
-                value.cl_signatures
-                    .keys()
-                    .map(|h| boxed(h.0))
-                    .collect()),
-            quorums_cl_signatures: boxed_vec(
-                value.cl_signatures
-                    .values()
-                    .map(|h| boxed(h.0))
-                    .collect())
+            // quorums_cl_sigs_count: value.cl_signatures.len(),
+            // quorums_cl_signatures_hashes: boxed_vec(
+            //     value.cl_signatures
+            //         .keys()
+            //         .map(|h| boxed(h.0))
+            //         .collect()),
+            // quorums_cl_signatures: boxed_vec(
+            //     value.cl_signatures
+            //         .values()
+            //         .map(|h| boxed(h.0))
+            //         .collect())
         }
     }
 }
@@ -132,12 +132,12 @@ impl Drop for MNListDiffResult {
             if !self.added_quorums.is_null() {
                 unbox_any_vec_ptr(self.added_quorums, self.added_quorums_count);
             }
-            if !self.quorums_cl_signatures_hashes.is_null() {
-                unbox_any_vec_ptr(self.quorums_cl_signatures_hashes, self.quorums_cl_sigs_count);
-            }
-            if !self.quorums_cl_signatures.is_null() {
-                unbox_any_vec_ptr(self.quorums_cl_signatures, self.quorums_cl_sigs_count);
-            }
+            // if !self.quorums_cl_signatures_hashes.is_null() {
+            //     unbox_any_vec_ptr(self.quorums_cl_signatures_hashes, self.quorums_cl_sigs_count);
+            // }
+            // if !self.quorums_cl_signatures.is_null() {
+            //     unbox_any_vec_ptr(self.quorums_cl_signatures, self.quorums_cl_sigs_count);
+            // }
         }
     }
 }
