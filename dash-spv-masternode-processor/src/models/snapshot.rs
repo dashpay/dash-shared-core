@@ -9,7 +9,6 @@ use crate::common::llmq_snapshot_skip_mode::LLMQSnapshotSkipMode;
 use crate::consensus::encode::VarInt;
 use crate::crypto::{byte_util::BytesDecodable, data_ops::Data};
 use crate::impl_bytes_decodable;
-use crate::models::MasternodeEntry;
 
 #[derive(Clone)]
 #[ferment_macro::export]
@@ -94,75 +93,6 @@ impl LLMQSnapshot {
         self.member_list.as_slice().bit_is_true_at_le_index(i)
     }
 
-    pub fn apply_skip_strategy(
-        &self,
-        sorted_combined_mns_list: Vec<MasternodeEntry>,
-        quorum_count: usize,
-        quarter_size: usize,
-    ) -> Vec<Vec<MasternodeEntry>> {
-        let mut quarter_quorum_members = vec![Vec::<MasternodeEntry>::new(); quorum_count];
-        match self.skip_list_mode {
-            LLMQSnapshotSkipMode::NoSkipping => {
-                let mut iter = sorted_combined_mns_list.iter();
-                (0..quorum_count).for_each(|i| {
-                    let mut quarter = Vec::<MasternodeEntry>::new();
-                    while quarter.len() < quarter_size {
-                        if let Some(node) = iter.next() {
-                            quarter.push(node.clone());
-                        } else {
-                            iter = sorted_combined_mns_list.iter();
-                        }
-                    }
-                    quarter_quorum_members[i] = quarter;
-                });
-            }
-            LLMQSnapshotSkipMode::SkipFirst => {
-                let mut first_entry_index = 0;
-                let mut processed_skip_list = Vec::<i32>::new();
-                for &s in &self.skip_list {
-                    if first_entry_index == 0 {
-                        first_entry_index = s;
-                        processed_skip_list.push(s);
-                    } else {
-                        processed_skip_list.push(first_entry_index + s);
-                    }
-                }
-                let mut idx = 0;
-                let mut idxk = 0;
-                for i in 0..quorum_count {
-                    while quarter_quorum_members[i].len() < quarter_size {
-                        if idxk != processed_skip_list.len() && idx == processed_skip_list[idxk] {
-                            idxk += 1;
-                        } else {
-                            quarter_quorum_members[i].push(sorted_combined_mns_list[idx as usize].clone());
-                        }
-                        idx += 1;
-                        if idx == sorted_combined_mns_list.len() as i32 {
-                            idx = 0;
-                        }
-                    }
-                }
-            }
-            LLMQSnapshotSkipMode::SkipExcept => {
-                (0..quorum_count).for_each(|i| {
-                    let mut quarter = Vec::<MasternodeEntry>::new();
-                    self.skip_list.iter().for_each(|unskipped| {
-                        if let Some(node) = sorted_combined_mns_list.get(*unskipped as usize) {
-                            if quarter.len() < quarter_size {
-                                quarter.push(node.clone());
-                            }
-                        }
-                    });
-                    quarter_quorum_members[i] = quarter;
-                });
-            }
-            LLMQSnapshotSkipMode::SkipAll => {
-                // TODO: do we need to impl smth in this strategy ?
-                warn!("skip_mode SkipAll not supported yet");
-            }
-        }
-        quarter_quorum_members
-    }
 }
 impl_bytes_decodable!(LLMQSnapshot);
 

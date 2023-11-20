@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 use byte::BytesExt;
 use crate::{common, models, ok_or_return_processing_error, processing};
 use crate::chain::common::{LLMQType, LLMQParams};
+use crate::common::LLMQSnapshotSkipMode;
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::models::{LLMQModifierType, LLMQVerificationContext};
 use crate::processing::{CoreProvider, CoreProviderError, LLMQValidationStatus, MasternodeProcessorCache, ProcessingError};
@@ -299,8 +300,12 @@ impl MasternodeProcessor {
                     self.get_non_rotated_masternodes_for_quorum(quorum, quorum.llmq_type, llmq_block_hash, block_height, masternodes, &cache.cl_signatures)
                 } {
                     Ok(masternodes) => quorum.verify(masternodes, block_height),
+                    Err(CoreProviderError::BlockHashNotFoundAt(height)) => {
+                        error!("missing block for height: {}", height);
+                        panic!("missing block for height: {}", height)
+                    },
                     Err(err) => {
-                        println!("validate_quorum error: {}", err);
+                        warn!("Error determining valid masternodes: ({})", err);
                         LLMQValidationStatus::ProviderError(err)
                     }
                 }
@@ -387,6 +392,75 @@ impl MasternodeProcessor {
         sorted_combined_mns_list.extend(sorted_used_mns_list);
         sorted_combined_mns_list
     }
+    pub fn apply_skip_strategy_for_snapshot(
+        snapshot: models::LLMQSnapshot,
+        sorted_combined_mns_list: Vec<models::MasternodeEntry>,
+        quorum_count: usize,
+        quarter_size: usize,
+    ) -> Vec<Vec<models::MasternodeEntry>> {
+        let mut quarter_quorum_members = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
+        match snapshot.skip_list_mode {
+            LLMQSnapshotSkipMode::NoSkipping => {
+                let mut iter = sorted_combined_mns_list.iter();
+                (0..quorum_count).for_each(|i| {
+                    let mut quarter = Vec::<models::MasternodeEntry>::new();
+                    while quarter.len() < quarter_size {
+                        if let Some(node) = iter.next() {
+                            quarter.push(node.clone());
+                        } else {
+                            iter = sorted_combined_mns_list.iter();
+                        }
+                    }
+                    quarter_quorum_members[i] = quarter;
+                });
+            }
+            LLMQSnapshotSkipMode::SkipFirst => {
+                let mut first_entry_index = 0;
+                let mut processed_skip_list = Vec::<i32>::new();
+                for &s in &snapshot.skip_list {
+                    if first_entry_index == 0 {
+                        first_entry_index = s;
+                        processed_skip_list.push(s);
+                    } else {
+                        processed_skip_list.push(first_entry_index + s);
+                    }
+                }
+                let mut idx = 0;
+                let mut idxk = 0;
+                for i in 0..quorum_count {
+                    while quarter_quorum_members[i].len() < quarter_size {
+                        if idxk != processed_skip_list.len() && idx == processed_skip_list[idxk] {
+                            idxk += 1;
+                        } else {
+                            quarter_quorum_members[i].push(sorted_combined_mns_list[idx as usize].clone());
+                        }
+                        idx += 1;
+                        if idx == sorted_combined_mns_list.len() as i32 {
+                            idx = 0;
+                        }
+                    }
+                }
+            }
+            LLMQSnapshotSkipMode::SkipExcept => {
+                (0..quorum_count).for_each(|i| {
+                    let mut quarter = Vec::<models::MasternodeEntry>::new();
+                    snapshot.skip_list.iter().for_each(|unskipped| {
+                        if let Some(node) = sorted_combined_mns_list.get(*unskipped as usize) {
+                            if quarter.len() < quarter_size {
+                                quarter.push(node.clone());
+                            }
+                        }
+                    });
+                    quarter_quorum_members[i] = quarter;
+                });
+            }
+            LLMQSnapshotSkipMode::SkipAll => {
+                // TODO: do we need to impl smth in this strategy ?
+                warn!("skip_mode SkipAll not supported yet");
+            }
+        }
+        quarter_quorum_members
+    }
 
     fn apply_skip_strategy_for_new_quarter(mut used_at_h_indexed_masternodes: Vec<Vec<models::MasternodeEntry>>, sorted_combined_mns_list: Vec<models::MasternodeEntry>, quorum_count: usize, quarter_size: usize) -> Vec<Vec<models::MasternodeEntry>> {
         let mut quarter_quorum_members = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
@@ -430,6 +504,48 @@ impl MasternodeProcessor {
         quarter_quorum_members
     }
 
+    fn usage_info_from_snapshot(snapshot: &models::LLMQSnapshot, masternode_list: models::MasternodeList, quorum_modifier: UInt256, work_block_height: u32) -> (Vec<models::MasternodeEntry>, Vec<models::MasternodeEntry>) {
+        let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height, false);
+        let sorted_scored_masternodes = MasternodeProcessor::sort_scored_masternodes(scored_masternodes);
+        let mut i = 0u32;
+        sorted_scored_masternodes
+            .into_iter()
+            .partition(|_| {
+                let used = snapshot.member_is_true_at_index(i);
+                i += 1;
+                used
+            })
+    }
+
+    fn usage_info_(previous_quarters: [&Vec<Vec<models::MasternodeEntry>>; 3], masternode_list: models::MasternodeList, skip_removed_masternodes: bool, quorum_count: usize) -> (Vec<models::MasternodeEntry>, Vec<models::MasternodeEntry>, Vec<Vec<models::MasternodeEntry>>) {
+        let mut used_at_h_masternodes = Vec::<models::MasternodeEntry>::new();
+        let mut used_at_h_indexed_masternodes = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
+        for i in 0..quorum_count {
+            // for quarters h - c, h -2c, h -3c
+            for quarter in &previous_quarters {
+                if let Some(quarter_nodes) = quarter.get(i) {
+                    for node in quarter_nodes {
+                        let hash = node.provider_registration_transaction_hash;
+                        if (!skip_removed_masternodes || masternode_list.has_masternode(hash)) &&
+                            masternode_list.has_valid_masternode(hash) {
+                            if !used_at_h_masternodes.iter().any(|m| m.provider_registration_transaction_hash == hash) {
+                                used_at_h_masternodes.push(node.clone());
+                            }
+                            if !used_at_h_indexed_masternodes[i].iter().any(|m| m.provider_registration_transaction_hash == hash) {
+                                used_at_h_indexed_masternodes[i].push(node.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let unused_at_h_masternodes = masternode_list.masternodes.values()
+            .filter(|mn| mn.is_valid && !used_at_h_masternodes.iter().any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash))
+            .cloned()
+            .collect();
+        (used_at_h_masternodes, unused_at_h_masternodes, used_at_h_indexed_masternodes)
+    }
+
     pub fn quorum_quarter_members_by_reconstruction_type(
         &self,
         reconstruction_type: LLMQQuarterReconstructionType,
@@ -439,81 +555,35 @@ impl MasternodeProcessor {
         cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
         unknown_lists: &mut Vec<UInt256>,
     ) -> Result<Vec<Vec<models::MasternodeEntry>>, CoreProviderError> {
-        match self.provider.masternode_list_info_for_height(work_block_height, cached_lists, unknown_lists, reconstruction_type) {
-            Ok(info) => {
+        self.provider.masternode_list_info_for_height(work_block_height, cached_lists, unknown_lists, reconstruction_type)
+            .and_then(|info| {
                 let llmq_type = llmq_params.r#type;
                 let quorum_count = llmq_params.signing_active_quorum_count as usize;
                 let quorum_size = llmq_params.size as usize;
                 let quarter_size = quorum_size / 4;
 
                 match (reconstruction_type, info) {
-                    (LLMQQuarterReconstructionType::Snapshot { cached_snapshots },
+                    (LLMQQuarterReconstructionType::Snapshot { .. },
                         LLMQQuarterReconstructionInfo::Snapshot(masternode_list, snapshot, work_block_hash)) => {
                         let quorum_modifier_type =  self.llmq_modifier_type_for(llmq_type, work_block_hash, work_block_height, cached_cl_signatures);
                         let quorum_modifier = quorum_modifier_type.build_llmq_hash();
-                        /////
-                        let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height, false);
-                        let sorted_scored_masternodes = MasternodeProcessor::sort_scored_masternodes(scored_masternodes);
-                        let mut i = 0u32;
-                        let (used_at_h_masternodes, unused_at_h_masternodes) = sorted_scored_masternodes
-                            .into_iter()
-                            .partition(|_| {
-                                let used = snapshot.member_is_true_at_index(i);
-                                i += 1;
-                                used
-                            });
-                        /////
+                        let (used_at_h_masternodes, unused_at_h_masternodes) = MasternodeProcessor::usage_info_from_snapshot(&snapshot, masternode_list, quorum_modifier, work_block_height);
                         let sorted_combined_mns_list = MasternodeProcessor::order(work_block_height, quorum_modifier, used_at_h_masternodes, unused_at_h_masternodes);
-                        let quarter_quorum_members = snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count, quarter_size);
+                        let quarter_quorum_members = Self::apply_skip_strategy_for_snapshot(snapshot, sorted_combined_mns_list, quorum_count, quarter_size);
                         Ok(quarter_quorum_members)
                     },
                     (LLMQQuarterReconstructionType::New { previous_quarters, skip_removed_masternodes },
                         LLMQQuarterReconstructionInfo::New(masternode_list, work_block_hash)) => {
                         let quorum_modifier_type = self.llmq_modifier_type_for(llmq_type, work_block_hash, work_block_height, cached_cl_signatures);
                         let quorum_modifier = quorum_modifier_type.build_llmq_hash();
-                        /////
-                        let mut used_at_h_masternodes = Vec::<models::MasternodeEntry>::new();
-                        let mut used_at_h_indexed_masternodes = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
-                        for i in 0..quorum_count {
-                            // for quarters h - c, h -2c, h -3c
-                            for quarter in &previous_quarters {
-                                if let Some(quarter_nodes) = quarter.get(i) {
-                                    for node in quarter_nodes {
-                                        let hash = node.provider_registration_transaction_hash;
-                                        if (!skip_removed_masternodes || masternode_list.has_masternode(hash)) &&
-                                            masternode_list.has_valid_masternode(hash) {
-                                            if !used_at_h_masternodes.iter().any(|m| m.provider_registration_transaction_hash == hash) {
-                                                used_at_h_masternodes.push(node.clone());
-                                            }
-                                            if !used_at_h_indexed_masternodes[i].iter().any(|m| m.provider_registration_transaction_hash == hash) {
-                                                used_at_h_indexed_masternodes[i].push(node.clone());
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        let unused_at_h_masternodes = masternode_list.masternodes.values()
-                            .filter(|mn| mn.is_valid && !used_at_h_masternodes.iter().any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash))
-                            .cloned()
-                            .collect();
-                        /////
+                        let (used_at_h_masternodes, unused_at_h_masternodes, used_at_h_indexed_masternodes) = MasternodeProcessor::usage_info_(previous_quarters, masternode_list, skip_removed_masternodes, quorum_count);
                         let sorted_combined_mns_list = MasternodeProcessor::order(work_block_height, quorum_modifier, used_at_h_masternodes, unused_at_h_masternodes);
                         let quarter_quorum_members = Self::apply_skip_strategy_for_new_quarter(used_at_h_indexed_masternodes, sorted_combined_mns_list, quorum_count, quarter_size);
                         Ok(quarter_quorum_members)
                     },
                     _ => Err(CoreProviderError::NullResult)
                 }
-            },
-            Err(CoreProviderError::BlockHashNotFoundAt(height)) => {
-                error!("missing block for height: {}", height);
-                panic!("missing block for height: {}", height)
-            },
-            Err(err) => {
-                warn!("new quarter is empty: ({})", err);
-                Err(err)
-            }
-        }
+            })
     }
 
     fn add_quorum_members_from_quarter(
@@ -593,9 +663,8 @@ impl MasternodeProcessor {
         let quorum_index = block_height % llmq_params.dkg_params.interval;
         let cycle_base_height = block_height - quorum_index;
         // println!("/////////////////////get_rotated_masternodes_for_quorum {} {} {} {}", block_height, llmq_params.dkg_params.interval, quorum_index, cycle_base_height);
-        match self.provider.lookup_block_hash_by_height(cycle_base_height) {
-            Err(err) => panic!("missing hash for block at height: {}: error: {}", cycle_base_height, err),
-            Ok(cycle_base_hash) => {
+        self.provider.lookup_block_hash_by_height(cycle_base_height)
+            .and_then(|cycle_base_hash| {
                 let map_by_type_indexed_opt = cached_llmq_indexed_members.get_mut(&llmq_type);
                 if map_by_type_indexed_opt.is_some() {
                     if let Some(members) = map_by_type_indexed_opt
@@ -617,7 +686,7 @@ impl MasternodeProcessor {
                     cached_cl_signatures,
                     cached_needed_masternode_lists,
                     skip_removed_masternodes,
-                ).and_then(|rotated_members| {
+                ).map(|rotated_members| {
                     let map_indexed_quorum_members_of_type =
                         cached_llmq_indexed_members.get_mut(&llmq_type).unwrap();
                     rotated_members.iter().enumerate().for_each(|(i, members)| {
@@ -625,13 +694,12 @@ impl MasternodeProcessor {
                     });
                     if let Some(members) = rotated_members.get(quorum_index as usize) {
                         map_by_type.insert(block_hash, members.clone());
-                        Ok(members.clone())
+                        members.clone()
                     } else {
-                        Ok(vec![])
+                        vec![]
                     }
                 })
-            }
-        }
+            })
     }
 
     pub fn read_list_diff_from_message<'a>(&self, message: &'a [u8], offset: &mut usize, protocol_version: u32) -> Result<models::MNListDiff, byte::Error> {
