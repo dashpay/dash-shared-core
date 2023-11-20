@@ -60,12 +60,7 @@ pub fn test_from_snapshot() {
             entry.llmq_hash,
             llmq_block_height,
             false,
-            cached_llmq_members,
-            cached_llmq_indexed_members,
-            &context.cache.mn_lists,
-            &context.cache.llmq_snapshots,
-            &context.cache.cl_signatures,
-            &mut context.cache.needed_masternode_lists
+            &mut context.cache
         );
         println!("masternodes: {:#?}", masternodes);
     });

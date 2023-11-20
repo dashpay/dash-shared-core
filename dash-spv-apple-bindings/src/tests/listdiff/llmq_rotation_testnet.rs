@@ -146,12 +146,7 @@ fn mainnet_quorum_quarters() {
         block_hash,
         block_height,
         false,
-        &mut context.cache.llmq_members,
-        &mut context.cache.llmq_indexed_members,
-        &context.cache.mn_lists,
-        &context.cache.llmq_snapshots,
-        &mut context.cache.cl_signatures,
-        &mut context.cache.needed_masternode_lists
+        &mut context.cache
     ).unwrap();
     let node_hashes = nodes.iter().map(|m| m.provider_registration_transaction_hash.clone()).collect::<Vec<UInt256>>();
     let needed_hashes = [
