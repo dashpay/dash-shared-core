@@ -30,6 +30,8 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     let cache = &mut *cache;
     println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length);
+    // let result = processor.mn_list_diff_result_from_message(message, is_from_snapshot, protocol_version, cache)
+    //     .map_or(std::ptr::null_mut(), ferment_interfaces::boxed);
     let result = process_mnlist_diff(&processor, message, is_from_snapshot, protocol_version, cache)
         .map_or(std::ptr::null_mut(), ferment_interfaces::boxed);
     println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());

@@ -4,7 +4,7 @@ use crate::{common, models, ok_or_return_processing_error, processing};
 use crate::chain::common::{LLMQType, LLMQParams};
 use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256, UInt768};
 use crate::models::{LLMQModifierType, LLMQVerificationContext};
-use crate::processing::{CoreProvider, CoreProviderError, LLMQValidationStatus, MasternodeProcessorCache, MNListDiffResult, ProcessingError};
+use crate::processing::{CoreProvider, CoreProviderError, LLMQValidationStatus, MasternodeProcessorCache, ProcessingError};
 
 pub enum LLMQQuarterType {
     AtHeightMinus3Cycles,
@@ -64,7 +64,7 @@ impl MasternodeProcessor {
         list_diff: models::MNListDiff,
         verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
-    ) -> MNListDiffResult {
+    ) -> processing::MNListDiffResult {
         let base_list = self.provider.find_masternode_list(
             list_diff.base_block_hash,
             &cache.mn_lists,
@@ -94,7 +94,7 @@ impl MasternodeProcessor {
         list_diff: models::MNListDiff,
         verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
-    ) -> MNListDiffResult {
+    ) -> processing::MNListDiffResult {
         let skip_removed_masternodes = list_diff.should_skip_removed_masternodes();
         let base_block_hash = list_diff.base_block_hash;
         let block_hash = list_diff.block_hash;
@@ -142,11 +142,11 @@ impl MasternodeProcessor {
         let needed_masternode_lists = cache.needed_masternode_lists.clone();
         cache.needed_masternode_lists.clear();
         let has_found_coinbase = coinbase_transaction.has_found_coinbase(&merkle_tree.hashes);
-        let desired_merkle_root = self.provider.lookup_merkle_root_by_hash(block_hash).unwrap_or(UInt256::MIN);
-        let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
+        let has_valid_coinbase = self.provider.lookup_merkle_root_by_hash(block_hash)
+            .map_or(false, |desired_merkle_root| merkle_tree.has_root(desired_merkle_root));
         let has_valid_mn_list_root = masternode_list.has_valid_mn_list_root(&coinbase_transaction);
         let has_valid_llmq_list_root = !quorums_active || masternode_list.has_valid_llmq_list_root(&coinbase_transaction);
-        let result = MNListDiffResult {
+        let result = processing::MNListDiffResult {
             base_block_hash,
             block_hash,
             has_found_coinbase,
@@ -215,8 +215,8 @@ impl MasternodeProcessor {
         (added_masternodes, modified_masternodes, masternodes)
     }
 
-    fn find_cl_signature_at_index(cl_signatures: &BTreeMap<UInt768, HashSet<u16>>, index: u16) -> Option<UInt768> {
-        cl_signatures.iter().find_map(|(signature, index_set)|
+    fn find_cl_signature_at_index(quorums_cl_sigs: &BTreeMap<UInt768, HashSet<u16>>, index: u16) -> Option<UInt768> {
+        quorums_cl_sigs.iter().find_map(|(signature, index_set)|
             if index_set.iter().any(|i| *i == index) { Some(*signature) } else { None })
     }
 
@@ -226,7 +226,7 @@ impl MasternodeProcessor {
         mut base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
         mut added_quorums: Vec<models::LLMQEntry>,
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
-        cl_signatures: &BTreeMap<UInt768, HashSet<u16>>,
+        quorums_cl_sigs: &BTreeMap<UInt768, HashSet<u16>>,
         skip_removed_masternodes: bool,
         verification_context: LLMQVerificationContext,
         cache: &mut MasternodeProcessorCache,
@@ -243,7 +243,7 @@ impl MasternodeProcessor {
                 .iter_mut()
                 .enumerate()
                 .for_each(|(index, quorum)| {
-                    if let Some(signature) = Self::find_cl_signature_at_index(cl_signatures, index as u16) {
+                    if let Some(signature) = Self::find_cl_signature_at_index(quorums_cl_sigs, index as u16) {
                         let llmq_height = self.provider.lookup_block_height_by_hash(quorum.llmq_hash);
                         if llmq_height != u32::MAX {
                             if let Ok(llmq_hash_minus_8) = self.provider.lookup_block_hash_by_height(llmq_height - 8) {
@@ -299,9 +299,43 @@ impl MasternodeProcessor {
                     self.get_non_rotated_masternodes_for_quorum(quorum, quorum.llmq_type, llmq_block_hash, block_height, masternodes, &cache.cl_signatures)
                 } {
                     Ok(masternodes) => quorum.verify(masternodes, block_height),
-                    Err(err) => LLMQValidationStatus::ProviderError(err)
+                    Err(err) => {
+                        println!("validate_quorum error: {}", err);
+                        LLMQValidationStatus::ProviderError(err)
+                    }
                 }
             })
+    }
+    // Loads block info before masternode list
+    pub fn validate_quorum_2(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> LLMQValidationStatus {
+        let llmq_block_hash = quorum.llmq_hash;
+        let block_height = self.provider.lookup_block_height_by_hash(llmq_block_hash);
+        let result = if quorum.index.is_some() {
+            self.get_rotated_masternodes_for_quorum(
+                quorum.llmq_type,
+                llmq_block_hash,
+                block_height,
+                &mut cache.llmq_members,
+                &mut cache.llmq_indexed_members,
+                &cache.mn_lists,
+                &cache.llmq_snapshots,
+                &cache.cl_signatures,
+                &mut cache.needed_masternode_lists,
+                skip_removed_masternodes,
+            )
+        } else {
+            self.provider.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists)
+                .and_then(|models::MasternodeList { masternodes, .. }|
+                    self.get_non_rotated_masternodes_for_quorum(quorum, quorum.llmq_type, llmq_block_hash, block_height, masternodes, &cache.cl_signatures))
+        };
+        match result {
+            Ok(valid_masternodes) => quorum.verify(valid_masternodes, block_height),
+            Err(CoreProviderError::NoMasternodeList) => LLMQValidationStatus::NoMasternodeList,
+            Err(err) => {
+                warn!("validate_quorum error: {}", err);
+                LLMQValidationStatus::ProviderError(err)
+            }
+        }
     }
 
     fn get_non_rotated_masternodes_for_quorum(
@@ -311,14 +345,14 @@ impl MasternodeProcessor {
         block_hash: UInt256,
         block_height: u32,
         masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
-        cached_cl_signatures: &BTreeMap<UInt256, UInt768>
+        cl_signatures: &BTreeMap<UInt256, UInt768>
     ) -> Result<Vec<models::MasternodeEntry>, CoreProviderError> {
         Ok(models::MasternodeList::get_masternodes_for_quorum(
             quorum,
             self.provider.chain_type(),
             masternodes,
             block_height,
-            self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8, cached_cl_signatures)))
+            self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8, cl_signatures)))
     }
 
     fn sort_scored_masternodes(scored_masternodes: BTreeMap<UInt256, models::MasternodeEntry>) -> Vec<models::MasternodeEntry> {
@@ -338,6 +372,20 @@ impl MasternodeProcessor {
                 .map(|score| (score, entry)))
             .collect::<BTreeMap<_, _>>();
         Self::sort_scored_masternodes(scored_masternodes)
+    }
+
+    fn order(work_block_height: u32, quorum_modifier: UInt256, used_at_h_masternodes: Vec<models::MasternodeEntry>, unused_at_h_masternodes: Vec<models::MasternodeEntry>) -> Vec<models::MasternodeEntry> {
+        let sorted_used_mns_list = MasternodeProcessor::valid_masternodes_for_rotated_quorum_map(
+            used_at_h_masternodes,
+            quorum_modifier,
+            work_block_height);
+        let sorted_unused_mns_list = MasternodeProcessor::valid_masternodes_for_rotated_quorum_map(
+            unused_at_h_masternodes,
+            quorum_modifier,
+            work_block_height);
+        let mut sorted_combined_mns_list = sorted_unused_mns_list;
+        sorted_combined_mns_list.extend(sorted_used_mns_list);
+        sorted_combined_mns_list
     }
 
     pub fn quorum_quarter_members_by_reconstruction_type(
@@ -361,6 +409,7 @@ impl MasternodeProcessor {
                         LLMQQuarterReconstructionInfo::Snapshot(masternode_list, snapshot, work_block_hash)) => {
                         let quorum_modifier_type =  self.llmq_modifier_type_for(llmq_type, work_block_hash, work_block_height, cached_cl_signatures);
                         let quorum_modifier = quorum_modifier_type.build_llmq_hash();
+                        /////
                         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height, false);
                         let sorted_scored_masternodes = MasternodeProcessor::sort_scored_masternodes(scored_masternodes);
                         let mut i = 0u32;
@@ -371,22 +420,15 @@ impl MasternodeProcessor {
                                 i += 1;
                                 is_true
                             });
-
-                        let sorted_used_mns_list = MasternodeProcessor::valid_masternodes_for_rotated_quorum_map(
-                            used_at_h_masternodes,
-                            quorum_modifier,
-                            work_block_height);
-                        let sorted_unused_mns_list = MasternodeProcessor::valid_masternodes_for_rotated_quorum_map(
-                            unused_at_h_masternodes,
-                            quorum_modifier,
-                            work_block_height);
-                        let mut sorted_combined_mns_list = sorted_unused_mns_list;
-                        sorted_combined_mns_list.extend(sorted_used_mns_list);
-
+                        /////
+                        let sorted_combined_mns_list = MasternodeProcessor::order(work_block_height, quorum_modifier, used_at_h_masternodes, unused_at_h_masternodes);
                         Ok(snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count, quarter_size))
                     },
                     (LLMQQuarterReconstructionType::New { previous_quarters, skip_removed_masternodes },
                         LLMQQuarterReconstructionInfo::New(masternode_list, work_block_hash)) => {
+                        let quorum_modifier_type = self.llmq_modifier_type_for(llmq_type, work_block_hash, work_block_height, cached_cl_signatures);
+                        let quorum_modifier = quorum_modifier_type.build_llmq_hash();
+                        /////
                         let mut quarter_quorum_members = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
                         let mut used_at_h_masternodes = Vec::<models::MasternodeEntry>::new();
                         let mut used_at_h_indexed_masternodes = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
@@ -413,19 +455,8 @@ impl MasternodeProcessor {
                             .filter(|mn| mn.is_valid && !used_at_h_masternodes.iter().any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash))
                             .cloned()
                             .collect();
-                        let quorum_modifier_type = self.llmq_modifier_type_for(llmq_params.r#type, work_block_hash, work_block_height, cached_cl_signatures);
-                        let quorum_modifier = quorum_modifier_type.build_llmq_hash();
-
-                        let sorted_used_mns_list = MasternodeProcessor::valid_masternodes_for_rotated_quorum_map(
-                            used_at_h_masternodes,
-                            quorum_modifier,
-                            work_block_height);
-                        let sorted_unused_mns_list = MasternodeProcessor::valid_masternodes_for_rotated_quorum_map(
-                            unused_at_h_masternodes,
-                            quorum_modifier,
-                            work_block_height);
-                        let mut sorted_combined_mns_list = sorted_unused_mns_list;
-                        sorted_combined_mns_list.extend(sorted_used_mns_list);
+                        /////
+                        let sorted_combined_mns_list = MasternodeProcessor::order(work_block_height, quorum_modifier, used_at_h_masternodes, unused_at_h_masternodes);
 
                         let mut skip_list = Vec::<i32>::new();
                         let mut first_skipped_index = 0i32;
@@ -475,53 +506,8 @@ impl MasternodeProcessor {
             Err(err) => {
                 warn!("new quarter is empty because of that: ({})", err);
                 Err(err)
-            }/*,
-            _ => {
-                warn!("MISSING: snapshot for block at height: {}", work_block_height);
-                vec![]
-            }*/
+            }
         }
-        // match reconstruction_type {
-        //     LLMQQuarterReconstructionType::Snapshot { cached_snapshots } => {
-        //         self.find_quarter(llmq_params, work_block_height, cached_lists, reconstruction_type, cached_cl_signatures, unknown_lists)
-        //     },
-        //     LLMQQuarterReconstructionType::New { previous_quarters, skip_removed_masternodes } => {
-        //
-        //     }
-        // }
-    }
-
-        // Reconstruct quorum members at index from snapshot
-    pub fn quorum_quarter_members_by_snapshot(
-        &self,
-        llmq_params: &LLMQParams,
-        work_block_height: u32,
-        cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
-        cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>,
-        cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
-        unknown_lists: &mut Vec<UInt256>,
-    ) -> Result<Vec<Vec<models::MasternodeEntry>>, CoreProviderError> {
-        // Quorum members dichotomy in snapshot
-        self.quorum_quarter_members_by_reconstruction_type(LLMQQuarterReconstructionType::Snapshot { cached_snapshots }, llmq_params, work_block_height, cached_lists, cached_cl_signatures, unknown_lists)
-    }
-
-    // Determine quorum members at new index
-    pub fn new_quorum_quarter_members(
-        &self,
-        llmq_params: &LLMQParams,
-        work_block_height: u32,
-        previous_quarters: [&Vec<Vec<models::MasternodeEntry>>; 3],
-        cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
-        cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
-        unknown_lists: &mut Vec<UInt256>,
-        skip_removed_masternodes: bool,
-    ) -> Result<Vec<Vec<models::MasternodeEntry>>, CoreProviderError> {
-        // let quorum_count = llmq_params.signing_active_quorum_count as usize;
-        // let quorum_size = llmq_params.size as usize;
-        // let mut quarter_quorum_members = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
-        // let quarter_size = quorum_size / 4;
-        let reconstruction_type = LLMQQuarterReconstructionType::New { previous_quarters, skip_removed_masternodes };
-        self.quorum_quarter_members_by_reconstruction_type(reconstruction_type, llmq_params, work_block_height, cached_lists, cached_cl_signatures, unknown_lists)
     }
 
     fn add_quorum_members_from_quarter(
@@ -547,13 +533,17 @@ impl MasternodeProcessor {
     ) -> Result<Vec<Vec<models::MasternodeEntry>>, CoreProviderError> {
         let num_quorums = llmq_params.signing_active_quorum_count as usize;
         let cycle_length = llmq_params.dkg_params.interval;
+        // Reconstruct quorum members at h - 3c from snapshot
         let reconstruction_type_snapshot = LLMQQuarterReconstructionType::Snapshot { cached_snapshots };
         self.quorum_quarter_members_by_reconstruction_type(reconstruction_type_snapshot, &llmq_params, (cycle_quorum_base_block_height - 3 * cycle_length) - 8, cached_lists, cached_cl_signatures, unknown_lists)
             .and_then(|q_h_m_3c|
+                // Reconstruct quorum members at h - 2c from snapshot
                 self.quorum_quarter_members_by_reconstruction_type(reconstruction_type_snapshot, &llmq_params, (cycle_quorum_base_block_height - 2 * cycle_length) - 8, cached_lists, cached_cl_signatures, unknown_lists)
                     .and_then(|q_h_m_2c|
+                        // Reconstruct quorum members at h - c from snapshot
                         self.quorum_quarter_members_by_reconstruction_type(reconstruction_type_snapshot, &llmq_params, (cycle_quorum_base_block_height - cycle_length) - 8, cached_lists, cached_cl_signatures, unknown_lists)
                             .and_then(|q_h_m_c|
+                                // Determine quorum members at new index
                                 self.quorum_quarter_members_by_reconstruction_type(LLMQQuarterReconstructionType::New { previous_quarters:  [&q_h_m_c, &q_h_m_2c, &q_h_m_3c], skip_removed_masternodes }, &llmq_params, (cycle_quorum_base_block_height - 0) - 8, cached_lists, cached_cl_signatures, unknown_lists)
                                     .map(|quarter_new| {
                                         let mut quorum_members =
@@ -642,7 +632,7 @@ impl MasternodeProcessor {
         models::MNListDiff::new(message, offset, |block_hash| self.provider.lookup_block_height_by_hash(block_hash), protocol_version)
     }
 
-    pub fn mn_list_diff_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, cache: &mut MasternodeProcessorCache) -> Result<MNListDiffResult, ProcessingError> {
+    pub fn mn_list_diff_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, cache: &mut MasternodeProcessorCache) -> Result<processing::MNListDiffResult, ProcessingError> {
         self.read_list_diff_from_message(message, &mut 0, protocol_version)
             .map_err(ProcessingError::from)
             .and_then(|list_diff| {
