@@ -158,6 +158,7 @@ impl LLMQSnapshot {
             }
             LLMQSnapshotSkipMode::SkipAll => {
                 // TODO: do we need to impl smth in this strategy ?
+                warn!("skip_mode SkipAll not supported yet");
             }
         }
         quarter_quorum_members
