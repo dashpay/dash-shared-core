@@ -643,18 +643,19 @@ impl MasternodeProcessor {
                     cached_llmq_indexed_members.insert(llmq_type, BTreeMap::new());
                 }
                 self.rotate_members(cycle_base_height, llmq_params, skip_removed_masternodes, &cache.mn_lists, &cache.llmq_snapshots, &cache.cl_signatures, &mut cache.needed_masternode_lists)
-                    .map(|rotated_members| {
+                    .and_then(|rotated_members| {
+                        let result = if let Some(members) = rotated_members.get(quorum_index as usize) {
+                            map_by_type.insert(block_hash, members.clone());
+                            Ok(members.clone())
+                        } else {
+                            Err(CoreProviderError::NullResult)
+                        };
                         let map_indexed_quorum_members_of_type =
                             cached_llmq_indexed_members.get_mut(&llmq_type).unwrap();
-                        rotated_members.iter().enumerate().for_each(|(i, members)| {
-                            map_indexed_quorum_members_of_type.insert((cycle_base_hash, i).into(), members.clone());
+                        rotated_members.into_iter().enumerate().for_each(|(i, members)| {
+                            map_indexed_quorum_members_of_type.insert((cycle_base_hash, i).into(), members);
                         });
-                        if let Some(members) = rotated_members.get(quorum_index as usize) {
-                            map_by_type.insert(block_hash, members.clone());
-                            members.clone()
-                        } else {
-                            vec![]
-                        }
+                        result
                     })
             })
     }
