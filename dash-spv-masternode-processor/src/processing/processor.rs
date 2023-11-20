@@ -258,8 +258,24 @@ impl MasternodeProcessor {
                         }
                     }
                     if verification_context.should_validate_quorum_of_type(quorum.llmq_type, self.provider.chain_type()) {
-                        let status = self.validate_quorum(quorum, skip_removed_masternodes, cache);
-                        has_valid_quorums &= status.is_not_critical();
+                        match self.validate_quorum(quorum, skip_removed_masternodes, cache) {
+                            Ok(LLMQValidationStatus::Verified | LLMQValidationStatus::NoMasternodeList) |
+                            Err(CoreProviderError::NoMasternodeList) => {
+                                has_valid_quorums &= true;
+                            },
+                            Err(CoreProviderError::BlockHashNotFoundAt(height)) => {
+                                error!("missing block for height: {}", height);
+                                panic!("missing block for height: {}", height)
+                            },
+                            Ok(status) => {
+                                warn!("Error quorum validation: ({:?})", status);
+                                has_valid_quorums &= false;
+                            },
+                            Err(error) => {
+                                warn!("Error provider: ({:?})", error);
+                                has_valid_quorums &= false;
+                            }
+                        }
                     }
             })
         }
@@ -278,12 +294,12 @@ impl MasternodeProcessor {
         (added_quorums, base_quorums, signatures, has_valid_quorums)
     }
 
-    pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> LLMQValidationStatus {
+    pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> Result<LLMQValidationStatus, CoreProviderError> {
         let llmq_block_hash = quorum.llmq_hash;
         self.provider.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists)
-            .map_or(LLMQValidationStatus::NoMasternodeList, |models::MasternodeList { masternodes, .. }| {
+            .and_then(|models::MasternodeList { masternodes, .. }| {
                 let block_height = self.provider.lookup_block_height_by_hash(llmq_block_hash);
-                match if quorum.index.is_some() {
+                if quorum.index.is_some() {
                     self.get_rotated_masternodes_for_quorum(
                         quorum.llmq_type,
                         llmq_block_hash,
@@ -298,49 +314,8 @@ impl MasternodeProcessor {
                     )
                 } else {
                     self.get_non_rotated_masternodes_for_quorum(quorum, quorum.llmq_type, llmq_block_hash, block_height, masternodes, &cache.cl_signatures)
-                } {
-                    Ok(masternodes) => quorum.verify(masternodes, block_height),
-                    Err(CoreProviderError::BlockHashNotFoundAt(height)) => {
-                        error!("missing block for height: {}", height);
-                        panic!("missing block for height: {}", height)
-                    },
-                    Err(err) => {
-                        warn!("Error determining valid masternodes: ({})", err);
-                        LLMQValidationStatus::ProviderError(err)
-                    }
-                }
+                }.and_then(|valid_masternodes| quorum.verify(valid_masternodes, block_height))
             })
-    }
-    // Loads block info before masternode list
-    pub fn validate_quorum_2(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> LLMQValidationStatus {
-        let llmq_block_hash = quorum.llmq_hash;
-        let block_height = self.provider.lookup_block_height_by_hash(llmq_block_hash);
-        let result = if quorum.index.is_some() {
-            self.get_rotated_masternodes_for_quorum(
-                quorum.llmq_type,
-                llmq_block_hash,
-                block_height,
-                &mut cache.llmq_members,
-                &mut cache.llmq_indexed_members,
-                &cache.mn_lists,
-                &cache.llmq_snapshots,
-                &cache.cl_signatures,
-                &mut cache.needed_masternode_lists,
-                skip_removed_masternodes,
-            )
-        } else {
-            self.provider.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists)
-                .and_then(|models::MasternodeList { masternodes, .. }|
-                    self.get_non_rotated_masternodes_for_quorum(quorum, quorum.llmq_type, llmq_block_hash, block_height, masternodes, &cache.cl_signatures))
-        };
-        match result {
-            Ok(valid_masternodes) => quorum.verify(valid_masternodes, block_height),
-            Err(CoreProviderError::NoMasternodeList) => LLMQValidationStatus::NoMasternodeList,
-            Err(err) => {
-                warn!("validate_quorum error: {}", err);
-                LLMQValidationStatus::ProviderError(err)
-            }
-        }
     }
 
     fn get_non_rotated_masternodes_for_quorum(

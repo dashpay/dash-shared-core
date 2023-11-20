@@ -15,6 +15,7 @@ use crate::consensus::{encode::VarInt, Encodable, Decodable, encode};
 use crate::crypto::{byte_util::AsBytes, UInt256, UInt384, UInt768};
 use crate::keys::BLSKey;
 use crate::models;
+use crate::processing::CoreProviderError;
 use crate::processing::llmq_validation_status::{LLMQValidationStatus, LLMQPayloadValidationStatus};
 
 #[derive(PartialEq)]
@@ -395,14 +396,14 @@ impl LLMQEntry {
 
 impl LLMQEntry {
 
-    pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
+    pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> Result<LLMQValidationStatus, CoreProviderError> {
         let payload_status = self.validate_payload();
         if !payload_status.is_ok() {
-            return LLMQValidationStatus::InvalidPayload(payload_status);
+            return Ok(LLMQValidationStatus::InvalidPayload(payload_status));
         }
         let status = self.validate(valid_masternodes, block_height);
         self.verified = status == LLMQValidationStatus::Verified;
-        status
+        Ok(status)
     }
 
     pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
