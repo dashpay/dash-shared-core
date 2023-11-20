@@ -9,7 +9,7 @@ use crate::processing::processor::{LLMQQuarterReconstructionInfo, LLMQQuarterRec
 
 pub trait CoreProvider: std::fmt::Debug {
     fn chain_type(&self) -> ChainType;
-    fn find_masternode_list(&self, block_hash: UInt256, cached_lists: &BTreeMap<UInt256, models::MasternodeList>, unknown_lists: &mut Vec<UInt256>) -> Result<models::MasternodeList, CoreProviderError> {
+    fn find_masternode_list(&self, block_hash: UInt256, cached_mn_lists: &BTreeMap<UInt256, models::MasternodeList>, unknown_mn_lists: &mut Vec<UInt256>) -> Result<models::MasternodeList, CoreProviderError> {
         let genesis_hash = self.chain_type().genesis_hash();
         if block_hash.is_zero() {
             // If it's a zero block we don't expect models list here
@@ -20,7 +20,7 @@ pub trait CoreProvider: std::fmt::Debug {
             // println!("find {}: {} It's a genesis -> Ok(EMPTY MNL)", self.lookup_block_height_by_hash(block_hash), block_hash);
             Ok(models::MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
             // None
-        } else if let Some(cached) = cached_lists.get(&block_hash) {
+        } else if let Some(cached) = cached_mn_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             // println!("find_masternode_list (cache) {}: {} -> Ok({:?})", self.lookup_block_height_by_hash(block_hash), block_hash, cached);
             Ok(cached.clone())
@@ -31,11 +31,11 @@ pub trait CoreProvider: std::fmt::Debug {
         } else {
             // println!("find {}: {} Unknown -> Err", self.lookup_block_height_by_hash(block_hash), block_hash);
             if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
-                unknown_lists.push(block_hash);
+                unknown_mn_lists.push(block_hash);
             } else if !self.chain_type().is_mainnet() {
                 self.add_insight(block_hash);
                 if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
-                    unknown_lists.push(block_hash);
+                    unknown_mn_lists.push(block_hash);
                 }
             }
             Err(CoreProviderError::NoMasternodeList)
@@ -55,8 +55,8 @@ pub trait CoreProvider: std::fmt::Debug {
         }
     }
 
-    fn find_snapshot(&self, block_hash: UInt256, cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>) -> Result<models::LLMQSnapshot, CoreProviderError> {
-        if let Some(cached) = cached_snapshots.get(&block_hash) {
+    fn find_snapshot(&self, block_hash: UInt256, cached_llmq_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>) -> Result<models::LLMQSnapshot, CoreProviderError> {
+        if let Some(cached) = cached_llmq_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             Ok(cached.clone())
         } else {
@@ -68,18 +68,18 @@ pub trait CoreProvider: std::fmt::Debug {
     fn masternode_list_info_for_height(
         &self,
         work_block_height: u32,
-        cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
-        unknown_lists: &mut Vec<UInt256>,
+        cached_mn_lists: &BTreeMap<UInt256, models::MasternodeList>,
+        unknown_mn_lists: &mut Vec<UInt256>,
         r#type: LLMQQuarterReconstructionType) -> Result<LLMQQuarterReconstructionInfo, CoreProviderError> {
         self.lookup_block_hash_by_height(work_block_height)
             .map_err(|err|
                 panic!("MISSING: block for height: {}: error: {}", work_block_height, err))
             .and_then(|work_block_hash|
-                self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
+                self.find_masternode_list(work_block_hash, cached_mn_lists, unknown_mn_lists)
                     .and_then(|masternode_list| match r#type {
                         LLMQQuarterReconstructionType::New { .. } => Ok(LLMQQuarterReconstructionInfo::New(masternode_list, work_block_hash)),
-                        LLMQQuarterReconstructionType::Snapshot { cached_snapshots } =>
-                            self.find_snapshot(work_block_hash, cached_snapshots)
+                        LLMQQuarterReconstructionType::Snapshot { cached_llmq_snapshots } =>
+                            self.find_snapshot(work_block_hash, cached_llmq_snapshots)
                                 .map(|snapshot|
                                     LLMQQuarterReconstructionInfo::Snapshot(masternode_list, snapshot, work_block_hash))
                     }))
