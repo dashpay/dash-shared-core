@@ -294,27 +294,33 @@ impl MasternodeProcessor {
         (added_quorums, base_quorums)
     }
 
+    fn find_valid_masternodes_for_quorum(&self, quorum: &models::LLMQEntry, block_height: u32, skip_removed_masternodes: bool, masternodes: BTreeMap<UInt256, models::MasternodeEntry>, cache: &mut MasternodeProcessorCache) -> Result<Vec<models::MasternodeEntry>, CoreProviderError> {
+        let llmq_block_hash = quorum.llmq_hash;
+        if quorum.index.is_some() {
+            self.get_rotated_masternodes_for_quorum(
+                quorum.llmq_type,
+                llmq_block_hash,
+                block_height,
+                &mut cache.llmq_members,
+                &mut cache.llmq_indexed_members,
+                &cache.mn_lists,
+                &cache.llmq_snapshots,
+                &cache.cl_signatures,
+                &mut cache.needed_masternode_lists,
+                skip_removed_masternodes,
+            )
+        } else {
+            self.get_non_rotated_masternodes_for_quorum(quorum, quorum.llmq_type, llmq_block_hash, block_height, masternodes, &cache.cl_signatures)
+        }
+    }
+
     pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> Result<LLMQValidationStatus, CoreProviderError> {
         let llmq_block_hash = quorum.llmq_hash;
         self.provider.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists)
             .and_then(|models::MasternodeList { masternodes, .. }| {
                 let block_height = self.provider.lookup_block_height_by_hash(llmq_block_hash);
-                if quorum.index.is_some() {
-                    self.get_rotated_masternodes_for_quorum(
-                        quorum.llmq_type,
-                        llmq_block_hash,
-                        block_height,
-                        &mut cache.llmq_members,
-                        &mut cache.llmq_indexed_members,
-                        &cache.mn_lists,
-                        &cache.llmq_snapshots,
-                        &cache.cl_signatures,
-                        &mut cache.needed_masternode_lists,
-                        skip_removed_masternodes,
-                    )
-                } else {
-                    self.get_non_rotated_masternodes_for_quorum(quorum, quorum.llmq_type, llmq_block_hash, block_height, masternodes, &cache.cl_signatures)
-                }.and_then(|valid_masternodes| quorum.verify(valid_masternodes, block_height))
+                self.find_valid_masternodes_for_quorum(quorum, block_height, skip_removed_masternodes, masternodes, cache)
+                    .and_then(|valid_masternodes| quorum.verify(valid_masternodes, block_height))
             })
     }
 
