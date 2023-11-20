@@ -615,10 +615,6 @@ impl MasternodeProcessor {
     ) -> Result<Vec<models::MasternodeEntry>, CoreProviderError> {
         let cached_llmq_members = &mut cache.llmq_members;
         let cached_llmq_indexed_members = &mut cache.llmq_indexed_members;
-        let cached_mn_lists = &cache.mn_lists;
-        let cached_llmq_snapshots = &cache.llmq_snapshots;
-        let cached_cl_signatures = &cache.cl_signatures;
-        let unknown_mn_lists = &mut cache.needed_masternode_lists;
         let map_by_type_opt = cached_llmq_members.get_mut(&llmq_type);
         if map_by_type_opt.is_some() {
             if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&block_hash) {
@@ -646,7 +642,7 @@ impl MasternodeProcessor {
                 } else {
                     cached_llmq_indexed_members.insert(llmq_type, BTreeMap::new());
                 }
-                self.rotate_members(cycle_base_height, llmq_params, skip_removed_masternodes, cached_mn_lists, cached_llmq_snapshots, cached_cl_signatures, unknown_mn_lists)
+                self.rotate_members(cycle_base_height, llmq_params, skip_removed_masternodes, &cache.mn_lists, &cache.llmq_snapshots, &cache.cl_signatures, &mut cache.needed_masternode_lists)
                     .map(|rotated_members| {
                         let map_indexed_quorum_members_of_type =
                             cached_llmq_indexed_members.get_mut(&llmq_type).unwrap();
