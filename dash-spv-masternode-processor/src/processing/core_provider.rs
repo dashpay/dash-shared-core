@@ -4,8 +4,6 @@ use crate::crypto::byte_util::Zeroable;
 use crate::crypto::{UInt256, UInt768};
 use crate::models;
 use crate::processing::ProcessingError;
-use crate::processing::processor::{LLMQQuarterReconstructionInfo, LLMQQuarterReconstructionType};
-
 
 pub trait CoreProvider: std::fmt::Debug {
     fn chain_type(&self) -> ChainType;
@@ -62,27 +60,6 @@ pub trait CoreProvider: std::fmt::Debug {
         } else {
             self.lookup_snapshot_by_block_hash(block_hash)
         }
-    }
-
-    // TODO: avoid panic && impl find_masternode_list by height
-    fn masternode_list_info_for_height(
-        &self,
-        work_block_height: u32,
-        cached_mn_lists: &BTreeMap<UInt256, models::MasternodeList>,
-        unknown_mn_lists: &mut Vec<UInt256>,
-        r#type: LLMQQuarterReconstructionType) -> Result<LLMQQuarterReconstructionInfo, CoreProviderError> {
-        self.lookup_block_hash_by_height(work_block_height)
-            .map_err(|err|
-                panic!("MISSING: block for height: {}: error: {}", work_block_height, err))
-            .and_then(|work_block_hash|
-                self.find_masternode_list(work_block_hash, cached_mn_lists, unknown_mn_lists)
-                    .and_then(|masternode_list| match r#type {
-                        LLMQQuarterReconstructionType::New { .. } => Ok(LLMQQuarterReconstructionInfo::New(masternode_list, work_block_hash)),
-                        LLMQQuarterReconstructionType::Snapshot { cached_llmq_snapshots } =>
-                            self.find_snapshot(work_block_hash, cached_llmq_snapshots)
-                                .map(|snapshot|
-                                    LLMQQuarterReconstructionInfo::Snapshot(masternode_list, snapshot, work_block_hash))
-                    }))
     }
 
     fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError>;
