@@ -1,6 +1,5 @@
 use byte::{BytesExt, TryRead};
 use std::collections::BTreeMap;
-use hashes::hex::ToHex;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
