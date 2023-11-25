@@ -80,11 +80,6 @@ pub fn register_logger() {
     unsafe { register_rust_logger(); }
 }
 
-pub fn register_cache<'a>() -> &'a mut MasternodeProcessorCache {
-    let cache = unsafe { &mut *processor_create_cache() };
-    cache
-}
-
 pub fn register_default_processor(context: &mut FFIContext) -> *mut MasternodeProcessor {
     unsafe {
         register_processor(
@@ -141,7 +136,8 @@ pub fn process_qrinfo(bytes: Vec<u8>, processor: *mut MasternodeProcessor, conte
     }
 }
 pub fn create_default_context_and_cache<'a>(chain: ChainType, is_dip_0024: bool) -> FFIContext<'a> {
-    create_default_context(chain, is_dip_0024, register_cache())
+    let cache = unsafe { &mut *processor_create_cache() };
+    create_default_context(chain, is_dip_0024, cache)
 }
 
 pub fn create_default_context(chain: ChainType, is_dip_0024: bool, cache: &mut MasternodeProcessorCache) -> FFIContext {

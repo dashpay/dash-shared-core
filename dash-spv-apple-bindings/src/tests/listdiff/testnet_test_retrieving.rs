@@ -2,10 +2,8 @@ use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::util::data_ops::merkle_root_from_hashes;
-use crate::common::register_processor;
 use crate::ffi::from::FromFFI;
-use crate::masternode::process_mnlistdiff_from_message;
-use crate::tests::common::{add_insight_lookup_default, create_default_context_and_cache, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{create_default_context_and_cache,process_mnlistdiff, register_default_processor};
 
 fn init_hashes() -> Vec<UInt256> {
     vec![
@@ -346,52 +344,13 @@ fn testnet_test_retrieve_saved_hashes() {
     let chain = ChainType::TestNet;
     let mut context = create_default_context_and_cache(chain, false);
     let bytes_122064 = chain.load_message("MNL_0_122064.dat");
-    let processor = unsafe {
-        &mut *register_processor(
-            chain,
-            get_merkle_root_by_hash_default,
-            get_block_height_by_hash_from_context,
-            get_block_hash_by_height_from_context,
-            get_llmq_snapshot_by_block_hash_from_context,
-            save_llmq_snapshot_in_cache,
-            get_cl_signature_by_block_hash_from_context,
-            save_cl_signature_in_cache,
-            get_masternode_list_by_block_hash_from_cache,
-            masternode_list_save_in_cache,
-            masternode_list_destroy_default,
-            add_insight_lookup_default,
-            hash_destroy_default,
-            snapshot_destroy_default,
-            should_process_diff_with_range_default,
-            &mut context as *mut _ as *mut std::ffi::c_void
-        )
-    };
-    let result_122064 = unsafe {
-        &*process_mnlistdiff_from_message(
-            bytes_122064.as_ptr(),
-            bytes_122064.len(),
-            chain,
-            false,
-            true,
-            70221,
-            processor,
-            context.cache,
-            &mut context as *mut _ as *mut std::ffi::c_void,
-    )};
+    let processor = register_default_processor(&mut context);
+    let result_122064 = process_mnlistdiff(bytes_122064, processor, &mut context, 70221, false, true);
+    let result_122064 = unsafe { &*result_122064 };
     assert!(result_122064.is_valid(), "Result must be valid");
     let bytes_122088 = chain.load_message("MNL_122064_122088.dat");
-    let result_122088 = unsafe {
-        &*process_mnlistdiff_from_message(
-            bytes_122088.as_ptr(),
-            bytes_122088.len(),
-            chain,
-            false,
-            true,
-            70221,
-            processor,
-            context.cache,
-            &mut context as *mut _ as *mut std::ffi::c_void,
-        )};
+    let result_122088 = process_mnlistdiff(bytes_122088, processor, &mut context, 70221, false, true);
+    let result_122088 = unsafe { &*result_122088 };
     assert!(result_122088.is_valid(), "Result must be valid");
 
     let block_hash_122064 = unsafe { UInt256(*result_122064.block_hash) };
