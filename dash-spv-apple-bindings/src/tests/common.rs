@@ -18,30 +18,6 @@ use crate::types;
 extern crate libc;
 extern crate reqwest;
 
-// #[derive(Debug, Copy, Clone)]
-// pub struct MerkleBlock {
-//     pub hash: UInt256,
-//     pub height: u32,
-//     pub merkleroot: UInt256,
-// }
-// impl MerkleBlock {
-//     pub fn new(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
-//         MerkleBlock {
-//             height,
-//             hash: UInt256::from_hex(hash).unwrap(),
-//             merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
-//     }
-//
-//     pub fn reversed(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
-//         MerkleBlock {
-//             height,
-//             hash: UInt256::from_hex(hash).unwrap().reverse(),
-//             merkleroot: UInt256::from_hex(merkle_root).unwrap_or(UInt256::MIN)
-//         }
-//     }
-//
-// }
-
 pub fn get_block_from_insight_by_hash(hash: UInt256) -> Option<MerkleBlock> {
     let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", hash.reversed().0.to_hex().as_str());
     request_block(path)
@@ -460,50 +436,16 @@ pub fn perform_mnlist_diff_test_for_message(
     let offset = &mut 0;
     assert!(length - *offset >= 32);
     let base_block_hash = UInt256::from_bytes(message, offset).unwrap();
-    assert_ne!(
-        base_block_hash,
-        UInt256::default(), /*UINT256_ZERO*/
-        "Base block hash should NOT be empty here"
-    );
+    assert_ne!(base_block_hash, UInt256::default(), "Base block hash should NOT be empty here");
     assert!(length - *offset >= 32);
     let _block_hash = UInt256::from_bytes(message, offset).unwrap();
     assert!(length - *offset >= 4);
     let total_transactions = u32::from_bytes(message, offset).unwrap();
-    assert_eq!(
-        total_transactions, should_be_total_transactions,
-        "Invalid transaction count"
-    );
+    assert_eq!(total_transactions, should_be_total_transactions, "Invalid transaction count");
     let use_insight_as_backup = false;
     let base_masternode_list_hash: *const u8 = null_mut();
-    let context = &mut FFIContext {
-        chain,
-        is_dip_0024: false,
-        cache: &mut MasternodeProcessorCache::default(),
-        blocks: init_testnet_store()
-    } as *mut _ as *mut std::ffi::c_void;
-
-    let cache = unsafe { processor_create_cache() };
-    let processor = unsafe {
-        register_processor(
-            chain,
-            get_merkle_root_by_hash_default,
-            get_block_height_by_hash_from_context,
-            get_block_hash_by_height_default,
-            get_llmq_snapshot_by_block_hash_default,
-            save_llmq_snapshot_default,
-            get_cl_signature_by_block_hash_from_context,
-            save_cl_signature_in_cache,
-            get_masternode_list_by_block_hash_default,
-            masternode_list_save_default,
-            masternode_list_destroy_default,
-            add_insight_lookup_default,
-            hash_destroy_default,
-            snapshot_destroy_default,
-            should_process_diff_with_range_default,
-            context as *mut _ as *mut std::ffi::c_void
-        )
-    };
-
+    let mut context = create_default_context_and_cache(chain, false);
+    let processor = register_default_processor(&mut context);
     let result = unsafe { &*process_mnlistdiff_from_message(
         c_array,
         length,
@@ -512,8 +454,8 @@ pub fn perform_mnlist_diff_test_for_message(
         true,
         70221,
         processor,
-        cache,
-        context,
+        context.cache,
+        &mut context as *mut _ as *mut std::ffi::c_void,
     )};
     println!("result: {:?}", result);
     let masternode_list = unsafe { (*result.masternode_list).decode() };
@@ -539,14 +481,8 @@ pub fn perform_mnlist_diff_test_for_message(
         .map(|h| UInt256::from_hex(h).unwrap())
         .collect();
     verify_smle_hashes.sort();
-    assert_eq!(
-        masternode_list_hashes, verify_smle_hashes,
-        "SMLE transaction hashes"
-    );
-    assert!(
-        result.has_found_coinbase,
-        "The coinbase was not part of provided hashes"
-    );
+    assert_eq!(masternode_list_hashes, verify_smle_hashes, "SMLE transaction hashes");
+    assert!(result.has_found_coinbase, "The coinbase was not part of provided hashes");
 }
 
 pub fn load_masternode_lists_for_files(

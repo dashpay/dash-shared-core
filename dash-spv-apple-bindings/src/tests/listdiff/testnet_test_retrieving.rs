@@ -1,12 +1,11 @@
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
-use dash_spv_masternode_processor::block_store::init_testnet_store;
 use dash_spv_masternode_processor::util::data_ops::merkle_root_from_hashes;
 use crate::common::register_processor;
 use crate::ffi::from::FromFFI;
 use crate::masternode::process_mnlistdiff_from_message;
-use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::common::{add_insight_lookup_default, create_default_context_and_cache, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 
 fn init_hashes() -> Vec<UInt256> {
     vec![
@@ -345,7 +344,7 @@ fn init_hashes() -> Vec<UInt256> {
 #[test]
 fn testnet_test_retrieve_saved_hashes() {
     let chain = ChainType::TestNet;
-    let context = &mut (FFIContext { chain, is_dip_0024: false, cache: &mut Default::default(), blocks: init_testnet_store() });
+    let mut context = create_default_context_and_cache(chain, false);
     let bytes_122064 = chain.load_message("MNL_0_122064.dat");
     let processor = unsafe {
         &mut *register_processor(
@@ -364,7 +363,7 @@ fn testnet_test_retrieve_saved_hashes() {
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            context as *mut _ as *mut std::ffi::c_void
+            &mut context as *mut _ as *mut std::ffi::c_void
         )
     };
     let result_122064 = unsafe {
@@ -377,7 +376,7 @@ fn testnet_test_retrieve_saved_hashes() {
             70221,
             processor,
             context.cache,
-            context as *mut _ as *mut std::ffi::c_void,
+            &mut context as *mut _ as *mut std::ffi::c_void,
     )};
     assert!(result_122064.is_valid(), "Result must be valid");
     let bytes_122088 = chain.load_message("MNL_122064_122088.dat");
@@ -391,7 +390,7 @@ fn testnet_test_retrieve_saved_hashes() {
             70221,
             processor,
             context.cache,
-            context as *mut _ as *mut std::ffi::c_void,
+            &mut context as *mut _ as *mut std::ffi::c_void,
         )};
     assert!(result_122088.is_valid(), "Result must be valid");
 

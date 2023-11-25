@@ -1,10 +1,11 @@
-use crate::chain::common::LLMQType;
+use crate::chain::common::llmq_type::LLMQType;
 use crate::chain::params::DUFFS;
 use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::crypto::{byte_util::Reversable, UInt256};
 use hashes::hex::FromHex;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
+#[ferment_macro::export]
 pub trait IHaveChainSettings {
     fn genesis_hash(&self) -> UInt256;
     fn genesis_height(&self) -> u32;
@@ -24,7 +25,7 @@ pub trait IHaveChainSettings {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
-#[ferment_macro::export]
+#[ferment_macro::export(IHaveChainSettings)]
 pub enum ChainType {
     #[default]
     MainNet,
@@ -53,7 +54,7 @@ impl From<ChainType> for i16 {
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
-#[ferment_macro::export]
+#[ferment_macro::export(IHaveChainSettings)]
 pub enum DevnetType {
     JackDaniels = 0,
     Devnet333 = 1,
