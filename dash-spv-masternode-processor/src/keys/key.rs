@@ -83,23 +83,13 @@ impl From<i16> for KeyKind {
 
 impl From<KeyKind> for i16 {
     fn from(value: KeyKind) -> Self {
-        match value {
-            KeyKind::ECDSA => 0,
-            KeyKind::BLS => 1,
-            KeyKind::BLSBasic => 2,
-            KeyKind::ED25519 => 3,
-        }
+        value as i16
     }
 }
 
 impl From<&KeyKind> for u8 {
     fn from(value: &KeyKind) -> Self {
-        match value {
-            KeyKind::ECDSA => 0,
-            KeyKind::BLS => 1,
-            KeyKind::BLSBasic => 2,
-            KeyKind::ED25519 => 3,
-        }
+        *value as u8
     }
 }
 
