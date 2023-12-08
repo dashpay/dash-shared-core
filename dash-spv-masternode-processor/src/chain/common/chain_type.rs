@@ -377,7 +377,7 @@ impl ChainType {
 
     pub fn protocol_version(&self) -> u32 {
         match self {
-            ChainType::MainNet => 70228,
+            ChainType::MainNet => 70230,
             ChainType::TestNet => 70230,
             ChainType::DevNet(_) => 70230
         }
@@ -475,8 +475,8 @@ impl ChainType {
     }
 
     pub fn core20_activation_height(&self) -> u32 {
-        // TODO: make this real when aware
         match self {
+            ChainType::MainNet => 1987776,
             ChainType::TestNet => 905100,
             _ => u32::MAX
         }
