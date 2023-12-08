@@ -475,8 +475,8 @@ impl ChainType {
     }
 
     pub fn core20_activation_height(&self) -> u32 {
-        // TODO: make this real when aware
         match self {
+            ChainType::MainNet => 1987776,
             ChainType::TestNet => 905100,
             _ => u32::MAX
         }
