@@ -1,8 +1,8 @@
 use byte::BytesExt;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::BytesDecodable;
-use crate::crypto::{UInt256, VarBytes};
+use crate::crypto::byte_util::{BytesDecodable, UInt256};
 use crate::crypto::var_array::VarArray;
+use crate::crypto::var_bytes::VarBytes;
 
 #[inline]
 fn ceil_log2(mut x: i32) -> i32 {

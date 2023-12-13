@@ -1,6 +1,6 @@
-use dash_spv_masternode_processor::chain::common::{ChainType, DevnetType};
 use dash_spv_masternode_processor::block_store::{init_testnet_store, MerkleBlock};
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::chain::common::{ChainType, DevnetType};
+use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use crate::common::processor_create_cache;
 use crate::masternode::process_mnlistdiff_from_message;
 use crate::tests::common::{assert_diff_result, create_default_context_and_cache, FFIContext, process_mnlistdiff, register_default_processor};

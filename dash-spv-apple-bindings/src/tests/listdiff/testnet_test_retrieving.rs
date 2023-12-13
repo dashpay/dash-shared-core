@@ -1,5 +1,5 @@
 use dash_spv_masternode_processor::chain::common::ChainType;
-use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt256};
+use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::util::data_ops::merkle_root_from_hashes;
 use crate::ffi::from::FromFFI;

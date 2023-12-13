@@ -1,8 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::c_char;
 use dash_spv_masternode_processor::chain::common::ChainType;
-use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::byte_util::{ConstDecodable, UInt256};
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi_core_provider::FFICoreProvider;

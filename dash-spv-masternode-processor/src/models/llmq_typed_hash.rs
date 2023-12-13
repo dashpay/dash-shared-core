@@ -1,5 +1,5 @@
 use crate::chain::common::llmq_type::LLMQType;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 
 #[derive(Debug, Copy, Clone)]
 #[ferment_macro::export]

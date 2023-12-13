@@ -1,4 +1,4 @@
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]

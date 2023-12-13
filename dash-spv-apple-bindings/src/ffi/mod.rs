@@ -1,6 +1,6 @@
 use std::os::raw::c_ulong;
 use dash_spv_masternode_processor::chain::derivation::{IIndexPath, IndexPath};
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use crate::types::opaque_key::{OpaqueKey, OpaqueKeys, OpaqueSerializedKeys};
 
 pub mod callbacks;

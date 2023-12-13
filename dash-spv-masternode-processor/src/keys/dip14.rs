@@ -2,7 +2,7 @@ use ed25519_dalek::{SigningKey, VerifyingKey};
 use secp256k1::Scalar;
 use crate::chain::derivation::{BIP32_HARD, IIndexPath};
 use crate::consensus::encode::Encodable;
-use crate::crypto::{ECPoint, UInt256, UInt512, byte_util::{AsBytes, clone_into_array}};
+use crate::crypto::byte_util::{AsBytes, clone_into_array, ECPoint, UInt256, UInt512};
 use crate::keys::{ECDSAKey, ED25519Key};
 
 pub trait IChildKeyDerivationData<T, SK, PK> where SK: SignKey {

@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
+use ferment_interfaces::unbox_any;
 use crate::chain::common::{ChainType, IHaveChainSettings};
-use crate::crypto::byte_util::Zeroable;
-use crate::crypto::{UInt256, UInt768};
-use crate::models;
+use crate::crypto::byte_util::{UInt256, UInt768, Zeroable};
+use crate::models::{snapshot::LLMQSnapshot, masternode_list::MasternodeList};
 use crate::processing::ProcessingError;
 
+// #[ferment_macro::export]
 pub trait CoreProvider: std::fmt::Debug {
     fn chain_type(&self) -> ChainType;
-    fn find_masternode_list(&self, block_hash: UInt256, cached_mn_lists: &BTreeMap<UInt256, models::MasternodeList>, unknown_mn_lists: &mut Vec<UInt256>) -> Result<models::MasternodeList, CoreProviderError> {
+    fn find_masternode_list(&self, block_hash: UInt256, cached_mn_lists: &BTreeMap<UInt256, MasternodeList>, unknown_mn_lists: &mut Vec<UInt256>) -> Result<MasternodeList, CoreProviderError> {
         let genesis_hash = self.chain_type().genesis_hash();
         if block_hash.is_zero() {
             // If it's a zero block we don't expect models list here
@@ -16,7 +17,7 @@ pub trait CoreProvider: std::fmt::Debug {
         } else if block_hash.eq(&genesis_hash) {
             // If it's a genesis block we don't expect models list here
             // println!("find {}: {} It's a genesis -> Ok(EMPTY MNL)", self.lookup_block_height_by_hash(block_hash), block_hash);
-            Ok(models::MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
+            Ok(MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
             // None
         } else if let Some(cached) = cached_mn_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
@@ -53,7 +54,7 @@ pub trait CoreProvider: std::fmt::Debug {
         }
     }
 
-    fn find_snapshot(&self, block_hash: UInt256, cached_llmq_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>) -> Result<models::LLMQSnapshot, CoreProviderError> {
+    fn find_snapshot(&self, block_hash: UInt256, cached_llmq_snapshots: &BTreeMap<UInt256, LLMQSnapshot>) -> Result<LLMQSnapshot, CoreProviderError> {
         if let Some(cached) = cached_llmq_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             Ok(cached.clone())
@@ -63,17 +64,17 @@ pub trait CoreProvider: std::fmt::Debug {
     }
 
     fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Result<UInt256, CoreProviderError>;
-    fn lookup_masternode_list(&self, block_hash: UInt256) -> Result<models::MasternodeList, CoreProviderError>;
+    fn lookup_masternode_list(&self, block_hash: UInt256) -> Result<MasternodeList, CoreProviderError>;
     fn lookup_cl_signature_by_block_hash(&self, block_hash: UInt256) -> Result<UInt768, CoreProviderError>;
-    fn lookup_snapshot_by_block_hash(&self, block_hash: UInt256) -> Result<models::LLMQSnapshot, CoreProviderError>;
+    fn lookup_snapshot_by_block_hash(&self, block_hash: UInt256) -> Result<LLMQSnapshot, CoreProviderError>;
     fn lookup_block_hash_by_height(&self, block_height: u32) -> Result<UInt256, CoreProviderError>;
     fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32;
 
     fn add_insight(&self, block_hash: UInt256);
     fn should_process_diff_with_range(&self, base_block_hash: UInt256, block_hash: UInt256) -> Result<(), ProcessingError>;
 
-    fn save_snapshot(&self, block_hash: UInt256, snapshot: models::LLMQSnapshot) -> bool;
-    fn save_masternode_list(&self, block_hash: UInt256, masternode_list: &models::MasternodeList) -> bool;
+    fn save_snapshot(&self, block_hash: UInt256, snapshot: LLMQSnapshot) -> bool;
+    fn save_masternode_list(&self, block_hash: UInt256, masternode_list: &MasternodeList) -> bool;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -119,7 +120,7 @@ pub enum byte_Error_FFI {
 pub enum CoreProviderError_FFI {
     NullResult,
     ByteError(*mut byte_Error_FFI),
-    BadBlockHash(*mut [u8; 32]),
+    BadBlockHash(*mut crate::fermented::types::crypto::byte_util::UInt256),
     BlockHashNotFoundAt(u32),
     NoMasternodeList,
 }
@@ -165,9 +166,9 @@ impl ferment_interfaces::FFIConversion<CoreProviderError> for CoreProviderError_
             CoreProviderError_FFI::NullResult =>
                 CoreProviderError::NullResult,
             CoreProviderError_FFI::ByteError(o_0) =>
-                CoreProviderError::ByteError(ferment_interfaces::FFIConversion::ffi_from_const(*o_0)),
+                CoreProviderError::ByteError(ferment_interfaces::FFIConversion::ffi_from(*o_0)),
             CoreProviderError_FFI::BadBlockHash(o_0) =>
-                CoreProviderError::BadBlockHash(ferment_interfaces::FFIConversion::ffi_from_const(*o_0)),
+                CoreProviderError::BadBlockHash(ferment_interfaces::FFIConversion::ffi_from(*o_0)),
             CoreProviderError_FFI::BlockHashNotFoundAt(o_0) =>
                 CoreProviderError::BlockHashNotFoundAt(*o_0),
             CoreProviderError_FFI::NoMasternodeList =>
@@ -193,8 +194,10 @@ impl Drop for CoreProviderError_FFI {
             match self {
                 CoreProviderError_FFI::ByteError(o_0) =>
                     <byte_Error_FFI as ferment_interfaces::FFIConversion<byte::Error>>::destroy(o_0.to_owned()),
-                CoreProviderError_FFI::BadBlockHash(o_0) =>
-                    <[u8; 32] as ferment_interfaces::FFIConversion<UInt256>>::destroy(o_0.to_owned()),
+                CoreProviderError_FFI::BadBlockHash(o_0) => {
+                    unbox_any(o_0);
+                },
+                    // <[u8; 32] as ferment_interfaces::FFIConversion<UInt256>>::destroy(o_0.to_owned()),
                 _ => {},
             }
         }

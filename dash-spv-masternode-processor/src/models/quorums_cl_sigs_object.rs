@@ -1,7 +1,7 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
 use crate::consensus::encode::VarInt;
-use crate::crypto::UInt768;
+use crate::crypto::byte_util::UInt768;
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
 #[ferment_macro::export]

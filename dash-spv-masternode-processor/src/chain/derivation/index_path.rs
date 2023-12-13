@@ -3,8 +3,7 @@ use std::os::raw::c_ulong;
 use std::slice;
 use byte::{BytesExt, LE, TryRead};
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::clone_into_array;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::{clone_into_array, UInt256};
 use super::BIP32_HARD;
 
 pub trait Extremum {

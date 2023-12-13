@@ -17,7 +17,7 @@ use crate::chain::ScriptMap;
 use crate::chain::derivation::index_path::IIndexPath;
 use crate::chain::tx::protocol::SIGHASH_ALL;
 use crate::consensus::Encodable;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 use crate::keys::dip14::{IChildKeyDerivation, SignKey};
 use crate::util::address::address;
 use crate::util::base58;

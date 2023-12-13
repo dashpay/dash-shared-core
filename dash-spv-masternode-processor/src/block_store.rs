@@ -1,6 +1,5 @@
 use hashes::hex::FromHex;
-use crate::crypto::byte_util::Reversable;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::{Reversable, UInt256};
 
 #[derive(Debug, Copy, Clone)]
 pub struct MerkleBlock {

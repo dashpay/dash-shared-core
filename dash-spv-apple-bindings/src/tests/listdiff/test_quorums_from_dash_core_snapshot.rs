@@ -1,5 +1,5 @@
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings};
-use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt256};
+use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::test_helpers::{masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
 use crate::tests::common::{create_default_context_and_cache, register_default_processor};
 

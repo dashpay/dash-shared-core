@@ -1,7 +1,7 @@
 use bip38::{Decrypt, Encrypt};
 use byte::BytesExt;
 use crate::chain::ScriptMap;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 use crate::keys::{ECDSAKey, KeyError};
 use crate::util::base58;
 

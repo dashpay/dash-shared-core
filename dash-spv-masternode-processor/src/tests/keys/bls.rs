@@ -4,8 +4,7 @@ use hashes::hex::{FromHex, ToHex};
 use hashes::{Hash, sha256d};
 use secp256k1::rand::{Rng, thread_rng};
 use crate::keys::{BLSKey, IKey};
-use crate::crypto::{UInt256, UInt384, UInt768};
-use crate::crypto::byte_util::Random;
+use crate::crypto::byte_util::{Random, UInt256, UInt384, UInt768};
 use crate::models::OperatorPublicKey;
 
 #[test]

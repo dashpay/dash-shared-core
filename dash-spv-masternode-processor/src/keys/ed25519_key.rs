@@ -4,7 +4,7 @@ use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use hashes::hex::{FromHex, ToHex};
 use hashes::sha256;
-use crate::crypto::{UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}, ECPoint};
+use crate::crypto::byte_util::{AsBytes, ECPoint, UInt160, UInt256, UInt512, Zeroable};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, IChildKeyDerivationData}, KeyError};

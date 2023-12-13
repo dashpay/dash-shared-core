@@ -12,7 +12,7 @@ use crate::chain::common::IHaveChainSettings;
 use crate::chain::common::llmq_type::LLMQType;
 use crate::common::{bitset::Bitset, llmq_version::LLMQVersion};
 use crate::consensus::{encode::VarInt, Encodable, Decodable, encode};
-use crate::crypto::{byte_util::AsBytes, UInt256, UInt384, UInt768};
+use crate::crypto::byte_util::{AsBytes, UInt256, UInt384, UInt768};
 use crate::keys::BLSKey;
 use crate::models;
 use crate::processing::CoreProviderError;

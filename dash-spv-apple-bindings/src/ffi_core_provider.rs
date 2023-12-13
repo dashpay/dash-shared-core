@@ -1,6 +1,5 @@
 use dash_spv_masternode_processor::chain::common::ChainType;
-use dash_spv_masternode_processor::crypto::byte_util::{MutDecodable};
-use dash_spv_masternode_processor::crypto::{UInt256, UInt768};
+use dash_spv_masternode_processor::crypto::byte_util::{MutDecodable, UInt256, UInt768};
 use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::processing::{CoreProvider, CoreProviderError, ProcessingError};
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};

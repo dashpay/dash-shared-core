@@ -2,7 +2,7 @@ use secp256k1::rand;
 use secp256k1::rand::Rng;
 use std::fmt::Write;
 use crate::consensus::Encodable;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 
 #[inline]
 pub fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {

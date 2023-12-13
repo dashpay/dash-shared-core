@@ -3,7 +3,7 @@ use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchem
 use hashes::{Hash, hex::FromHex, sha256, sha256d};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
-use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
+use crate::crypto::byte_util::{AsBytes, BytesDecodable, Zeroable, UInt160, UInt256, UInt384, UInt768};
 use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}, KeyError};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::KeyError::DHKeyExchange;

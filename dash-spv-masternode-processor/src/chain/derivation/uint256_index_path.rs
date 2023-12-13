@@ -1,7 +1,7 @@
 use std::cmp;
 use std::cmp::Ordering;
 use std::hash::Hash;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 use super::IIndexPath;
 
 #[derive(Clone, Debug, Default, Eq, Hash)]

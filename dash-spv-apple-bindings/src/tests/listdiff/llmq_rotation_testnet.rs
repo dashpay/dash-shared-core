@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use dash_spv_masternode_processor::block_store::init_mainnet_store;
 use dash_spv_masternode_processor::chain::common::ChainType;
-use dash_spv_masternode_processor::crypto::{byte_util::Reversable, UInt256};
+use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::processing::MasternodeProcessor;

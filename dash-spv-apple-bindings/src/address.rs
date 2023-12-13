@@ -6,7 +6,7 @@
 // use crate::ffi::ByteArray;
 
 pub mod addresses {
-    use dash_spv_masternode_processor::crypto::UInt160;
+    use dash_spv_masternode_processor::crypto::byte_util::UInt160;
     use dash_spv_masternode_processor::util::address::address;
     use dash_spv_masternode_processor::chain::common::chain_type::ChainType;
 

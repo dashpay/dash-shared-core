@@ -1,7 +1,7 @@
 use std::io;
 use byte::{BytesExt, TryRead};
 use crate::consensus::{Decodable, Encodable, encode};
-use crate::crypto::UInt128;
+use crate::crypto::byte_util::UInt128;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]

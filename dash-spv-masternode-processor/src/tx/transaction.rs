@@ -5,7 +5,8 @@ use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
 use crate::chain::params::TX_UNCONFIRMED;
 use crate::consensus::{Decodable, Encodable, encode, encode::VarInt};
-use crate::crypto::{UInt256, VarBytes};
+use crate::crypto::byte_util::UInt256;
+use crate::crypto::var_bytes::VarBytes;
 
 pub static SIGHASH_ALL: u32 = 1;
 

@@ -1,10 +1,9 @@
 use byte::{BytesExt, TryRead};
 use hashes::{Hash, sha256d};
 use crate::chain::common::ChainType;
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::clone_into_array;
-use crate::crypto::UInt256;
 use crate::chain::derivation::BIP32_HARD;
+use crate::consensus::Encodable;
+use crate::crypto::byte_util::{clone_into_array, UInt256};
 use crate::keys::KeyError;
 use crate::util::{base58, endian};
 use crate::util::sec_vec::SecVec;

@@ -728,7 +728,7 @@ checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
 
 [[package]]
 name = "ferment"
-version = "0.1.1"
+version = "0.1.4"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -736,11 +736,11 @@ dependencies = [
 
 [[package]]
 name = "ferment-interfaces"
-version = "0.1.1"
+version = "0.1.4"
 
 [[package]]
 name = "ferment-macro"
-version = "0.1.1"
+version = "0.1.4"
 dependencies = [
  "quote",
  "syn 1.0.109",

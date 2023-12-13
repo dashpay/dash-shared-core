@@ -1,5 +1,5 @@
 use std::ffi::c_void;
-use dash_spv_masternode_processor::crypto::{UInt256, UInt768};
+use dash_spv_masternode_processor::crypto::byte_util::{UInt256, UInt768};
 use dash_spv_masternode_processor::models::masternode_list::MasternodeList;
 use dash_spv_masternode_processor::models::snapshot::LLMQSnapshot;
 use dash_spv_masternode_processor::processing::processing_error::ProcessingError;

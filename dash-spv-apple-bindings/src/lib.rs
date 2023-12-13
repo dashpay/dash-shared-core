@@ -19,7 +19,7 @@ mod types;
 pub extern crate dash_spv_masternode_processor;
 pub extern crate merk;
 
-use dash_spv_masternode_processor::crypto::{UInt128, UInt160, UInt256, UInt384, UInt512, UInt768};
+use dash_spv_masternode_processor::crypto::byte_util::{UInt128, UInt160, UInt256, UInt384, UInt512, UInt768};
 
 #[macro_export]
 macro_rules! impl_ffi_bytearray {

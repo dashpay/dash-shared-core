@@ -1,7 +1,7 @@
 use base64::{alphabet, Engine};
 use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use hashes::hex::{FromHex, ToHex};
-use crate::crypto::{UInt160, UInt256, UInt512};
+use crate::crypto::byte_util::{UInt160, UInt256, UInt512};
 use crate::util::base58;
 
 #[test]

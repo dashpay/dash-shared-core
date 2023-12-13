@@ -7,7 +7,7 @@ use serde::ser::SerializeStruct;
 use crate::chain::constants::CORE_PROTO_19_2;
 use crate::common::{block::Block, masternode_type::MasternodeType, socket_address::SocketAddress};
 use crate::consensus::Encodable;
-use crate::crypto::{UInt160, UInt256, byte_util::Zeroable};
+use crate::crypto::byte_util::{UInt160, UInt256, Zeroable};
 use crate::models::operator_public_key::OperatorPublicKey;
 use crate::util::data_ops::short_hex_string_from;
 

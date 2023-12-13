@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
-use crate::crypto::{UInt256, UInt384, UInt768};
+use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyError};
 use crate::util::sec_vec::SecVec;
 

@@ -2,7 +2,7 @@ use std::io;
 use bls_signatures::G1Element;
 use byte::{BytesExt, TryRead};
 use crate::consensus::{Decodable, Encodable, encode};
-use crate::crypto::UInt384;
+use crate::crypto::byte_util::UInt384;
 use crate::keys::BLSKey;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]

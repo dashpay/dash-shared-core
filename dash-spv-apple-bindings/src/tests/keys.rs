@@ -1,8 +1,7 @@
 use std::ffi::CString;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::derivation::{IIndexPath, IndexPath};
-use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
-use dash_spv_masternode_processor::crypto::{UInt256, UInt384};
+use dash_spv_masternode_processor::crypto::byte_util::{ConstDecodable, UInt256, UInt384};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::keys::KeyKind;
 use crate::ffi::IndexPathData;

@@ -4,7 +4,7 @@ use byte::{BytesExt, TryRead};
 use crate::consensus;
 use crate::consensus::encode::VarInt;
 use crate::consensus::{Encodable, encode};
-use crate::crypto::{UInt256, UInt768};
+use crate::crypto::byte_util::{UInt256, UInt768};
 use crate::tx::transaction::{Transaction, TransactionType};
 
 

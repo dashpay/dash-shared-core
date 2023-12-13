@@ -1,8 +1,7 @@
 use hashes::hex::FromHex;
 use crate::chain::common::chain_type::DevnetType;
 use crate::chain::common::ChainType;
-use crate::crypto::byte_util::Reversable;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::{Reversable, UInt256};
 
 pub(crate) const DUFFS: u64 = 100000000;
 pub(crate) const MAX_MONEY: u64 = 21000000 * DUFFS;

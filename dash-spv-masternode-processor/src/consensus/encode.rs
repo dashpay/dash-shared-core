@@ -36,7 +36,7 @@ use std::borrow::Cow;
 use std::io::{self, Cursor, Read};
 use std::{rc, sync};
 use hashes::{Hash, sha256, sha256d};
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 use crate::hash_types::{BlockHash, FilterHash, FilterHeader, TxMerkleNode};
 use crate::hashes::hex::ToHex;
 use crate::tx::{TransactionInput, TransactionOutput};

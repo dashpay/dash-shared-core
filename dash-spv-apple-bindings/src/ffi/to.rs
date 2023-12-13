@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::ptr::null_mut;
 use ferment_interfaces::{boxed, boxed_vec};
 use dash_spv_masternode_processor::{chain, common, models, tx};
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use crate::ffi::from::FromFFI;
 use crate::types;
 

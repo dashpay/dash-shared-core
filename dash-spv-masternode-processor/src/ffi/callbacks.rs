@@ -1,7 +1,7 @@
 extern crate libc;
 use std::ffi::c_void;
 use crate::{models, types};
-use crate::crypto::{byte_util::MutDecodable, UInt256, UInt768};
+use crate::crypto::byte_util::{MutDecodable, UInt256, UInt768};
 use crate::ffi::from::FromFFI;
 use crate::processing::ProcessingError;
 

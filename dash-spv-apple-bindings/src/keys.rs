@@ -5,7 +5,7 @@ use std::slice;
 use ferment_interfaces::{boxed, boxed_vec, unbox_any};
 use dash_spv_masternode_processor::chain::{bip::{bip32, bip38::BIP38}, common::{ChainType, IHaveChainSettings}, derivation::IndexPath};
 use dash_spv_masternode_processor::consensus::Encodable;
-use dash_spv_masternode_processor::crypto::{byte_util::{AsBytes, ConstDecodable, Reversable, Zeroable}, UInt160, UInt256, UInt384, UInt512, UInt768};
+use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, ConstDecodable, Reversable, UInt160, UInt256, UInt384, UInt512, UInt768, Zeroable};
 use dash_spv_masternode_processor::keys::{BLSKey, crypto_data::{CryptoData, DHKey}, ECDSAKey, ED25519Key, IKey, KeyError, KeyKind};
 use dash_spv_masternode_processor::processing::{keys_cache::KeysCache, ProcessingError};
 use dash_spv_masternode_processor::util::{address::address, sec_vec::SecVec};

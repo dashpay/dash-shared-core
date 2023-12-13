@@ -3,8 +3,7 @@ pub mod address {
     use hashes::hex::{FromHex, ToHex};
     use crate::chain::params::{BITCOIN_PUBKEY_ADDRESS, BITCOIN_SCRIPT_ADDRESS, ScriptMap};
     use crate::consensus::Encodable;
-    use crate::crypto::byte_util::clone_into_array;
-    use crate::crypto::UInt160;
+    use crate::crypto::byte_util::{clone_into_array, UInt160};
     use crate::util::base58;
     use crate::util::data_append::DataAppend;
     use crate::util::script::ScriptElement;

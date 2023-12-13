@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use crate::crypto::UInt256;
+use crate::crypto::byte_util::UInt256;
 use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry, masternode_list::MasternodeList};
 
 #[derive(Clone)]

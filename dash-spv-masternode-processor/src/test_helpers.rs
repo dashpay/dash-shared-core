@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::chain::common::{ChainType, LLMQType};
 use crate::common::{Bitset, LLMQSnapshotSkipMode, LLMQVersion, MasternodeType, SocketAddress};
 use crate::consensus::encode::VarInt;
-use crate::crypto::{byte_util::{BytesDecodable, Reversable}, UInt160, UInt256, UInt384, UInt768, VarArray, VarBytes};
+use crate::crypto::{VarArray, VarBytes, byte_util::{BytesDecodable, Reversable, UInt160, UInt256, UInt384, UInt768}};
 use crate::hashes::hex::FromHex;
 use crate::models;
-use crate::models::OperatorPublicKey;
+// use crate::models::OperatorPublicKey;
 use crate::tx::CoinbaseTransaction;
 use crate::util::base58;
 
@@ -358,7 +358,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             let public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
             let version = node.version.unwrap_or(0);
             let is_valid = u8::from(node.is_valid);
-            let operator_public_key = OperatorPublicKey {
+            let operator_public_key = models::OperatorPublicKey {
                 data: public_key,
                 version
             };
