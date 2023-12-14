@@ -79,10 +79,10 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
 
         let last_quorum_per_index_count = read_var_int(&mut offset)?.0 as usize;
 
-        let mut last_quorum_per_index: Vec<models::LLMQEntry> =
+        let mut last_quorum_per_index: Vec<models::llmq_entry::LLMQEntry> =
             Vec::with_capacity(last_quorum_per_index_count);
         for _i in 0..last_quorum_per_index_count {
-            last_quorum_per_index.push(bytes.read_with::<models::LLMQEntry>(&mut offset, byte::LE)?);
+            last_quorum_per_index.push(bytes.read_with::<models::llmq_entry::LLMQEntry>(&mut offset, byte::LE)?);
         }
         let quorum_snapshot_list_count = read_var_int(&mut offset)?.0 as usize;
         let mut quorum_snapshot_list: Vec<models::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);

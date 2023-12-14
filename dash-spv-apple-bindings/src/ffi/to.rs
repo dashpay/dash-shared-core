@@ -138,7 +138,7 @@ impl ToFFI for models::MasternodeList {
     }
 }
 
-impl ToFFI for models::MasternodeEntry {
+impl ToFFI for models::masternode_entry::MasternodeEntry {
     type Item = types::MasternodeEntry;
 
     fn encode(&self) -> Self::Item {
@@ -239,7 +239,7 @@ impl ToFFI for models::MasternodeEntry {
     }
 }
 
-impl ToFFI for models::LLMQEntry {
+impl ToFFI for models::llmq_entry::LLMQEntry {
     type Item = types::LLMQEntry;
 
     fn encode(&self) -> Self::Item {
@@ -330,7 +330,7 @@ impl ToFFI for common::Block {
 }
 
 pub fn encode_quorums_map(
-    quorums: &BTreeMap<chain::common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+    quorums: &BTreeMap<chain::common::LLMQType, BTreeMap<UInt256, models::llmq_entry::LLMQEntry>>,
 ) -> *mut *mut types::LLMQMap {
     boxed_vec(
         quorums
@@ -352,7 +352,7 @@ pub fn encode_quorums_map(
 }
 
 pub fn encode_masternodes_map(
-    masternodes: &BTreeMap<UInt256, models::MasternodeEntry>,
+    masternodes: &BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>,
 ) -> *mut *mut types::MasternodeEntry {
     boxed_vec(
         masternodes

@@ -149,9 +149,9 @@ pub struct Llmq {
     pub members_sig: String,
 }
 
-impl From<Llmq> for models::LLMQEntry {
+impl From<Llmq> for models::llmq_entry::LLMQEntry {
     fn from(llmq: Llmq) -> Self {
-        models::LLMQEntry::new(
+        models::llmq_entry::LLMQEntry::new(
             LLMQVersion::from(llmq.version as u16),
             LLMQType::from(llmq.llmq_type as u8),
             block_hash_to_block_hash(llmq.quorum_hash),
@@ -284,14 +284,14 @@ pub fn value_to_masternode_list(value: &serde_json::Value) -> models::Masternode
     }
 }
 
-pub fn quorums_to_quorums_vec(value: Vec<Llmq>) -> Vec<models::LLMQEntry> {
-    value.into_iter().map(models::LLMQEntry::from).collect()
+pub fn quorums_to_quorums_vec(value: Vec<Llmq>) -> Vec<models::llmq_entry::LLMQEntry> {
+    value.into_iter().map(models::llmq_entry::LLMQEntry::from).collect()
 }
 
-pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> {
-    let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = BTreeMap::new();
+pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, models::llmq_entry::LLMQEntry>> {
+    let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::llmq_entry::LLMQEntry>> = BTreeMap::new();
     value.into_iter().for_each(|llmq| {
-        let entry = models::LLMQEntry::from(llmq);
+        let entry = models::llmq_entry::LLMQEntry::from(llmq);
         quorums
             .entry(entry.llmq_type)
             .or_insert_with(BTreeMap::new)
@@ -301,8 +301,8 @@ pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<U
     quorums
 }
 
-// pub fn masternodes_to_masternodes(value: Vec<Masternode>) -> BTreeMap<UInt256, models::MasternodeEntry> {
-//     let map: BTreeMap<UInt256, models::MasternodeEntry> = value
+// pub fn masternodes_to_masternodes(value: Vec<Masternode>) -> BTreeMap<UInt256, models::masternode_entry::MasternodeEntry> {
+//     let map: BTreeMap<UInt256, models::masternode_entry::MasternodeEntry> = value
 //         .into_iter()
 //         .filter_map(|node| {
 //
@@ -329,7 +329,7 @@ pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<U
 //             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
 //             let operator_public_key = UInt384::from_hex(node.pubkeyoperator.as_str()).unwrap();
 //             let is_valid = node.status == "ENABLED";
-//             let entry = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
+//             let entry = models::masternode_entry::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
 //             // assert_eq!(message.len(), MN_ENTRY_PAYLOAD_LENGTH);
 //             // entry.update_with_block_height(block_height);
 //             Some(entry)
@@ -345,8 +345,8 @@ pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<U
 //     map
 // }
 
-pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::MasternodeEntry> {
-    let map: BTreeMap<UInt256, models::MasternodeEntry> = value
+pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::masternode_entry::MasternodeEntry> {
+    let map: BTreeMap<UInt256, models::masternode_entry::MasternodeEntry> = value
         .into_iter()
         .map(|node| {
             let provider_registration_transaction_hash = UInt256::from_hex(node.pro_reg_tx_hash.as_str()).unwrap();
@@ -363,7 +363,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
                 version
             };
             let update_height = node.update_height.unwrap_or(0);
-            let mut masternode = models::MasternodeEntry::new(version, provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, is_valid, MasternodeType::Regular, 0, UInt160::MIN, update_height, 70219);
+            let mut masternode = models::masternode_entry::MasternodeEntry::new(version, provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, is_valid, MasternodeType::Regular, 0, UInt160::MIN, update_height, 70219);
             masternode.known_confirmed_at_height = node.known_confirmed_at_height;
             masternode
         })

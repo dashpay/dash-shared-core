@@ -1,0 +1,9 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./dash-spv-masternode-processor/Cargo.toml",
+        "./dash-spv-masternode-processor/Cargo.toml",
+        "./dash-spv-masternode-processor/Cargo.toml",
+        "./dash-spv-masternode-processor/Cargo.toml",
+        "./dash-spv-masternode-processor/Cargo.toml"
+    ]
+}

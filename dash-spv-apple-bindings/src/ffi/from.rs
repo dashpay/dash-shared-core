@@ -138,7 +138,7 @@ impl FromFFI for types::MasternodeList {
                 |mut acc, i| {
                     let llmq_map = &*(*self.llmq_type_maps.add(i));
                     let key = chain::common::LLMQType::from(llmq_map.llmq_type);
-                    let value: BTreeMap<UInt256, models::LLMQEntry> = (0..llmq_map.count)
+                    let value: BTreeMap<UInt256, models::llmq_entry::LLMQEntry> = (0..llmq_map.count)
                         .into_iter()
                         .fold(BTreeMap::new(), |mut acc, j| {
                             let raw_value = &*(*llmq_map.values.add(j));
@@ -166,7 +166,7 @@ impl FromFFI for types::OperatorPublicKey {
 }
 
 impl FromFFI for types::MasternodeEntry {
-    type Item = models::MasternodeEntry;
+    type Item = models::masternode_entry::MasternodeEntry;
     unsafe fn decode(&self) -> Self::Item {
         Self::Item {
             provider_registration_transaction_hash: UInt256(
@@ -243,7 +243,7 @@ impl FromFFI for types::MasternodeEntry {
 }
 
 impl FromFFI for types::LLMQEntry {
-    type Item = models::LLMQEntry;
+    type Item = models::llmq_entry::LLMQEntry;
 
     unsafe fn decode(&self) -> Self::Item {
         let signers_bitset =

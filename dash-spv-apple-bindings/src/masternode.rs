@@ -130,7 +130,7 @@ pub extern "C" fn quorum_build_llmq_hash_v20(llmq_type: LLMQType, height: u32, b
 pub extern "C" fn masternode_hash_confirmed_hash(confirmed_hash: *const u8, pro_reg_tx_hash: *const u8) -> ByteArray {
     let confirmed_hash = UInt256::from_const(confirmed_hash).unwrap_or(UInt256::MIN);
     let pro_reg_tx_hash = UInt256::from_const(pro_reg_tx_hash).unwrap_or(UInt256::MIN);
-    models::MasternodeEntry::hash_confirmed_hash(confirmed_hash, pro_reg_tx_hash).into()
+    models::masternode_entry::MasternodeEntry::hash_confirmed_hash(confirmed_hash, pro_reg_tx_hash).into()
 }
 
 /// # Safety
@@ -249,7 +249,7 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> =
         Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
-        let quorum = ok_or_return_processing_error!(models::LLMQEntry::from_bytes(message, offset));
+        let quorum = ok_or_return_processing_error!(models::llmq_entry::LLMQEntry::from_bytes(message, offset));
         last_quorum_per_index_vec.push(ferment_interfaces::boxed(quorum.encode()));
     }
     let quorum_snapshot_list_count = ok_or_return_processing_error!(read_var_int(offset)).0 as usize;

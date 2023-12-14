@@ -20,14 +20,14 @@ pub enum LLMQQuarterReconstructionType<'a> {
         cached_llmq_snapshots: &'a BTreeMap<UInt256, models::LLMQSnapshot>
     },
     New {
-        previous_quarters: [&'a Vec<Vec<models::MasternodeEntry>>; 3],
+        previous_quarters: [&'a Vec<Vec<models::masternode_entry::MasternodeEntry>>; 3],
         skip_removed_masternodes: bool,
     }
 }
 
 pub enum LLMQQuarterUsageType {
     Snapshot(models::LLMQSnapshot),
-    New(Vec<Vec<models::MasternodeEntry>>)
+    New(Vec<Vec<models::masternode_entry::MasternodeEntry>>)
 }
 
 // https://github.com/rust-lang/rfcs/issues/2770
@@ -162,15 +162,15 @@ impl MasternodeProcessor {
     #[allow(clippy::type_complexity)]
     pub fn classify_masternodes(
         &self,
-        base_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
-        added_or_modified_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
+        base_masternodes: BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>,
+        added_or_modified_masternodes: BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>,
         deleted_masternode_hashes: Vec<UInt256>,
         block_height: u32,
         block_hash: UInt256,
     ) -> (
-        BTreeMap<UInt256, models::MasternodeEntry>,
-        BTreeMap<UInt256, models::MasternodeEntry>,
-        BTreeMap<UInt256, models::MasternodeEntry>,
+        BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>,
+        BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>,
+        BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>,
     ) {
         let added_masternodes = added_or_modified_masternodes
             .iter()
@@ -220,7 +220,7 @@ impl MasternodeProcessor {
     fn verify_added_quorums(
         &self,
         verification_context: LLMQVerificationContext,
-        added_quorums: &mut Vec<models::LLMQEntry>,
+        added_quorums: &mut Vec<models::llmq_entry::LLMQEntry>,
         skip_removed_masternodes: bool,
         quorums_cl_sigs: &BTreeMap<UInt768, HashSet<u16>>,
         cache: &mut MasternodeProcessorCache,
@@ -271,12 +271,12 @@ impl MasternodeProcessor {
 
     pub fn process_quorums(
         &self,
-        mut base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
-        added_quorums: Vec<models::LLMQEntry>,
+        mut base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::llmq_entry::LLMQEntry>>,
+        added_quorums: Vec<models::llmq_entry::LLMQEntry>,
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
     ) -> (
-        Vec<models::LLMQEntry>,
-        BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+        Vec<models::llmq_entry::LLMQEntry>,
+        BTreeMap<LLMQType, BTreeMap<UInt256, models::llmq_entry::LLMQEntry>>,
     ) {
         for (llmq_type, keys_to_delete) in &deleted_quorums {
             if let Some(llmq_map) = base_quorums.get_mut(llmq_type) {
@@ -293,7 +293,7 @@ impl MasternodeProcessor {
         (added_quorums, base_quorums)
     }
 
-    fn find_valid_masternodes_for_quorum(&self, quorum: &models::LLMQEntry, block_height: u32, skip_removed_masternodes: bool, masternodes: BTreeMap<UInt256, models::MasternodeEntry>, cache: &mut MasternodeProcessorCache) -> Result<Vec<models::MasternodeEntry>, CoreProviderError> {
+    fn find_valid_masternodes_for_quorum(&self, quorum: &models::llmq_entry::LLMQEntry, block_height: u32, skip_removed_masternodes: bool, masternodes: BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>, cache: &mut MasternodeProcessorCache) -> Result<Vec<models::masternode_entry::MasternodeEntry>, CoreProviderError> {
         if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(quorum.llmq_type, quorum.llmq_hash, block_height, skip_removed_masternodes, cache)
         } else {
@@ -301,7 +301,7 @@ impl MasternodeProcessor {
         }
     }
 
-    pub fn validate_quorum(&self, quorum: &mut models::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> Result<LLMQValidationStatus, CoreProviderError> {
+    pub fn validate_quorum(&self, quorum: &mut models::llmq_entry::LLMQEntry, skip_removed_masternodes: bool, cache: &mut MasternodeProcessorCache) -> Result<LLMQValidationStatus, CoreProviderError> {
         let llmq_block_hash = quorum.llmq_hash;
         self.provider.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists)
             .and_then(|models::MasternodeList { masternodes, .. }| {
@@ -316,10 +316,10 @@ impl MasternodeProcessor {
         llmq_type: LLMQType,
         block_hash: UInt256,
         block_height: u32,
-        quorum: &models::LLMQEntry,
-        masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
+        quorum: &models::llmq_entry::LLMQEntry,
+        masternodes: BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>,
         cache: &mut MasternodeProcessorCache
-    ) -> Result<Vec<models::MasternodeEntry>, CoreProviderError> {
+    ) -> Result<Vec<models::masternode_entry::MasternodeEntry>, CoreProviderError> {
         Ok(models::MasternodeList::get_masternodes_for_quorum(
             quorum,
             self.provider.chain_type(),
@@ -328,17 +328,17 @@ impl MasternodeProcessor {
             self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8, &cache.cl_signatures)))
     }
 
-    fn sort_scored_masternodes(scored_masternodes: BTreeMap<UInt256, models::MasternodeEntry>) -> Vec<models::MasternodeEntry> {
+    fn sort_scored_masternodes(scored_masternodes: BTreeMap<UInt256, models::masternode_entry::MasternodeEntry>) -> Vec<models::masternode_entry::MasternodeEntry> {
         let mut v = Vec::from_iter(scored_masternodes);
         v.sort_by(|(s1, _), (s2, _)| s2.reversed().cmp(&s1.reversed()));
         v.into_iter().map(|(s, node)| node).collect()
     }
 
     pub fn valid_masternodes_for_rotated_quorum_map(
-        masternodes: Vec<models::MasternodeEntry>,
+        masternodes: Vec<models::masternode_entry::MasternodeEntry>,
         quorum_modifier: UInt256,
         block_height: u32,
-    ) -> Vec<models::MasternodeEntry> {
+    ) -> Vec<models::masternode_entry::MasternodeEntry> {
         let scored_masternodes = masternodes
             .into_iter()
             .filter_map(|entry| models::MasternodeList::masternode_score(&entry, quorum_modifier, block_height)
@@ -349,13 +349,13 @@ impl MasternodeProcessor {
 
     pub fn apply_skip_strategy_of_type(
         skip_type: LLMQQuarterUsageType,
-        used_at_h_masternodes: Vec<models::MasternodeEntry>,
-        unused_at_h_masternodes: Vec<models::MasternodeEntry>,
+        used_at_h_masternodes: Vec<models::masternode_entry::MasternodeEntry>,
+        unused_at_h_masternodes: Vec<models::masternode_entry::MasternodeEntry>,
         work_block_height: u32,
         quorum_modifier: UInt256,
         quorum_count: usize,
         quarter_size: usize,
-    ) -> Vec<Vec<models::MasternodeEntry>> {
+    ) -> Vec<Vec<models::masternode_entry::MasternodeEntry>> {
         let sorted_used_mns_list = MasternodeProcessor::valid_masternodes_for_rotated_quorum_map(
             used_at_h_masternodes,
             quorum_modifier,
@@ -364,7 +364,7 @@ impl MasternodeProcessor {
             unused_at_h_masternodes,
             quorum_modifier,
             work_block_height);
-        let sorted_combined_mns_list = sorted_unused_mns_list.into_iter().chain(sorted_used_mns_list.into_iter()).collect::<Vec<models::MasternodeEntry>>();
+        let sorted_combined_mns_list = sorted_unused_mns_list.into_iter().chain(sorted_used_mns_list.into_iter()).collect::<Vec<models::masternode_entry::MasternodeEntry>>();
         match skip_type {
             LLMQQuarterUsageType::Snapshot(snapshot) => {
                 match snapshot.skip_list_mode {
@@ -411,12 +411,12 @@ impl MasternodeProcessor {
                     LLMQSnapshotSkipMode::SkipAll => {
                         // TODO: do we need to impl smth in this strategy ?
                         warn!("skip_mode SkipAll not supported yet");
-                        vec![Vec::<models::MasternodeEntry>::new(); quorum_count]
+                        vec![Vec::<models::masternode_entry::MasternodeEntry>::new(); quorum_count]
                     }
                 }
             },
             LLMQQuarterUsageType::New(mut used_at_h_indexed_masternodes) => {
-                let mut quarter_quorum_members = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
+                let mut quarter_quorum_members = vec![Vec::<models::masternode_entry::MasternodeEntry>::new(); quorum_count];
                 let mut skip_list = Vec::<i32>::new();
                 let mut first_skipped_index = 0i32;
                 let mut idx = 0i32;
@@ -459,7 +459,7 @@ impl MasternodeProcessor {
         }
     }
 
-    fn usage_info_from_snapshot(masternode_list: models::MasternodeList, snapshot: &models::LLMQSnapshot, quorum_modifier: UInt256, work_block_height: u32) -> (Vec<models::MasternodeEntry>, Vec<models::MasternodeEntry>) {
+    fn usage_info_from_snapshot(masternode_list: models::MasternodeList, snapshot: &models::LLMQSnapshot, quorum_modifier: UInt256, work_block_height: u32) -> (Vec<models::masternode_entry::MasternodeEntry>, Vec<models::masternode_entry::MasternodeEntry>) {
         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height, false);
         let sorted_scored_masternodes = MasternodeProcessor::sort_scored_masternodes(scored_masternodes);
         let mut i = 0u32;
@@ -472,9 +472,9 @@ impl MasternodeProcessor {
             })
     }
 
-    fn usage_info_(masternode_list: models::MasternodeList, previous_quarters: [&Vec<Vec<models::MasternodeEntry>>; 3], skip_removed_masternodes: bool, quorum_count: usize) -> (Vec<models::MasternodeEntry>, Vec<models::MasternodeEntry>, Vec<Vec<models::MasternodeEntry>>) {
-        let mut used_at_h_masternodes = Vec::<models::MasternodeEntry>::new();
-        let mut used_at_h_indexed_masternodes = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
+    fn usage_info_(masternode_list: models::MasternodeList, previous_quarters: [&Vec<Vec<models::masternode_entry::MasternodeEntry>>; 3], skip_removed_masternodes: bool, quorum_count: usize) -> (Vec<models::masternode_entry::MasternodeEntry>, Vec<models::masternode_entry::MasternodeEntry>, Vec<Vec<models::masternode_entry::MasternodeEntry>>) {
+        let mut used_at_h_masternodes = Vec::<models::masternode_entry::MasternodeEntry>::new();
+        let mut used_at_h_indexed_masternodes = vec![Vec::<models::masternode_entry::MasternodeEntry>::new(); quorum_count];
         for i in 0..quorum_count {
             // for quarters h - c, h -2c, h -3c
             for quarter in &previous_quarters {
@@ -509,7 +509,7 @@ impl MasternodeProcessor {
         cached_mn_lists: &BTreeMap<UInt256, models::MasternodeList>,
         cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
         unknown_mn_lists: &mut Vec<UInt256>,
-    ) -> Result<Vec<Vec<models::MasternodeEntry>>, CoreProviderError> {
+    ) -> Result<Vec<Vec<models::masternode_entry::MasternodeEntry>>, CoreProviderError> {
         self.provider.lookup_block_hash_by_height(work_block_height)
             .map_err(|err| CoreProviderError::BlockHashNotFoundAt(work_block_height))
             .and_then(|work_block_hash|
@@ -543,8 +543,8 @@ impl MasternodeProcessor {
     }
 
     fn add_quorum_members_from_quarter(
-        quorum_members: &mut Vec<Vec<models::MasternodeEntry>>,
-        quarter: &[Vec<models::MasternodeEntry>],
+        quorum_members: &mut Vec<Vec<models::masternode_entry::MasternodeEntry>>,
+        quarter: &[Vec<models::masternode_entry::MasternodeEntry>],
         index: usize,
     ) {
         if let Some(indexed_quarter) = quarter.get(index) {
@@ -562,7 +562,7 @@ impl MasternodeProcessor {
         cached_llmq_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>,
         cached_cl_signatures: &BTreeMap<UInt256, UInt768>,
         unknown_mn_lists: &mut Vec<UInt256>,
-    ) -> Result<Vec<Vec<models::MasternodeEntry>>, CoreProviderError> {
+    ) -> Result<Vec<Vec<models::masternode_entry::MasternodeEntry>>, CoreProviderError> {
         let num_quorums = llmq_params.signing_active_quorum_count as usize;
         let cycle_length = llmq_params.dkg_params.interval;
         // Reconstruct quorum members at h - 3c from snapshot
@@ -579,7 +579,7 @@ impl MasternodeProcessor {
                                 self.quorum_quarter_members_by_reconstruction_type(LLMQQuarterReconstructionType::New { previous_quarters:  [&q_h_m_c, &q_h_m_2c, &q_h_m_3c], skip_removed_masternodes }, &llmq_params, (cycle_base_height - 0) - 8, cached_mn_lists, cached_cl_signatures, unknown_mn_lists)
                                     .map(|quarter_new| {
                                         let mut quorum_members =
-                                            Vec::<Vec<models::MasternodeEntry>>::with_capacity(num_quorums);
+                                            Vec::<Vec<models::masternode_entry::MasternodeEntry>>::with_capacity(num_quorums);
                                         (0..num_quorums).for_each(|index| {
                                             Self::add_quorum_members_from_quarter(&mut quorum_members, &q_h_m_3c, index);
                                             Self::add_quorum_members_from_quarter(&mut quorum_members, &q_h_m_2c, index);
@@ -600,7 +600,7 @@ impl MasternodeProcessor {
         block_height: u32,
         skip_removed_masternodes: bool,
         cache: &mut MasternodeProcessorCache
-    ) -> Result<Vec<models::MasternodeEntry>, CoreProviderError> {
+    ) -> Result<Vec<models::masternode_entry::MasternodeEntry>, CoreProviderError> {
         let cached_llmq_members = &mut cache.llmq_members;
         let cached_llmq_indexed_members = &mut cache.llmq_indexed_members;
         let map_by_type_opt = cached_llmq_members.get_mut(&llmq_type);
