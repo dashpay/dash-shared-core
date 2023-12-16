@@ -506,6 +506,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dash-spv-coinjoin"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.24.5",
+ "dash-spv-masternode-processor",
+ "ferment",
+ "ferment-interfaces",
+ "ferment-macro",
+]
+
+[[package]]
 name = "dash-spv-example-app"
 version = "0.1.0"
 
