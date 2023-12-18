@@ -5,3 +5,8 @@ pub mod coinjoin_final_transaction;
 pub mod pool_state;
 pub mod coinjoin_status_update;
 pub mod pool_status_update;
+pub mod coinjoin_signed_inputs;
+pub mod coinjoin_entry;
+pub mod transaction_outpoint;
+pub mod send_coinjoin_queue;
+pub mod coinjoin_broadcast_tx;

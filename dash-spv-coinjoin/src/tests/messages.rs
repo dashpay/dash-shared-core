@@ -2,15 +2,20 @@ use dash_spv_masternode_processor::consensus::{Decodable, Encodable};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::crypto::byte_util::Reversable;
 use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::tx::Transaction;
 use std::io::Cursor;
 
 use crate::messages::coinjoin_accept_message::CoinJoinAcceptMessage;
+use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::messages::coinjoin_complete_message::CoinJoinCompleteMessage;
+use crate::messages::coinjoin_entry::CoinJoinEntry;
 use crate::messages::coinjoin_final_transaction::CoinJoinFinalTransaction;
+use crate::messages::coinjoin_signed_inputs::CoinJoinSignedInputs;
 use crate::messages::coinjoin_status_update::CoinJoinStatusUpdate;
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_state::PoolState;
 use crate::messages::pool_status_update::PoolStatusUpdate;
+use crate::messages::transaction_outpoint::TransactionOutPoint;
 
 #[test]
 pub fn test_coinjoin_accept_message() {
@@ -122,4 +127,96 @@ pub fn test_coinjoin_status_update_from_ctor() {
     from_ctor.consensus_encode(&mut buffer).unwrap();
 
     assert_eq!(buffer.to_hex(), payload.to_hex());
+}
+
+#[test]
+pub fn coinjoin_signed_inputs_round_test() {
+    let tx_data = Vec::from_hex("02000000042607763cf6eceb2478060ead38fbb3151b7676b6a243e78b58c420a4ad99cb05010000006a47304402201f95f3a194bd51c521adcd46173d3d5c9bd2dd148004dd1da72e686fd6d946e4022020e34d85cd817aff0663b133915ca2eda5ecd5d5a93fba33f2e9644f1d1513a3012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffffe27ecbb210e98a5d2dba6e3bfa0732b8f6371155c3f8bd0420027d2eb3d24a7d010000006b483045022100c7d5c710ebdf8a2526389347823c3de83b3da498eeac5d1e9001e2e86f4cd0d002200e91ee98abc4f5fb5a78e8e80ed6fd17697a706e7118f87e545d8fdad65a845b012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff70a65da4b8d4438058c2e8f36811577cdb244d33c7973644386259135e3635a3010000006b483045022100d1c279574bdb0a4c72b6a11247f2945746b50f3a847c9c6925f0badfa8f5827a0220059884f1e9099fcfbb4966cced355e764ddf18bc60a3e03a3804c0c9b20618a4012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff4605e08cc9758029e89705c41872f063854684b5abf2020e56aca53f161b3fea000000006b483045022100f5afc8c1e722b25532b0a3561f0c37cf80bcd288a40fa0ced53d9a137f06dbc8022067c8ad28484b4a504f74cc7ad754ab4b87f0fbb46a4725e915b625eb000be8fd012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff02224e0000000000001976a914b889fb3449a36530c85d9689c4773c5cd1ba223388ac51844c8c060000001976a9140d5bcbeeb459af40f97fcb4a98e9d1ed13e904c888acb1f80a00").unwrap();
+    let mut cursor = Cursor::new(&tx_data);
+    let tx = Transaction::consensus_decode(&mut cursor).unwrap();
+
+    let dss = CoinJoinSignedInputs { inputs: tx.inputs }; // using inputs from the transaction above
+    let mut buffer = Vec::new();
+    dss.consensus_encode(&mut buffer).unwrap();
+
+    cursor = Cursor::new(&buffer);
+    let from_bytes = CoinJoinSignedInputs::consensus_decode(&mut cursor).unwrap();
+
+    assert_eq!(4, from_bytes.inputs.len());
+    assert_eq!(4, dss.inputs.len());
+    assert_eq!(from_bytes.inputs[0].input_hash, dss.inputs[0].input_hash);
+    assert_eq!(from_bytes.inputs[2].input_hash, dss.inputs[2].input_hash);
+}
+
+#[test]
+pub fn coinjoin_entry_round_test() {
+    let mut tx_data = Vec::from_hex("02000000042607763cf6eceb2478060ead38fbb3151b7676b6a243e78b58c420a4ad99cb05010000006a47304402201f95f3a194bd51c521adcd46173d3d5c9bd2dd148004dd1da72e686fd6d946e4022020e34d85cd817aff0663b133915ca2eda5ecd5d5a93fba33f2e9644f1d1513a3012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffffe27ecbb210e98a5d2dba6e3bfa0732b8f6371155c3f8bd0420027d2eb3d24a7d010000006b483045022100c7d5c710ebdf8a2526389347823c3de83b3da498eeac5d1e9001e2e86f4cd0d002200e91ee98abc4f5fb5a78e8e80ed6fd17697a706e7118f87e545d8fdad65a845b012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff70a65da4b8d4438058c2e8f36811577cdb244d33c7973644386259135e3635a3010000006b483045022100d1c279574bdb0a4c72b6a11247f2945746b50f3a847c9c6925f0badfa8f5827a0220059884f1e9099fcfbb4966cced355e764ddf18bc60a3e03a3804c0c9b20618a4012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff4605e08cc9758029e89705c41872f063854684b5abf2020e56aca53f161b3fea000000006b483045022100f5afc8c1e722b25532b0a3561f0c37cf80bcd288a40fa0ced53d9a137f06dbc8022067c8ad28484b4a504f74cc7ad754ab4b87f0fbb46a4725e915b625eb000be8fd012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff02224e0000000000001976a914b889fb3449a36530c85d9689c4773c5cd1ba223388ac51844c8c060000001976a9140d5bcbeeb459af40f97fcb4a98e9d1ed13e904c888acb1f80a00").unwrap();
+    let mut cursor = Cursor::new(&tx_data);
+    let tx1 = Transaction::consensus_decode(&mut cursor).unwrap();
+
+    tx_data = Vec::from_hex("01000000033f90cbc2d751c77358b3ff37efd72936b389a17b9ec72bdec4678394814cfe2d000000006a473044022050d2f3b6f097f1973b29bb5a0e98f307f6fc338bb8d29e4a7eb257eebd147ccd022055f88aa06cf90aec97991db9c351fd622fa60fe2cb6bbe6df2ecfef03ca047fa012102d336120a91d7d3497056715f6078e36c56e84c41038cf630260ef3245f6ba39effffffff94cae0fa480e004218a66ea7eae8c0a1a39dbd8ebba966004ddfdcac1e11f089000000006b483045022100ed1fbe54b90c8d69e616b79ba5e03e192bdee6b26f66d40d9da14ae7c7e64a9c022062c54fb1635937a38f3b43b504777c9faf357734cad6f53130870f7e980a3be60121037c4c4205eceb06bbf1e4894e52ecddcf700e1a699e2a4cbee9fd7ed748fb7a59ffffffff3e2611f35c7a2fefadce6b115ce8e14b31b627667af9c04909c0ddcceb8294a3000000006a473044022036bed2e8600ed1a715618ca398553254c14fcea824b77ed784cee5f5b23b84df022041c4821e6e639169ddc891e4d6b4e146e5f4684e5687daf5fcce2fd1f73392230121037c4c4205eceb06bbf1e4894e52ecddcf700e1a699e2a4cbee9fd7ed748fb7a59ffffffff0260182300000000001976a9140205411ec940f9139ea72e3a999d21fceff671e688ac4dc27200000000001976a91425b2b9126bf32e6115a813d019e72b7b9106211b88ac00000000").unwrap();
+    cursor = Cursor::new(&tx_data);
+    let tx2 = Transaction::consensus_decode(&mut cursor).unwrap();
+
+    let dsi = CoinJoinEntry {
+        mixing_inputs: tx1.inputs,
+        mixing_outputs: tx1.outputs,
+        tx_collateral: tx2
+    };
+    
+    let mut buffer = Vec::new();
+    dsi.consensus_encode(&mut buffer).unwrap();
+
+    cursor = Cursor::new(&buffer);
+    let from_bytes = CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
+
+    assert_eq!(4, from_bytes.mixing_inputs.len());
+    assert_eq!(4, dsi.mixing_inputs.len());
+    assert_eq!(2, from_bytes.mixing_outputs.len());
+    assert_eq!(2, dsi.mixing_outputs.len());
+
+    assert_eq!(from_bytes.mixing_inputs[0].input_hash, dsi.mixing_inputs[0].input_hash);
+    assert_eq!(from_bytes.mixing_inputs[2].input_hash, dsi.mixing_inputs[2].input_hash);
+
+    assert_eq!(from_bytes.mixing_outputs[0].amount, dsi.mixing_outputs[0].amount);
+    assert_eq!(from_bytes.mixing_outputs[1].amount, dsi.mixing_outputs[1].amount);
+
+    assert_eq!(from_bytes.tx_collateral.tx_hash, dsi.tx_collateral.tx_hash);
+}
+
+#[test]
+pub fn test_transaction_outpoint_payload() {
+    let hex = "e2f910eb47e2dde768b9f89e1a84607ac559c0f9628ff0b44b49de0a92e5b0ce00000000";
+    let outpoint_data = Vec::from_hex(hex).unwrap();
+    let mut cursor = Cursor::new(&outpoint_data);
+    let outpoint = TransactionOutPoint::consensus_decode(&mut cursor).unwrap();
+
+    let hash = UInt256::from_hex("ceb0e5920ade494bb4f08f62f9c059c57a60841a9ef8b968e7dde247eb10f9e2").unwrap().reversed();
+
+    assert_eq!(hash, outpoint.hash);
+    assert_eq!(0, outpoint.index);
+
+    let from_ctor = TransactionOutPoint { hash, index: 0 };
+    let mut buffer = Vec::new();
+    from_ctor.consensus_encode(&mut buffer).unwrap();
+
+    assert_eq!(hash, outpoint.hash);
+    assert_eq!(hex, buffer.to_hex());
+}
+
+#[test]
+pub fn coinjoin_broadcast_tx_round_test() {
+    let tx_data = Vec::from_hex("02000000042607763cf6eceb2478060ead38fbb3151b7676b6a243e78b58c420a4ad99cb05010000006a47304402201f95f3a194bd51c521adcd46173d3d5c9bd2dd148004dd1da72e686fd6d946e4022020e34d85cd817aff0663b133915ca2eda5ecd5d5a93fba33f2e9644f1d1513a3012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffffe27ecbb210e98a5d2dba6e3bfa0732b8f6371155c3f8bd0420027d2eb3d24a7d010000006b483045022100c7d5c710ebdf8a2526389347823c3de83b3da498eeac5d1e9001e2e86f4cd0d002200e91ee98abc4f5fb5a78e8e80ed6fd17697a706e7118f87e545d8fdad65a845b012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff70a65da4b8d4438058c2e8f36811577cdb244d33c7973644386259135e3635a3010000006b483045022100d1c279574bdb0a4c72b6a11247f2945746b50f3a847c9c6925f0badfa8f5827a0220059884f1e9099fcfbb4966cced355e764ddf18bc60a3e03a3804c0c9b20618a4012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff4605e08cc9758029e89705c41872f063854684b5abf2020e56aca53f161b3fea000000006b483045022100f5afc8c1e722b25532b0a3561f0c37cf80bcd288a40fa0ced53d9a137f06dbc8022067c8ad28484b4a504f74cc7ad754ab4b87f0fbb46a4725e915b625eb000be8fd012102bf7c36100b0d394e79a1704b8bf9e030a62e139a293f5da891671c56d555f732feffffff02224e0000000000001976a914b889fb3449a36530c85d9689c4773c5cd1ba223388ac51844c8c060000001976a9140d5bcbeeb459af40f97fcb4a98e9d1ed13e904c888acb1f80a00").unwrap();
+    let mut cursor = Cursor::new(&tx_data);
+    let tx = Transaction::consensus_decode(&mut cursor).unwrap();
+    let pro_tx_hash = UInt256::from_hex("3fc39b657385a7d2e824ca2644bdcddcef0bc25775c30c4f747345ef4f1c7503").unwrap().reversed();
+    let signature = Vec::from_hex("998c5118eef9a89bfe5c6b961a8cc5af52cb00d0394688e78b23194699f7356cece6f8af63fdb0c28c2728c05325a6fe").unwrap();
+    let signature_time: i64 = 1702813411;
+
+    let from_ctor = CoinJoinBroadcastTx { 
+        tx,
+        pro_tx_hash,
+        signature: Some(signature),
+        signature_time
+    };
 }

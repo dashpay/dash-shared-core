@@ -1,6 +1,6 @@
 use std::io;
 use std::io::{Error, Write};
-use dash_spv_masternode_processor::tx::{Transaction, TransactionType::Classic};
+use dash_spv_masternode_processor::tx::{Transaction, TransactionType};
 use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
 
 // dsf
@@ -30,7 +30,7 @@ impl Decodable for CoinJoinFinalTransaction {
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         let msg_session_id = u32::consensus_decode(&mut d)? as i32;
         let mut tx = Transaction::consensus_decode(&mut d)?;
-        tx.tx_type = Classic;
+        tx.tx_type = TransactionType::Classic;
 
         Ok(CoinJoinFinalTransaction { msg_session_id, tx })
     }
