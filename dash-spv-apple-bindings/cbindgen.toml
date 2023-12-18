@@ -12,8 +12,8 @@ include_guard = "dash_shared_core_h"
 [parse]
 parse_deps = true
 #expand = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
-include = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
-extra_bindings = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
+include = ["dash-spv-masternode-processor", "dash-spv-coinjoin", "rs-merk-verify-c-binding"]
+extra_bindings = ["dash-spv-masternode-processor", "dash-spv-coinjoin", "rs-merk-verify-c-binding"]
 
 [enum]
 prefix_with_name = true
@@ -33,6 +33,7 @@ prefix_with_name = true
 #// Here we write down crate names (!) where we want to retrieve C-bindings
 #let includes = vec![
 #"dash-spv-masternode-processor".to_string(),
+#"dash-spv-coinjoin".to_string(),
 #"rs-merk-verify-c-binding".to_string()
 #];
 #let config = cbindgen::Config {

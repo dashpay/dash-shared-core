@@ -5,13 +5,7 @@ use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::tx::Transaction;
 use std::io::Cursor;
 
-use crate::messages::coinjoin_accept_message::CoinJoinAcceptMessage;
-use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
-use crate::messages::coinjoin_complete_message::CoinJoinCompleteMessage;
-use crate::messages::coinjoin_entry::CoinJoinEntry;
-use crate::messages::coinjoin_final_transaction::CoinJoinFinalTransaction;
-use crate::messages::coinjoin_signed_inputs::CoinJoinSignedInputs;
-use crate::messages::coinjoin_status_update::CoinJoinStatusUpdate;
+use crate::messages;
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_state::PoolState;
 use crate::messages::pool_status_update::PoolStatusUpdate;
@@ -24,7 +18,7 @@ pub fn test_coinjoin_accept_message() {
     let tx_id = UInt256::from_hex("956685418a5c4fecaedf74d2ac56862e22830658b6b256e4e2dea0b665e1f756").unwrap().reversed();
    
     let mut cursor = Cursor::new(&payload);
-    let dca = CoinJoinAcceptMessage::consensus_decode(&mut cursor).unwrap();
+    let dca = messages::CoinJoinAcceptMessage::consensus_decode(&mut cursor).unwrap();
     
     let mut buffer = Vec::new();
     dca.consensus_encode(&mut buffer).unwrap();
@@ -41,9 +35,9 @@ pub fn test_coinjoin_complete_message() {
     let payload = Vec::from_hex("0362080014000000").unwrap();
 
     let mut cursor = Cursor::new(&payload);
-    let dsc = CoinJoinCompleteMessage::consensus_decode(&mut cursor).unwrap();
+    let dsc = messages::CoinJoinCompleteMessage::consensus_decode(&mut cursor).unwrap();
 
-    let from_ctor = CoinJoinCompleteMessage {
+    let from_ctor = messages::CoinJoinCompleteMessage {
         msg_session_id: 549379, 
         msg_message_id: PoolMessage::MsgSuccess
     };
@@ -62,10 +56,10 @@ pub fn test_coinjoin_final_transaction() {
     let tx_id = UInt256::from_hex("a57015f0f8c85cdee8ab47d9bb7792c23c21bfbad1a19b7b4368915ba970fae1").unwrap().reversed();
    
     let mut cursor = Cursor::new(&payload);
-    let dsf = CoinJoinFinalTransaction::consensus_decode(&mut cursor).unwrap();
+    let dsf = messages::CoinJoinFinalTransaction::consensus_decode(&mut cursor).unwrap();
     
     let tx_hash = dsf.tx.tx_hash;
-    let from_ctor = CoinJoinFinalTransaction {
+    let from_ctor = messages::CoinJoinFinalTransaction {
         msg_session_id: 512727, 
         tx: dsf.tx
     };
@@ -84,7 +78,7 @@ pub fn test_coinjoin_status_update_from_payload() {
     // let mut payload = Vec::from_hex("b3f30b0001000000000000000000000001000000").unwrap(); // TODO: versioning (BLS_LEGACY payload)
    
     let mut cursor = Cursor::new(&payload);
-    let mut dssu = CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
+    let mut dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(783283, dssu.session_id);
     assert_eq!(PoolState::PoolStateQueue, dssu.pool_state);
@@ -95,7 +89,7 @@ pub fn test_coinjoin_status_update_from_payload() {
     // payload = Vec::from_hex("d7d2070003000000000000000100000013000000").unwrap(); // TODO: versioning (BLS_LEGACY payload)
    
     cursor = Cursor::new(&payload);
-    dssu = CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
+    dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(512727, dssu.session_id);
     assert_eq!(PoolState::PoolStateSigning, dssu.pool_state);
@@ -109,14 +103,14 @@ pub fn test_coinjoin_status_update_from_ctor() {
     // let mut payload = Vec::from_hex("5faa0c0001000000000000000100000013000000").unwrap(); // TODO: versioning (BLS_LEGACY payload)
    
     let mut cursor = Cursor::new(&payload);
-    let dssu = CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
+    let dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(830047, dssu.session_id);
     assert_eq!(PoolState::PoolStateQueue, dssu.pool_state);
     assert_eq!(PoolStatusUpdate::StatusAccepted, dssu.status_update);
     assert_eq!(PoolMessage::MsgNoErr, dssu.message_id);
    
-    let from_ctor = CoinJoinStatusUpdate {
+    let from_ctor = messages::CoinJoinStatusUpdate {
         session_id: 830047,
         pool_state: PoolState::PoolStateQueue,
         status_update: PoolStatusUpdate::StatusAccepted,
@@ -135,12 +129,12 @@ pub fn coinjoin_signed_inputs_round_test() {
     let mut cursor = Cursor::new(&tx_data);
     let tx = Transaction::consensus_decode(&mut cursor).unwrap();
 
-    let dss = CoinJoinSignedInputs { inputs: tx.inputs }; // using inputs from the transaction above
+    let dss = messages::CoinJoinSignedInputs { inputs: tx.inputs }; // using inputs from the transaction above
     let mut buffer = Vec::new();
     dss.consensus_encode(&mut buffer).unwrap();
 
     cursor = Cursor::new(&buffer);
-    let from_bytes = CoinJoinSignedInputs::consensus_decode(&mut cursor).unwrap();
+    let from_bytes = messages::CoinJoinSignedInputs::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(4, from_bytes.inputs.len());
     assert_eq!(4, dss.inputs.len());
@@ -158,7 +152,7 @@ pub fn coinjoin_entry_round_test() {
     cursor = Cursor::new(&tx_data);
     let tx2 = Transaction::consensus_decode(&mut cursor).unwrap();
 
-    let dsi = CoinJoinEntry {
+    let dsi = messages::CoinJoinEntry {
         mixing_inputs: tx1.inputs,
         mixing_outputs: tx1.outputs,
         tx_collateral: tx2
@@ -168,7 +162,7 @@ pub fn coinjoin_entry_round_test() {
     dsi.consensus_encode(&mut buffer).unwrap();
 
     cursor = Cursor::new(&buffer);
-    let from_bytes = CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
+    let from_bytes = messages::CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(4, from_bytes.mixing_inputs.len());
     assert_eq!(4, dsi.mixing_inputs.len());
@@ -213,10 +207,50 @@ pub fn coinjoin_broadcast_tx_round_test() {
     let signature = Vec::from_hex("998c5118eef9a89bfe5c6b961a8cc5af52cb00d0394688e78b23194699f7356cece6f8af63fdb0c28c2728c05325a6fe").unwrap();
     let signature_time: i64 = 1702813411;
 
-    let from_ctor = CoinJoinBroadcastTx { 
+    let dstx = messages::CoinJoinBroadcastTx { 
         tx,
         pro_tx_hash,
         signature: Some(signature),
         signature_time
     };
+
+    let mut buffer = Vec::new();
+    dstx.consensus_encode(&mut buffer).unwrap();
+
+    cursor = Cursor::new(&buffer);
+    let from_bytes = messages::CoinJoinBroadcastTx::consensus_decode(&mut cursor).unwrap();
+
+    assert_eq!(dstx.tx.tx_hash, from_bytes.tx.tx_hash);
+    assert_eq!(dstx.pro_tx_hash, from_bytes.pro_tx_hash);
+    assert_eq!(dstx.signature.unwrap().to_hex(), from_bytes.signature.unwrap().to_hex());
+    assert_eq!(dstx.signature_time, from_bytes.signature_time);
+}
+
+#[test]
+pub fn coinjoin_queue_message_round_test() {
+    let denomination = 16;
+    let pro_tx_hash = UInt256::from_hex("3fc39b657385a7d2e824ca2644bdcddcef0bc25775c30c4f747345ef4f1c7503").unwrap().reversed();
+    let signature = Vec::from_hex("998c5118eef9a89bfe5c6b961a8cc5af52cb00d0394688e78b23194699f7356cece6f8af63fdb0c28c2728c05325a6fe").unwrap();
+    let time: i64 = 1702813411;
+    let ready = true;
+
+    let dsq = messages::CoinJoinQueueMessage { 
+        denomination,
+        pro_tx_hash,
+        ready,
+        time,
+        signature: Some(signature),
+    };
+
+    let mut buffer = Vec::new();
+    dsq.consensus_encode(&mut buffer).unwrap();
+
+    let mut cursor = Cursor::new(&buffer);
+    let from_bytes = messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
+
+    assert_eq!(dsq.denomination, from_bytes.denomination);
+    assert_eq!(dsq.pro_tx_hash, from_bytes.pro_tx_hash);
+    assert_eq!(dsq.time, from_bytes.time);
+    assert_eq!(dsq.ready, from_bytes.ready);
+    assert_eq!(dsq.signature.unwrap().to_hex(), from_bytes.signature.unwrap().to_hex());
 }
