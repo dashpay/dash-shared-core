@@ -23,12 +23,6 @@ impl Encodable for CoinJoinStatusUpdate {
         let mut offset = 0;
         offset += (self.session_id as u32).consensus_encode(&mut writer)?;
         offset += (self.pool_state.value() as u32).consensus_encode(&mut writer)?;
-
-        // TODO: versioning
-        // if (protocolVersion <= params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.COINJOIN_SU)) {
-        //     Utils.uint32ToByteStreamLE(0, stream); // nEntriesCount, deprecated
-        // }
-
         offset += (self.status_update.value() as u32).consensus_encode(&mut writer)?;
         offset += (self.message_id.value() as u32).consensus_encode(&mut writer)?;
 
@@ -41,12 +35,6 @@ impl Decodable for CoinJoinStatusUpdate {
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         let session_id = u32::consensus_decode(&mut d)? as i32;
         let pool_state = u32::consensus_decode(&mut d)? as i32;
-
-        // TODO: versioning
-        // if (protocolVersion <= params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.COINJOIN_SU)) {
-        //     cursor += 4; // Skip deprecated nEntriesCount
-        // }
-        
         let status_update = u32::consensus_decode(&mut d)? as i32;
         let message_id = u32::consensus_decode(&mut d)? as i32;
 

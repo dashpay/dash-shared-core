@@ -10,7 +10,6 @@ use dash_spv_masternode_processor::tx::Transaction;
 #[ferment_macro::export]
 pub struct CoinJoinBroadcastTx {
     pub tx: Transaction,
-    // pub masternode_outpoint: TransactionOutPoint, // TODO: versioning
     pub pro_tx_hash: UInt256,
     pub signature: Option<Vec<u8>>,
     pub signature_time: i64,
@@ -23,14 +22,7 @@ impl Encodable for CoinJoinBroadcastTx {
         let tx_data = self.tx.to_data(); // TODO: consensus_encode
         writer.write_all(&tx_data)?;
         offset += tx_data.len();
-
-        // TODO: versioning
-        // if (protocolVersion >= params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.COINJOIN_PROTX_HASH)) {
-            offset += self.pro_tx_hash.consensus_encode(&mut writer)?;
-        // } else {
-        //     masternodeOutpoint.bitcoinSerialize(stream);
-        // }
-
+        offset += self.pro_tx_hash.consensus_encode(&mut writer)?;
         offset += match self.signature {
             Some(ref signature) => signature.consensus_encode(&mut writer)?,
             None => 0
@@ -45,14 +37,7 @@ impl Decodable for CoinJoinBroadcastTx {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         let tx = Transaction::consensus_decode(&mut d)?;
-
-        // TODO: versioning
-        // if (protocolVersion >= params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.COINJOIN_PROTX_HASH)) {
-            let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
-        // } else {
-        //     masternodeOutpoint.bitcoinSerialize(stream);
-        // }
-
+        let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
         let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
         let signature_time = i64::consensus_decode(&mut d)?;
 

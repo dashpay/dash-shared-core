@@ -10,7 +10,6 @@ use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
 #[ferment_macro::export]
 pub struct CoinJoinQueueMessage {
     pub denomination: u32,
-    // pub masternode_outpoint: TransactionOutPoint, TODO: versioning
     pub pro_tx_hash: UInt256,
     pub time: i64,
     pub ready: bool, // ready to submit
@@ -22,14 +21,7 @@ impl Encodable for CoinJoinQueueMessage {
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
         offset += self.denomination.consensus_encode(&mut writer)?;
-
-        // TODO: versioning
-        // if (protocolVersion >= params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.COINJOIN_PROTX_HASH)) {
-            offset += self.pro_tx_hash.consensus_encode(&mut writer)?;
-        // } else {
-        //     masternodeOutpoint.bitcoinSerialize(stream);
-        // }
-
+        offset += self.pro_tx_hash.consensus_encode(&mut writer)?;
         offset += self.time.consensus_encode(&mut writer)?;
         offset += self.ready.consensus_encode(&mut writer)?;
         offset += match self.signature {
@@ -45,14 +37,7 @@ impl Decodable for CoinJoinQueueMessage {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         let denomination = u32::consensus_decode(&mut d)?;
-
-        // TODO: versioning
-        // if (protocolVersion >= params.getProtocolVersionNum(NetworkParameters.ProtocolVersion.COINJOIN_PROTX_HASH)) {
-            let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
-        // } else {
-        //     masternodeOutpoint.bitcoinSerialize(stream);
-        // }
-
+        let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
         let time = i64::consensus_decode(&mut d)?;
         let ready: bool = bool::consensus_decode(&mut d)?;
         let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();

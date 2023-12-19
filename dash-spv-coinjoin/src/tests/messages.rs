@@ -75,8 +75,6 @@ pub fn test_coinjoin_final_transaction() {
 pub fn test_coinjoin_status_update_from_payload() {
     // CoinJoinStatusUpdate(sessionID=783283, state=POOL_STATE_QUEUE, statusUpdate=STATUS_REJECTED, messageID=ERR_DENOM)
     let mut payload = Vec::from_hex("b3f30b00010000000000000001000000").unwrap();
-    // let mut payload = Vec::from_hex("b3f30b0001000000000000000000000001000000").unwrap(); // TODO: versioning (BLS_LEGACY payload)
-   
     let mut cursor = Cursor::new(&payload);
     let mut dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
@@ -86,8 +84,6 @@ pub fn test_coinjoin_status_update_from_payload() {
     assert_eq!(PoolMessage::ErrDenom, dssu.message_id);
 
     payload = Vec::from_hex("d7d20700030000000100000013000000").unwrap();
-    // payload = Vec::from_hex("d7d2070003000000000000000100000013000000").unwrap(); // TODO: versioning (BLS_LEGACY payload)
-   
     cursor = Cursor::new(&payload);
     dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
@@ -100,8 +96,6 @@ pub fn test_coinjoin_status_update_from_payload() {
 #[test]
 pub fn test_coinjoin_status_update_from_ctor() {
     let payload = Vec::from_hex("5faa0c00010000000100000013000000").unwrap();
-    // let mut payload = Vec::from_hex("5faa0c0001000000000000000100000013000000").unwrap(); // TODO: versioning (BLS_LEGACY payload)
-   
     let mut cursor = Cursor::new(&payload);
     let dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
