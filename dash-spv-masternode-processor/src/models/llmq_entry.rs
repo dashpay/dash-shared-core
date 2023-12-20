@@ -396,7 +396,7 @@ impl LLMQEntry {
 
 impl LLMQEntry {
 
-    pub fn verify(&mut self, valid_masternodes: Vec<models::masternode_entry::MasternodeEntry>, block_height: u32) -> Result<LLMQValidationStatus, CoreProviderError> {
+    pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> Result<LLMQValidationStatus, CoreProviderError> {
         let payload_status = self.validate_payload();
         if !payload_status.is_ok() {
             return Ok(LLMQValidationStatus::InvalidPayload(payload_status));
@@ -406,7 +406,7 @@ impl LLMQEntry {
         Ok(status)
     }
 
-    pub fn validate(&mut self, valid_masternodes: Vec<models::masternode_entry::MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
+    pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
         let commitment_hash = self.generate_commitment_hash();
         let use_legacy = self.version.use_bls_legacy();
         let operator_keys = valid_masternodes

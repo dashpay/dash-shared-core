@@ -17,7 +17,7 @@ pub struct QRInfo {
     pub snapshot_h_3c: models::snapshot::LLMQSnapshot,
     pub snapshot_h_4c: Option<models::snapshot::LLMQSnapshot>,
     pub extra_share: bool,
-    pub last_quorum_per_index: Vec<models::llmq_entry::LLMQEntry>,
+    pub last_quorum_per_index: Vec<models::LLMQEntry>,
     pub quorum_snapshot_list: Vec<models::snapshot::LLMQSnapshot>,
     pub mn_list_diff_list: Vec<models::mn_list_diff::MNListDiff>,
 }
@@ -79,10 +79,10 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
 
         let last_quorum_per_index_count = read_var_int(&mut offset)?.0 as usize;
 
-        let mut last_quorum_per_index: Vec<models::llmq_entry::LLMQEntry> =
+        let mut last_quorum_per_index: Vec<models::LLMQEntry> =
             Vec::with_capacity(last_quorum_per_index_count);
         for _i in 0..last_quorum_per_index_count {
-            last_quorum_per_index.push(bytes.read_with::<models::llmq_entry::LLMQEntry>(&mut offset, byte::LE)?);
+            last_quorum_per_index.push(bytes.read_with::<models::LLMQEntry>(&mut offset, byte::LE)?);
         }
         let quorum_snapshot_list_count = read_var_int(&mut offset)?.0 as usize;
         let mut quorum_snapshot_list: Vec<models::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);

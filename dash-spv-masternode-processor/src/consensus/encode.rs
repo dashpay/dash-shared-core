@@ -617,7 +617,7 @@ impl_vec!(UInt256);
 impl_vec!(TransactionInput);
 impl_vec!(TransactionOutput);
 // impl_vec!(MasternodeEntry);
-impl_vec!(crate::models::llmq_entry::LLMQEntry);
+impl_vec!(crate::models::LLMQEntry);
 
 // #[cfg(feature = "std")] impl_vec!(Inventory);
 // #[cfg(feature = "std")] impl_vec!((u32, Address));

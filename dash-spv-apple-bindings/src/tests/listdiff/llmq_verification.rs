@@ -54,7 +54,7 @@ fn testnet_llmq_verification() {
                 .insert(llmq_hash, map.decode());
             acc
         });
-    let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::llmq_entry::LLMQEntry>> = added_quorums
+    let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = added_quorums
         .into_iter()
         .filter(|(_, map)| map.contains_key(&block_hash_119064))
         .collect();
@@ -103,7 +103,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
                 .insert(llmq_hash, map.decode());
             acc
         });
-    let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::llmq_entry::LLMQEntry>> = added_quorums
+    let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = added_quorums
         .into_iter()
         .filter(|(_, map)| map.contains_key(&block_hash_119064))
         .collect();
