@@ -1,8 +1,7 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
-use dash_spv_masternode_processor::tx::Transaction;
+use std::io::{Read, Write, Error};
+use dash_spv_masternode_processor::consensus::encode;
+use dash_spv_masternode_processor::crypto::byte_util::UInt256;
+use dash_spv_masternode_processor::tx::transaction::Transaction;
 
 // dstx
 #[repr(C)]
@@ -15,7 +14,7 @@ pub struct CoinJoinBroadcastTx {
     pub signature_time: i64,
 }
 
-impl Encodable for CoinJoinBroadcastTx {
+impl encode::Encodable for CoinJoinBroadcastTx {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -33,9 +32,9 @@ impl Encodable for CoinJoinBroadcastTx {
     }
 }
 
-impl Decodable for CoinJoinBroadcastTx {
+impl encode::Decodable for CoinJoinBroadcastTx {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let tx = Transaction::consensus_decode(&mut d)?;
         let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
         let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();

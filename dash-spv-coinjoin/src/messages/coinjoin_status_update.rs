@@ -1,10 +1,9 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
+use std::io::{Error, Read, Write};
+use dash_spv_masternode_processor::consensus::encode;
 
-use super::pool_message::PoolMessage;
-use super::pool_state::PoolState;
-use super::pool_status_update::PoolStatusUpdate;
+use crate::messages::pool_message::PoolMessage;
+use crate::messages::pool_state::PoolState;
+use crate::messages::pool_status_update::PoolStatusUpdate;
 
 // dssu
 #[repr(C)]
@@ -17,7 +16,7 @@ pub struct CoinJoinStatusUpdate {
     pub message_id: PoolMessage,
 }
 
-impl Encodable for CoinJoinStatusUpdate {
+impl encode::Encodable for CoinJoinStatusUpdate {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -30,9 +29,9 @@ impl Encodable for CoinJoinStatusUpdate {
     }
 }
 
-impl Decodable for CoinJoinStatusUpdate {
+impl encode::Decodable for CoinJoinStatusUpdate {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let session_id = u32::consensus_decode(&mut d)? as i32;
         let pool_state = u32::consensus_decode(&mut d)? as i32;
         let status_update = u32::consensus_decode(&mut d)? as i32;

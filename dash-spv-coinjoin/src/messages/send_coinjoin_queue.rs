@@ -1,6 +1,5 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
+use std::io::{Error, Read, Write};
+use dash_spv_masternode_processor::consensus::encode;
 
 // senddsq
 #[repr(C)]
@@ -10,7 +9,7 @@ pub struct SendCoinJoinQueue {
     pub send: bool,
 }
 
-impl Encodable for SendCoinJoinQueue {
+impl encode::Encodable for SendCoinJoinQueue {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -20,9 +19,9 @@ impl Encodable for SendCoinJoinQueue {
     }
 }
 
-impl Decodable for SendCoinJoinQueue {
+impl encode::Decodable for SendCoinJoinQueue {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let send = bool::consensus_decode(&mut d)?;
 
         Ok(SendCoinJoinQueue { send })

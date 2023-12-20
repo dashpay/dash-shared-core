@@ -21,3 +21,7 @@ pub use self::coinjoin_entry::CoinJoinEntry;
 pub use self::send_coinjoin_queue::SendCoinJoinQueue;
 pub use self::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 pub use self::coinjoin_queue_message::CoinJoinQueueMessage;
+pub use self::pool_message::PoolMessage;
+pub use self::pool_state::PoolState;
+pub use self::pool_status_update::PoolStatusUpdate;
+pub use self::transaction_outpoint::TransactionOutPoint;

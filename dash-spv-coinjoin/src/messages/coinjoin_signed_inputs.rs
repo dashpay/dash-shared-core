@@ -1,8 +1,6 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::consensus::encode::VarInt;
-use dash_spv_masternode_processor::tx::TransactionInput;
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
+use std::io::{Error, Read, Write};
+use dash_spv_masternode_processor::tx::transaction::TransactionInput;
+use dash_spv_masternode_processor::consensus::encode;
 
 // dss
 #[repr(C)]
@@ -12,11 +10,11 @@ pub struct CoinJoinSignedInputs {
     pub inputs: Vec<TransactionInput>,
 }
 
-impl Encodable for CoinJoinSignedInputs {
+impl encode::Encodable for CoinJoinSignedInputs {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
-        let amount = VarInt(self.inputs.len() as u64);
+        let amount = encode::VarInt(self.inputs.len() as u64);
         offset += amount.consensus_encode(&mut writer)?;
 
         for i in 0..self.inputs.len() {
@@ -27,9 +25,9 @@ impl Encodable for CoinJoinSignedInputs {
     }
 }
 
-impl Decodable for CoinJoinSignedInputs {
+impl encode::Decodable for CoinJoinSignedInputs {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let mut inputs = vec![];
         let amount = encode::VarInt::consensus_decode(&mut d)?.0;
 

@@ -1,7 +1,6 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
+use std::io::{Error, Read, Write};
+use dash_spv_masternode_processor::crypto::byte_util::UInt256;
+use dash_spv_masternode_processor::consensus::encode;
 
 // dsq
 // A currently in progress mixing merge and denomination information
@@ -16,7 +15,7 @@ pub struct CoinJoinQueueMessage {
     pub signature: Option<Vec<u8>>,
 }
 
-impl Encodable for CoinJoinQueueMessage {
+impl encode::Encodable for CoinJoinQueueMessage {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -33,9 +32,9 @@ impl Encodable for CoinJoinQueueMessage {
     }
 }
 
-impl Decodable for CoinJoinQueueMessage {
+impl encode::Decodable for CoinJoinQueueMessage {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let denomination = u32::consensus_decode(&mut d)?;
         let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
         let time = i64::consensus_decode(&mut d)?;

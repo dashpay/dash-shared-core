@@ -1,7 +1,6 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::tx::{Transaction, TransactionType::Classic};
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
+use std::io::{Read, Write, Error};
+use dash_spv_masternode_processor::consensus::encode;
+use dash_spv_masternode_processor::tx::transaction::{Transaction, TransactionType};
 
 // dsa
 #[repr(C)]
@@ -12,7 +11,7 @@ pub struct CoinJoinAcceptMessage {
     pub tx_collateral: Transaction,
 }
 
-impl Encodable for CoinJoinAcceptMessage {
+impl encode::Encodable for CoinJoinAcceptMessage {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -25,12 +24,12 @@ impl Encodable for CoinJoinAcceptMessage {
     }
 }
 
-impl Decodable for CoinJoinAcceptMessage {
+impl encode::Decodable for CoinJoinAcceptMessage {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let denomination = u32::consensus_decode(&mut d)?;
         let mut tx_collateral = Transaction::consensus_decode(&mut d)?;
-        tx_collateral.tx_type = Classic;
+        tx_collateral.tx_type = TransactionType::Classic;
 
         Ok(CoinJoinAcceptMessage { denomination, tx_collateral })
     }

@@ -11,52 +11,6 @@
     unused_qualifications
 )]
 pub mod types {
-    pub mod ffi {
-        pub mod callbacks {
-            #[doc = "FFI-representation of the GetLLMQSnapshotByBlockHashCallback"]
-            #[allow(non_camel_case_types)]
-            pub type GetLLMQSnapshotByBlockHashCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: models :: snapshot :: LLMQSnapshot ;
-            #[doc = "FFI-representation of the SaveMasternodeListCallback"]
-            #[allow(non_camel_case_types)]
-            pub type SaveMasternodeListCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , masternode_list : * mut dash_spv_masternode_processor :: fermented :: types :: models :: masternode_list :: MasternodeList , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> bool ;
-            #[doc = "FFI-representation of the ShouldProcessDiffWithRangeCallback"]
-            #[allow(non_camel_case_types)]
-            pub type ShouldProcessDiffWithRangeCallback = unsafe extern "C" fn (base_block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: processing :: processing_error :: ProcessingError ;
-            #[doc = "FFI-representation of the GetBlockHeightByHashCallback"]
-            #[allow(non_camel_case_types)]
-            pub type GetBlockHeightByHashCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> u32 ;
-            #[doc = "FFI-representation of the GetCLSignatureByBlockHashCallback"]
-            #[allow(non_camel_case_types)]
-            pub type GetCLSignatureByBlockHashCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt768 ;
-            #[doc = "FFI-representation of the GetMerkleRootCallback"]
-            #[allow(non_camel_case_types)]
-            pub type GetMerkleRootCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 ;
-            #[doc = "FFI-representation of the GetBlockHashByHeightCallback"]
-            #[allow(non_camel_case_types)]
-            pub type GetBlockHashByHeightCallback = unsafe extern "C" fn (block_height : u32 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 ;
-            #[doc = "FFI-representation of the AddInsightCallback"]
-            #[allow(non_camel_case_types)]
-            pub type AddInsightCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) ;
-            #[doc = "FFI-representation of the DestroyLLMQSnapshotCallback"]
-            #[allow(non_camel_case_types)]
-            pub type DestroyLLMQSnapshotCallback = unsafe extern "C" fn (snapshot : * mut dash_spv_masternode_processor :: fermented :: types :: models :: snapshot :: LLMQSnapshot) ;
-            #[doc = "FFI-representation of the GetMasternodeListCallback"]
-            #[allow(non_camel_case_types)]
-            pub type GetMasternodeListCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: models :: masternode_list :: MasternodeList ;
-            #[doc = "FFI-representation of the DestroyMasternodeListCallback"]
-            #[allow(non_camel_case_types)]
-            pub type DestroyMasternodeListCallback = unsafe extern "C" fn (masternode_list : * mut dash_spv_masternode_processor :: fermented :: types :: models :: masternode_list :: MasternodeList) ;
-            #[doc = "FFI-representation of the SaveCLSignatureCallback"]
-            #[allow(non_camel_case_types)]
-            pub type SaveCLSignatureCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , cl_signature : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt768 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> bool ;
-            #[doc = "FFI-representation of the DestroyHashCallback"]
-            #[allow(non_camel_case_types)]
-            pub type DestroyHashCallback = unsafe extern "C" fn (hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256) ;
-            #[doc = "FFI-representation of the SaveLLMQSnapshotCallback"]
-            #[allow(non_camel_case_types)]
-            pub type SaveLLMQSnapshotCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , snapshot : * mut dash_spv_masternode_processor :: fermented :: types :: models :: snapshot :: LLMQSnapshot , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> bool ;
-        }
-    }
     pub mod address {
         pub mod addresses {
             #[doc = "FFI-representation of the address_from_hash160"]
@@ -85,6 +39,52 @@ pub mod types {
                 );
                 ferment_interfaces::FFIConversion::ffi_to_opt(obj)
             }
+        }
+    }
+    pub mod ffi {
+        pub mod callbacks {
+            #[doc = "FFI-representation of the SaveMasternodeListCallback"]
+            #[allow(non_camel_case_types)]
+            pub type SaveMasternodeListCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , masternode_list : * mut dash_spv_masternode_processor :: fermented :: types :: models :: masternode_list :: MasternodeList , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> bool ;
+            #[doc = "FFI-representation of the GetBlockHeightByHashCallback"]
+            #[allow(non_camel_case_types)]
+            pub type GetBlockHeightByHashCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> u32 ;
+            #[doc = "FFI-representation of the ShouldProcessDiffWithRangeCallback"]
+            #[allow(non_camel_case_types)]
+            pub type ShouldProcessDiffWithRangeCallback = unsafe extern "C" fn (base_block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: processing :: processing_error :: ProcessingError ;
+            #[doc = "FFI-representation of the GetLLMQSnapshotByBlockHashCallback"]
+            #[allow(non_camel_case_types)]
+            pub type GetLLMQSnapshotByBlockHashCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: models :: snapshot :: LLMQSnapshot ;
+            #[doc = "FFI-representation of the SaveCLSignatureCallback"]
+            #[allow(non_camel_case_types)]
+            pub type SaveCLSignatureCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , cl_signature : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt768 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> bool ;
+            #[doc = "FFI-representation of the SaveLLMQSnapshotCallback"]
+            #[allow(non_camel_case_types)]
+            pub type SaveLLMQSnapshotCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , snapshot : * mut dash_spv_masternode_processor :: fermented :: types :: models :: snapshot :: LLMQSnapshot , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> bool ;
+            #[doc = "FFI-representation of the GetCLSignatureByBlockHashCallback"]
+            #[allow(non_camel_case_types)]
+            pub type GetCLSignatureByBlockHashCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt768 ;
+            #[doc = "FFI-representation of the DestroyMasternodeListCallback"]
+            #[allow(non_camel_case_types)]
+            pub type DestroyMasternodeListCallback = unsafe extern "C" fn (masternode_list : * mut dash_spv_masternode_processor :: fermented :: types :: models :: masternode_list :: MasternodeList) ;
+            #[doc = "FFI-representation of the DestroyLLMQSnapshotCallback"]
+            #[allow(non_camel_case_types)]
+            pub type DestroyLLMQSnapshotCallback = unsafe extern "C" fn (snapshot : * mut dash_spv_masternode_processor :: fermented :: types :: models :: snapshot :: LLMQSnapshot) ;
+            #[doc = "FFI-representation of the GetMerkleRootCallback"]
+            #[allow(non_camel_case_types)]
+            pub type GetMerkleRootCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 ;
+            #[doc = "FFI-representation of the AddInsightCallback"]
+            #[allow(non_camel_case_types)]
+            pub type AddInsightCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) ;
+            #[doc = "FFI-representation of the GetMasternodeListCallback"]
+            #[allow(non_camel_case_types)]
+            pub type GetMasternodeListCallback = unsafe extern "C" fn (block_hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: models :: masternode_list :: MasternodeList ;
+            #[doc = "FFI-representation of the DestroyHashCallback"]
+            #[allow(non_camel_case_types)]
+            pub type DestroyHashCallback = unsafe extern "C" fn (hash : * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256) ;
+            #[doc = "FFI-representation of the GetBlockHashByHeightCallback"]
+            #[allow(non_camel_case_types)]
+            pub type GetBlockHashByHeightCallback = unsafe extern "C" fn (block_height : u32 , context : * mut ferment_interfaces :: fermented :: types :: OpaqueContext_FFI) -> * mut dash_spv_masternode_processor :: fermented :: types :: crypto :: byte_util :: UInt256 ;
         }
     }
 }

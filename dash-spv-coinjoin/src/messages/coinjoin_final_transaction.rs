@@ -1,7 +1,6 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::tx::{Transaction, TransactionType};
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
+use std::io::{Error, Read, Write};
+use dash_spv_masternode_processor::tx::transaction::{Transaction, TransactionType};
+use dash_spv_masternode_processor::consensus::encode;
 
 // dsf
 #[repr(C)]
@@ -12,7 +11,7 @@ pub struct CoinJoinFinalTransaction {
     pub tx: Transaction,
 }
 
-impl Encodable for CoinJoinFinalTransaction {
+impl encode::Encodable for CoinJoinFinalTransaction {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -25,9 +24,9 @@ impl Encodable for CoinJoinFinalTransaction {
     }
 }
 
-impl Decodable for CoinJoinFinalTransaction {
+impl encode::Decodable for CoinJoinFinalTransaction {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let msg_session_id = u32::consensus_decode(&mut d)? as i32;
         let mut tx = Transaction::consensus_decode(&mut d)?;
         tx.tx_type = TransactionType::Classic;

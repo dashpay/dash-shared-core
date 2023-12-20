@@ -1,8 +1,6 @@
-use std::io;
-use std::io::{Error, Write};
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
-
-use super::pool_message::PoolMessage;
+use std::io::{Read, Write, Error};
+use dash_spv_masternode_processor::consensus::encode;
+use crate::messages::pool_message::PoolMessage;
 
 // dsc
 #[repr(C)]
@@ -13,7 +11,7 @@ pub struct CoinJoinCompleteMessage {
     pub msg_message_id: PoolMessage,
 }
 
-impl Encodable for CoinJoinCompleteMessage {
+impl encode::Encodable for CoinJoinCompleteMessage {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -24,9 +22,9 @@ impl Encodable for CoinJoinCompleteMessage {
     }
 }
 
-impl Decodable for CoinJoinCompleteMessage {
+impl encode::Decodable for CoinJoinCompleteMessage {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let msg_session_id = u32::consensus_decode(&mut d)? as i32;
         let message_id = u32::consensus_decode(&mut d)? as i32;
 

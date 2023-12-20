@@ -1,15 +1,10 @@
+use std::io::Cursor;
 use dash_spv_masternode_processor::consensus::{Decodable, Encodable};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::crypto::byte_util::Reversable;
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::tx::Transaction;
-use std::io::Cursor;
-
 use crate::messages;
-use crate::messages::pool_message::PoolMessage;
-use crate::messages::pool_state::PoolState;
-use crate::messages::pool_status_update::PoolStatusUpdate;
-use crate::messages::transaction_outpoint::TransactionOutPoint;
 
 #[test]
 pub fn test_coinjoin_accept_message() {
@@ -39,7 +34,7 @@ pub fn test_coinjoin_complete_message() {
 
     let from_ctor = messages::CoinJoinCompleteMessage {
         msg_session_id: 549379, 
-        msg_message_id: PoolMessage::MsgSuccess
+        msg_message_id: messages::PoolMessage::MsgSuccess
     };
     let mut buffer = Vec::new();
     from_ctor.consensus_encode(&mut buffer).unwrap();
@@ -79,18 +74,18 @@ pub fn test_coinjoin_status_update_from_payload() {
     let mut dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(783283, dssu.session_id);
-    assert_eq!(PoolState::PoolStateQueue, dssu.pool_state);
-    assert_eq!(PoolStatusUpdate::StatusRejected, dssu.status_update);
-    assert_eq!(PoolMessage::ErrDenom, dssu.message_id);
+    assert_eq!(messages::PoolState::PoolStateQueue, dssu.pool_state);
+    assert_eq!(messages::PoolStatusUpdate::StatusRejected, dssu.status_update);
+    assert_eq!(messages::PoolMessage::ErrDenom, dssu.message_id);
 
     payload = Vec::from_hex("d7d20700030000000100000013000000").unwrap();
     cursor = Cursor::new(&payload);
     dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(512727, dssu.session_id);
-    assert_eq!(PoolState::PoolStateSigning, dssu.pool_state);
-    assert_eq!(PoolStatusUpdate::StatusAccepted, dssu.status_update);
-    assert_eq!(PoolMessage::MsgNoErr, dssu.message_id);
+    assert_eq!(messages::PoolState::PoolStateSigning, dssu.pool_state);
+    assert_eq!(messages::PoolStatusUpdate::StatusAccepted, dssu.status_update);
+    assert_eq!(messages::PoolMessage::MsgNoErr, dssu.message_id);
 }
 
 #[test]
@@ -100,15 +95,15 @@ pub fn test_coinjoin_status_update_from_ctor() {
     let dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(830047, dssu.session_id);
-    assert_eq!(PoolState::PoolStateQueue, dssu.pool_state);
-    assert_eq!(PoolStatusUpdate::StatusAccepted, dssu.status_update);
-    assert_eq!(PoolMessage::MsgNoErr, dssu.message_id);
+    assert_eq!(messages::PoolState::PoolStateQueue, dssu.pool_state);
+    assert_eq!(messages::PoolStatusUpdate::StatusAccepted, dssu.status_update);
+    assert_eq!(messages::PoolMessage::MsgNoErr, dssu.message_id);
    
     let from_ctor = messages::CoinJoinStatusUpdate {
         session_id: 830047,
-        pool_state: PoolState::PoolStateQueue,
-        status_update: PoolStatusUpdate::StatusAccepted,
-        message_id: PoolMessage::MsgNoErr
+        pool_state: messages::PoolState::PoolStateQueue,
+        status_update: messages::PoolStatusUpdate::StatusAccepted,
+        message_id: messages::PoolMessage::MsgNoErr
     };
 
     let mut buffer = Vec::new();
@@ -177,14 +172,14 @@ pub fn test_transaction_outpoint_payload() {
     let hex = "e2f910eb47e2dde768b9f89e1a84607ac559c0f9628ff0b44b49de0a92e5b0ce00000000";
     let outpoint_data = Vec::from_hex(hex).unwrap();
     let mut cursor = Cursor::new(&outpoint_data);
-    let outpoint = TransactionOutPoint::consensus_decode(&mut cursor).unwrap();
+    let outpoint = messages::TransactionOutPoint::consensus_decode(&mut cursor).unwrap();
 
     let hash = UInt256::from_hex("ceb0e5920ade494bb4f08f62f9c059c57a60841a9ef8b968e7dde247eb10f9e2").unwrap().reversed();
 
     assert_eq!(hash, outpoint.hash);
     assert_eq!(0, outpoint.index);
 
-    let from_ctor = TransactionOutPoint { hash, index: 0 };
+    let from_ctor = messages::TransactionOutPoint { hash, index: 0 };
     let mut buffer = Vec::new();
     from_ctor.consensus_encode(&mut buffer).unwrap();
 

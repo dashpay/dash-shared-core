@@ -1,7 +1,7 @@
 use core::slice;
 use std::io::Cursor;
 
-use crate::dash_spv_coinjoin::messages;
+use dash_spv_coinjoin::messages;
 use dash_spv_masternode_processor::consensus::Decodable;
 use ferment_interfaces::boxed;
 

@@ -1,8 +1,7 @@
-use std::io;
-use std::io::{Error, Write};
+use std::io::{Read, Write, Error};
+use dash_spv_masternode_processor::consensus::encode;
+use dash_spv_masternode_processor::tx::transaction::{TransactionInput, TransactionOutput, Transaction, TransactionType};
 use dash_spv_masternode_processor::consensus::encode::VarInt;
-use dash_spv_masternode_processor::tx::{TransactionInput, TransactionOutput, Transaction, TransactionType};
-use dash_spv_masternode_processor::consensus::{Decodable, Encodable, encode};
 
 // dsi
 // A client's transaction in the mixing pool
@@ -15,7 +14,7 @@ pub struct CoinJoinEntry {
     pub tx_collateral: Transaction,
 }
 
-impl Encodable for CoinJoinEntry {
+impl encode::Encodable for CoinJoinEntry {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -41,9 +40,9 @@ impl Encodable for CoinJoinEntry {
     }
 }
 
-impl Decodable for CoinJoinEntry {
+impl encode::Decodable for CoinJoinEntry {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let mut mixing_inputs = vec![];
         let input_amount = encode::VarInt::consensus_decode(&mut d)?.0;
 
