@@ -14,6 +14,7 @@ fn main() {
     match ferment::Builder::new()
         .with_crates(vec![
             "dash_spv_masternode_processor".to_string(),
+            "dash_spv_coinjoin".to_string(),
             "rs_merk_verify_c_binding".to_string()
         ])
         .generate() {

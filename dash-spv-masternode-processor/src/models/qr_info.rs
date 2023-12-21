@@ -17,7 +17,7 @@ pub struct QRInfo {
     pub snapshot_h_3c: models::snapshot::LLMQSnapshot,
     pub snapshot_h_4c: Option<models::snapshot::LLMQSnapshot>,
     pub extra_share: bool,
-    pub last_quorum_per_index: Vec<models::llmq_entry::LLMQEntry>,
+    pub last_quorum_per_index: Vec<models::LLMQEntry>,
     pub quorum_snapshot_list: Vec<models::snapshot::LLMQSnapshot>,
     pub mn_list_diff_list: Vec<models::mn_list_diff::MNListDiff>,
 }

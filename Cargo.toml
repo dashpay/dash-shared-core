@@ -3,6 +3,7 @@ members = [
     "dash-spv-apple-bindings",
     "dash-spv-example-app",
     "dash-spv-masternode-processor",
+    "dash-spv-coinjoin",
     "reachability",
 ]
 resolver = "2"

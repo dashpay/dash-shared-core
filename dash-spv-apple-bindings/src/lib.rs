@@ -9,6 +9,7 @@ mod fermented;
 mod keys;
 mod masternode;
 mod tx;
+mod coinjoin;
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +18,7 @@ mod ffi;
 mod types;
 
 pub extern crate dash_spv_masternode_processor;
+pub extern crate dash_spv_coinjoin;
 pub extern crate merk;
 
 use dash_spv_masternode_processor::crypto::byte_util::{UInt128, UInt160, UInt256, UInt384, UInt512, UInt768};
