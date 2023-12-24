@@ -8,4 +8,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define COINJOIN_ENTRY_MAX_SIZE 9
+
 #endif /* example_h */

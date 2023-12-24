@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use hashes::hex::ToHex;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ScriptType {
     PayToPubkey,
     PayToPubkeyHash,
