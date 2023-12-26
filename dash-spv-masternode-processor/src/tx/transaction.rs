@@ -1,9 +1,14 @@
+use std::io;
+
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
-use crate::consensus::encode::VarInt;
-use crate::consensus::Encodable;
+use crate::blockdata::opcodes::all::OP_RETURN;
+use crate::consensus::encode::{VarInt, self};
+use crate::consensus::{Encodable, Decodable};
 use crate::crypto::{UInt256, VarBytes};
+use crate::util::data_append::DataAppend;
+use crate::util::script::{ScriptType, ScriptElement};
 
 // block height indicating transaction is unconfirmed
 pub const TX_UNCONFIRMED: i32 = i32::MAX;
@@ -28,6 +33,13 @@ pub enum TransactionType {
     // tmp
     /// TODO: find actual value for this type
     CreditFunding = 255,
+}
+
+impl Decodable for TransactionType {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        Ok(TransactionType::from(u16::consensus_decode(&mut d)?))
+    }
 }
 
 impl From<u16> for TransactionType {
@@ -73,6 +85,33 @@ pub struct TransactionInput {
     pub signature: Option<Vec<u8>>,
     pub sequence: u32,
 }
+
+impl Encodable for TransactionInput {
+    #[inline]
+    fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
+        let mut offset = 0;
+        offset += self.input_hash.consensus_encode(&mut writer)?;
+        offset += self.index.consensus_encode(&mut writer)?;
+        offset += match self.signature {
+            Some(ref signature) => signature.consensus_encode(&mut writer)?,
+            None => 0
+        };
+        offset += self.sequence.consensus_encode(&mut writer)?;
+        Ok(offset)
+    }
+}
+
+impl Decodable for TransactionInput {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let input_hash = UInt256::consensus_decode(&mut d)?;
+        let index = u32::consensus_decode(&mut d)?;
+        let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
+        let sequence = u32::consensus_decode(&mut d)?;
+        Ok(Self { input_hash, index, signature, sequence, script: None })
+    }
+}
+
 
 impl std::fmt::Debug for TransactionInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -124,6 +163,28 @@ pub struct TransactionOutput {
     pub address: Option<Vec<u8>>,
 }
 
+impl Encodable for TransactionOutput {
+    #[inline]
+    fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
+        let mut offset = 0;
+        offset += self.amount.consensus_encode(&mut writer)?;
+        offset += match self.script {
+            Some(ref script) => script.consensus_encode(&mut writer)?,
+            None => 0
+        };
+        Ok(offset)
+    }
+}
+
+impl Decodable for TransactionOutput {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let amount = u64::consensus_decode(&mut d)?;
+        let script: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
+        Ok(TransactionOutput { amount, script, address: None })
+    }
+}
+
 impl std::fmt::Debug for TransactionOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransactionOutput")
@@ -148,6 +209,44 @@ impl<'a> TryRead<'a, Endian> for TransactionOutput {
             address: None,
         };
         Ok((output, *offset))
+    }
+}
+
+impl TransactionOutput {
+    const MAX_SCRIPT_SIZE: usize = 10000;
+    
+    pub fn script_pub_key_type(&self) -> ScriptType {
+        if let Some(ref script) = self.script {
+            match script.script_elements()[..] {
+                // pay-to-pubkey-hash scriptPubKey
+                [ScriptElement::Number(0x76/*OP_DUP*/), ScriptElement::Number(0xa9/*OP_HASH160*/), ScriptElement::Data(data, len @ b'\x14'), ScriptElement::Number(0x88/*OP_EQUALVERIFY*/), ScriptElement::Number(0xac/*OP_CHECKSIG*/)] =>
+                    ScriptType::PayToPubkeyHash,
+                // pay-to-script-hash scriptPubKey
+                [ScriptElement::Number(0xa9/*OP_HASH160*/), ScriptElement::Data(data, len @ b'\x14'), ScriptElement::Number(0x87/*OP_EQUAL*/)] =>
+                    ScriptType::PayToScriptHash,
+                // pay-to-pubkey scriptPubKey
+                [ScriptElement::Data(data, len @ 33u8 | len @ 65u8), ScriptElement::Number(0xac/*OP_CHECKSIG*/)] =>
+                    ScriptType::PayToPubkey,
+                // unknown script type
+                _ => ScriptType::Unknown,
+            }
+        } else {
+            return ScriptType::Unknown;
+        }
+    }
+
+    /// Returns whether the script is guaranteed to fail at execution,
+    /// regardless of the initial stack. This allows outputs to be pruned
+    /// instantly when entering the UTXO set.
+    pub fn is_script_unspendable(&self) -> bool {
+        if let Some(ref script) = self.script {
+            let script_elements = script.script_elements();
+
+            return script_elements.len() > 0 && script_elements[0] == ScriptElement::Number(OP_RETURN.into_u8()) ||
+                   script.len() > Self::MAX_SCRIPT_SIZE;
+        } else {
+            return true;
+        }
     }
 }
 
@@ -282,6 +381,29 @@ impl Transaction {
 
     pub fn tx_type(&self) -> TransactionType {
         self.tx_type
+    }
+}
+
+impl Decodable for Transaction {
+    #[inline]
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        let version = u16::consensus_decode(&mut d)?;
+        let tx_type = TransactionType::consensus_decode(&mut d)?;
+        let inputs: Vec<TransactionInput> = Vec::consensus_decode(&mut d)?;
+        let outputs: Vec<TransactionOutput> = Vec::consensus_decode(&mut d)?;
+        let lock_time = u32::consensus_decode(&mut d)?;
+        let mut tx = Self {
+            inputs,
+            outputs,
+            version,
+            tx_type,
+            lock_time,
+            block_height: TX_UNCONFIRMED as u32,
+            tx_hash: None,
+            payload_offset: 0,
+        };
+        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()));
+        Ok(tx)
     }
 }
 

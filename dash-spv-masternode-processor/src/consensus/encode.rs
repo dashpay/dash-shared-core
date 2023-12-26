@@ -36,11 +36,13 @@ use std::borrow::Cow;
 use std::io::{self, Cursor, Read};
 use std::{rc, sync};
 use hashes::{Hash, sha256, sha256d};
+use crate::crypto::UInt256;
 use crate::hash_types::{BlockHash, FilterHash, FilterHeader, TxMerkleNode};
 use crate::hashes::hex::ToHex;
 
 // use hashes::hex::ToHex;
 
+use crate::tx::{TransactionInput, TransactionOutput};
 // use blockdata::transaction::{TxOut, Transaction, TxIn};
 // #[cfg(feature = "std")]
 // use network::{message_blockdata::Inventory, address::{Address, AddrV2Message}};
@@ -610,6 +612,13 @@ impl_vec!(TxMerkleNode);
 // impl_vec!(TxIn);
 impl_vec!(Vec<u8>);
 impl_vec!(u64);
+
+impl_vec!(bool);
+impl_vec!(UInt256);
+impl_vec!(TransactionInput);
+impl_vec!(TransactionOutput);
+// impl_vec!(MasternodeEntry);
+// impl_vec!(crate::models::LLMQEntry);
 
 // #[cfg(feature = "std")] impl_vec!(Inventory);
 // #[cfg(feature = "std")] impl_vec!((u32, Address));

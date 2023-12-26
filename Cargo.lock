@@ -506,6 +506,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dash-spv-coinjoin"
+version = "0.1.0"
+dependencies = [
+ "cbindgen 0.24.5",
+ "dash-spv-masternode-processor",
+ "ferment",
+ "ferment-interfaces",
+ "ferment-macro",
+]
+
+[[package]]
 name = "dash-spv-example-app"
 version = "0.1.0"
 
@@ -540,6 +551,7 @@ name = "dash_spv_apple_bindings"
 version = "0.4.16"
 dependencies = [
  "cbindgen 0.24.5",
+ "dash-spv-coinjoin",
  "dash-spv-masternode-processor",
  "rs-merk-verify-c-binding",
 ]
@@ -713,6 +725,26 @@ name = "fastrand"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
+
+[[package]]
+name = "ferment"
+version = "0.1.4"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "ferment-interfaces"
+version = "0.1.4"
+
+[[package]]
+name = "ferment-macro"
+version = "0.1.4"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "fiat-crypto"

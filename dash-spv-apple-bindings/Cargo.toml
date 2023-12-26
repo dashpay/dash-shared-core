@@ -13,6 +13,10 @@ publish = true
 path = "../dash-spv-masternode-processor"
 features = ["default", "generate-dashj-tests"]
 
+[dependencies.dash-spv-coinjoin]
+path = "../dash-spv-coinjoin"
+features = []
+
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashpay/rs-merk-verify-c-binding"
 branch = "for-use-in-main-crate"
