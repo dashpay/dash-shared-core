@@ -3,16 +3,18 @@ use std::io::Cursor;
 
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::callbacks::GetInputValueByPrevoutHash;
+use dash_spv_coinjoin::callbacks::{GetInputValueByPrevoutHash, HasChainLock};
 use dash_spv_masternode_processor::consensus::Decodable;
 use ferment_interfaces::boxed;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_coinjoin(
     get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
+    has_chain_lock: HasChainLock,
 ) -> *mut CoinJoin {
     let coinjoin = CoinJoin::new(
         get_input_value_by_prevout_hash,
+        has_chain_lock
     );
     println!("register_coinjoin: {:?}", coinjoin);
     boxed(coinjoin)

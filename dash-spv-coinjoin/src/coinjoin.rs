@@ -3,17 +3,19 @@ use std::ptr::null;
 
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::DUFFS;
+use dash_spv_masternode_processor::common::Block;
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 use ferment_interfaces::boxed;
 
-use crate::callbacks::GetInputValueByPrevoutHash;
+use crate::callbacks::{GetInputValueByPrevoutHash, HasChainLock};
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
 use crate::models::InputValue;
+use crate::utils::value_from_amount::value_from_amount;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -22,7 +24,8 @@ pub struct CoinJoin {
     pub opaque_context: *const std::ffi::c_void,
     // pub chain_type: ChainType,
     pub get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
-    map_dstx: HashMap<UInt256, CoinJoinBroadcastTx>, // TODO: thread safety
+    pub has_chain_lock: HasChainLock,
+    map_dstx: HashMap<UInt256, CoinJoinBroadcastTx> // TODO: thread safety?
 }
 
 impl CoinJoin {
@@ -38,11 +41,13 @@ impl CoinJoin {
 
     pub fn new(
         get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
+        has_chain_lock: HasChainLock,
     ) -> Self {
         Self {
             opaque_context: null(),
             // chain_type: ChainType::MainNet,
             get_input_value_by_prevout_hash,
+            has_chain_lock,
             map_dstx: HashMap::new(),
         }
     }
@@ -119,7 +124,7 @@ impl CoinJoin {
             -1 => "out-of-bounds".to_string(),
             -2 => "non-denom".to_string(),
             -3 => "to-amount-error".to_string(),
-            n => format!("{}", n),
+            n => value_from_amount(n),
         }
     }
 
@@ -175,6 +180,84 @@ impl CoinJoin {
     }
 
     pub fn get_collateral_amount() -> u64 { Self::get_smallest_denomination() / 10 }
+    pub fn get_max_collateral_amount() -> u64 { Self::get_collateral_amount() * 4 }
+
+    pub fn is_collateral_amount(n_input_amount: u64) -> bool {
+        n_input_amount >= Self::get_collateral_amount() && n_input_amount <= Self::get_max_collateral_amount()
+    }
+
+    pub fn calculate_amount_priority(input_amount: u64) -> i64 {
+        let mut opt_denom = 0;
+
+        for denom in Self::get_standard_denominations() {
+            if input_amount == *denom {
+                opt_denom = *denom;
+            }
+        }
+
+        if opt_denom > 0 {
+            return (DUFFS as f64 / opt_denom as f64 * 10000.0) as i64;
+        }
+
+        if input_amount < DUFFS {
+            return 20000;
+        }
+
+        // nondenom return largest first
+        -1 * (input_amount / DUFFS) as i64
+    }
+
+    pub fn check_dstxs(&mut self, block: Block) {
+        self.map_dstx.retain(|_, tx| !tx.is_expired(block, self.has_chain_lock, self.opaque_context));
+    }
+
+    pub fn add_dstx(&mut self, dstx: CoinJoinBroadcastTx) {
+        if let Some(tx_hash) = dstx.tx.tx_hash {
+            self.map_dstx.insert(tx_hash, dstx);
+        }
+    }
+
+    pub fn has_dstx(&self, tx_hash: UInt256) -> bool {
+        self.map_dstx.contains_key(&tx_hash)
+    }
+
+    pub fn get_dstx(&self, tx_hash: UInt256) -> Option<&CoinJoinBroadcastTx> {
+        self.map_dstx.get(&tx_hash)
+    }
+
+    pub fn update_block_tip(&mut self, block: Block) {
+        self.check_dstxs(block);
+    }
+
+    pub fn notify_chain_lock(&mut self, block: Block) {
+        self.check_dstxs(block);
+    }
+
+    pub fn update_dstx_confirmed_height(&mut self, tx_hash: UInt256, n_height: i32) {
+        if let Some(broadcast_tx) = self.map_dstx.get_mut(&tx_hash) {
+            broadcast_tx.set_confirmed_height(n_height);
+        }
+    }
+
+    pub fn transaction_added_to_mempool(&mut self, tx_hash: UInt256) {
+        self.update_dstx_confirmed_height(tx_hash, -1);
+    }
+
+    pub fn block_connected(&mut self, block_height: u32, block_transactions: Vec<UInt256>, vtx_conflicted: Vec<UInt256>) {
+        for tx_hash in vtx_conflicted {
+            self.update_dstx_confirmed_height(tx_hash, -1);
+        }
+
+        for tx_hash in block_transactions {
+            self.update_dstx_confirmed_height(tx_hash, block_height as i32);
+        }
+    }
+
+    pub fn block_disconnected(&mut self, block_transactions: Vec<UInt256>,) {
+        for tx_hash in block_transactions {
+            self.update_dstx_confirmed_height(tx_hash, -1);
+        }
+    }
 
     pub fn get_message_by_id(message_id: PoolMessage) -> &'static str {
         match message_id {
@@ -237,7 +320,18 @@ impl CoinJoin {
         }
     }
 
+    pub fn get_rounds_string(rounds: i32) -> &'static str {
+        match rounds {
+            -4 => "bad index",
+            -3 => "collateral",
+            -2 => "non-denominated",
+            -1 => "no such tx",
+            _ => "coinjoin",
+        }
+    }
+
     fn get_input_value_by_prevout_hash(&self, prevout_hash: UInt256) -> Option<InputValue> {
+        // TODO: callback
         unsafe { 
             let input_ptr = (self.get_input_value_by_prevout_hash)(boxed(prevout_hash.0), self.opaque_context);
             

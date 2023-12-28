@@ -1,7 +1,12 @@
+use std::ffi::c_void;
 use std::io::{Read, Write, Error};
 use dash_spv_masternode_processor::consensus::encode;
+use dash_spv_masternode_processor::common::block::Block;
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
+use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
+
+use crate::callbacks::HasChainLock;
 
 // dstx
 #[repr(C)]
@@ -12,6 +17,38 @@ pub struct CoinJoinBroadcastTx {
     pub pro_tx_hash: UInt256,
     pub signature: Option<Vec<u8>>,
     pub signature_time: i64,
+    // memory only
+    // when corresponding tx is 0-confirmed or conflicted, nConfirmedHeight is -1
+    confirmed_height: i32,
+}
+
+impl CoinJoinBroadcastTx {
+    pub fn new(tx: Transaction, pro_tx_hash: UInt256, signature: Option<Vec<u8>>, signature_time: i64) -> Self {
+        Self {
+            tx,
+            pro_tx_hash,
+            signature,
+            signature_time,
+            confirmed_height: -1,
+        }
+    }
+
+    pub fn set_confirmed_height(&mut self, confirmed_height: i32) {
+        self.confirmed_height = confirmed_height;
+    }
+
+    pub fn is_expired(&self, block: Block, has_chain_lock: HasChainLock, context: *const c_void) -> bool {
+        // expire confirmed DSTXes after ~1h since confirmation or chainlocked confirmation
+        if self.confirmed_height == -1 || (block.height as i32) < self.confirmed_height {
+            return false; // not mined yet
+        }
+
+        if block.height as i32 - self.confirmed_height > 24 {
+            return true; // mined more than an hour ago
+        }
+
+        return unsafe { has_chain_lock(block.encode(), context) }; 
+    }
 }
 
 impl encode::Encodable for CoinJoinBroadcastTx {
@@ -40,6 +77,6 @@ impl encode::Decodable for CoinJoinBroadcastTx {
         let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
         let signature_time = i64::consensus_decode(&mut d)?;
 
-        Ok(CoinJoinBroadcastTx { tx, pro_tx_hash, signature, signature_time })
+        Ok(CoinJoinBroadcastTx::new(tx, pro_tx_hash, signature, signature_time) )
     }
 }

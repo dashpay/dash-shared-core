@@ -74,7 +74,7 @@ pub fn test_coinjoin_status_update_from_payload() {
     let mut dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(783283, dssu.session_id);
-    assert_eq!(messages::PoolState::PoolStateQueue, dssu.pool_state);
+    assert_eq!(messages::PoolState::Queue, dssu.pool_state);
     assert_eq!(messages::PoolStatusUpdate::StatusRejected, dssu.status_update);
     assert_eq!(messages::PoolMessage::ErrDenom, dssu.message_id);
 
@@ -83,7 +83,7 @@ pub fn test_coinjoin_status_update_from_payload() {
     dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(512727, dssu.session_id);
-    assert_eq!(messages::PoolState::PoolStateSigning, dssu.pool_state);
+    assert_eq!(messages::PoolState::Signing, dssu.pool_state);
     assert_eq!(messages::PoolStatusUpdate::StatusAccepted, dssu.status_update);
     assert_eq!(messages::PoolMessage::MsgNoErr, dssu.message_id);
 }
@@ -95,13 +95,13 @@ pub fn test_coinjoin_status_update_from_ctor() {
     let dssu = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(830047, dssu.session_id);
-    assert_eq!(messages::PoolState::PoolStateQueue, dssu.pool_state);
+    assert_eq!(messages::PoolState::Queue, dssu.pool_state);
     assert_eq!(messages::PoolStatusUpdate::StatusAccepted, dssu.status_update);
     assert_eq!(messages::PoolMessage::MsgNoErr, dssu.message_id);
    
     let from_ctor = messages::CoinJoinStatusUpdate {
         session_id: 830047,
-        pool_state: messages::PoolState::PoolStateQueue,
+        pool_state: messages::PoolState::Queue,
         status_update: messages::PoolStatusUpdate::StatusAccepted,
         message_id: messages::PoolMessage::MsgNoErr
     };
@@ -196,13 +196,7 @@ pub fn coinjoin_broadcast_tx_round_test() {
     let signature = Vec::from_hex("998c5118eef9a89bfe5c6b961a8cc5af52cb00d0394688e78b23194699f7356cece6f8af63fdb0c28c2728c05325a6fe").unwrap();
     let signature_time: i64 = 1702813411;
 
-    let dstx = messages::CoinJoinBroadcastTx { 
-        tx,
-        pro_tx_hash,
-        signature: Some(signature),
-        signature_time
-    };
-
+    let dstx = messages::CoinJoinBroadcastTx::new(tx, pro_tx_hash, Some(signature), signature_time);
     let mut buffer = Vec::new();
     dstx.consensus_encode(&mut buffer).unwrap();
 
