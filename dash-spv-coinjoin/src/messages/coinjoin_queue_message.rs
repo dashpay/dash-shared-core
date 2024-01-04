@@ -4,9 +4,9 @@ use dash_spv_masternode_processor::consensus::encode;
 
 // dsq
 // A currently in progress mixing merge and denomination information
-#[repr(C)]
+// #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
+// #[ferment_macro::export]
 pub struct CoinJoinQueueMessage {
     pub denomination: u32,
     pub pro_tx_hash: UInt256,

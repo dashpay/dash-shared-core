@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ptr::null;
 
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::DUFFS;
@@ -9,7 +8,7 @@ use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 use ferment_interfaces::boxed;
 
-use crate::callbacks::{GetInputValueByPrevoutHash, HasChainLock};
+use crate::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
@@ -17,14 +16,13 @@ use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
 use crate::models::InputValue;
 use crate::utils::value_from_amount::value_from_amount;
 
-#[repr(C)]
 #[derive(Debug)]
 // #[ferment_macro::export]
 pub struct CoinJoin {
     pub opaque_context: *const std::ffi::c_void,
-    // pub chain_type: ChainType,
     pub get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
     pub has_chain_lock: HasChainLock,
+    pub destroy_input_value: DestroyInputValue,
     map_dstx: HashMap<UInt256, CoinJoinBroadcastTx> // TODO: thread safety?
 }
 
@@ -42,12 +40,14 @@ impl CoinJoin {
     pub fn new(
         get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
         has_chain_lock: HasChainLock,
+        destroy_input_value: DestroyInputValue,
+        context: *const std::ffi::c_void
     ) -> Self {
         Self {
-            opaque_context: null(),
-            // chain_type: ChainType::MainNet,
+            opaque_context: context,
             get_input_value_by_prevout_hash,
             has_chain_lock,
+            destroy_input_value,
             map_dstx: HashMap::new(),
         }
     }
@@ -132,13 +132,12 @@ impl CoinJoin {
     pub fn is_collateral_valid(&self, tx_collateral: &Transaction, check_inputs: bool) -> bool {
         if tx_collateral.outputs.is_empty() {
             // TODO: logs
-            // TODO: tx_hash.to_hex
-            println!("coinjoin: Collateral invalid due to no outputs: {}", tx_collateral.tx_hash.unwrap_or_default());
+            println!("[RUST] coinjoin: Collateral invalid due to no outputs: {}", tx_collateral.tx_hash.unwrap_or_default());
             return false;
         }
 
         if tx_collateral.lock_time != 0 {
-            println!("coinjoin: Collateral invalid due to lock time != 0: {}", tx_collateral.tx_hash.unwrap_or_default());
+            println!("[RUST] coinjoin: Collateral invalid due to lock time != 0: {}", tx_collateral.tx_hash.unwrap_or_default());
             return false;
         }
     
@@ -149,29 +148,32 @@ impl CoinJoin {
             n_value_out = n_value_out + txout.amount as i64;
     
             if txout.script_pub_key_type() != ScriptType::PayToPubkeyHash && !txout.is_script_unspendable() {
-                println!("coinjoin: Invalid Script, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
+                println!("[RUST] coinjoin: Invalid Script, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }
     
         if check_inputs {
             for txin in &tx_collateral.inputs {
-                let result = self.get_input_value_by_prevout_hash(txin.input_hash);
+                let result = self.get_input_value_by_prevout_hash(txin.input_hash, txin.index);
                 
                 if let Some(input_value) = result {
                     if !input_value.is_valid {
+                        println!("[RUST] coinjoin: spent or non-locked mempool input! txin={:?}", txin);
                        return false;
                     }
 
                     n_value_in = n_value_in + input_value.value as i64;
                 } else {
-                    println!("coinjoin: -- Unknown inputs in collateral transaction, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
+                    println!("[RUST] coinjoin: -- Unknown inputs in collateral transaction, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
                     return false;
                 }
             }
 
+            println!("[RUST] coinjoin: n_value_out={}, n_value_in={}", n_value_out, n_value_in);
+
             if n_value_in - n_value_out < CoinJoin::get_collateral_amount() as i64 {
-                println!("coinjoin: did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
+                println!("[RUST] coinjoin: did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }
@@ -330,13 +332,13 @@ impl CoinJoin {
         }
     }
 
-    fn get_input_value_by_prevout_hash(&self, prevout_hash: UInt256) -> Option<InputValue> {
-        // TODO: callback
+    fn get_input_value_by_prevout_hash(&self, prevout_hash: UInt256, index: u32) -> Option<InputValue> {
         unsafe { 
-            let input_ptr = (self.get_input_value_by_prevout_hash)(boxed(prevout_hash.0), self.opaque_context);
+            let input_ptr = (self.get_input_value_by_prevout_hash)(boxed(prevout_hash.0), index, self.opaque_context);
             
             if !input_ptr.is_null() {
                 let input_value: InputValue = std::ptr::read(input_ptr);
+                (self.destroy_input_value)(input_ptr);
                 Some(input_value)
             } else {
                 None
