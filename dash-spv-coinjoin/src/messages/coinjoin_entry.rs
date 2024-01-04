@@ -5,9 +5,9 @@ use dash_spv_masternode_processor::consensus::encode::VarInt;
 
 // dsi
 // A client's transaction in the mixing pool
-#[repr(C)]
+// #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
+// #[ferment_macro::export]
 pub struct CoinJoinEntry {
     pub mixing_inputs: Vec<TransactionInput>,
     pub mixing_outputs: Vec<TransactionOutput>,

@@ -5,6 +5,7 @@ use dash_spv_masternode_processor::crypto::byte_util::Reversable;
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::tx::Transaction;
 use crate::messages;
+use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 
 #[test]
 pub fn test_coinjoin_accept_message() {
@@ -196,12 +197,12 @@ pub fn coinjoin_broadcast_tx_round_test() {
     let signature = Vec::from_hex("998c5118eef9a89bfe5c6b961a8cc5af52cb00d0394688e78b23194699f7356cece6f8af63fdb0c28c2728c05325a6fe").unwrap();
     let signature_time: i64 = 1702813411;
 
-    let dstx = messages::CoinJoinBroadcastTx::new(tx, pro_tx_hash, Some(signature), signature_time);
+    let dstx = CoinJoinBroadcastTx::new(tx, pro_tx_hash, Some(signature), signature_time);
     let mut buffer = Vec::new();
     dstx.consensus_encode(&mut buffer).unwrap();
 
     cursor = Cursor::new(&buffer);
-    let from_bytes = messages::CoinJoinBroadcastTx::consensus_decode(&mut cursor).unwrap();
+    let from_bytes = CoinJoinBroadcastTx::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(dstx.tx.tx_hash, from_bytes.tx.tx_hash);
     assert_eq!(dstx.pro_tx_hash, from_bytes.pro_tx_hash);

@@ -3,15 +3,16 @@ use std::io::{Read, Write, Error};
 use dash_spv_masternode_processor::consensus::encode;
 use dash_spv_masternode_processor::common::block::Block;
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
+use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 
 use crate::callbacks::HasChainLock;
 
 // dstx
-#[repr(C)]
+// #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
+// #[ferment_macro::export]
 pub struct CoinJoinBroadcastTx {
     pub tx: Transaction,
     pub pro_tx_hash: UInt256,
@@ -47,7 +48,7 @@ impl CoinJoinBroadcastTx {
             return true; // mined more than an hour ago
         }
 
-        return unsafe { has_chain_lock(block.encode(), context) }; 
+        return unsafe { has_chain_lock(boxed(block.encode()), context) }; 
     }
 }
 

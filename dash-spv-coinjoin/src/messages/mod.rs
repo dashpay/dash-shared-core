@@ -20,7 +20,6 @@ pub use self::coinjoin_status_update::CoinJoinStatusUpdate;
 pub use self::coinjoin_signed_inputs::CoinJoinSignedInputs;
 pub use self::coinjoin_entry::CoinJoinEntry;
 pub use self::send_coinjoin_queue::SendCoinJoinQueue;
-pub use self::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 pub use self::coinjoin_queue_message::CoinJoinQueueMessage;
 pub use self::pool_message::PoolMessage;
 pub use self::pool_state::PoolState;
