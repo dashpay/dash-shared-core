@@ -7,6 +7,9 @@ use crate::chain::params::TX_UNCONFIRMED;
 use crate::consensus::{Decodable, Encodable, encode, encode::VarInt};
 use crate::crypto::byte_util::UInt256;
 use crate::crypto::var_bytes::VarBytes;
+use crate::util::data_append::DataAppend;
+use crate::util::script::{ScriptType, ScriptElement};
+use crate::blockdata::opcodes::all::OP_RETURN;
 
 pub static SIGHASH_ALL: u32 = 1;
 
@@ -209,6 +212,44 @@ impl<'a> TryRead<'a, Endian> for TransactionOutput {
             address: None,
         };
         Ok((output, *offset))
+    }
+}
+
+impl TransactionOutput {
+    const MAX_SCRIPT_SIZE: usize = 10000;
+    
+    pub fn script_pub_key_type(&self) -> ScriptType {
+        if let Some(ref script) = self.script {
+            match script.script_elements()[..] {
+                // pay-to-pubkey-hash scriptPubKey
+                [ScriptElement::Number(0x76/*OP_DUP*/), ScriptElement::Number(0xa9/*OP_HASH160*/), ScriptElement::Data(data, len @ b'\x14'), ScriptElement::Number(0x88/*OP_EQUALVERIFY*/), ScriptElement::Number(0xac/*OP_CHECKSIG*/)] =>
+                    ScriptType::PayToPubkeyHash,
+                // pay-to-script-hash scriptPubKey
+                [ScriptElement::Number(0xa9/*OP_HASH160*/), ScriptElement::Data(data, len @ b'\x14'), ScriptElement::Number(0x87/*OP_EQUAL*/)] =>
+                    ScriptType::PayToScriptHash,
+                // pay-to-pubkey scriptPubKey
+                [ScriptElement::Data(data, len @ 33u8 | len @ 65u8), ScriptElement::Number(0xac/*OP_CHECKSIG*/)] =>
+                    ScriptType::PayToPubkey,
+                // unknown script type
+                _ => ScriptType::Unknown,
+            }
+        } else {
+            return ScriptType::Unknown;
+        }
+    }
+
+    /// Returns whether the script is guaranteed to fail at execution,
+    /// regardless of the initial stack. This allows outputs to be pruned
+    /// instantly when entering the UTXO set.
+    pub fn is_script_unspendable(&self) -> bool {
+        if let Some(ref script) = self.script {
+            let script_elements = script.script_elements();
+
+            return script_elements.len() > 0 && script_elements[0] == ScriptElement::Number(OP_RETURN.into_u8()) ||
+                   script.len() > Self::MAX_SCRIPT_SIZE;
+        } else {
+            return true;
+        }
     }
 }
 

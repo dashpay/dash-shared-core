@@ -11,6 +11,7 @@ pub mod transaction_outpoint;
 pub mod send_coinjoin_queue;
 pub mod coinjoin_broadcast_tx;
 pub mod coinjoin_queue_message;
+pub mod pool_status;
 
 pub use self::coinjoin_accept_message::CoinJoinAcceptMessage;
 pub use self::coinjoin_complete_message::CoinJoinCompleteMessage;
@@ -19,9 +20,9 @@ pub use self::coinjoin_status_update::CoinJoinStatusUpdate;
 pub use self::coinjoin_signed_inputs::CoinJoinSignedInputs;
 pub use self::coinjoin_entry::CoinJoinEntry;
 pub use self::send_coinjoin_queue::SendCoinJoinQueue;
-pub use self::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 pub use self::coinjoin_queue_message::CoinJoinQueueMessage;
 pub use self::pool_message::PoolMessage;
 pub use self::pool_state::PoolState;
+pub use self::pool_status::PoolStatus;
 pub use self::pool_status_update::PoolStatusUpdate;
 pub use self::transaction_outpoint::TransactionOutPoint;

@@ -1,11 +1,11 @@
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PoolState {
-    PoolStateIdle = 0,
-    PoolStateQueue = 1,
-    PoolStateAcceptingEntries = 2,
-    PoolStateSigning = 3,
-    PoolStateError = 4,
+    Idle = 0,
+    Queue = 1,
+    AcceptingEntries = 2,
+    Signing = 3,
+    Error = 4,
 }
 
 impl PoolState {
@@ -15,20 +15,20 @@ impl PoolState {
 
     pub fn from_value(value: i32) -> Self {
         match value {
-            0 => PoolState::PoolStateIdle,
-            1 => PoolState::PoolStateQueue,
-            2 => PoolState::PoolStateAcceptingEntries,
-            3 => PoolState::PoolStateSigning,
-            4 => PoolState::PoolStateError,
-            _ => PoolState::PoolStateIdle, // Default case
+            0 => PoolState::Idle,
+            1 => PoolState::Queue,
+            2 => PoolState::AcceptingEntries,
+            3 => PoolState::Signing,
+            4 => PoolState::Error,
+            _ => PoolState::Idle, // Default case
         }
     }
 
     pub fn pool_state_min() -> Self {
-        PoolState::PoolStateIdle
+        PoolState::Idle
     }
 
     pub fn pool_state_max() -> Self {
-        PoolState::PoolStateError
+        PoolState::Error
     }
 }

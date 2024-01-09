@@ -3,9 +3,9 @@ use dash_spv_masternode_processor::tx::transaction::TransactionInput;
 use dash_spv_masternode_processor::consensus::encode;
 
 // dss
-#[repr(C)]
+// #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
+// #[ferment_macro::export]
 pub struct CoinJoinSignedInputs {
     pub inputs: Vec<TransactionInput>,
 }

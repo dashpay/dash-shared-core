@@ -2,9 +2,9 @@ use std::io::{Error, Read, Write};
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use dash_spv_masternode_processor::consensus::encode;
 
-#[repr(C)]
+// #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
+// #[ferment_macro::export]
 pub struct TransactionOutPoint {
     pub hash: UInt256,
     pub index: u32,
