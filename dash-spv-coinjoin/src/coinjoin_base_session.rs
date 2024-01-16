@@ -9,11 +9,9 @@ use crate::coinjoin::CoinJoin;
 use crate::messages::{coinjoin_entry::CoinJoinEntry, pool_state::PoolState, pool_status::PoolStatus, pool_message::PoolMessage};
 use crate::models::valid_in_outs::ValidInOuts;
 
-// TODO: thread safety
 #[repr(C)]
 #[derive(Debug)]
-// #[ferment_macro::export]
-struct CoinJoinBaseSession {
+pub struct CoinJoinBaseSession {
     pub entries: Vec<CoinJoinEntry>,
     pub final_mutable_transaction: Option<Transaction>,
     pub state: PoolState,

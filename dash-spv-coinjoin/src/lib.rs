@@ -4,6 +4,8 @@ pub mod coinjoin;
 pub mod constants;
 pub mod callbacks;
 pub mod coinjoin_base_session;
+pub mod coinjoin_client_session;
+pub mod wallet_ex;
 pub mod utils;
 
 #[cfg(test)]
