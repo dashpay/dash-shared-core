@@ -14,7 +14,7 @@ use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
 use crate::models::InputValue;
-use crate::utils::value_from_amount::value_from_amount;
+use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
 // #[ferment_macro::export]
@@ -23,7 +23,7 @@ pub struct CoinJoin {
     pub get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
     pub has_chain_lock: HasChainLock,
     pub destroy_input_value: DestroyInputValue,
-    map_dstx: HashMap<UInt256, CoinJoinBroadcastTx> // TODO: thread safety?
+    map_dstx: HashMap<UInt256, CoinJoinBroadcastTx>, // TODO: thread safety?
 }
 
 impl CoinJoin {
@@ -60,8 +60,8 @@ impl CoinJoin {
         Self::STANDARD_DENOMINATIONS[Self::STANDARD_DENOMINATIONS.len() - 1]
     }
 
-    pub fn is_denominated_amount(n_input_amount: u64) -> bool {
-        Self::amount_to_denomination(n_input_amount) > 0
+    pub fn is_denominated_amount(input_amount: u64) -> bool {
+        Self::amount_to_denomination(input_amount) > 0
     }
 
     pub fn is_valid_denomination(n_denom: i32) -> bool {
@@ -70,9 +70,9 @@ impl CoinJoin {
 
     /// Return a bitshifted integer representing a denomination in STANDARD_DENOMINATIONS
     /// or 0 if none was found
-    pub fn amount_to_denomination(n_input_amount: u64) -> i32 {
+    pub fn amount_to_denomination(input_amount: u64) -> i32 {
         for (i, &denom) in Self::STANDARD_DENOMINATIONS.iter().enumerate() {
-            if n_input_amount == denom {
+            if input_amount == denom {
                 return 1 << i;
             }
         }
@@ -124,7 +124,7 @@ impl CoinJoin {
             -1 => "out-of-bounds".to_string(),
             -2 => "non-denom".to_string(),
             -3 => "to-amount-error".to_string(),
-            n => value_from_amount(n),
+            n => n.to_friendly_string(),
         }
     }
 
@@ -184,8 +184,8 @@ impl CoinJoin {
     pub fn get_collateral_amount() -> u64 { Self::get_smallest_denomination() / 10 }
     pub fn get_max_collateral_amount() -> u64 { Self::get_collateral_amount() * 4 }
 
-    pub fn is_collateral_amount(n_input_amount: u64) -> bool {
-        n_input_amount >= Self::get_collateral_amount() && n_input_amount <= Self::get_max_collateral_amount()
+    pub fn is_collateral_amount(input_amount: u64) -> bool {
+        input_amount >= Self::get_collateral_amount() && input_amount <= Self::get_max_collateral_amount()
     }
 
     pub fn calculate_amount_priority(input_amount: u64) -> i64 {
@@ -333,16 +333,16 @@ impl CoinJoin {
     }
 
     fn get_input_value_by_prevout_hash(&self, prevout_hash: UInt256, index: u32) -> Option<InputValue> {
-        unsafe { 
+        unsafe {
             let input_ptr = (self.get_input_value_by_prevout_hash)(boxed(prevout_hash.0), index, self.opaque_context);
             
-            if !input_ptr.is_null() {
-                let input_value: InputValue = std::ptr::read(input_ptr);
-                (self.destroy_input_value)(input_ptr);
-                Some(input_value)
-            } else {
-                None
-            }
+            if input_ptr.is_null() {
+                return None 
+            } 
+
+            let input_value: InputValue = std::ptr::read(input_ptr);
+            (self.destroy_input_value)(input_ptr);
+            Some(input_value)
         }
     }
 }

@@ -5,8 +5,12 @@ use std::ffi::c_void;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
+use dash_spv_coinjoin::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue, GetWalletTransaction, DestroyWalletTransaction, IsMineInput};
+use dash_spv_coinjoin::messages::transaction_outpoint::TransactionOutPoint;
+use dash_spv_coinjoin::models::CoinJoinClientOptions;
+use dash_spv_coinjoin::wallet_ex::WalletEx;
 use dash_spv_masternode_processor::consensus::Decodable;
+use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::ffi::from::FromFFI;
@@ -30,6 +34,20 @@ pub unsafe extern "C" fn register_coinjoin(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn register_wallet_ex(
+    options_ptr: *mut CoinJoinClientOptions,
+    get_wallet_transaction: GetWalletTransaction,
+    destroy_wallet_transaction: DestroyWalletTransaction,
+    is_mine: IsMineInput,
+    context: *const c_void
+) -> *mut WalletEx {
+    let options: CoinJoinClientOptions = std::ptr::read(options_ptr);
+    let wallet_ex = WalletEx::new(context, options, get_wallet_transaction, destroy_wallet_transaction, is_mine);
+    println!("[RUST] register_wallet_ex: {:?}", wallet_ex);
+    boxed(wallet_ex)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn unregister_coinjoin(coinjoin: *mut CoinJoin) {
     println!("[RUST] 💀 unregister_coinjoin: {:?}", coinjoin);
     let unboxed = unbox_any(coinjoin);
@@ -37,12 +55,22 @@ pub unsafe extern "C" fn unregister_coinjoin(coinjoin: *mut CoinJoin) {
 
 #[no_mangle]
 pub unsafe extern "C" fn call_coinjoin(
-    coin_join: *mut CoinJoin,
+    coinjoin: *mut CoinJoin,
     tx: *mut Transaction,
     context: *const c_void
 ) -> bool {
     println!("[RUST] call coinjoin with tx: {:?}", tx);
-    return (*coin_join).is_collateral_valid(&(*tx).decode(), true);
+    return (*coinjoin).is_collateral_valid(&(*tx).decode(), true);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn call_wallet_ex(
+    wallet_ex: *mut WalletEx,
+    prevout_hash: *mut [u8; 32],
+    index: u32,
+) -> i32 {
+    println!("[RUST] call wallet_ex");
+    return (*wallet_ex).get_real_outpoint_coinjoin_rounds(TransactionOutPoint::new(UInt256(*(prevout_hash)), index), 0);
 }
 
 #[no_mangle]
