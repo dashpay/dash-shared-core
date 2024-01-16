@@ -4,7 +4,7 @@ use crate::chain::common::ChainType;
 use crate::crypto::byte_util::{Reversable, UInt256};
 
 pub const DUFFS: u64 = 100000000;
-pub(crate) const MAX_MONEY: u64 = 21000000 * DUFFS;
+pub const MAX_MONEY: u64 = 21000000 * DUFFS;
 /// standard tx fee per b of tx size
 pub(crate) const TX_FEE_PER_B: u64 = 1;
 /// standard ix fee per input

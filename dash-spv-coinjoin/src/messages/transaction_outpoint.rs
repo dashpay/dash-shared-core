@@ -3,11 +3,17 @@ use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use dash_spv_masternode_processor::consensus::encode;
 
 // #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 // #[ferment_macro::export]
 pub struct TransactionOutPoint {
     pub hash: UInt256,
     pub index: u32,
+}
+
+impl TransactionOutPoint {
+    pub fn new(hash: UInt256, index: u32) -> Self {
+        TransactionOutPoint { hash, index }
+    }
 }
 
 impl encode::Encodable for TransactionOutPoint {

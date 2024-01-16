@@ -25,4 +25,3 @@ pub use self::pool_message::PoolMessage;
 pub use self::pool_state::PoolState;
 pub use self::pool_status::PoolStatus;
 pub use self::pool_status_update::PoolStatusUpdate;
-pub use self::transaction_outpoint::TransactionOutPoint;
