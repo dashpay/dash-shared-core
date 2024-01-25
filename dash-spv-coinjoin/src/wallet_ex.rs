@@ -17,7 +17,7 @@ use crate::models::CoinJoinClientOptions;
 pub struct WalletEx {
     opaque_context: *const std::ffi::c_void,
     options: CoinJoinClientOptions,
-    locked_coins_set: HashSet<TransactionOutPoint>,
+    pub locked_coins_set: HashSet<TransactionOutPoint>,
     anonymizable_tally_cached_non_denom: bool,
     anonymizable_tally_cached: bool,
     map_outpoint_rounds_cache: HashMap<TransactionOutPoint, i32>,

@@ -64,13 +64,39 @@ pub unsafe extern "C" fn call_coinjoin(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn call_wallet_ex(
+pub unsafe extern "C" fn is_denominated_amount(
+    amount: u64,
+) -> bool {
+    println!("[RUST] call is_denominated_amount with amount {}", amount);
+    return CoinJoin::is_denominated_amount(amount);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_collateral_amount(
+    amount: u64,
+) -> bool {
+    println!("[RUST] call is_collateral_amount with amount {}", amount);
+    return CoinJoin::is_collateral_amount(amount);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_fully_mixed(
     wallet_ex: *mut WalletEx,
     prevout_hash: *mut [u8; 32],
     index: u32,
-) -> i32 {
-    println!("[RUST] call wallet_ex");
-    return (*wallet_ex).get_real_outpoint_coinjoin_rounds(TransactionOutPoint::new(UInt256(*(prevout_hash)), index), 0);
+) -> bool {
+    println!("[RUST] call wallet_ex.is_fully_mixed");
+    return (*wallet_ex).is_fully_mixed(TransactionOutPoint::new(UInt256(*(prevout_hash)), index));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_locked_coin(
+    wallet_ex: *mut WalletEx,
+    prevout_hash: *mut [u8; 32],
+    index: u32,
+) -> bool {
+    println!("[RUST] call wallet_ex.is_fully_mixed");
+    return (*wallet_ex).locked_coins_set.contains(&TransactionOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
 #[no_mangle]

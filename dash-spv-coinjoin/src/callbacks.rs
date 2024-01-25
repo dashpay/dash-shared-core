@@ -32,3 +32,8 @@ pub type IsMineInput = unsafe extern "C" fn(
     index: u32,
     context: *const c_void,
 ) -> bool;
+
+pub type IsMineAddress = unsafe extern "C" fn(
+    address: *mut [u8; 32],
+    context: *const c_void,
+) -> bool;
