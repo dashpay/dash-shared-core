@@ -1,9 +1,9 @@
-use crate::{wallet_ex::WalletEx, models::transaction_destination::TransactionDestination};
+use crate::{wallet_ex::WalletEx, models::tx_destination::TxDestination};
 
 #[derive(Debug)]
 pub(crate) struct KeyHolder {
     reserve_destination: ReserveDestination, // TODO: use ReserveKey
-    destination: TransactionDestination,
+    destination: TxDestination,
 }
 
 impl KeyHolder {

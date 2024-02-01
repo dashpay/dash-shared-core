@@ -2,11 +2,14 @@ pub mod messages;
 pub mod models;
 pub mod coinjoin;
 pub mod constants;
-pub mod callbacks;
 pub mod coinjoin_base_session;
 pub mod coinjoin_client_session;
 pub mod wallet_ex;
-pub mod utils;
+pub mod ffi;
+
+pub(crate) mod coin_selection;
+
+mod utils;
 
 #[cfg(test)]
 pub mod tests;
