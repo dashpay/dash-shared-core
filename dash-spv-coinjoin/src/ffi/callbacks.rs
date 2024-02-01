@@ -52,3 +52,8 @@ pub type SelectCoinsGroupedByAddresses = unsafe extern "C" fn(
 pub type DestroySelectedCoins = unsafe extern "C" fn(
     selected_coins: *mut SelectedCoins,
 );
+
+pub type IsMineAddress = unsafe extern "C" fn(
+    address: *mut [u8; 32],
+    context: *const c_void,
+) -> bool;

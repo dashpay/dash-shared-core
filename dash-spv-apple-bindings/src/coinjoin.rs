@@ -79,7 +79,23 @@ pub unsafe extern "C" fn call_coinjoin(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn call_wallet_ex(
+pub unsafe extern "C" fn is_denominated_amount(
+    amount: u64,
+) -> bool {
+    println!("[RUST] call is_denominated_amount with amount {}", amount);
+    return CoinJoin::is_denominated_amount(amount);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_collateral_amount(
+    amount: u64,
+) -> bool {
+    println!("[RUST] call is_collateral_amount with amount {}", amount);
+    return CoinJoin::is_collateral_amount(amount);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_fully_mixed(
     wallet_ex: *mut WalletEx,
     prevout_hash: *mut [u8; 32],
     index: u32,
