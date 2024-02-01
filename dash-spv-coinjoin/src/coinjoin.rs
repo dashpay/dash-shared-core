@@ -8,13 +8,14 @@ use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 use ferment_interfaces::boxed;
 
-use crate::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
+use crate::ffi::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
-use crate::models::InputValue;
+use crate::models::{CoinJoinClientOptions, InputValue};
 use crate::utils::coin_format::CoinFormat;
+use crate::wallet_ex::WalletEx;
 
 #[derive(Debug)]
 // #[ferment_macro::export]
@@ -38,6 +39,8 @@ impl CoinJoin {
     ];
 
     pub fn new(
+        wallet_ex: WalletEx,
+        options: CoinJoinClientOptions,
         get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
         has_chain_lock: HasChainLock,
         destroy_input_value: DestroyInputValue,
@@ -48,7 +51,7 @@ impl CoinJoin {
             get_input_value_by_prevout_hash,
             has_chain_lock,
             destroy_input_value,
-            map_dstx: HashMap::new(),
+            map_dstx: HashMap::new()
         }
     }
 

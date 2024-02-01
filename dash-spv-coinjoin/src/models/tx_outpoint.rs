@@ -2,21 +2,20 @@ use std::io::{Error, Read, Write};
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use dash_spv_masternode_processor::consensus::encode;
 
-// #[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 // #[ferment_macro::export]
-pub struct TransactionOutPoint {
+pub struct TxOutPoint {
     pub hash: UInt256,
     pub index: u32,
 }
 
-impl TransactionOutPoint {
+impl TxOutPoint {
     pub fn new(hash: UInt256, index: u32) -> Self {
-        TransactionOutPoint { hash, index }
+        TxOutPoint { hash, index }
     }
 }
 
-impl encode::Encodable for TransactionOutPoint {
+impl encode::Encodable for TxOutPoint {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut offset = 0;
@@ -27,12 +26,12 @@ impl encode::Encodable for TransactionOutPoint {
     }
 }
 
-impl encode::Decodable for TransactionOutPoint {
+impl encode::Decodable for TxOutPoint {
     #[inline]
     fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let hash = UInt256::consensus_decode(&mut d)?;
         let index = u32::consensus_decode(&mut d)?;
 
-        Ok(TransactionOutPoint { hash, index })
+        Ok(TxOutPoint { hash, index })
     }
 }
