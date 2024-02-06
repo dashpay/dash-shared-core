@@ -7,7 +7,7 @@ use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 
-use crate::callbacks::HasChainLock;
+use crate::ffi::callbacks::HasChainLock;
 
 // dstx
 // #[repr(C)]

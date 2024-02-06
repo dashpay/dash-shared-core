@@ -6,14 +6,14 @@ use dash_spv_masternode_processor::tx::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
-use crate::messages::transaction_outpoint::TransactionOutPoint;
+use crate::models::tx_outpoint::TxOutPoint;
 use crate::messages::{pool_state::PoolState, pool_status::PoolStatus};
 use crate::models::pending_dsa_request::PendingDsaRequest;
 use crate::models::{CoinJoinClientOptions, Balance};
 use crate::coinjoin_base_session::CoinJoinBaseSession;
 use crate::utils::coin_format::CoinFormat;
 use crate::utils::key_holder_storage::KeyHolderStorage;
-use crate::utils::compact_tally_item::CompactTallyItem;
+use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::wallet_ex::WalletEx;
 
 static mut NEXT_ID: i32 = 0;
@@ -30,7 +30,7 @@ pub struct CoinJoinClientSession {
     status: PoolStatus,
     last_create_denominated_result: bool,
     session_id: i32,
-    outpoint_locked: Vec<TransactionOutPoint>,
+    outpoint_locked: Vec<TxOutPoint>,
     mixing_masternode: Option<MasternodeEntry>,
     pending_dsa_request: Option<PendingDsaRequest>,
     tx_my_collateral: Option<Transaction>,
@@ -109,7 +109,7 @@ impl CoinJoinClientSession {
             
             if balance_left_to_mix < value_min {
                 self.set_status(PoolStatus::ErrNotEnoughFunds);
-                // queueSessionCompleteListeners(getState(), ERR_SESSION);
+                // queueSessionCompleteListeners(getState(), ERR_SESSION); TODO: 
             }
             
             return false;
@@ -121,7 +121,7 @@ impl CoinJoinClientSession {
         let balance_denominated = balance_denominated_conf + balance_denominated_unconf;
         let balance_to_denominate = self.options.coinjoin_amount * DUFFS - balance_denominated;
 
-        // Adjust n_balance_needs_anonymized to consume final denom
+        // Adjust balance_needs_anonymized to consume final denom
         if balance_denominated - balance_anonymized > balance_needs_anonymized as u64 {
             let denoms = CoinJoin::get_standard_denominations();
             let mut additional_denom: u64 = 0;
@@ -151,20 +151,21 @@ impl CoinJoinClientSession {
             balance_to_denominate.to_friendly_string()
         );
 
-        if dry_run {
-            return true;
-        }
-
         // Check if we have should create more denominated inputs i.e.
         // there are funds to denominate and denominated balance does not exceed
         // max amount to mix yet.
         self.last_create_denominated_result = true;
         
         if balance_anonimizable_non_denom >= value_min + CoinJoin::get_max_collateral_amount() && balance_to_denominate > 0 {
-            self.last_create_denominated_result = self.create_denominated(balance_to_denominate);
+            self.last_create_denominated_result = self.create_denominated(balance_to_denominate, dry_run);
         }
 
-        //check if we have the collateral sized inputs
+        if dry_run {
+            println!("[RUST] CoinJoin: create denominations {}, {}", self.last_create_denominated_result, dry_run);
+            return self.last_create_denominated_result;
+        }
+
+        // check if we have the collateral sized inputs
         if !self.mixing_wallet.has_collateral_inputs(true) {
             return !self.mixing_wallet.has_collateral_inputs(false) && self.make_collateral_amounts();
         }
@@ -177,7 +178,7 @@ impl CoinJoinClientSession {
         // Initial phase, find a Masternode
         // Clean if there is anything left from previous session
         self.unlock_coins();
-        self.key_holder_storage.return_all();
+        // self.key_holder_storage.return_all(); TODO
         self.set_null();
 
         // should be no unconfirmed denoms in non-multi-session mode
@@ -213,7 +214,7 @@ impl CoinJoinClientSession {
 
                 // lock the funds we're going to use for our collateral
                 for txin in collateral.inputs {
-                    let outpoint = TransactionOutPoint::new(txin.input_hash, txin.index);
+                    let outpoint = TxOutPoint::new(txin.input_hash, txin.index);
                     self.mixing_wallet.lock_coin(outpoint.clone());
                     self.outpoint_locked.push(outpoint);
                 }
@@ -234,7 +235,7 @@ impl CoinJoinClientSession {
         return false;
     }
 
-    fn create_denominated(&self, balance_to_denominate: u64) -> bool {
+    fn create_denominated(&mut self, balance_to_denominate: u64, dry_run: bool) -> bool {
         if !self.options.enable_coinjoin {
             return false;
         }
@@ -246,16 +247,16 @@ impl CoinJoinClientSession {
         let mut vec_tally: Vec<CompactTallyItem> = self.mixing_wallet.select_coins_grouped_by_addresses(true, true, true, 400);
     
         if vec_tally.is_empty() {
-            println!("CoinJoinClientSession::CreateDenominated -- SelectCoinsGroupedByAddresses can't find any inputs!\n");
+            println!("[RUST] CoinJoinClientSession::CreateDenominated -- SelectCoinsGroupedByAddresses can't find any inputs!\n");
             return false;
         }
     
         // Start from the largest balances first to speed things up by creating txes with larger/largest denoms included
         vec_tally.sort_by(|a, b| b.amount.cmp(&a.amount));
-        let create_mixing_collaterals = !self.mixing_wallet.has_collateral_inputs();
+        let create_mixing_collaterals = !self.mixing_wallet.has_collateral_inputs(true);
     
         for item in vec_tally {
-            if !self.create_denominated_with_item(&item, balance_to_denominate, create_mixing_collaterals) {
+            if !self.create_denominated_with_item(&item, balance_to_denominate, create_mixing_collaterals, dry_run) {
                 continue;
             }
 
@@ -266,10 +267,10 @@ impl CoinJoinClientSession {
         false
     }
 
-    fn create_denominated_with_item(&self, tally_item: &CompactTallyItem, balance_to_denominate: u64, create_mixing_collaterals: bool) -> bool {
+    fn create_denominated_with_item(&self, tally_item: &CompactTallyItem, balance_to_denominate: u64, create_mixing_collaterals: bool, dry_run: bool) -> bool {
 
         // TODO
-        return false;
+        return true;
     }
 
     fn make_collateral_amounts(&self) -> bool {

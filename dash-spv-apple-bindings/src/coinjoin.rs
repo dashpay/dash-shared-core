@@ -2,11 +2,12 @@ use core::slice;
 use std::io::Cursor;
 use std::ffi::c_void;
 
+use dash_spv_coinjoin::ffi::callbacks::DestroySelectedCoins;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue, GetWalletTransaction, DestroyWalletTransaction, IsMineInput};
-use dash_spv_coinjoin::messages::transaction_outpoint::TransactionOutPoint;
+use dash_spv_coinjoin::ffi::callbacks::{DestroyInputValue, DestroyWalletTransaction, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses};
+use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::CoinJoinClientOptions;
 use dash_spv_coinjoin::wallet_ex::WalletEx;
 use dash_spv_masternode_processor::consensus::Decodable;
@@ -17,12 +18,16 @@ use dash_spv_masternode_processor::types::Transaction;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_coinjoin(
+    wallet_ex: *mut WalletEx,
+    options: *mut CoinJoinClientOptions,
     get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
     has_chain_lock: HasChainLock,
     destroy_input_value: DestroyInputValue,
     context: *const c_void
 ) -> *mut CoinJoin {
     let coinjoin = CoinJoin::new(
+        std::ptr::read(wallet_ex),
+        std::ptr::read(options),
         get_input_value_by_prevout_hash,
         has_chain_lock,
         destroy_input_value,
@@ -38,10 +43,22 @@ pub unsafe extern "C" fn register_wallet_ex(
     get_wallet_transaction: GetWalletTransaction,
     destroy_wallet_transaction: DestroyWalletTransaction,
     is_mine: IsMineInput,
+    has_collateral_inputs: HasCollateralInputs,
+    selected_coins: SelectCoinsGroupedByAddresses,
+    destroy_selected_coins: DestroySelectedCoins,
     context: *const c_void
 ) -> *mut WalletEx {
     let options: CoinJoinClientOptions = std::ptr::read(options_ptr);
-    let wallet_ex = WalletEx::new(context, options, get_wallet_transaction, destroy_wallet_transaction, is_mine);
+    let wallet_ex = WalletEx::new(
+        context, 
+        options, 
+        get_wallet_transaction, 
+        destroy_wallet_transaction, 
+        is_mine, 
+        has_collateral_inputs, 
+        selected_coins, 
+        destroy_selected_coins
+    );
     println!("[RUST] register_wallet_ex: {:?}", wallet_ex);
     boxed(wallet_ex)
 }
@@ -54,12 +71,11 @@ pub unsafe extern "C" fn unregister_coinjoin(coinjoin: *mut CoinJoin) {
 
 #[no_mangle]
 pub unsafe extern "C" fn call_coinjoin(
-    coinjoin: *mut CoinJoin,
-    tx: *mut Transaction,
-    context: *const c_void
+    coinjoin: *mut CoinJoin
 ) -> bool {
-    println!("[RUST] call coinjoin with tx: {:?}", tx);
-    return (*coinjoin).is_collateral_valid(&(*tx).decode(), true);
+    println!("[RUST] call coinjoin");
+    // return (*coinjoin).trigger_session();
+    return true;
 }
 
 #[no_mangle]
@@ -85,7 +101,7 @@ pub unsafe extern "C" fn is_fully_mixed(
     index: u32,
 ) -> bool {
     println!("[RUST] call wallet_ex.is_fully_mixed");
-    return (*wallet_ex).is_fully_mixed(TransactionOutPoint::new(UInt256(*(prevout_hash)), index));
+    return (*wallet_ex).is_fully_mixed(TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
 #[no_mangle]
@@ -95,7 +111,13 @@ pub unsafe extern "C" fn is_locked_coin(
     index: u32,
 ) -> bool {
     println!("[RUST] call wallet_ex.is_fully_mixed");
-    return (*wallet_ex).locked_coins_set.contains(&TransactionOutPoint::new(UInt256(*(prevout_hash)), index));
+    return (*wallet_ex).locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn coinjoin_get_smallest_denomination() -> u64 {
+    println!("[RUST] call coinjoin_get_smallest_denomination");
+    return CoinJoin::get_smallest_denomination();
 }
 
 #[no_mangle]
