@@ -39,8 +39,6 @@ impl CoinJoin {
     ];
 
     pub fn new(
-        wallet_ex: WalletEx,
-        options: CoinJoinClientOptions,
         get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
         has_chain_lock: HasChainLock,
         destroy_input_value: DestroyInputValue,

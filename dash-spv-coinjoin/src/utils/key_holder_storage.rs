@@ -1,8 +1,10 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{utils::key_holder::KeyHolder, wallet_ex::WalletEx};
 
 #[derive(Debug)]
 pub(crate) struct KeyHolderStorage {
-    storage: Vec<KeyHolder>
+    storage: Vec<KeyHolder>,
 }
 
 impl KeyHolderStorage {
@@ -12,32 +14,19 @@ impl KeyHolderStorage {
         }
     }
 
-    pub fn add_key(&self, wallet: &WalletEx) -> Option<Vec<u8>>  {
+    pub fn add_key(&mut self, wallet: Rc<RefCell<WalletEx>>) -> Option<Vec<u8>>  {
         let key_holder = KeyHolder::new(wallet);
-        let script = key_holder.get_script_for_destination();
+        let script = key_holder.destination.clone();
         self.storage.push(key_holder);
-        script
+        
+        return script;
     }
 
     pub fn keep_all(&self) {
-        let tmp = std::mem::replace(&mut *self.storage, Vec::new());
-
-        if !tmp.is_empty() {
-            for key in tmp {
-                key.keep_key();
-            }
-            println!("keepAll -- {} keys kept", tmp.len());
-        }
+        // TODO
     }
 
     pub fn return_all(&self) {
-        let tmp = std::mem::replace(&mut *self.storage, Vec::new());
-
-        if !tmp.is_empty() {
-            for key in tmp {
-                key.return_key();
-            }
-            println!("returnAll -- {} keys returned", tmp.len());
-        }
+        // TODO
     }
 }

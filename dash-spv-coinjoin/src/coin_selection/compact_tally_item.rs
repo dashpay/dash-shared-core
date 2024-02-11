@@ -8,12 +8,12 @@ pub struct CompactTallyItem {
     pub input_coins: Vec<InputCoin>,
 }
 
-// impl CompactTallyItem {
-//     fn new(tx_destination: TxDestination) -> Self {
-//         CompactTallyItem {
-//             tx_destination,
-//             amount: 0,
-//             input_coins: Vec::new(),
-//         }
-//     }
-// }
+impl CompactTallyItem {
+    pub fn new(tx_destination: TxDestination) -> Self {
+        CompactTallyItem {
+            tx_destination,
+            amount: 0,
+            input_coins: Vec::new(),
+        }
+    }
+}

@@ -2,11 +2,11 @@ use core::slice;
 use std::io::Cursor;
 use std::ffi::c_void;
 
-use dash_spv_coinjoin::ffi::callbacks::DestroySelectedCoins;
+use dash_spv_coinjoin::coinjoin_client_session::CoinJoinClientSession;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{DestroyInputValue, DestroyWalletTransaction, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses};
+use dash_spv_coinjoin::ffi::callbacks::{DestroyInputValue, DestroyWalletTransaction, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses, DestroySelectedCoins, SignTransaction};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::CoinJoinClientOptions;
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -14,20 +14,16 @@ use dash_spv_masternode_processor::consensus::Decodable;
 use ferment_interfaces::{boxed, unbox_any};
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::ffi::from::FromFFI;
-use dash_spv_masternode_processor::types::Transaction;
+use dash_spv_masternode_processor::types;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_coinjoin(
-    wallet_ex: *mut WalletEx,
-    options: *mut CoinJoinClientOptions,
     get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
     has_chain_lock: HasChainLock,
     destroy_input_value: DestroyInputValue,
     context: *const c_void
 ) -> *mut CoinJoin {
     let coinjoin = CoinJoin::new(
-        std::ptr::read(wallet_ex),
-        std::ptr::read(options),
         get_input_value_by_prevout_hash,
         has_chain_lock,
         destroy_input_value,
@@ -38,7 +34,8 @@ pub unsafe extern "C" fn register_coinjoin(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn register_wallet_ex(
+pub unsafe extern "C" fn register_client_session(
+    coinjoin: *mut CoinJoin,
     options_ptr: *mut CoinJoinClientOptions,
     get_wallet_transaction: GetWalletTransaction,
     destroy_wallet_transaction: DestroyWalletTransaction,
@@ -46,36 +43,56 @@ pub unsafe extern "C" fn register_wallet_ex(
     has_collateral_inputs: HasCollateralInputs,
     selected_coins: SelectCoinsGroupedByAddresses,
     destroy_selected_coins: DestroySelectedCoins,
+    sign_transaction: SignTransaction,
     context: *const c_void
-) -> *mut WalletEx {
-    let options: CoinJoinClientOptions = std::ptr::read(options_ptr);
-    let wallet_ex = WalletEx::new(
-        context, 
-        options, 
+) -> *mut CoinJoinClientSession {
+    let session = CoinJoinClientSession::new(
+        std::ptr::read(coinjoin),
+        std::ptr::read(options_ptr), 
+        sign_transaction,
         get_wallet_transaction, 
         destroy_wallet_transaction, 
         is_mine, 
         has_collateral_inputs, 
         selected_coins, 
-        destroy_selected_coins
+        destroy_selected_coins,
+        context
     );
-    println!("[RUST] register_wallet_ex: {:?}", wallet_ex);
-    boxed(wallet_ex)
+    println!("[RUST] register_session");
+    boxed(session)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn call_session(
+    session: *mut CoinJoinClientSession
+) -> bool {
+    println!("[RUST] call session");
+    (*session).run_session();
+    return true;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn on_transaction_signed_for_session(
+    tx: *mut types::Transaction, 
+    session: *mut CoinJoinClientSession,
+    destroy_wallet_transaction: DestroyWalletTransaction
+) {
+    (*session).on_transaction_signed((*tx).decode());
+    (destroy_wallet_transaction)(tx);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn destroy_transaction(
+    tx: *mut types::Transaction
+) {
+    println!("[RUST] 💀 destroy_transaction");
+    let unboxed = unbox_any(tx);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn unregister_coinjoin(coinjoin: *mut CoinJoin) {
     println!("[RUST] 💀 unregister_coinjoin: {:?}", coinjoin);
     let unboxed = unbox_any(coinjoin);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn call_coinjoin(
-    coinjoin: *mut CoinJoin
-) -> bool {
-    println!("[RUST] call coinjoin");
-    // return (*coinjoin).trigger_session();
-    return true;
 }
 
 #[no_mangle]

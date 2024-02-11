@@ -1,13 +1,15 @@
-use crate::{wallet_ex::WalletEx, models::tx_destination::TxDestination};
+use std::{cell::RefCell, rc::Rc};
+
+use crate::{wallet_ex::WalletEx, models::{reserve_destination::ReserveDestination, tx_destination::TxDestination}};
 
 #[derive(Debug)]
 pub(crate) struct KeyHolder {
     reserve_destination: ReserveDestination, // TODO: use ReserveKey
-    destination: TxDestination,
+    pub destination: TxDestination,
 }
 
 impl KeyHolder {
-    pub fn new(wallet: &WalletEx) -> Self {
+    pub fn new(wallet: Rc<RefCell<WalletEx>>) -> Self {
         // Get the next CoinJoinKey?
         let reserve_destination = ReserveDestination::new(wallet);
         let destination = reserve_destination.get_reserved_destination(false);
@@ -23,9 +25,5 @@ impl KeyHolder {
 
     pub fn return_key(&mut self) {
         self.reserve_destination.return_destination();
-    }
-
-    pub fn get_script_for_destination(&self) -> Option<Vec<u8>> {
-        self.destination.get_script()
     }
 }

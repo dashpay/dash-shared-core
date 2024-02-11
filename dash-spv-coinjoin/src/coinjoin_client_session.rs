@@ -1,4 +1,5 @@
-use std::fmt::Debug;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use dash_spv_masternode_processor::chain::params::DUFFS;
 use dash_spv_masternode_processor::models::MasternodeEntry;
@@ -6,6 +7,7 @@ use dash_spv_masternode_processor::tx::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
+use crate::ffi::callbacks::{DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::messages::{pool_state::PoolState, pool_status::PoolStatus};
 use crate::models::pending_dsa_request::PendingDsaRequest;
@@ -14,18 +16,19 @@ use crate::coinjoin_base_session::CoinJoinBaseSession;
 use crate::utils::coin_format::CoinFormat;
 use crate::utils::key_holder_storage::KeyHolderStorage;
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
+use crate::utils::transaction_builder::TransactionBuilder;
 use crate::wallet_ex::WalletEx;
 
 static mut NEXT_ID: i32 = 0;
 
-#[derive(Debug)]
 pub struct CoinJoinClientSession {
     id: i32,
     coinjoin: CoinJoin,
-    mixing_wallet: WalletEx,
+    mixing_wallet: Rc<RefCell<WalletEx>>,
     base_session: CoinJoinBaseSession,
     options: CoinJoinClientOptions,
     key_holder_storage: KeyHolderStorage,
+    tx_builder: TransactionBuilder,
     state: PoolState,
     status: PoolStatus,
     last_create_denominated_result: bool,
@@ -35,24 +38,45 @@ pub struct CoinJoinClientSession {
     pending_dsa_request: Option<PendingDsaRequest>,
     tx_my_collateral: Option<Transaction>,
     is_my_collateral_valid: bool,
-    str_auto_denom_result: String
+    str_auto_denom_result: String,
+    sign_transaction: SignTransaction,
+    opaque_context: *const std::ffi::c_void
 }
 
 impl CoinJoinClientSession {
     pub fn new(
         coinjoin: CoinJoin,
-        wallet_ex: WalletEx,
         options: CoinJoinClientOptions,
+        sign_transaction: SignTransaction,
+        get_wallet_transaction: GetWalletTransaction,
+        destroy_wallet_transaction: DestroyWalletTransaction,
+        is_mine: IsMineInput,
+        has_collateral_inputs: HasCollateralInputs,
+        selected_coins: SelectCoinsGroupedByAddresses,
+        destroy_selected_coins: DestroySelectedCoins,
+        context: *const std::ffi::c_void
     ) -> Self {
         unsafe { NEXT_ID += 1; } // TODO
+
+        let wallet_ex = Rc::new(RefCell::new(WalletEx::new(
+            context, 
+            options.clone(), 
+            get_wallet_transaction, 
+            destroy_wallet_transaction, 
+            is_mine, 
+            has_collateral_inputs, 
+            selected_coins, 
+            destroy_selected_coins
+        )));
 
         Self {
             id: unsafe { NEXT_ID }, 
             coinjoin: coinjoin,
-            mixing_wallet: wallet_ex,
+            mixing_wallet: wallet_ex.clone(),
             base_session: CoinJoinBaseSession::new(),
-            options: options,
             key_holder_storage: KeyHolderStorage::new(),
+            tx_builder: TransactionBuilder::new(wallet_ex, sign_transaction, false, options.chain_type, context),
+            options: options,
             state: PoolState::Idle,
             status: PoolStatus::Warmup,
             last_create_denominated_result: true,
@@ -62,11 +86,25 @@ impl CoinJoinClientSession {
             pending_dsa_request: None,
             tx_my_collateral: None,
             is_my_collateral_valid: false,
-            str_auto_denom_result: String::new()
+            str_auto_denom_result: String::new(),
+            sign_transaction,
+            opaque_context: context
         }
     }
 
-    pub fn do_automatic_denominating(&self, dry_run: bool, balance_info: Balance) -> bool {
+    pub fn run_session(&mut self) {
+        let tally_items = self.mixing_wallet.borrow_mut().select_coins_grouped_by_addresses(false, true, true, -1);
+        println!("[RUST] CoinJoin: run_session - tally_items: {}", tally_items.len());
+        self.tx_builder.init(tally_items.first().unwrap().to_owned());
+        println!("[RUST] CoinJoin: run_session tx_builder.bytes_base: {:?}", self.tx_builder.bytes_base);
+    }
+
+    pub fn on_transaction_signed(&mut self, tx: Transaction) {
+        self.tx_builder.bytes_base = tx.to_data().len() as i32;
+        println!("[RUST] CoinJoin: on_transaction_signed tx_builder.bytes_base: {:?}", self.tx_builder.bytes_base);
+    }
+
+    pub fn do_automatic_denominating(&mut self, dry_run: bool, balance_info: Balance) -> bool {
         if self.state != PoolState::Idle || !self.options.enable_coinjoin {
             return false;
         }
@@ -91,21 +129,21 @@ impl CoinJoinClientSession {
             return false;
         }
 
-        let balance_needs_anonymized = sub_res.unwrap();
+        let mut balance_needs_anonymized = sub_res.unwrap();
         let mut value_min = CoinJoin::get_smallest_denomination();
 
         // if there are no confirmed DS collateral inputs yet
-        if !self.mixing_wallet.has_collateral_inputs(true) {
+        if !self.mixing_wallet.borrow_mut().has_collateral_inputs(true) {
             // should have some additional amount for them
             value_min = value_min + CoinJoin::get_max_collateral_amount();
         }
 
         // including denoms but applying some restrictions
-        let balance_anonymizable = self.mixing_wallet.get_anonymizable_balance(false, true);
+        let balance_anonymizable = self.mixing_wallet.borrow_mut().get_anonymizable_balance(false, true);
 
          // mixable balance is way too small
          if balance_anonymizable < value_min {
-            let balance_left_to_mix = self.mixing_wallet.get_anonymizable_balance(false, false);
+            let balance_left_to_mix = self.mixing_wallet.borrow_mut().get_anonymizable_balance(false, false);
             
             if balance_left_to_mix < value_min {
                 self.set_status(PoolStatus::ErrNotEnoughFunds);
@@ -115,7 +153,7 @@ impl CoinJoinClientSession {
             return false;
         }
 
-        let balance_anonimizable_non_denom = self.mixing_wallet.get_anonymizable_balance(true);
+        let balance_anonimizable_non_denom = self.mixing_wallet.borrow_mut().get_anonymizable_balance(true, true);
         let balance_denominated_conf = balance_info.denominated_trusted;
         let balance_denominated_unconf = balance_info.denominated_untrusted_pending;
         let balance_denominated = balance_denominated_conf + balance_denominated_unconf;
@@ -166,8 +204,8 @@ impl CoinJoinClientSession {
         }
 
         // check if we have the collateral sized inputs
-        if !self.mixing_wallet.has_collateral_inputs(true) {
-            return !self.mixing_wallet.has_collateral_inputs(false) && self.make_collateral_amounts();
+        if !self.mixing_wallet.borrow_mut().has_collateral_inputs(true) {
+            return !self.mixing_wallet.borrow_mut().has_collateral_inputs(false) && self.make_collateral_amounts();
         }
 
         if self.session_id != 0 {
@@ -189,7 +227,7 @@ impl CoinJoinClientSession {
         }
 
         let mut reason = String::new();
-        match self.tx_my_collateral {
+        match &self.tx_my_collateral {
             None => {
                 if !self.create_collateral_transaction(&mut reason) {
                     println!("coinjoin: create collateral error: {}", reason);
@@ -199,7 +237,7 @@ impl CoinJoinClientSession {
             Some(collateral) => {
                 if !self.is_my_collateral_valid || !self.coinjoin.is_collateral_valid(&collateral, true) {
                     println!("coinjoin: invalid collateral, recreating... [id: {}] ", self.id);
-                    let output = collateral.outputs[0];
+                    let output = &collateral.outputs[0];
                     
                     if output.script_pub_key_type() == ScriptType::PayToPubkeyHash {
                         // TODO
@@ -213,9 +251,9 @@ impl CoinJoinClientSession {
                 }
 
                 // lock the funds we're going to use for our collateral
-                for txin in collateral.inputs {
+                for txin in &collateral.inputs {
                     let outpoint = TxOutPoint::new(txin.input_hash, txin.index);
-                    self.mixing_wallet.lock_coin(outpoint.clone());
+                    self.mixing_wallet.borrow_mut().lock_coin(outpoint.clone());
                     self.outpoint_locked.push(outpoint);
                 }
             },
@@ -244,7 +282,7 @@ impl CoinJoinClientSession {
         // We still want to consume a lot of inputs to avoid creating only smaller denoms though.
         // Knowing that each CTxIn is at least 148 B big, 400 inputs should take 400 x ~148 B = ~60 kB.
         // This still leaves more than enough room for another data of typical CreateDenominated tx.
-        let mut vec_tally: Vec<CompactTallyItem> = self.mixing_wallet.select_coins_grouped_by_addresses(true, true, true, 400);
+        let mut vec_tally: Vec<CompactTallyItem> = self.mixing_wallet.borrow_mut().select_coins_grouped_by_addresses(true, true, true, 400);
     
         if vec_tally.is_empty() {
             println!("[RUST] CoinJoinClientSession::CreateDenominated -- SelectCoinsGroupedByAddresses can't find any inputs!\n");
@@ -253,7 +291,7 @@ impl CoinJoinClientSession {
     
         // Start from the largest balances first to speed things up by creating txes with larger/largest denoms included
         vec_tally.sort_by(|a, b| b.amount.cmp(&a.amount));
-        let create_mixing_collaterals = !self.mixing_wallet.has_collateral_inputs(true);
+        let create_mixing_collaterals = !self.mixing_wallet.borrow_mut().has_collateral_inputs(true);
     
         for item in vec_tally {
             if !self.create_denominated_with_item(&item, balance_to_denominate, create_mixing_collaterals, dry_run) {
@@ -303,7 +341,7 @@ impl CoinJoinClientSession {
         }
 
         for outpoint in &self.outpoint_locked {
-            self.mixing_wallet.unlock_coin(outpoint);
+            self.mixing_wallet.borrow_mut().unlock_coin(outpoint);
         }
 
         self.outpoint_locked.clear();
