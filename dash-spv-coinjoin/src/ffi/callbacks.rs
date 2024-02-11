@@ -28,6 +28,11 @@ pub type DestroyWalletTransaction = unsafe extern "C" fn(
     input_value: *mut types::Transaction,
 );
 
+pub type SignTransaction = unsafe extern "C" fn(
+    transaction: *mut types::Transaction,
+    context: *const c_void
+);
+
 pub type IsMineInput = unsafe extern "C" fn(
     prevout_hash: *mut [u8; 32],
     index: u32,

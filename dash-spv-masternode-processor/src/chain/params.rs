@@ -15,7 +15,7 @@ pub(crate) const TX_OUTPUT_SIZE: u64 = 34;
 /// estimated size for a typical compact pubkey transaction input
 pub(crate) const TX_INPUT_SIZE: u64 = 148;
 /// no txout can be below this amount
-pub(crate) const TX_MIN_OUTPUT_AMOUNT: u64 = TX_FEE_PER_B * 3 * (TX_OUTPUT_SIZE + TX_INPUT_SIZE);
+pub const TX_MIN_OUTPUT_AMOUNT: u64 = TX_FEE_PER_B * 3 * (TX_OUTPUT_SIZE + TX_INPUT_SIZE);
 /// no tx can be larger than this size in bytes
 pub(crate) const TX_MAX_SIZE: u64 = 100000;
 /// block height indicating transaction is unconfirmed
