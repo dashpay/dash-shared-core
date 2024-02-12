@@ -1,4 +1,5 @@
 use std::collections::{HashSet, HashMap};
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::consensus::Encodable;
@@ -9,7 +10,7 @@ use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
 use ferment_interfaces::boxed;
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
-use crate::ffi::callbacks::{DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses};
+use crate::ffi::callbacks::{DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::models::tx_outpoint::TxOutPoint;
@@ -251,12 +252,38 @@ impl WalletEx {
         return vec_tally_ret;
     }
 
-    fn clear_anonymizable_caches(&mut self) {
-        self.anonymizable_tally_cached_non_denom = false;
-        self.anonymizable_tally_cached = false;
+    pub fn get_anonymizable_balance(&mut self, skip_denominated: bool, skip_unconfirmed: bool) -> u64 {
+        if !self.options.enable_coinjoin {
+            return 0;
+        }
+
+        let tally_items = self.select_coins_grouped_by_addresses(skip_denominated, true, skip_unconfirmed, -1);
+        
+        if tally_items.is_empty() {
+            return 0;
+        }
+
+        let mut total = 0;
+        let smallest_denom = CoinJoin::get_smallest_denomination();
+        let mixing_collateral = CoinJoin::get_collateral_amount();
+
+        for item in tally_items {
+            let is_denominated = CoinJoin::is_denominated_amount(item.amount);
+            
+            if skip_denominated && is_denominated {
+                continue;
+            }
+
+            // assume that the fee to create denoms should be mixing collateral at max
+            if item.amount >= smallest_denom + if is_denominated { 0 } else { mixing_collateral } {
+                total = total + item.amount;
+            }
+        }
+
+        return total;
     }
 
-    fn get_wallet_transaction(&self, hash: UInt256) -> Option<Transaction> {
+    pub fn get_wallet_transaction(&self, hash: UInt256) -> Option<Transaction> {
         unsafe {
             let wtx = (self.get_wallet_transaction)(boxed(hash.0), self.opaque_context);
             
@@ -268,6 +295,11 @@ impl WalletEx {
             (self.destroy_wallet_transaction)(wtx);
             Some(transaction)
         }
+    }
+
+    fn clear_anonymizable_caches(&mut self) {
+        self.anonymizable_tally_cached_non_denom = false;
+        self.anonymizable_tally_cached = false;
     }
 
     fn is_mine_input(&self, txin: &TransactionInput) -> bool {

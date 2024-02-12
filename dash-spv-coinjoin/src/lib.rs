@@ -9,7 +9,7 @@ pub mod ffi;
 
 pub(crate) mod coin_selection;
 
-mod utils;
+pub mod utils;
 
 #[cfg(test)]
 pub mod tests;
