@@ -39,7 +39,7 @@ pub struct TransactionBuilder {
     /// Call KeepKey for all keys in destructor if fKeepKeys is true, call ReturnKey for all key if its false.
     keep_keys: bool,
     /// Contains all outputs already added to the transaction
-    vec_outputs: Vec<TransactionBuilderOutput>,
+    pub outputs: Vec<TransactionBuilderOutput>,
     dry_run: bool,
     chain_type: ChainType,
     sign_transaction: SignTransaction,
@@ -62,7 +62,7 @@ impl<'a> TransactionBuilder {
             bytes_base: 0,
             bytes_output: 0,
             keep_keys: false,
-            vec_outputs: Vec::new(),
+            outputs: Vec::new(),
             dry_run,
             chain_type,
             sign_transaction,
@@ -114,27 +114,23 @@ impl<'a> TransactionBuilder {
     }
 
     /// Check it would be possible to add a single output with the amount amount. Returns true if its possible and false if not.
-    pub fn could_add_output(&self, amount_output: i64) -> bool {
-        if amount_output < 0 {
-            return false;
-        }
-        
+    pub fn could_add_output(&self, amount_output: u64) -> bool {
         // Adding another output can change the serialized size of the vout size hence + GetSizeOfCompactSizeDiff()
         let bytes = self.get_bytes_total() + self.bytes_output + self.get_size_of_compact_size_diff(1);
-        return TransactionBuilder::get_amount_left(self.get_amount_initial() as i64, self.get_amount_used() as i64 + amount_output, self.get_fee(bytes as u64) as i64) >= 0;
+        return TransactionBuilder::get_amount_left(self.get_amount_initial() as i64, (self.get_amount_used() + amount_output) as i64, self.get_fee(bytes as u64) as i64) >= 0;
     }
 
     /// Check if it's possible to add multiple outputs as vector of amounts. Returns true if its possible to add all of them and false if not.
-    pub fn could_add_outputs(&self, vec_output_amounts: Vec<i64>) -> bool {
+    pub fn could_add_outputs(&self, vec_output_amounts: &Vec<i64>) -> bool {
         let mut amount_additional = 0;
         let bytes_additional = self.bytes_output * vec_output_amounts.len() as i32;
         let vec_len = vec_output_amounts.len();
 
         for amount_output in vec_output_amounts {
-            if amount_output < 0 {
+            if *amount_output < 0 {
                 return false;
             }
-            amount_additional += amount_output;
+            amount_additional += *amount_output;
         }
         // Adding other outputs can change the serialized size of the vout size hence + GetSizeOfCompactSizeDiff()
         let bytes = self.get_bytes_total() + bytes_additional + self.get_size_of_compact_size_diff(vec_len);
@@ -162,16 +158,16 @@ impl<'a> TransactionBuilder {
     }
 
     /// Add an output with the amount. Returns a pointer to the output if it could be added and nullptr if not due to insufficient amount left.
-    pub fn add_output(&mut self, amount_output: i64) -> Option<&TransactionBuilderOutput> {
+    pub fn add_output(&mut self, amount_output: u64) -> Option<&TransactionBuilderOutput> {
         if self.could_add_output(amount_output) {
-            self.vec_outputs.push(TransactionBuilderOutput::new(self.wallet_ex.clone(), amount_output as u64, self.dry_run));
-            return self.vec_outputs.last();
+            self.outputs.push(TransactionBuilderOutput::new(self.wallet_ex.clone(), amount_output as u64, self.dry_run));
+            return self.outputs.last();
         }
         return None;
     }
 
     pub fn commit(&mut self, str_result: &String) -> bool {
-        let vec_send: Vec<Recipient> = self.vec_outputs
+        let vec_send: Vec<Recipient> = self.outputs
             .iter()
             .map(|out| Recipient {
                 script_pub_key: out.script.clone(), 
@@ -180,6 +176,7 @@ impl<'a> TransactionBuilder {
             })
             .collect();
 
+        println!("CoinJoin commit: vec_send: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
         // TODO: commit transaction
         self.keep_keys = true;
         return true;
@@ -218,11 +215,11 @@ impl<'a> TransactionBuilder {
     }
 
     fn get_bytes_total(&self) -> i32 {
-        return self.bytes_base + self.vec_outputs.len() as i32 * self.bytes_output + self.get_size_of_compact_size_diff(self.vec_outputs.len());
+        return self.bytes_base + self.outputs.len() as i32 * self.bytes_output + self.get_size_of_compact_size_diff(self.outputs.len());
     }
     
     fn get_size_of_compact_size_diff(&self, add: usize) -> i32 {
-        let size = self.vec_outputs.len();
+        let size = self.outputs.len();
 
         return self.get_compact_size_diff(size, size + add);
     }
@@ -237,7 +234,7 @@ impl<'a> TransactionBuilder {
 
     fn get_amount_used(&self) -> u64 {
         let mut amount = 0;
-        for output in &self.vec_outputs {
+        for output in &self.outputs {
             amount += output.amount;
         }
         return amount;
@@ -262,8 +259,8 @@ impl<'a> TransactionBuilder {
 
     /// Clear the output vector and keep/return the included keys depending on the value of fKeepKeys
     fn clear(&mut self) {
-        let mut vec_outputs_tmp = self.vec_outputs.clone();
-        self.vec_outputs.clear();
+        let mut vec_outputs_tmp = self.outputs.clone();
+        self.outputs.clear();
 
         for output in &mut vec_outputs_tmp {
             if self.keep_keys {
@@ -274,7 +271,7 @@ impl<'a> TransactionBuilder {
         }
 
         if let Some(address) = self.dummy_reserve_destination.address.clone() {
-            println!("returning: {}", address.to_hex());
+            println!("[RUST] TransactionBuilder returning: {}", address.to_hex());
         }
         
         // Always return this key
@@ -291,7 +288,7 @@ impl fmt::Display for TransactionBuilder {
             self.bytes_output,
             self.get_bytes_total(),
             self.get_amount_initial().to_friendly_string(),
-            self.vec_outputs.len(),
+            self.outputs.len(),
             self.coin_control.fee_rate.to_friendly_string(),
             self.coin_control.discard_fee_rate.to_friendly_string(),
             self.get_fee(self.get_bytes_total() as u64).to_friendly_string()
