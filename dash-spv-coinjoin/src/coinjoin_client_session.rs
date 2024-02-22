@@ -1,4 +1,6 @@
+use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use dash_spv_masternode_processor::chain::params::DUFFS;
@@ -7,7 +9,8 @@ use dash_spv_masternode_processor::tx::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
-use crate::ffi::callbacks::{DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use crate::constants::{COINJOIN_DENOM_OUTPUTS_THRESHOLD, DEFAULT_COINJOIN_DENOMS_GOAL, DEFAULT_COINJOIN_DENOMS_HARDCAP};
+use crate::ffi::callbacks::{InputsWithAmount, DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::messages::{pool_state::PoolState, pool_status::PoolStatus};
 use crate::models::pending_dsa_request::PendingDsaRequest;
@@ -54,6 +57,7 @@ impl CoinJoinClientSession {
         has_collateral_inputs: HasCollateralInputs,
         selected_coins: SelectCoinsGroupedByAddresses,
         destroy_selected_coins: DestroySelectedCoins,
+        inputs_with_amount: InputsWithAmount,
         context: *const std::ffi::c_void
     ) -> Self {
         unsafe { NEXT_ID += 1; } // TODO
@@ -66,7 +70,8 @@ impl CoinJoinClientSession {
             is_mine, 
             has_collateral_inputs, 
             selected_coins, 
-            destroy_selected_coins
+            destroy_selected_coins,
+            inputs_with_amount
         )));
 
         Self {
@@ -92,16 +97,8 @@ impl CoinJoinClientSession {
         }
     }
 
-    pub fn run_session(&mut self) {
-        let tally_items = self.mixing_wallet.borrow_mut().select_coins_grouped_by_addresses(false, true, true, -1);
-        println!("[RUST] CoinJoin: run_session - tally_items: {}", tally_items.len());
-        self.tx_builder.init(tally_items.first().unwrap().to_owned());
-        println!("[RUST] CoinJoin: run_session tx_builder.bytes_base: {:?}", self.tx_builder.bytes_base);
-    }
-
     pub fn on_transaction_signed(&mut self, tx: Transaction) {
         self.tx_builder.bytes_base = tx.to_data().len() as i32;
-        println!("[RUST] CoinJoin: on_transaction_signed tx_builder.bytes_base: {:?}", self.tx_builder.bytes_base);
     }
 
     pub fn do_automatic_denominating(&mut self, dry_run: bool, balance_info: Balance) -> bool {
@@ -157,10 +154,10 @@ impl CoinJoinClientSession {
         let balance_denominated_conf = balance_info.denominated_trusted;
         let balance_denominated_unconf = balance_info.denominated_untrusted_pending;
         let balance_denominated = balance_denominated_conf + balance_denominated_unconf;
-        let balance_to_denominate = self.options.coinjoin_amount * DUFFS - balance_denominated;
+        let balance_to_denominate = (self.options.coinjoin_amount * DUFFS).saturating_sub(balance_denominated);
 
         // Adjust balance_needs_anonymized to consume final denom
-        if balance_denominated - balance_anonymized > balance_needs_anonymized as u64 {
+        if balance_denominated.saturating_sub(balance_anonymized) > balance_needs_anonymized as u64 {
             let denoms = CoinJoin::get_standard_denominations();
             let mut additional_denom: u64 = 0;
             
@@ -222,7 +219,7 @@ impl CoinJoinClientSession {
         // should be no unconfirmed denoms in non-multi-session mode
         if !self.options.coinjoin_multi_session && balance_denominated_unconf > 0 {
             self.str_auto_denom_result = "Found unconfirmed denominated outputs, will wait till they confirm to continue.".to_string();
-            println!("coinjoin: {}", self.str_auto_denom_result);
+            println!("[RUST] coinjoin: {}", self.str_auto_denom_result);
             return false;
         }
 
@@ -230,13 +227,13 @@ impl CoinJoinClientSession {
         match &self.tx_my_collateral {
             None => {
                 if !self.create_collateral_transaction(&mut reason) {
-                    println!("coinjoin: create collateral error: {}", reason);
+                    println!("[RUST] coinjoin: create collateral error: {}", reason);
                     return false;
                 }
             },
             Some(collateral) => {
                 if !self.is_my_collateral_valid || !self.coinjoin.is_collateral_valid(&collateral, true) {
-                    println!("coinjoin: invalid collateral, recreating... [id: {}] ", self.id);
+                    println!("[RUST] coinjoin: invalid collateral, recreating... [id: {}] ", self.id);
                     let output = &collateral.outputs[0];
                     
                     if output.script_pub_key_type() == ScriptType::PayToPubkeyHash {
@@ -245,7 +242,7 @@ impl CoinJoinClientSession {
                     }
 
                     if !self.create_collateral_transaction(&mut reason) {
-                        println!("coinjoin: create collateral error: {}", reason);
+                        println!("[RUST] coinjoin: create collateral error: {}", reason);
                         return false;
                     }
                 }
@@ -273,7 +270,7 @@ impl CoinJoinClientSession {
         return false;
     }
 
-    fn create_denominated(&mut self, balance_to_denominate: u64, dry_run: bool) -> bool {
+    pub fn create_denominated(&mut self, balance_to_denominate: u64, dry_run: bool) -> bool { // TODO: unpub
         if !self.options.enable_coinjoin {
             return false;
         }
@@ -301,13 +298,231 @@ impl CoinJoinClientSession {
             return true;
         }
     
-        println!("coinjoin: createDenominated({}) -- failed! ", balance_to_denominate.to_friendly_string());
+        println!("[RUST] CoinJoinClientSession: createDenominated({}) -- failed! ", balance_to_denominate.to_friendly_string());
         false
     }
 
-    fn create_denominated_with_item(&self, tally_item: &CompactTallyItem, balance_to_denominate: u64, create_mixing_collaterals: bool, dry_run: bool) -> bool {
+    fn create_denominated_with_item(
+        &mut self, 
+        tally_item: &CompactTallyItem, 
+        balance_to_denominate: u64, 
+        create_mixing_collaterals: bool, 
+        dry_run: bool
+    ) -> bool {
+        if !self.options.enable_coinjoin {
+            return false;
+        }
 
-        // TODO
+        // denominated input is always a single one, so we can check its amount directly and return early
+        if tally_item.input_coins.len() == 1 && CoinJoin::is_denominated_amount(tally_item.amount) {
+            return false;
+        }
+
+        self.tx_builder = TransactionBuilder::new(
+            self.mixing_wallet.clone(), 
+            self.sign_transaction, 
+            dry_run, 
+            self.options.chain_type, 
+            self.opaque_context
+        );
+        self.tx_builder.init(tally_item.clone());
+
+        println!("[RUST] CoinJoinClientSession: Start {}", self.tx_builder);
+
+        // ****** Add an output for mixing collaterals ************ /
+
+        if create_mixing_collaterals && self.tx_builder.add_output(CoinJoin::get_max_collateral_amount()).is_none() {
+            println!("[RUST] CoinJoinClientSession::CreateDenominatedWithItem -- Failed to add collateral output\n");
+            return false;
+        }
+
+        // ****** Add outputs for denoms ************ /
+
+        let mut add_final = true;
+        let denoms = CoinJoin::get_standard_denominations();
+        let mut map_denom_count = HashMap::new();
+
+        for denom_value in denoms {
+            map_denom_count.insert(*denom_value, self.mixing_wallet.borrow_mut().count_input_with_amount(*denom_value));
+        }
+
+        // Will generate outputs for the createdenoms up to coinjoinmaxdenoms per denom
+
+        // This works in the way creating PS denoms has traditionally worked, assuming enough funds,
+        // it will start with the smallest denom then create 11 of those, then go up to the next biggest denom create 11
+        // and repeat. Previously, once the largest denom was reached, as many would be created were created as possible and
+        // then any remaining was put into a change address and denominations were created in the same manner a block later.
+        // Now, in this system, so long as we don't reach COINJOIN_DENOM_OUTPUTS_THRESHOLD outputs the process repeats in
+        // the same transaction, creating up to nCoinJoinDenomsHardCap per denomination in a single transaction.
+        // let tx_builder = self.tx_builder.borrow_mut();
+
+        let mut balance_to_denominate = balance_to_denominate;
+
+        while self.tx_builder.could_add_output(CoinJoin::get_smallest_denomination()) && (self.tx_builder.outputs.len() as i32) < COINJOIN_DENOM_OUTPUTS_THRESHOLD {
+            for denom_value in denoms.iter().rev() {
+                let mut current_denom = map_denom_count[denom_value];
+                let mut outputs = 0;
+
+                let mut need_more_outputs = |tx_builder: &TransactionBuilder, balance_to_denominate: u64, outputs: i32| {
+                    if tx_builder.could_add_output(*denom_value) {
+                        if add_final && balance_to_denominate > 0 && balance_to_denominate < *denom_value {
+                            add_final = false; // add final denom only once, only the smallest possible one
+                            println!("[RUST] CoinJoinClientSession -- 1 - FINAL - nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
+                                denom_value.to_friendly_string(), balance_to_denominate.to_friendly_string(), outputs, tx_builder.to_string());
+                            true
+                        } else if balance_to_denominate >= *denom_value {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                };
+
+                // add each output up to 11 times or until it can't be added again or until we reach nCoinJoinDenomsGoal
+                while need_more_outputs(&self.tx_builder, balance_to_denominate, outputs) && outputs <= 10 && current_denom <  DEFAULT_COINJOIN_DENOMS_GOAL {
+                    // Add output and subtract denomination amount
+                    if self.tx_builder.add_output(*denom_value).is_some() {
+                        outputs += 1;
+                        current_denom += 1;
+                        balance_to_denominate = balance_to_denominate.saturating_sub(*denom_value);
+                        map_denom_count.insert(*denom_value, current_denom);
+                        println!("[RUST] CoinJoinClientSession -- 2 - nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
+                            denom_value.to_friendly_string(), balance_to_denominate.to_friendly_string(), outputs, self.tx_builder.to_string());
+                    } else {
+                        println!("[RUST] CoinJoinClientSession -- 2 - Error: AddOutput failed for nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
+                            denom_value.to_friendly_string(), balance_to_denominate.to_friendly_string(), outputs, self.tx_builder.to_string());
+                        return false;
+                    }
+                }
+
+                if self.tx_builder.amount_left() == 0 || balance_to_denominate <= 0 {
+                    break;
+                }
+            }
+
+            let mut finished = true;
+
+            for (denom, count) in &map_denom_count {
+                // Check if this specific denom could use another loop, check that there aren't nCoinJoinDenomsGoal of this
+                // denom and that our nValueLeft/nBalanceToDenominate is enough to create one of these denoms, if so, loop again.
+                if *count < DEFAULT_COINJOIN_DENOMS_GOAL && self.tx_builder.could_add_output(*denom) && balance_to_denominate > 0 {
+                    finished = false;
+                    println!("[RUST] CoinJoinClientSession -- 1 - NOT finished - nDenomValue: {}, count: {}, nBalanceToDenominate: {}, {}",
+                        denom.to_friendly_string(), count, balance_to_denominate.to_friendly_string(), self.tx_builder.to_string());
+                    break;
+                }
+                println!("[RUST] CoinJoinClientSession -- 1 - FINISHED - nDenomValue: {}, count: {}, nBalanceToDenominate: {}, {}",
+                    denom.to_friendly_string(), count, balance_to_denominate.to_friendly_string(), self.tx_builder.to_string());
+            }
+
+            if finished {
+                break;
+            }
+        }
+
+        // Now that nCoinJoinDenomsGoal worth of each denom have been created or the max number of denoms given the value of the input, do something with the remainder.
+        // if (txBuilder.CouldAddOutput(CCoinJoin::GetSmallestDenomination()) && nBalanceToDenominate >= CCoinJoin::GetSmallestDenomination() && txBuilder.CountOutputs() < COINJOIN_DENOM_OUTPUTS_THRESHOLD) {
+        if self.tx_builder.could_add_output(CoinJoin::get_smallest_denomination()) && balance_to_denominate >= CoinJoin::get_smallest_denomination() && (self.tx_builder.outputs.len() as i32) < COINJOIN_DENOM_OUTPUTS_THRESHOLD {
+            let largest_denom_value = denoms[0];
+            println!("[RUST] CoinJoinClientSession -- 2 - Process remainder: {}\n", self.tx_builder.to_string());
+
+            let count_possible_outputs = |amount: i64, tx_builder: &TransactionBuilder| -> u64 {
+                let mut vec_outputs: Vec<i64> = Vec::new();
+                loop {
+                    // Create a potential output
+                    vec_outputs.push(amount);
+                    if !tx_builder.could_add_outputs(&vec_outputs) || 
+                        tx_builder.outputs.len() + vec_outputs.len() > COINJOIN_DENOM_OUTPUTS_THRESHOLD as usize {
+                        // If it's not possible to add it due to insufficient amount left or total number of outputs exceeds
+                        // COINJOIN_DENOM_OUTPUTS_THRESHOLD, drop the output again and stop trying.
+                        vec_outputs.pop();
+                        break;
+                    }
+                }
+                vec_outputs.len() as u64
+            };
+
+            // Go big to small
+            for denom_value in denoms {
+                if balance_to_denominate <= 0 {
+                    break;
+                }
+                
+                let mut outputs = 0;
+                // Number of denoms we can create given our denom and the amount of funds we have left
+                let denoms_to_create_value = count_possible_outputs(*denom_value as i64, &self.tx_builder);
+                // Prefer overshooting the target balance by larger denoms (hence `+1`) instead of a more
+                // accurate approximation by many smaller denoms. This is ok because when we get here we
+                // should have nCoinJoinDenomsGoal of each smaller denom already. Also, without `+1`
+                // we can end up in a situation when there is already nCoinJoinDenomsHardCap of smaller
+                // denoms, yet we can't mix the remaining nBalanceToDenominate because it's smaller than
+                // nDenomValue (and thus denomsToCreateBal == 0), so the target would never get reached
+                // even when there is enough funds for that.
+                let denoms_to_create_bal = (balance_to_denominate / *denom_value as u64) + 1;
+                // Use the smaller value
+                let denoms_to_create = denoms_to_create_value.min(denoms_to_create_bal);
+                println!("[RUST] CoinJoinClientSession -- 2 - nBalanceToDenominate: {}, nDenomValue: {}, denomsToCreateValue: {}, denomsToCreateBal: {}\n",
+                    balance_to_denominate.to_friendly_string(), denom_value.to_friendly_string(), denoms_to_create_value.to_friendly_string(), denoms_to_create_bal.to_friendly_string());
+
+                let mut it = map_denom_count[denom_value];
+
+                for i in 0..denoms_to_create {
+                    // Never go above the cap unless it's the largest denom
+                    if *denom_value != largest_denom_value && it >= DEFAULT_COINJOIN_DENOMS_HARDCAP {
+                        break;
+                    }
+
+                    // Increment helpers, add output and subtract denomination amount
+                    if self.tx_builder.add_output(*denom_value).is_some() {
+                        outputs += 1;
+                        it += 1;
+                        map_denom_count.insert(*denom_value, it);
+                        balance_to_denominate = balance_to_denominate.saturating_sub(*denom_value);
+                    } else {
+                        println!("[RUST] CoinJoinClientSession -- 2 - Error: AddOutput failed at {}/{}, {}\n", i + 1, denoms_to_create, self.tx_builder.to_string());
+                        break;
+                    }
+
+                    println!("[RUST] CoinJoinClientSession -- 2 - denomValue: {}, balanceToDenominate: {}, nOutputs: {}, {}\n",
+                        denom_value.to_friendly_string(), balance_to_denominate.to_friendly_string(), outputs, self.tx_builder.to_string());
+                    
+                    if (self.tx_builder.outputs.len() as i32) >= COINJOIN_DENOM_OUTPUTS_THRESHOLD {
+                        break;
+                    }
+                }
+
+                if (self.tx_builder.outputs.len() as i32) >= COINJOIN_DENOM_OUTPUTS_THRESHOLD {
+                    break;
+                }
+            }
+        }
+
+        println!("[RUST] CoinJoinClientSession -- 3 - nBalanceToDenominate: {}, {}\n", balance_to_denominate.to_friendly_string(), self.tx_builder.to_string());
+
+        for (denom, count) in &map_denom_count {
+            println!("[RUST] CoinJoinClientSession -- 3 - DONE - nDenomValue: {}, count: {}\n", denom.to_friendly_string(), count);
+        }
+
+        // No reasons to create mixing collaterals if we can't create denoms to mix
+        if (create_mixing_collaterals && self.tx_builder.outputs.len() == 1) || self.tx_builder.outputs.len() == 0 {
+            return false;
+        }
+
+        if !dry_run {
+            let str_result = String::new();
+            
+            if !self.tx_builder.commit(&str_result) {
+                println!("[RUST] CoinJoinClientSession -- 4 - Commit failed: {}\n", str_result);
+                return false;
+            }
+
+            // use the same nCachedLastSuccessBlock as for DS mixing to prevent race
+            // m_manager.UpdatedSuccessBlock(); // TODO
+            println!("[RUST] CoinJoinClientSession -- 4 - txid: {}\n", str_result);
+        }
+
         return true;
     }
 

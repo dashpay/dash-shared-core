@@ -1,6 +1,4 @@
 use std::collections::{HashSet, HashMap};
-use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::UInt256;
@@ -10,7 +8,7 @@ use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
 use ferment_interfaces::boxed;
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
-use crate::ffi::callbacks::{DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use crate::ffi::callbacks::{InputsWithAmount, DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::models::tx_outpoint::TxOutPoint;
@@ -32,7 +30,8 @@ pub struct WalletEx {
     is_mine_input: IsMineInput,
     has_collateral_inputs: HasCollateralInputs,
     select_coins: SelectCoinsGroupedByAddresses,
-    destroy_selected_coins: DestroySelectedCoins
+    destroy_selected_coins: DestroySelectedCoins,
+    inputs_with_amount: InputsWithAmount
 }
 
 impl WalletEx {
@@ -44,7 +43,8 @@ impl WalletEx {
         is_mine_input: IsMineInput,
         has_collateral_inputs: HasCollateralInputs,
         select_coins: SelectCoinsGroupedByAddresses,
-        destroy_selected_coins: DestroySelectedCoins
+        destroy_selected_coins: DestroySelectedCoins,
+        inputs_with_amount: InputsWithAmount
     ) -> Self {
         WalletEx {
             opaque_context,
@@ -61,7 +61,8 @@ impl WalletEx {
             is_mine_input,
             has_collateral_inputs,
             select_coins,
-            destroy_selected_coins
+            destroy_selected_coins,
+            inputs_with_amount
         }
     }
 
@@ -296,6 +297,14 @@ impl WalletEx {
             Some(transaction)
         }
     }
+
+    /**
+     * Count the number of unspent outputs that have a certain value
+     */
+    pub fn count_input_with_amount(&self, value: u64) -> u32 {
+        return unsafe { (self.inputs_with_amount)(value, self.opaque_context) };
+    }
+
 
     fn clear_anonymizable_caches(&mut self) {
         self.anonymizable_tally_cached_non_denom = false;
