@@ -62,3 +62,8 @@ pub type IsMineAddress = unsafe extern "C" fn(
     address: *mut [u8; 32],
     context: *const c_void,
 ) -> bool;
+
+pub type InputsWithAmount = unsafe extern "C" fn(
+    amount: u64,
+    context: *const c_void,
+) -> u32;

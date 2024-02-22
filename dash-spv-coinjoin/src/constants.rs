@@ -15,8 +15,8 @@ pub const MAX_COINJOIN_AMOUNT: u64 = MAX_MONEY / DUFFS;
 pub const DEFAULT_COINJOIN_SESSIONS: i32 = 4;
 pub const DEFAULT_COINJOIN_ROUNDS: i32 = 4;
 pub const DEFAULT_COINJOIN_AMOUNT: i32 = 1000;
-pub const DEFAULT_COINJOIN_DENOMS_GOAL: i32 = 50;
-pub const DEFAULT_COINJOIN_DENOMS_HARDCAP: i32 = 300;
+pub const DEFAULT_COINJOIN_DENOMS_GOAL: u32 = 50;
+pub const DEFAULT_COINJOIN_DENOMS_HARDCAP: u32 = 300;
 
 // How many new denom outputs to create before we consider the "goal" loop in CreateDenominated
 // a final one and start creating an actual tx. Same limit applies for the "hard cap" part of the algo.
