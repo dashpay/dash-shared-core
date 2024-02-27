@@ -12,7 +12,7 @@ pub struct TransactionBuilderOutput {
 
 impl<'a> TransactionBuilderOutput {
     pub fn new(wallet: Rc<RefCell<WalletEx>>, amount: u64, dry_run: bool) -> Self {
-        let reserve_destination = ReserveDestination::new(wallet);
+        let mut reserve_destination = ReserveDestination::new(wallet);
         Self {
             script: if dry_run { Some(vec![0;20]) } else { reserve_destination.get_reserved_destination(false) },
             reserve_destination,
