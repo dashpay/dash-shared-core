@@ -1,8 +1,11 @@
 use std::ffi::c_void;
+use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types;
 use crate::ffi::selected_coins::SelectedCoins;
 use crate::models::InputValue;
 use crate::wallet_ex::WalletEx;
+
+use super::recepient::Recipient;
 
 pub type GetInputValueByPrevoutHash = unsafe extern "C" fn(
     prevout_hash: *mut [u8; 32],
@@ -67,3 +70,13 @@ pub type InputsWithAmount = unsafe extern "C" fn(
     amount: u64,
     context: *const c_void,
 ) -> u32;
+
+pub type FreshReceiveCoinJoinAddress = unsafe extern "C" fn(
+    context: *const c_void,
+) -> ByteArray;
+
+pub type CommitTransaction = unsafe extern "C" fn(
+    items: *mut *mut Recipient,
+    item_count: usize,
+    context: *const c_void
+);

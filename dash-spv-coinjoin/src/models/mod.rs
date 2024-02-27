@@ -9,7 +9,6 @@ pub(crate) mod coin_control;
 pub(crate) mod reserve_destination;
 pub(crate) mod denominations;
 pub(crate) mod transaction_builder_output;
-pub(crate) mod recepient;
 
 pub use self::input_value::InputValue;
 pub use self::coinjoin_client_options::CoinJoinClientOptions;

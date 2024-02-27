@@ -6,7 +6,7 @@ use dash_spv_coinjoin::coinjoin_client_session::CoinJoinClientSession;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{DestroyInputValue, DestroySelectedCoins, DestroyWalletTransaction, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, HasCollateralInputs, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use dash_spv_coinjoin::ffi::callbacks::{CommitTransaction, DestroyInputValue, DestroySelectedCoins, DestroyWalletTransaction, FreshReceiveCoinJoinAddress, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, HasCollateralInputs, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::CoinJoinClientOptions;
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -46,6 +46,8 @@ pub unsafe extern "C" fn register_client_session(
     destroy_selected_coins: DestroySelectedCoins,
     sign_transaction: SignTransaction,
     count_inputs_with_amount: InputsWithAmount,
+    fresh_coinjoin_key: FreshReceiveCoinJoinAddress,
+    commit_transaction: CommitTransaction,
     context: *const c_void
 ) -> *mut CoinJoinClientSession {
     let session = CoinJoinClientSession::new(
@@ -59,6 +61,8 @@ pub unsafe extern "C" fn register_client_session(
         selected_coins, 
         destroy_selected_coins,
         count_inputs_with_amount,
+        fresh_coinjoin_key,
+        commit_transaction,
         context
     );
     println!("[RUST] register_session");

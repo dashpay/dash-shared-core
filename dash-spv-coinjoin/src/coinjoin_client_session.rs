@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -10,7 +9,7 @@ use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
 use crate::constants::{COINJOIN_DENOM_OUTPUTS_THRESHOLD, DEFAULT_COINJOIN_DENOMS_GOAL, DEFAULT_COINJOIN_DENOMS_HARDCAP};
-use crate::ffi::callbacks::{InputsWithAmount, DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use crate::ffi::callbacks::{CommitTransaction, DestroySelectedCoins, DestroyWalletTransaction, FreshReceiveCoinJoinAddress, GetWalletTransaction, HasCollateralInputs, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::messages::{pool_state::PoolState, pool_status::PoolStatus};
 use crate::models::pending_dsa_request::PendingDsaRequest;
@@ -58,6 +57,8 @@ impl CoinJoinClientSession {
         selected_coins: SelectCoinsGroupedByAddresses,
         destroy_selected_coins: DestroySelectedCoins,
         inputs_with_amount: InputsWithAmount,
+        fresh_coinjoin_key: FreshReceiveCoinJoinAddress,
+        commit_transaction: CommitTransaction,
         context: *const std::ffi::c_void
     ) -> Self {
         unsafe { NEXT_ID += 1; } // TODO
@@ -71,7 +72,9 @@ impl CoinJoinClientSession {
             has_collateral_inputs, 
             selected_coins, 
             destroy_selected_coins,
-            inputs_with_amount
+            inputs_with_amount,
+            fresh_coinjoin_key,
+            commit_transaction
         )));
 
         Self {

@@ -7,6 +7,7 @@ use dash_spv_masternode_processor::chain::params::TX_MIN_OUTPUT_AMOUNT;
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::to::ToFFI;
+use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::hashes::hex::ToHex;
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput, TransactionOutput, TransactionType};
 use dash_spv_masternode_processor::util::data_append::DataAppend;
@@ -14,7 +15,7 @@ use dash_spv_masternode_processor::util::data_append::DataAppend;
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::constants::REFERENCE_DEFAULT_MIN_TX_FEE;
 use crate::ffi::callbacks::SignTransaction;
-use crate::models::recepient::Recipient;
+use crate::ffi::recepient::Recipient;
 use crate::utils::coin_format::CoinFormat;
 use crate::wallet_ex::WalletEx;
 use crate::models::coin_control::CoinControl;
@@ -169,15 +170,17 @@ impl<'a> TransactionBuilder {
     pub fn commit(&mut self, str_result: &String) -> bool {
         let vec_send: Vec<Recipient> = self.outputs
             .iter()
+            .filter(|x| x.script.is_some())
             .map(|out| Recipient {
-                script_pub_key: out.script.clone(), 
+                script_pub_key: ByteArray::from(out.script.clone().unwrap()),
                 amount: out.amount,
                 subtract_fee_from_amount: false,
             })
             .collect();
 
-        println!("CoinJoin commit: vec_send: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
-        // TODO: commit transaction
+        println!("[RUST] CoinJoin tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
+        self.wallet_ex.borrow().commit_transaction(&vec_send);
+
         self.keep_keys = true;
         return true;
     }

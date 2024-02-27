@@ -1,16 +1,22 @@
 use std::collections::{HashSet, HashMap};
+use std::slice;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::crypto::byte_util::Reversable;
+use dash_spv_masternode_processor::ffi::boxer::boxed_vec;
 use dash_spv_masternode_processor::ffi::from::FromFFI;
+use dash_spv_masternode_processor::hashes::hex::ToHex;
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
+use dash_spv_masternode_processor::util::address::address;
 use ferment_interfaces::boxed;
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
-use crate::ffi::callbacks::{InputsWithAmount, DestroySelectedCoins, DestroyWalletTransaction, GetWalletTransaction, HasCollateralInputs, IsMineInput, SelectCoinsGroupedByAddresses};
+use crate::ffi::callbacks::{CommitTransaction, DestroySelectedCoins, DestroyWalletTransaction, FreshReceiveCoinJoinAddress, GetWalletTransaction, HasCollateralInputs, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
+use crate::ffi::recepient::Recipient;
+use crate::models::tx_destination::TxDestination;
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::models::CoinJoinClientOptions;
 
@@ -24,6 +30,9 @@ pub struct WalletEx {
     anonymizable_tally_cached: bool,
     vec_anonymizable_tally_cached: Vec<CompactTallyItem>,
     map_outpoint_rounds_cache: HashMap<TxOutPoint, i32>,
+    unused_keys: HashMap<UInt256, Vec<u8>>,
+    // TODO: we may not need keyUsage, it is used as a way to audit unusedKeys
+    key_usage: HashMap<UInt256, bool>,
     coinjoin_salt: UInt256,
     get_wallet_transaction: GetWalletTransaction,
     destroy_wallet_transaction: DestroyWalletTransaction,
@@ -31,7 +40,9 @@ pub struct WalletEx {
     has_collateral_inputs: HasCollateralInputs,
     select_coins: SelectCoinsGroupedByAddresses,
     destroy_selected_coins: DestroySelectedCoins,
-    inputs_with_amount: InputsWithAmount
+    inputs_with_amount: InputsWithAmount,
+    fresh_receive_coinjoin_address: FreshReceiveCoinJoinAddress,
+    commit_transaction: CommitTransaction
 }
 
 impl WalletEx {
@@ -44,7 +55,9 @@ impl WalletEx {
         has_collateral_inputs: HasCollateralInputs,
         select_coins: SelectCoinsGroupedByAddresses,
         destroy_selected_coins: DestroySelectedCoins,
-        inputs_with_amount: InputsWithAmount
+        inputs_with_amount: InputsWithAmount,
+        fresh_receive_coinjoin_address: FreshReceiveCoinJoinAddress,
+        commit_transaction: CommitTransaction
     ) -> Self {
         WalletEx {
             opaque_context,
@@ -56,13 +69,17 @@ impl WalletEx {
             vec_anonymizable_tally_cached: Vec::new(),
             map_outpoint_rounds_cache: HashMap::new(),
             coinjoin_salt: UInt256([0;32]), // TODO: InitCoinJoinSalt ?
+            unused_keys: HashMap::with_capacity(1024),
+            key_usage: HashMap::new(),
             get_wallet_transaction,
             destroy_wallet_transaction,
             is_mine_input,
             has_collateral_inputs,
             select_coins,
             destroy_selected_coins,
-            inputs_with_amount
+            inputs_with_amount,
+            fresh_receive_coinjoin_address,
+            commit_transaction
         }
     }
 
@@ -305,13 +322,85 @@ impl WalletEx {
         return unsafe { (self.inputs_with_amount)(value, self.opaque_context) };
     }
 
+    pub fn get_unused_key(&mut self) -> TxDestination {
+        if self.unused_keys.is_empty() {
+            println!("[RUST] WalletEx - obtaining fresh key");
+            println!("[RUST] WalletEx - keyUsage map has unused keys: {}", !self.key_usage.is_empty() && self.key_usage.values().all(|used| !used));
+            return Some(self.fresh_receive_key());
+        }
+
+        let key: UInt256;
+        let item: Vec<u8>;
+
+        if let Some(pair) = self.unused_keys.iter().next() {
+            key = *pair.0;
+            item = pair.1.clone();
+
+            println!("[RUST] WalletEx - reusing key: {:?}", address::with_script_sig(&item, &self.options.chain_type.script_map()));
+            println!("[RUST] WalletEx - keyUsage map says this key is used: {}", self.key_usage.get(&key).unwrap());
+        } else {
+            return None;
+        }
+
+        // remove the key
+        self.unused_keys.remove(&key);
+        self.key_usage.insert(key, true);
+        
+        return Some(item);
+    }
+
+    pub fn add_unused_key(&mut self, destination: &TxDestination) {
+        if let Some(key) = destination {
+            let key_id = UInt256::sha256(key);
+            self.unused_keys.insert(key_id, key.clone());
+            self.key_usage.insert(key_id, false);
+            println!("[RUST] WalletEx - add unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
+        }
+    }
+
+    pub fn remove_unused_key(&mut self, destination: &TxDestination) {
+        if let Some(key) = destination {
+            let key_id = UInt256::sha256(key);
+            self.unused_keys.remove(&key_id);
+            self.key_usage.insert(key_id, true);
+            println!("[RUST] WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
+        }
+    }
 
     fn clear_anonymizable_caches(&mut self) {
         self.anonymizable_tally_cached_non_denom = false;
         self.anonymizable_tally_cached = false;
     }
 
+    pub fn commit_transaction(&self, vec_send: &Vec<Recipient>) {
+        unsafe {
+            (self.commit_transaction)(boxed_vec(
+                vec_send
+                    .iter()
+                    .map(|input| boxed((*input).clone()))
+                    .collect()
+            ), vec_send.len(), self.opaque_context)
+
+            // TODO: free vec_send ?
+        }
+    }
+
     fn is_mine_input(&self, txin: &TransactionInput) -> bool {
         unsafe { (self.is_mine_input)(boxed(txin.input_hash.0), txin.index, self.opaque_context) }
+    }
+
+    fn fresh_receive_key(&mut self) -> Vec<u8> {
+        let fresh_key = unsafe {
+            let data = (self.fresh_receive_coinjoin_address)(self.opaque_context);
+            let result = slice::from_raw_parts(data.ptr, data.len);
+            // TODO: unbox_any(data); ? 
+            result
+        };
+
+        let result = fresh_key.to_vec();
+        println!("[RUST] WalletEx - fresh key: {:?}", address::with_script_pub_key(&result, &self.options.chain_type.script_map()));
+        self.key_usage.insert(UInt256::sha256(fresh_key), true);
+
+        return result;
     }
 }
