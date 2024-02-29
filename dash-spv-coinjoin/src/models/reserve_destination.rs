@@ -22,7 +22,6 @@ use super::tx_destination::TxDestination;
 #[derive(Debug, Clone)]
 pub struct ReserveDestination {
     wallet_ex: Rc<RefCell<WalletEx>>,
-    pub index: i64,
     pub address: TxDestination,
     pub internal: bool,
 }
@@ -31,22 +30,43 @@ impl<'a> ReserveDestination {
     pub fn new(wallet_ex: Rc<RefCell<WalletEx>>) -> Self {
         Self {
             wallet_ex,
-            index: -1,
             address: None,
             internal: false,
         }
     }
 
-    pub fn get_reserved_destination(&self, internal: bool) -> Option<Vec<u8>> {
-        // TODO
-        None
+    pub fn get_reserved_destination(&mut self, internal: bool) -> TxDestination {
+        if self.address.is_none() {
+            let mut wallet = self.wallet_ex.borrow_mut();
+            
+            if let Some(key) = wallet.get_unused_key() {
+                self.address = Some(key);
+                self.internal = true;
+            } else {
+                return None;
+            }
+        }
+
+        return self.address.clone();
     }
 
     pub fn keep_destination(&mut self) {
-        // TODO
+        if self.address.is_some() {
+            self.wallet_ex.borrow_mut().remove_unused_key(&self.address);
+        } else {
+            println!("[RUST] cannot keep key");
+        }
+
+        self.address = None;
     }
 
     pub fn return_destination(&mut self) {
-        // TODO
+        if self.address.is_some() {
+            self.wallet_ex.borrow_mut().add_unused_key(&self.address);
+        } else {
+            println!("[RUST] cannot return key");
+        }
+
+        self.address = None;
     }
 }

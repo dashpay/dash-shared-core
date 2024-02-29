@@ -11,7 +11,7 @@ pub(crate) struct KeyHolder {
 impl KeyHolder {
     pub fn new(wallet: Rc<RefCell<WalletEx>>) -> Self {
         // Get the next CoinJoinKey?
-        let reserve_destination = ReserveDestination::new(wallet);
+        let mut reserve_destination = ReserveDestination::new(wallet);
         let destination = reserve_destination.get_reserved_destination(false);
         Self {
             reserve_destination,
