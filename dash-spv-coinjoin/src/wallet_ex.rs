@@ -6,16 +6,18 @@ use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::crypto::byte_util::Reversable;
 use dash_spv_masternode_processor::ffi::boxer::boxed_vec;
 use dash_spv_masternode_processor::ffi::from::FromFFI;
-use dash_spv_masternode_processor::hashes::hex::ToHex;
+use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
 use dash_spv_masternode_processor::util::address::address;
 use ferment_interfaces::boxed;
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
-use crate::ffi::callbacks::{CommitTransaction, DestroySelectedCoins, DestroyWalletTransaction, FreshReceiveCoinJoinAddress, GetWalletTransaction, HasCollateralInputs, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses};
+use crate::coin_selection::input_coin::InputCoin;
+use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
+use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::tx_destination::TxDestination;
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::models::CoinJoinClientOptions;
@@ -35,13 +37,15 @@ pub struct WalletEx {
     key_usage: HashMap<UInt256, bool>,
     coinjoin_salt: UInt256,
     get_wallet_transaction: GetWalletTransaction,
-    destroy_wallet_transaction: DestroyWalletTransaction,
+    sign_transaction: SignTransaction,
+    destroy_transaction: DestroyWalletTransaction,
     is_mine_input: IsMineInput,
-    has_collateral_inputs: HasCollateralInputs,
+    available_coins: AvailableCoins,
+    destroy_gathered_outputs: DestroyGatheredOutputs,
     select_coins: SelectCoinsGroupedByAddresses,
     destroy_selected_coins: DestroySelectedCoins,
     inputs_with_amount: InputsWithAmount,
-    fresh_receive_coinjoin_address: FreshReceiveCoinJoinAddress,
+    fresh_coinjoin_address: FreshCoinJoinAddress,
     commit_transaction: CommitTransaction
 }
 
@@ -50,13 +54,15 @@ impl WalletEx {
         opaque_context: *const std::ffi::c_void,
         options: CoinJoinClientOptions,
         get_wallet_transaction: GetWalletTransaction,
-        destroy_wallet_transaction: DestroyWalletTransaction,
+        sign_transaction: SignTransaction,
+        destroy_transaction: DestroyWalletTransaction,
         is_mine_input: IsMineInput,
-        has_collateral_inputs: HasCollateralInputs,
+        available_coins: AvailableCoins,
+        destroy_gathered_outputs: DestroyGatheredOutputs,
         select_coins: SelectCoinsGroupedByAddresses,
         destroy_selected_coins: DestroySelectedCoins,
         inputs_with_amount: InputsWithAmount,
-        fresh_receive_coinjoin_address: FreshReceiveCoinJoinAddress,
+        fresh_coinjoin_address: FreshCoinJoinAddress,
         commit_transaction: CommitTransaction
     ) -> Self {
         WalletEx {
@@ -72,13 +78,15 @@ impl WalletEx {
             unused_keys: HashMap::with_capacity(1024),
             key_usage: HashMap::new(),
             get_wallet_transaction,
-            destroy_wallet_transaction,
+            sign_transaction,
+            destroy_transaction,
             is_mine_input,
-            has_collateral_inputs,
+            available_coins,
+            destroy_gathered_outputs,
             select_coins,
             destroy_selected_coins,
             inputs_with_amount,
-            fresh_receive_coinjoin_address,
+            fresh_coinjoin_address,
             commit_transaction
         }
     }
@@ -210,7 +218,29 @@ impl WalletEx {
     }
 
     pub fn has_collateral_inputs(&mut self, only_confirmed: bool) -> bool {
-        unsafe { (self.has_collateral_inputs)(only_confirmed, self, self.opaque_context) }
+        let mut coin_control = CoinControl::new();
+        coin_control.coin_type = CoinType::OnlyCoinJoinCollateral;
+        let result = self.availalbe_coins(only_confirmed, coin_control);
+
+        return !result.is_empty();
+    }
+
+    pub fn availalbe_coins(&mut self, only_safe: bool, coin_control: CoinControl) -> Vec<InputCoin> {
+        let mut vec_gathered_outputs: Vec<InputCoin> = Vec::new();
+        
+        unsafe {
+            let gathered_outputs = (self.available_coins)(only_safe, coin_control.encode(), self, self.opaque_context);
+            (0..(*gathered_outputs).item_count)
+                .into_iter()
+                .map(|i| (**(*gathered_outputs).items.add(i)).decode())
+                .for_each(
+                    |item| vec_gathered_outputs.push(item)
+                );
+
+            (self.destroy_gathered_outputs)(gathered_outputs);
+        }
+
+        return vec_gathered_outputs;
     }
 
     pub fn select_coins_grouped_by_addresses(
@@ -238,7 +268,6 @@ impl WalletEx {
 
         unsafe {
             let selected_coins = (self.select_coins)(skip_denominated, anonymizable, skip_unconfirmed, max_outpoints_per_address, self, self.opaque_context);
-
             (0..(*selected_coins).item_count)
                 .into_iter()
                 .map(|i| (**(*selected_coins).items.add(i)).decode())
@@ -261,11 +290,7 @@ impl WalletEx {
             }
         }
         
-        // debug
-//            StringBuilder strMessage = new StringBuilder("vecTallyRet:\n");
-//            for (CompactTallyItem item :vecTallyRet)
-//                strMessage.append(String.format("  %s %s\n", item.txDestination, item.amount.toFriendlyString()));
-//            log.info(strMessage.toString()); /* Continued */
+        println!("[RUST] CoinJoin, vec_tally_ret items: {:?}", vec_tally_ret);
 
         return vec_tally_ret;
     }
@@ -310,7 +335,7 @@ impl WalletEx {
             }
             
             let transaction = (*wtx).decode();
-            (self.destroy_wallet_transaction)(wtx);
+            (self.destroy_transaction)(wtx);
             Some(transaction)
         }
     }
@@ -322,11 +347,11 @@ impl WalletEx {
         return unsafe { (self.inputs_with_amount)(value, self.opaque_context) };
     }
 
-    pub fn get_unused_key(&mut self) -> TxDestination {
+    pub fn get_unused_key(&mut self, internal: bool) -> TxDestination {
         if self.unused_keys.is_empty() {
             println!("[RUST] WalletEx - obtaining fresh key");
             println!("[RUST] WalletEx - keyUsage map has unused keys: {}", !self.key_usage.is_empty() && self.key_usage.values().all(|used| !used));
-            return Some(self.fresh_receive_key());
+            return Some(self.fresh_receive_key(internal));
         }
 
         let key: UInt256;
@@ -367,14 +392,11 @@ impl WalletEx {
         }
     }
 
-    fn clear_anonymizable_caches(&mut self) {
-        self.anonymizable_tally_cached_non_denom = false;
-        self.anonymizable_tally_cached = false;
-    }
+    pub fn commit_transaction(&self, vec_send: &Vec<Recipient>) -> bool {
+        let mut result = false;
 
-    pub fn commit_transaction(&self, vec_send: &Vec<Recipient>) {
         unsafe {
-            (self.commit_transaction)(boxed_vec(
+            result = (self.commit_transaction)(boxed_vec(
                 vec_send
                     .iter()
                     .map(|input| boxed((*input).clone()))
@@ -383,15 +405,37 @@ impl WalletEx {
 
             // TODO: free vec_send ?
         }
+
+        return result;
+    }
+
+    pub fn sign_transaction(&self, tx: &Transaction) -> Option<Transaction> {
+        unsafe {
+            let raw_tx = (self.sign_transaction)(boxed(tx.encode()), self.opaque_context);
+
+            if raw_tx.is_null() {
+                return None;
+            }
+
+            let signed_tx =  (*raw_tx).decode();
+            (self.destroy_transaction)(raw_tx);
+
+            return Some(signed_tx);
+        }
+    }
+
+    fn clear_anonymizable_caches(&mut self) {
+        self.anonymizable_tally_cached_non_denom = false;
+        self.anonymizable_tally_cached = false;
     }
 
     fn is_mine_input(&self, txin: &TransactionInput) -> bool {
         unsafe { (self.is_mine_input)(boxed(txin.input_hash.0), txin.index, self.opaque_context) }
     }
 
-    fn fresh_receive_key(&mut self) -> Vec<u8> {
+    fn fresh_receive_key(&mut self, internal: bool) -> Vec<u8> {
         let fresh_key = unsafe {
-            let data = (self.fresh_receive_coinjoin_address)(self.opaque_context);
+            let data = (self.fresh_coinjoin_address)(internal, self.opaque_context);
             let result = slice::from_raw_parts(data.ptr, data.len);
             // TODO: unbox_any(data); ? 
             result

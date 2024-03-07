@@ -6,14 +6,16 @@ use dash_spv_coinjoin::coinjoin_client_session::CoinJoinClientSession;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{CommitTransaction, DestroyInputValue, DestroySelectedCoins, DestroyWalletTransaction, FreshReceiveCoinJoinAddress, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, HasCollateralInputs, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use dash_spv_coinjoin::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
-use dash_spv_coinjoin::models::CoinJoinClientOptions;
+use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
 use dash_spv_masternode_processor::consensus::Decodable;
 use ferment_interfaces::{boxed, unbox_any};
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::ffi::from::FromFFI;
+use dash_spv_masternode_processor::ffi::boxer::boxed;
+use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::types;
 
 #[no_mangle]
@@ -40,12 +42,13 @@ pub unsafe extern "C" fn register_client_session(
     get_wallet_transaction: GetWalletTransaction,
     destroy_wallet_transaction: DestroyWalletTransaction,
     is_mine: IsMineInput,
-    has_collateral_inputs: HasCollateralInputs,
+    available_coins: AvailableCoins,
+    destroy_gathered_outputs: DestroyGatheredOutputs,
     selected_coins: SelectCoinsGroupedByAddresses,
     destroy_selected_coins: DestroySelectedCoins,
     sign_transaction: SignTransaction,
     count_inputs_with_amount: InputsWithAmount,
-    fresh_coinjoin_key: FreshReceiveCoinJoinAddress,
+    fresh_coinjoin_key: FreshCoinJoinAddress,
     commit_transaction: CommitTransaction,
     context: *const c_void
 ) -> *mut CoinJoinClientSession {
@@ -56,7 +59,8 @@ pub unsafe extern "C" fn register_client_session(
         get_wallet_transaction, 
         destroy_wallet_transaction, 
         is_mine, 
-        has_collateral_inputs, 
+        available_coins,
+        destroy_gathered_outputs,
         selected_coins, 
         destroy_selected_coins,
         count_inputs_with_amount,
@@ -64,41 +68,30 @@ pub unsafe extern "C" fn register_client_session(
         commit_transaction,
         context
     );
-    println!("[RUST] register_session");
+    println!("[RUST] CoinJoin: register_session");
     boxed(session)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn call_session(
     session: *mut CoinJoinClientSession,
-    balance_denominate: u64
+    balance_info: Balance
 ) -> bool {
-    println!("[RUST] call session");
-    (*session).create_denominated(balance_denominate, false);
-    return true;
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn on_transaction_signed_for_session(
-    tx: *mut types::Transaction, 
-    session: *mut CoinJoinClientSession,
-    destroy_wallet_transaction: DestroyWalletTransaction
-) {
-    (*session).on_transaction_signed((*tx).decode());
-    (destroy_wallet_transaction)(tx);
+    println!("[RUST] CoinJoin: session.do_automatic_denominating");
+    return (*session).do_automatic_denominating(false, balance_info);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn destroy_transaction(
     tx: *mut types::Transaction
 ) {
-    println!("[RUST] 💀 destroy_transaction");
+    println!("[RUST] CoinJoin 💀 destroy_transaction");
     let unboxed = unbox_any(tx);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn unregister_coinjoin(coinjoin: *mut CoinJoin) {
-    println!("[RUST] 💀 unregister_coinjoin: {:?}", coinjoin);
+    println!("[RUST] CoinJoin 💀 unregister_coinjoin: {:?}", coinjoin);
     let unboxed = unbox_any(coinjoin);
 }
 
@@ -106,7 +99,7 @@ pub unsafe extern "C" fn unregister_coinjoin(coinjoin: *mut CoinJoin) {
 pub unsafe extern "C" fn is_denominated_amount(
     amount: u64,
 ) -> bool {
-    println!("[RUST] call is_denominated_amount with amount {}", amount);
+    println!("[RUST] CoinJoin call is_denominated_amount with amount {}", amount);
     return CoinJoin::is_denominated_amount(amount);
 }
 
@@ -114,7 +107,7 @@ pub unsafe extern "C" fn is_denominated_amount(
 pub unsafe extern "C" fn is_collateral_amount(
     amount: u64,
 ) -> bool {
-    println!("[RUST] call is_collateral_amount with amount {}", amount);
+    println!("[RUST] CoinJoin call is_collateral_amount with amount {}", amount);
     return CoinJoin::is_collateral_amount(amount);
 }
 
@@ -124,7 +117,7 @@ pub unsafe extern "C" fn is_fully_mixed(
     prevout_hash: *mut [u8; 32],
     index: u32,
 ) -> bool {
-    println!("[RUST] call wallet_ex.is_fully_mixed");
+    println!("[RUST] CoinJoin call wallet_ex.is_fully_mixed");
     return (*wallet_ex).is_fully_mixed(TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
@@ -134,13 +127,13 @@ pub unsafe extern "C" fn is_locked_coin(
     prevout_hash: *mut [u8; 32],
     index: u32,
 ) -> bool {
-    println!("[RUST] call wallet_ex.is_fully_mixed");
+    println!("[RUST] CoinJoin call wallet_ex.is_fully_mixed");
     return (*wallet_ex).locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn coinjoin_get_smallest_denomination() -> u64 {
-    println!("[RUST] call coinjoin_get_smallest_denomination");
+    println!("[RUST] CoinJoin call coinjoin_get_smallest_denomination");
     return CoinJoin::get_smallest_denomination();
 }
 

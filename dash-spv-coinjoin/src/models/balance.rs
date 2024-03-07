@@ -1,5 +1,7 @@
 use std::fmt;
 
+#[repr(C)]
+#[derive(Debug)]
 pub struct Balance {
     pub my_trusted: u64,           // Trusted, at depth=GetBalance.min_depth or more
     pub my_untrusted_pending: u64, // Untrusted, but in mempool (pending)
