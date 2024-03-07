@@ -4,7 +4,7 @@ use crate::{wallet_ex::WalletEx, models::{reserve_destination::ReserveDestinatio
 
 #[derive(Debug)]
 pub(crate) struct KeyHolder {
-    reserve_destination: ReserveDestination, // TODO: use ReserveKey
+    reserve_destination: ReserveDestination, // TODO(dashj): use ReserveKey
     pub destination: TxDestination,
 }
 
