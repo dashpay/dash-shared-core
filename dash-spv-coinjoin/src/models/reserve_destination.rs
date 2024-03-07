@@ -39,7 +39,7 @@ impl<'a> ReserveDestination {
         if self.address.is_none() {
             let mut wallet = self.wallet_ex.borrow_mut();
             
-            if let Some(key) = wallet.get_unused_key() {
+            if let Some(key) = wallet.get_unused_key(internal) {
                 self.address = Some(key);
                 self.internal = true;
             } else {

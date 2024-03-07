@@ -311,7 +311,6 @@ impl Transaction {
             *offset += input.input_hash.consensus_encode(&mut buffer).unwrap();
             *offset += input.index.consensus_encode(&mut buffer).unwrap();
             if subscript_index == u64::MAX && input.signature.is_some() {
-                println!("[RUST] CoinJoin: writing down signature for {}", i);
                 *offset += input
                     .signature
                     .as_ref()
@@ -320,7 +319,6 @@ impl Transaction {
                     .unwrap()
                 // *offset += consensus_encode_with_size(input.signature.unwrap(), &mut buffer).unwrap()
             } else if subscript_index == i as u64 && input.script.is_some() {
-                println!("[RUST] CoinJoin: writing down script for {}", i);
                 *offset += input
                     .script
                     .as_ref()
@@ -329,7 +327,6 @@ impl Transaction {
                     .unwrap()
                 // *offset += consensus_encode_with_size(input.script.unwrap(), &mut buffer).unwrap()
             } else {
-                println!("[RUST] CoinJoin: writing down zero for {}", i);
                 *offset += VarInt(0_u64).consensus_encode(&mut buffer).unwrap();
             }
             *offset += input.sequence.consensus_encode(&mut buffer).unwrap();

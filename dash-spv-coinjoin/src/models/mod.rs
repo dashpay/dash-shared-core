@@ -1,4 +1,3 @@
-pub mod input_value;
 pub mod coinjoin_client_options;
 pub mod balance;
 pub mod tx_outpoint;
@@ -10,6 +9,5 @@ pub(crate) mod reserve_destination;
 pub(crate) mod denominations;
 pub(crate) mod transaction_builder_output;
 
-pub use self::input_value::InputValue;
 pub use self::coinjoin_client_options::CoinJoinClientOptions;
 pub use self::balance::Balance;

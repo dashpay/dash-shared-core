@@ -2,9 +2,11 @@ use std::ffi::c_void;
 use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types;
 use crate::ffi::selected_coins::SelectedCoins;
-use crate::models::InputValue;
 use crate::wallet_ex::WalletEx;
 
+use super::coin_control::CoinControl;
+use super::gathered_outputs::GatheredOutputs;
+use super::input_value::InputValue;
 use super::recepient::Recipient;
 
 pub type GetInputValueByPrevoutHash = unsafe extern "C" fn(
@@ -34,7 +36,7 @@ pub type DestroyWalletTransaction = unsafe extern "C" fn(
 pub type SignTransaction = unsafe extern "C" fn(
     transaction: *mut types::Transaction,
     context: *const c_void
-);
+) -> *mut types::Transaction;
 
 pub type IsMineInput = unsafe extern "C" fn(
     prevout_hash: *mut [u8; 32],
@@ -42,17 +44,22 @@ pub type IsMineInput = unsafe extern "C" fn(
     context: *const c_void,
 ) -> bool;
 
-pub type HasCollateralInputs = unsafe extern "C" fn(
-    only_confirmed: bool,
+pub type AvailableCoins = unsafe extern "C" fn(
+    only_safe: bool,
+    coin_control: CoinControl,
     wallet_ex: &mut WalletEx,
     context: *const c_void,
-) -> bool;
+) -> *mut GatheredOutputs;
+
+pub type DestroyGatheredOutputs = unsafe extern "C" fn(
+    gathered_outputs: *mut GatheredOutputs,
+);
 
 pub type SelectCoinsGroupedByAddresses = unsafe extern "C" fn(
-    skipDenominated: bool,
+    skip_denominated: bool,
     anonymizable: bool,
-    skipUnconfirmed: bool,
-    maxOupointsPerAddress: i32,
+    skip_unconfirmed: bool,
+    max_oupoints_per_address: i32,
     wallet_ex: &mut WalletEx,
     context: *const c_void,
 ) -> *mut SelectedCoins;
@@ -71,7 +78,8 @@ pub type InputsWithAmount = unsafe extern "C" fn(
     context: *const c_void,
 ) -> u32;
 
-pub type FreshReceiveCoinJoinAddress = unsafe extern "C" fn(
+pub type FreshCoinJoinAddress = unsafe extern "C" fn(
+    internal: bool,
     context: *const c_void,
 ) -> ByteArray;
 
@@ -79,4 +87,4 @@ pub type CommitTransaction = unsafe extern "C" fn(
     items: *mut *mut Recipient,
     item_count: usize,
     context: *const c_void
-);
+) -> bool;

@@ -5,8 +5,8 @@ use dash_spv_masternode_processor::{hashes::hex::FromHex, consensus::Decodable};
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 use ferment_interfaces::unbox_any;
 
+use crate::ffi::input_value::InputValue;
 use crate::models::denominations::Denomination;
-use crate::models::InputValue;
 use crate::coinjoin::CoinJoin;
 
 #[test]

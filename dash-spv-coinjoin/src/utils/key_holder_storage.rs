@@ -22,11 +22,9 @@ impl KeyHolderStorage {
         return script;
     }
 
-    pub fn keep_all(&self) {
-        // TODO
-    }
-
-    pub fn return_all(&self) {
-        // TODO
+    pub fn return_all(&mut self) {
+        for key_holder in &mut self.storage {
+            key_holder.return_key();
+        }
     }
 }
