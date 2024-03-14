@@ -9,7 +9,7 @@ use dash_spv_masternode_processor::ffi::from::FromFFI;
 use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
 use dash_spv_masternode_processor::util::address::address;
-use ferment_interfaces::boxed;
+use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
@@ -396,14 +396,15 @@ impl WalletEx {
         let mut result = false;
 
         unsafe {
-            result = (self.commit_transaction)(boxed_vec(
+            let boxed = boxed_vec(
                 vec_send
                     .iter()
                     .map(|input| boxed((*input).clone()))
                     .collect()
-            ), vec_send.len(), self.opaque_context)
-
-            // TODO: free vec_send ?
+            );
+            result = (self.commit_transaction)(boxed, vec_send.len(), self.opaque_context);
+            let vec = unbox_vec_ptr(boxed, vec_send.len());
+            unbox_any_vec(vec);
         }
 
         return result;

@@ -113,7 +113,7 @@ impl<'a> TransactionBuilder {
     }
 
     /// Check if it's possible to add multiple outputs as vector of amounts. Returns true if its possible to add all of them and false if not.
-    pub fn could_add_outputs(&self, vec_output_amounts: &Vec<u64>) -> bool {
+    pub fn could_add_outputs(&self, vec_output_amounts: &[u64]) -> bool {
         let mut amount_additional = 0;
         let bytes_additional = self.bytes_output * vec_output_amounts.len() as i32;
         let vec_len = vec_output_amounts.len();

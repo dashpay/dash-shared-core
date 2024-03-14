@@ -73,12 +73,22 @@ pub unsafe extern "C" fn register_client_session(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn call_session(
+pub unsafe extern "C" fn do_automatic_denominating(
     session: *mut CoinJoinClientSession,
     balance_info: Balance
-) -> bool {
+) -> u64 {
     println!("[RUST] CoinJoin: session.do_automatic_denominating");
     return (*session).do_automatic_denominating(false, balance_info);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn finish_automatic_denominating(
+    session: *mut CoinJoinClientSession,
+    balance_denominated_unconf: u64, 
+    balance_needs_anonymized: u64
+) -> bool {
+    println!("[RUST] CoinJoin: session.finish_automatic_denominating");
+    return (*session).finish_automatic_denominating(balance_denominated_unconf, balance_needs_anonymized);
 }
 
 #[no_mangle]
@@ -127,7 +137,7 @@ pub unsafe extern "C" fn is_locked_coin(
     prevout_hash: *mut [u8; 32],
     index: u32,
 ) -> bool {
-    println!("[RUST] CoinJoin call wallet_ex.is_fully_mixed");
+    println!("[RUST] CoinJoin call wallet_ex.is_locked_coin");
     return (*wallet_ex).locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 

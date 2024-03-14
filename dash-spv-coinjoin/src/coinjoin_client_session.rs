@@ -104,9 +104,9 @@ impl CoinJoinClientSession {
         }
     }
 
-    pub fn do_automatic_denominating(&mut self, dry_run: bool, balance_info: Balance) -> bool {
+    pub fn do_automatic_denominating(&mut self, dry_run: bool, balance_info: Balance) -> u64 {
         if self.state != PoolState::Idle || !self.options.enable_coinjoin {
-            return false;
+            return 0;
         }
 
         // if (getEntriesCount() > 0) { TODO: statuses
@@ -116,7 +116,7 @@ impl CoinJoinClientSession {
 
         if self.base_session.entries.len() > 0 {
             self.set_status(PoolStatus::Mixing);
-            return false;
+            return 0;
         }
 
         let balance_anonymized = balance_info.anonymized;
@@ -126,7 +126,7 @@ impl CoinJoinClientSession {
             println!("[RUST] CoinJoinClientSession::do_automatic_denominating -- Nothing to do\n");
             // nothing to do, just keep it in idle mode
             self.set_status(PoolStatus::Finished);
-            return false;
+            return 0;
         }
 
         let mut balance_needs_anonymized = sub_res.unwrap();
@@ -152,7 +152,7 @@ impl CoinJoinClientSession {
                 // queueSessionCompleteListeners(getState(), ERR_SESSION); TODO: 
             }
             
-            return false;
+            return 0;
         }
 
         let balance_anonimizable_non_denom = self.mixing_wallet.borrow_mut().get_anonymizable_balance(true, true);
@@ -203,8 +203,17 @@ impl CoinJoinClientSession {
 
         if dry_run {
             println!("[RUST] CoinJoin: create denominations {}, {}", self.last_create_denominated_result, dry_run);
-            return self.last_create_denominated_result;
+            return if self.last_create_denominated_result { balance_needs_anonymized } else { 0 };
         }
+
+        // let balance_denominated_unconf = balance_info.denominated_untrusted_pending;
+        // self.finish_automatic_denominating(balance_denominated_unconf, balance_needs_anonymized)
+
+        return balance_needs_anonymized;
+    }
+
+    pub fn finish_automatic_denominating(&mut self, balance_denominated_unconf: u64, balance_needs_anonymized: u64) -> bool {
+        println!("[RUST] CoinJoin: finish_automatic_denominating: {}, {}", balance_denominated_unconf.to_friendly_string(), balance_needs_anonymized.to_friendly_string());
 
         // check if we have the collateral sized inputs
         if !self.mixing_wallet.borrow_mut().has_collateral_inputs(true) {
@@ -274,6 +283,7 @@ impl CoinJoinClientSession {
         }
         
         self.set_status(PoolStatus::WarnNoCompatibleMasternode);
+
         return false;
     }
 
@@ -541,7 +551,7 @@ impl CoinJoinClientSession {
             return false;
         }
 
-        println!("[RUST] CoinJoin make_collateral_amounts");
+        println!("[RUST] CoinJoin: make_collateral_amounts");
 
         // NOTE: We do not allow txes larger than 100 kB, so we have to limit number of inputs here.
         // We still want to consume a lot of inputs to avoid creating only smaller denoms though.
@@ -612,7 +622,7 @@ impl CoinJoinClientSession {
 
         let case; // Just for debug logs
 
-        if tx_builder.could_add_outputs(&[CoinJoin::get_max_collateral_amount(), CoinJoin::get_collateral_amount()].to_vec()) {
+        if tx_builder.could_add_outputs(&[CoinJoin::get_max_collateral_amount(), CoinJoin::get_collateral_amount()]) {
             case = 1;
             // <case1>, see TransactionRecord::decomposeTransaction
             // Out1 == CoinJoin.GetMaxCollateralAmount()
@@ -630,7 +640,7 @@ impl CoinJoinClientSession {
                     );
                 }
             }
-        } else if tx_builder.could_add_outputs(&[CoinJoin::get_collateral_amount(), CoinJoin::get_collateral_amount()].to_vec()) {
+        } else if tx_builder.could_add_outputs(&[CoinJoin::get_collateral_amount(), CoinJoin::get_collateral_amount()]) {
             case = 2;
             // <case2>, see TransactionRecord::decomposeTransaction
             // Out1 CoinJoin.isCollateralAmount()
