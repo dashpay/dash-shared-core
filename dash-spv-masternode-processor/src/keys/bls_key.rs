@@ -1,5 +1,6 @@
 use bls_signatures::bip32::{ChainCode, ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
+use hashes::hex::ToHex;
 use hashes::{Hash, hex::FromHex, sha256, sha256d};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
@@ -68,6 +69,9 @@ impl IKey for BLSKey {
     }
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         self.verify_uint768(UInt256::from(message_digest), UInt768::from(signature))
+    }
+    fn verify_with_uint(&mut self, message_digest: UInt256, signature: &[u8]) -> bool {
+        self.verify_uint768(message_digest, UInt768::from(signature))
     }
 
     fn secret_key(&self) -> UInt256 {
@@ -372,6 +376,9 @@ impl BLSKey {
     }
 
     pub fn verify_uint768(&self, digest: UInt256, signature: UInt768) -> bool {
+        let digest_hex = digest.as_bytes().to_hex();
+        let signature_hex = signature.as_bytes().to_hex();
+
         Self::verify_message_with_key(self, digest.as_bytes(), signature)
     }
 

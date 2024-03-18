@@ -1,8 +1,9 @@
 use std::io::Cursor;
 use dash_spv_masternode_processor::consensus::{Decodable, Encodable};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
-use dash_spv_masternode_processor::crypto::byte_util::Reversable;
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable};
+use dash_spv_masternode_processor::crypto::{UInt256, UInt384, UInt768};
+use dash_spv_masternode_processor::models::OperatorPublicKey;
 use dash_spv_masternode_processor::tx::Transaction;
 use crate::messages;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
@@ -194,8 +195,8 @@ pub fn coinjoin_broadcast_tx_round_test() {
 pub fn coinjoin_queue_message_round_test() {
     let denomination = 16;
     let pro_tx_hash = UInt256::from_hex("3fc39b657385a7d2e824ca2644bdcddcef0bc25775c30c4f747345ef4f1c7503").unwrap().reversed();
-    let signature = Vec::from_hex("998c5118eef9a89bfe5c6b961a8cc5af52cb00d0394688e78b23194699f7356cece6f8af63fdb0c28c2728c05325a6fe").unwrap();
-    let time: i64 = 1702813411;
+    let signature = UInt768::from_hex("a4f1ebf98b3b2df98c6375d391c4aba667edbaccb31610a8ded1eaba92c87ce59d2dcbea67fd59d212edd87553fbbeac0041bc514782b3ae5184f6d194c3dbdd8f94b5ce5e0e358aed3557b18188d51cbbcda80fba2ff7dabb808029ba255431").unwrap().reversed();
+    let time: u64 = 1702813411;
     let ready = true;
 
     let dsq = messages::CoinJoinQueueMessage { 
@@ -204,6 +205,7 @@ pub fn coinjoin_queue_message_round_test() {
         ready,
         time,
         signature: Some(signature),
+        tried: false
     };
 
     let mut buffer = Vec::new();
@@ -216,5 +218,23 @@ pub fn coinjoin_queue_message_round_test() {
     assert_eq!(dsq.pro_tx_hash, from_bytes.pro_tx_hash);
     assert_eq!(dsq.time, from_bytes.time);
     assert_eq!(dsq.ready, from_bytes.ready);
-    assert_eq!(dsq.signature.unwrap().to_hex(), from_bytes.signature.unwrap().to_hex());
+    assert_eq!(dsq.signature.unwrap().as_bytes().to_hex(), from_bytes.signature.unwrap().as_bytes().to_hex());
+}
+
+#[test]
+pub fn coinjoin_queue_verify_signature_test() {
+    let queue_from_ctor = messages::CoinJoinQueueMessage {
+        denomination: 8,
+        pro_tx_hash: UInt256::from_hex("160120d0aa01ae90e2abb2791a313af326274536f930c95e393959598f29c636").unwrap().reversed(),
+        time: 1703168338,
+        ready: false,
+        signature: Some(UInt768::from_hex("a4f1ebf98b3b2df98c6375d391c4aba667edbaccb31610a8ded1eaba92c87ce59d2dcbea67fd59d212edd87553fbbeac0041bc514782b3ae5184f6d194c3dbdd8f94b5ce5e0e358aed3557b18188d51cbbcda80fba2ff7dabb808029ba255431").unwrap().reversed()),
+        tried: false
+    };
+
+    let masternode_operator_key = OperatorPublicKey {
+        data: UInt384::from_hex("066d57a6451b7800c1c2a6c6e04fe73ec2e1c95e492bacae760ad2f79ca3c30727ec9bf0daea43c08ff1ad6c2cf07612").unwrap().reversed(),
+        version: 1,
+    };
+    assert!(queue_from_ctor.check_signature(masternode_operator_key));
 }

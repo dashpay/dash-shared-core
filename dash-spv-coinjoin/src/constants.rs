@@ -38,3 +38,5 @@ pub const COINJOIN_RANDOM_ROUNDS: i32 = 3;
 
 // If feePerKb is lower than this, Dash Core will treat it as if there were no fee.
 pub const REFERENCE_DEFAULT_MIN_TX_FEE: u64 = 1000; // 0.01 mDASH
+
+pub const COINJOIN_QUEUE_TIMEOUT: u64 = 30;

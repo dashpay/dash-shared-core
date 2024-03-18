@@ -8,6 +8,7 @@ pub(crate) mod coin_control;
 pub(crate) mod reserve_destination;
 pub(crate) mod denominations;
 pub(crate) mod transaction_builder_output;
+pub(crate) mod masternode_meta_info;
 
 pub use self::coinjoin_client_options::CoinJoinClientOptions;
 pub use self::balance::Balance;
