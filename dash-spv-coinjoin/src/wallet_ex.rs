@@ -438,7 +438,7 @@ impl WalletEx {
         let fresh_key = unsafe {
             let data = (self.fresh_coinjoin_address)(internal, self.opaque_context);
             let result = slice::from_raw_parts(data.ptr, data.len);
-            // TODO: unbox_any(data); ? 
+            unbox_vec_ptr(data.ptr as *mut u8, data.len);
             result
         };
 

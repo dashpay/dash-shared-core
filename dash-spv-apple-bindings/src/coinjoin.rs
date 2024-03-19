@@ -6,7 +6,7 @@ use dash_spv_coinjoin::coinjoin_client_session::CoinJoinClientSession;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use dash_spv_coinjoin::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetWalletTransaction, HasChainLock, InputsWithAmount, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SignTransaction};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn register_coinjoin(
 
 #[no_mangle]
 pub unsafe extern "C" fn register_client_session(
-    coinjoin: *mut CoinJoin,
+    coinjoin_ptr: *mut CoinJoin,
     options_ptr: *mut CoinJoinClientOptions,
     get_wallet_transaction: GetWalletTransaction,
     destroy_wallet_transaction: DestroyWalletTransaction,
@@ -50,10 +50,12 @@ pub unsafe extern "C" fn register_client_session(
     count_inputs_with_amount: InputsWithAmount,
     fresh_coinjoin_key: FreshCoinJoinAddress,
     commit_transaction: CommitTransaction,
+    masternode_by_hash: MasternodeByHash,
+    destroy_masternode: DestroyMasternode,
     context: *const c_void
 ) -> *mut CoinJoinClientSession {
     let session = CoinJoinClientSession::new(
-        std::ptr::read(coinjoin),
+        std::ptr::read(coinjoin_ptr),
         std::ptr::read(options_ptr), 
         sign_transaction,
         get_wallet_transaction, 
@@ -66,6 +68,8 @@ pub unsafe extern "C" fn register_client_session(
         count_inputs_with_amount,
         fresh_coinjoin_key,
         commit_transaction,
+        // masternode_by_hash, TODO
+        // destroy_masternode,
         context
     );
     println!("[RUST] CoinJoin: register_session");
