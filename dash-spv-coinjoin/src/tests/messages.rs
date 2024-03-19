@@ -196,7 +196,7 @@ pub fn coinjoin_queue_message_round_test() {
     let denomination = 16;
     let pro_tx_hash = UInt256::from_hex("3fc39b657385a7d2e824ca2644bdcddcef0bc25775c30c4f747345ef4f1c7503").unwrap().reversed();
     let signature = UInt768::from_hex("a4f1ebf98b3b2df98c6375d391c4aba667edbaccb31610a8ded1eaba92c87ce59d2dcbea67fd59d212edd87553fbbeac0041bc514782b3ae5184f6d194c3dbdd8f94b5ce5e0e358aed3557b18188d51cbbcda80fba2ff7dabb808029ba255431").unwrap().reversed();
-    let time: u64 = 1702813411;
+    let time: i64 = 1702813411;
     let ready = true;
 
     let dsq = messages::CoinJoinQueueMessage { 

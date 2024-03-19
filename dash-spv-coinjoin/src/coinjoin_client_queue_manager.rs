@@ -3,12 +3,13 @@ use std::{collections::HashMap, time::Instant};
 use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::from::FromFFI, models::MasternodeEntry};
 use ferment_interfaces::boxed;
 
-use crate::{ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage};
+use crate::{ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage, models::CoinJoinClientOptions};
 
 pub struct CoinJoinClientQueueManager {
     coinjoin_queue: Vec<CoinJoinQueueMessage>,
     spamming_masternodes: HashMap<UInt256, u64>,
     masternode_metadata_manager: MasternodeMetadataManager,
+    coinjoin_options: CoinJoinClientOptions,
     masternode_by_hash: MasternodeByHash,
     destroy_masternode: DestroyMasternode,
     valid_mns_count: ValidMasternodeCount,
@@ -18,6 +19,7 @@ pub struct CoinJoinClientQueueManager {
 impl CoinJoinClientQueueManager {
     pub fn new(
         masternode_metadata_manager: MasternodeMetadataManager,
+        coinjoin_options: CoinJoinClientOptions,
         masternode_by_hash: MasternodeByHash,
         destroy_masternode: DestroyMasternode,
         valid_mns_count: ValidMasternodeCount,
@@ -29,6 +31,7 @@ impl CoinJoinClientQueueManager {
             masternode_by_hash,
             destroy_masternode,
             masternode_metadata_manager,
+            coinjoin_options,
             valid_mns_count,
             context
         }
@@ -40,12 +43,12 @@ impl CoinJoinClientQueueManager {
 
     pub fn check_queue(&mut self) {
         let current_time = Instant::now().elapsed().as_secs();
-        self.coinjoin_queue.retain(|q| !q.is_time_out_of_bounds(current_time));
+        self.coinjoin_queue.retain(|q| !q.is_time_out_of_bounds(current_time as i64));
     }
 
     pub fn get_queue_item_and_try(&mut self) -> Option<CoinJoinQueueMessage> {
         for dsq in self.coinjoin_queue.iter_mut() {
-            if !dsq.tried && !dsq.is_time_out_of_bounds(Instant::now().elapsed().as_secs()) {
+            if !dsq.tried && !dsq.is_time_out_of_bounds(Instant::now().elapsed().as_secs() as i64) {
                 dsq.tried = true;
                 return Some(dsq.clone());
             }
@@ -72,7 +75,7 @@ impl CoinJoinClientQueueManager {
 
         println!("[RUST] CoinJoin: DSQUEUE -- {:?} new", dsq);
 
-        if dsq.is_time_out_of_bounds(Instant::now().elapsed().as_secs()) {
+        if dsq.is_time_out_of_bounds(Instant::now().elapsed().as_secs() as i64) {
             return;
         }
 
@@ -82,6 +85,46 @@ impl CoinJoinClientQueueManager {
                 return;
             }
 
+
+            // if the queue is ready, submit if we can
+            if dsq.ready && self.is_try_submit_denominate(&dmn) {
+                println!("[RUST] CoinJoin: DSQUEUE -- CoinJoin queue ({:?}) is ready on masternode {}", dsq, dmn.socket_address);
+            } else {
+                if let Some(meta_info) = self.masternode_metadata_manager.get_meta_info(dmn.provider_registration_transaction_hash, true) {
+                    let last_dsq = meta_info.last_dsq;
+                    let dsq_threshold = self.masternode_metadata_manager.get_dsq_threshold(dmn.provider_registration_transaction_hash, self.valid_mns_count());
+                    println!("[RUST] CoinJoin: DSQUEUE -- lastDsq: {}  dsqThreshold: {}  dsqCount: {}", last_dsq, dsq_threshold, self.masternode_metadata_manager.dsq_count);
+                    // don't allow a few nodes to dominate the queuing process
+                    if last_dsq != 0 && dsq_threshold > self.masternode_metadata_manager.dsq_count {
+                        if !self.spamming_masternodes.contains_key(&dsq.pro_tx_hash) {
+                            self.spamming_masternodes.insert(dsq.pro_tx_hash, Instant::now().elapsed().as_secs());
+                            println!("[RUST] CoinJoin: DSQUEUE -- Masternode {} is sending too many dsq messages", dmn.provider_registration_transaction_hash);
+                        }
+                        return;
+                    }
+                } else {
+                    return;
+                }
+
+                self.masternode_metadata_manager.allow_mixing(dmn.provider_registration_transaction_hash);
+                println!("[RUST] CoinJoin: DSQUEUE -- new CoinJoin queue ({:?}) from masternode {}", dsq, dmn.socket_address);
+                
+                // TODO
+                // foreach manager in CoinJoinClientManagers {
+                    // coinJoinClientManager.markAlreadyJoinedQueueAsTried(dsq);
+                // }
+
+                self.coinjoin_queue.push(dsq);
+            }
+        }
+    }
+
+    pub fn do_maintainence(&mut self) {
+        if !self.coinjoin_options.enable_coinjoin {
+            return;
+        }
+
+        if !self.is_synced() {
 
         }
     }
@@ -101,7 +144,7 @@ impl CoinJoinClientQueueManager {
         }
     }
 
-    fn valid_mns_count(&self) -> u32 {
+    fn valid_mns_count(&self) -> u64 {
         unsafe { return (self.valid_mns_count)(self.context); }
     }
 
@@ -112,5 +155,9 @@ impl CoinJoinClientQueueManager {
         // }
 
         return false;
+    }
+
+    fn is_synced(&self) -> bool {
+        return true;
     }
 }

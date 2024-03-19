@@ -100,4 +100,4 @@ pub type DestroyMasternode = unsafe extern "C" fn(
 
 pub type ValidMasternodeCount = unsafe extern "C" fn(
     context: *const c_void,
-) -> u32;
+) -> u64;

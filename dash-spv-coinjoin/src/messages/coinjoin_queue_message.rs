@@ -16,7 +16,7 @@ use crate::constants::COINJOIN_QUEUE_TIMEOUT;
 pub struct CoinJoinQueueMessage {
     pub denomination: u32,
     pub pro_tx_hash: UInt256,
-    pub time: u64,
+    pub time: i64,
     pub ready: bool, // ready to submit
     pub signature: Option<UInt768>,
     // Memory only
@@ -24,7 +24,7 @@ pub struct CoinJoinQueueMessage {
 }
 
 impl CoinJoinQueueMessage {
-    pub fn is_time_out_of_bounds(&self, current_time: u64) -> bool {
+    pub fn is_time_out_of_bounds(&self, current_time: i64) -> bool {
         return current_time.saturating_sub(self.time) > COINJOIN_QUEUE_TIMEOUT || 
             self.time.saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT
     }
@@ -80,7 +80,7 @@ impl encode::Decodable for CoinJoinQueueMessage {
     fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         let denomination = u32::consensus_decode(&mut d)?;
         let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
-        let time = i64::consensus_decode(&mut d)? as u64;
+        let time = i64::consensus_decode(&mut d)?;
         let ready: bool = bool::consensus_decode(&mut d)?;
         let signature: Option<UInt768> = UInt768::consensus_decode(&mut d).ok();
         
