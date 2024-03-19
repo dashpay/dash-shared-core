@@ -101,3 +101,7 @@ pub type DestroyMasternode = unsafe extern "C" fn(
 pub type ValidMasternodeCount = unsafe extern "C" fn(
     context: *const c_void,
 ) -> u64;
+
+pub type IsBlockchainSynced = unsafe extern "C" fn(
+    context: *const c_void,
+) -> bool;

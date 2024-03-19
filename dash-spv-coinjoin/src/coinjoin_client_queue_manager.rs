@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Instant};
 use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::from::FromFFI, models::MasternodeEntry};
 use ferment_interfaces::boxed;
 
-use crate::{ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage, models::CoinJoinClientOptions};
+use crate::{constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, IsBlockchainSynced, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage, models::CoinJoinClientOptions};
 
 pub struct CoinJoinClientQueueManager {
     coinjoin_queue: Vec<CoinJoinQueueMessage>,
@@ -13,6 +13,7 @@ pub struct CoinJoinClientQueueManager {
     masternode_by_hash: MasternodeByHash,
     destroy_masternode: DestroyMasternode,
     valid_mns_count: ValidMasternodeCount,
+    is_synced: IsBlockchainSynced,
     context: *const std::ffi::c_void
 }
 
@@ -23,6 +24,7 @@ impl CoinJoinClientQueueManager {
         masternode_by_hash: MasternodeByHash,
         destroy_masternode: DestroyMasternode,
         valid_mns_count: ValidMasternodeCount,
+        is_synced: IsBlockchainSynced,
         context: *const std::ffi::c_void
     ) -> Self {
         Self {
@@ -33,6 +35,7 @@ impl CoinJoinClientQueueManager {
             masternode_metadata_manager,
             coinjoin_options,
             valid_mns_count,
+            is_synced,
             context
         }
     }
@@ -125,8 +128,11 @@ impl CoinJoinClientQueueManager {
         }
 
         if !self.is_synced() {
-
+            return;
         }
+
+        self.check_queue();
+        self.spamming_masternodes.retain(|_, v| (*v + COINJOIN_QUEUE_TIMEOUT as u64) > Instant::now().elapsed().as_secs());
     }
 
     fn get_mn(&self, pro_tx_hash: UInt256) -> Option<MasternodeEntry> {
@@ -158,6 +164,6 @@ impl CoinJoinClientQueueManager {
     }
 
     fn is_synced(&self) -> bool {
-        return true;
+        unsafe { return (self.is_synced)(self.context); }
     }
 }

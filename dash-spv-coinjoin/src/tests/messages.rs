@@ -1,4 +1,5 @@
 use std::io::Cursor;
+use byte::BytesExt;
 use dash_spv_masternode_processor::consensus::{Decodable, Encodable};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable};
