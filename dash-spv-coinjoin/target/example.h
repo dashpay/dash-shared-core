@@ -50,4 +50,6 @@
 
 #define REFERENCE_DEFAULT_MIN_TX_FEE 1000
 
+#define COINJOIN_QUEUE_TIMEOUT 30
+
 #endif /* example_h */

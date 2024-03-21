@@ -1,6 +1,6 @@
 use std::ffi::c_void;
 use dash_spv_masternode_processor::ffi::ByteArray;
-use dash_spv_masternode_processor::types;
+use dash_spv_masternode_processor::types::{self, MasternodeEntry};
 use crate::ffi::selected_coins::SelectedCoins;
 use crate::wallet_ex::WalletEx;
 
@@ -87,4 +87,21 @@ pub type CommitTransaction = unsafe extern "C" fn(
     items: *mut *mut Recipient,
     item_count: usize,
     context: *const c_void
+) -> bool;
+
+pub type MasternodeByHash = unsafe extern "C" fn(
+    address: *mut [u8; 32],
+    context: *const c_void,
+) -> *mut MasternodeEntry;
+
+pub type DestroyMasternode = unsafe extern "C" fn(
+    selected_coins: *mut MasternodeEntry,
+);
+
+pub type ValidMasternodeCount = unsafe extern "C" fn(
+    context: *const c_void,
+) -> u64;
+
+pub type IsBlockchainSynced = unsafe extern "C" fn(
+    context: *const c_void,
 ) -> bool;
