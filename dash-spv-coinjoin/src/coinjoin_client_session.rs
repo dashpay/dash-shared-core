@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Instant;
 
 use dash_spv_masternode_processor::blockdata::opcodes::all::OP_RETURN;
 use dash_spv_masternode_processor::chain::params::DUFFS;
@@ -11,9 +12,11 @@ use dash_spv_masternode_processor::tx::{Transaction, TransactionInput, Transacti
 use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
-use crate::constants::{COINJOIN_DENOM_OUTPUTS_THRESHOLD, DEFAULT_COINJOIN_DENOMS_GOAL, DEFAULT_COINJOIN_DENOMS_HARDCAP};
+use crate::constants::{COINJOIN_DENOM_OUTPUTS_THRESHOLD, COINJOIN_ENTRY_MAX_SIZE, DEFAULT_COINJOIN_DENOMS_GOAL, DEFAULT_COINJOIN_DENOMS_HARDCAP};
 use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use crate::messages::CoinJoinEntry;
 use crate::models::coin_control::{CoinControl, CoinType};
+use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::reserve_destination::ReserveDestination;
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::messages::{pool_state::PoolState, pool_status::PoolStatus};
@@ -35,10 +38,7 @@ pub struct CoinJoinClientSession {
     base_session: CoinJoinBaseSession,
     options: CoinJoinClientOptions,
     key_holder_storage: KeyHolderStorage,
-    state: PoolState,
-    status: PoolStatus,
     last_create_denominated_result: bool,
-    session_id: i32,
     outpoint_locked: Vec<TxOutPoint>,
     mixing_masternode: Option<MasternodeEntry>,
     pending_dsa_request: Option<PendingDsaRequest>,
@@ -90,10 +90,7 @@ impl CoinJoinClientSession {
             base_session: CoinJoinBaseSession::new(),
             key_holder_storage: KeyHolderStorage::new(),
             options: options,
-            state: PoolState::Idle,
-            status: PoolStatus::Warmup,
             last_create_denominated_result: true,
-            session_id: 0,
             outpoint_locked: Vec::new(),
             mixing_masternode: None,
             pending_dsa_request: None,
@@ -105,7 +102,7 @@ impl CoinJoinClientSession {
     }
 
     pub fn do_automatic_denominating(&mut self, dry_run: bool, balance_info: Balance) -> u64 {
-        if self.state != PoolState::Idle || !self.options.enable_coinjoin {
+        if self.base_session.state != PoolState::Idle || !self.options.enable_coinjoin {
             return 0;
         }
 
@@ -220,7 +217,7 @@ impl CoinJoinClientSession {
             return !self.mixing_wallet.borrow_mut().has_collateral_inputs(false) && self.make_collateral_amounts();
         }
 
-        if self.session_id != 0 {
+        if self.base_session.session_id != 0 {
             self.set_status(PoolStatus::Mixing);
             return false;
         }
@@ -750,7 +747,7 @@ impl CoinJoinClientSession {
         
         let mut coin_control = CoinControl::new();
         coin_control.coin_type = CoinType::OnlyCoinJoinCollateral;
-        let coins = self.mixing_wallet.borrow_mut().availalbe_coins(true, coin_control);
+        let coins = self.mixing_wallet.borrow_mut().available_coins(true, coin_control);
 
         if coins.is_empty() {
             str_reason.push_str("CoinJoin requires a collateral transaction and could not locate an acceptable input!");
@@ -838,5 +835,214 @@ impl CoinJoinClientSession {
         // TODO
 
         return false;
+    }
+
+    /// As a client, submit part of a future mixing transaction to a Masternode to start the process
+    pub fn submit_denominate(&mut self) -> bool {
+        let mut str_error = String::new();
+        let mut vec_tx_dsin = Vec::new();
+        let mut vec_psin_out_pairs_tmp = Vec::new();
+
+        if !self.select_denominate(&mut str_error, &mut vec_tx_dsin) {
+            println!("[RUST] CoinJoin: SelectDenominate failed, error: {}", str_error);
+            return false;
+        }
+
+        let mut vec_inputs_by_rounds = Vec::new();
+
+        for i in 0..(self.options.coinjoin_rounds + self.options.coinjoin_random_rounds) {
+            if self.prepare_denominate(i, i, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, true) {
+                println!("[RUST] CoinJoin: Running CoinJoin denominate for {} rounds, success", i);
+                vec_inputs_by_rounds.push((i, vec_psin_out_pairs_tmp.len()));
+            } else {
+                println!("[RUST] CoinJoin: Running CoinJoin denominate for {} rounds, error: {}", i, str_error);
+            }
+        }
+
+        // more inputs first, for equal input count prefer the one with fewer rounds
+        vec_inputs_by_rounds.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+
+        println!("[RUST] CoinJoin: vecInputsByRounds(size={}) for denom {}", vec_inputs_by_rounds.len(), self.base_session.session_denom);
+        for pair in &vec_inputs_by_rounds {
+            println!("[RUST] CoinJoin: vecInputsByRounds: rounds: {}, inputs: {}", pair.0, pair.1);
+        }
+
+        let rounds = vec_inputs_by_rounds[0].0;
+
+        if self.prepare_denominate(rounds, rounds, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, false) {
+            println!("[RUST] CoinJoin: Running CoinJoin denominate for {} rounds, success", rounds);
+            return self.send_denominate(vec_psin_out_pairs_tmp);
+        }
+
+        // We failed? That's strange but let's just make final attempt and try to mix everything
+        if self.prepare_denominate(0, self.options.coinjoin_rounds - 1, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, false) {
+            println!("[RUST] CoinJoin: Running CoinJoin denominate for all rounds, success");
+            return self.send_denominate(vec_psin_out_pairs_tmp);
+        }
+
+        // Should never actually get here but just in case
+        println!("[RUST] CoinJoin: Running CoinJoin denominate for all rounds, error: {}", str_error);
+        self.str_auto_denom_result = str_error;
+        return false;
+    }
+
+    /// step 0: select denominated inputs and txouts
+    fn select_denominate(&mut self, str_error_ret: &mut String, vec_tx_dsin_ret: &mut Vec<CoinJoinTransactionInput>) -> bool {
+        if !self.options.enable_coinjoin {
+            return false;
+        }
+
+        // if sm_wallet.IsLocked(true) { TODO: recheck
+        //     str_error_ret.push_str("Wallet locked, unable to create transaction!");
+        //     return false;
+        // }
+
+        if self.base_session.entries.len() > 0 {
+            str_error_ret.push_str("Already have pending entries in the CoinJoin pool");
+            return false;
+        }
+
+        vec_tx_dsin_ret.clear();
+        let selected = self.mixing_wallet.borrow_mut().select_tx_dsins_by_denomination(
+            self.base_session.session_denom, 
+            CoinJoin::max_pool_amount(), 
+            vec_tx_dsin_ret
+        );
+
+        if !selected {
+            str_error_ret.push_str(
+                &format!("Can't select current denominated inputs: {} for session {}",
+                    CoinJoin::denomination_to_amount(self.base_session.session_denom).to_friendly_string(), self.base_session.session_id)
+            );
+            
+            for input in vec_tx_dsin_ret.iter() {
+                str_error_ret.push_str(&format!("\n{:?}", input));
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /// step 1: prepare denominated inputs and outputs
+    fn prepare_denominate(
+        &mut self, 
+        min_rounds: i32, 
+        max_rounds: i32, 
+        str_error_ret: &mut String,
+        vec_tx_dsin: &Vec<CoinJoinTransactionInput>, 
+        vec_psin_out_pairs_ret: &mut Vec<(CoinJoinTransactionInput, TransactionOutput)>, 
+        dry_run: bool
+    ) -> bool {
+        if !CoinJoin::is_valid_denomination(self.base_session.session_denom) {
+            str_error_ret.push_str("Incorrect session denom");
+            return false;
+        }
+        let denom_amount = CoinJoin::denomination_to_amount(self.base_session.session_denom);
+
+        let mut steps = 0;
+        vec_psin_out_pairs_ret.clear();
+
+        for entry in vec_tx_dsin.iter() {
+            if steps >= COINJOIN_ENTRY_MAX_SIZE {
+                break;
+            }
+
+            if entry.rounds < min_rounds || entry.rounds > max_rounds {
+                continue;
+            }
+
+            let script_denom;
+            if dry_run {
+                script_denom = Some(vec![]);
+            } else {
+                if steps >= 1 && rand::thread_rng().gen_range(0..5) == 0 {
+                    steps += 1;
+                    continue;
+                }
+
+                script_denom = self.key_holder_storage.add_key(self.mixing_wallet.clone());
+            }
+            vec_psin_out_pairs_ret.push((entry.clone(), TransactionOutput { amount: denom_amount as u64, script: script_denom, address: None } ));
+            steps += 1;
+        }
+
+        if vec_psin_out_pairs_ret.is_empty() {
+            self.key_holder_storage.return_all();
+            str_error_ret.push_str("Can't prepare current denominated outputs");
+            return false;
+        }
+
+        if !dry_run {
+            for pair in vec_psin_out_pairs_ret.iter() {
+                self.mixing_wallet.borrow_mut().lock_coin(pair.0.outpoint());
+                self.outpoint_locked.push(pair.0.outpoint());
+            }
+        }
+
+        true
+    }
+
+    /// step 2: send denominated inputs and outputs prepared in step 1
+    fn send_denominate(&mut self, vec_psin_out_pairs: Vec<(CoinJoinTransactionInput, TransactionOutput)>) -> bool {
+        // if self.tx_my_collateral.as_ref().map_or(true, |tx| tx.inputs.is_empty()) {
+        if self.tx_my_collateral.is_none() || self.tx_my_collateral.as_ref().unwrap().inputs.is_empty() {
+            println!("[RUST] CoinJoin: -- CoinJoin collateral not set");
+            return false;
+        }
+
+        // we should already be connected to a Masternode
+        if self.base_session.session_id == 0 {
+            println!("[RUST] CoinJoin: No Masternode has been selected yet.");
+            self.unlock_coins();
+            self.key_holder_storage.return_all();
+            self.set_null();
+
+            return false;
+        }
+
+        self.base_session.state = PoolState::AcceptingEntries;
+        self.str_auto_denom_result = String::new();
+
+        println!("[RUST] CoinJoin: -- Added transaction to pool.");
+
+        let mut tx = Transaction {  // for debug purposes only
+            inputs: vec![],
+            outputs: vec![],
+            lock_time: 0,
+            version: 0,
+            tx_hash: None,
+            tx_type: TransactionType::Classic,
+            payload_offset: 0,
+            block_height: 0,
+        };
+        let mut vec_tx_dsin_tmp = Vec::new();
+        let mut vec_tx_out_tmp = Vec::new();
+
+        for pair in vec_psin_out_pairs {
+            vec_tx_dsin_tmp.push(pair.0.txin.clone());
+            vec_tx_out_tmp.push(pair.1.clone());
+            tx.inputs.push(pair.0.txin);
+            tx.outputs.push(pair.1);
+        }
+
+        println!("[RUST] CoinJoin: -- Submitting partial tx {:?} to session {}", tx, self.base_session.session_id);
+
+        // Store our entry for later use
+        let entry = CoinJoinEntry {
+            mixing_inputs: vec_tx_dsin_tmp, 
+            mixing_outputs: vec_tx_out_tmp, 
+            tx_collateral: self.tx_my_collateral.as_ref().unwrap().clone() 
+        };
+        self.base_session.entries.push(entry.clone());
+        self.relay(entry);
+        self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+
+        return true;
+    }
+
+    fn relay(&self, entry: CoinJoinEntry) {
+        // TODO
     }
 }
