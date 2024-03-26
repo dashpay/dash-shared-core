@@ -1,12 +1,14 @@
 use std::collections::{HashSet, HashMap};
 use std::slice;
 use byte::{BytesExt, LE};
+use rand::seq::SliceRandom;
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::crypto::byte_util::Reversable;
 use dash_spv_masternode_processor::ffi::boxer::boxed_vec;
 use dash_spv_masternode_processor::ffi::from::FromFFI;
 use dash_spv_masternode_processor::ffi::to::ToFFI;
+use dash_spv_masternode_processor::secp256k1::rand;
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
 use dash_spv_masternode_processor::util::address::address;
 use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
@@ -18,9 +20,11 @@ use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
 use crate::models::coin_control::{CoinControl, CoinType};
+use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::tx_destination::TxDestination;
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::models::CoinJoinClientOptions;
+use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
 pub struct WalletEx {
@@ -220,12 +224,12 @@ impl WalletEx {
     pub fn has_collateral_inputs(&mut self, only_confirmed: bool) -> bool {
         let mut coin_control = CoinControl::new();
         coin_control.coin_type = CoinType::OnlyCoinJoinCollateral;
-        let result = self.availalbe_coins(only_confirmed, coin_control);
+        let result = self.available_coins(only_confirmed, coin_control);
 
         return !result.is_empty();
     }
 
-    pub fn availalbe_coins(&mut self, only_safe: bool, coin_control: CoinControl) -> Vec<InputCoin> {
+    pub fn available_coins(&mut self, only_safe: bool, coin_control: CoinControl) -> Vec<InputCoin> {
         let mut vec_gathered_outputs: Vec<InputCoin> = Vec::new();
         
         unsafe {
@@ -423,6 +427,60 @@ impl WalletEx {
 
             return Some(signed_tx);
         }
+    }
+
+    pub fn select_tx_dsins_by_denomination(&mut self, denom: i32, value_max: u64, vec_tx_dsin_ret: &mut Vec<CoinJoinTransactionInput>) -> bool {
+        let mut value_total: u64 = 0;
+        let mut set_recent_tx_ids = HashSet::new();
+        vec_tx_dsin_ret.clear();
+    
+        if !CoinJoin::is_valid_denomination(denom) {
+            return false;
+        }
+    
+        let denom_amount = CoinJoin::denomination_to_amount(denom);
+        let mut coin_control = CoinControl::new();
+        coin_control.coin_type = CoinType::OnlyReadyToMix;
+    
+        let mut coins = self.available_coins(true, coin_control);
+        println!("[RUST] CoinJoin: -- vCoins.size(): {}", coins.len());
+        coins.shuffle(&mut rand::thread_rng());
+    
+        for out in coins.iter() {
+            let tx_hash = out.tx_outpoint.hash;
+            let value = out.output.amount;
+    
+            if set_recent_tx_ids.contains(&tx_hash) || value_total + value > value_max || value as i64 != denom_amount {
+                continue;
+            }
+    
+            let txin = TransactionInput {
+                input_hash: tx_hash,
+                index: out.tx_outpoint.index,
+                script: None,
+                signature: None,
+                sequence: 0
+            };
+            let script_pub_key = out.output.script.clone();
+            let rounds = self.get_real_outpoint_coinjoin_rounds(out.tx_outpoint.clone(), 0);
+    
+            value_total += value;
+            vec_tx_dsin_ret.push(CoinJoinTransactionInput::new(txin, script_pub_key, rounds));
+            set_recent_tx_ids.insert(tx_hash);
+            println!("[RUST] CoinJoin: -- hash: {}, nValue: {}", tx_hash, value.to_friendly_string());
+        }
+    
+        println!("[RUST] CoinJoin: -- setRecentTxIds.size(): {}", set_recent_tx_ids.len());
+        
+        if set_recent_tx_ids.is_empty() {
+            println!("[RUST] CoinJoin: No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
+            
+            for output in coins.iter() {
+                println!("  output: {:?}", output);
+            }
+        }
+    
+        return value_total > 0;
     }
 
     fn clear_anonymizable_caches(&mut self) {
