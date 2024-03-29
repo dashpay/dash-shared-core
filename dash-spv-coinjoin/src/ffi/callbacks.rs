@@ -105,3 +105,11 @@ pub type ValidMasternodeCount = unsafe extern "C" fn(
 pub type IsBlockchainSynced = unsafe extern "C" fn(
     context: *const c_void,
 ) -> bool;
+
+pub type GetMasternodeList = unsafe extern "C" fn(
+    context: *const c_void,
+) -> *mut types::MasternodeList;
+
+pub type DestroyMasternodeList = unsafe extern "C" fn(
+    mn_list: *mut types::MasternodeList,
+);

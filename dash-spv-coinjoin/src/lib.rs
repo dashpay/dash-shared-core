@@ -4,6 +4,7 @@ pub mod coinjoin;
 pub mod constants;
 pub mod coinjoin_base_session;
 pub mod coinjoin_client_session;
+pub mod coinjoin_client_manager;
 pub mod wallet_ex;
 pub mod ffi;
 
