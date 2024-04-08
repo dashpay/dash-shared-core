@@ -1,10 +1,11 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::time::Instant;
 
 use dash_spv_masternode_processor::blockdata::opcodes::all::OP_RETURN;
 use dash_spv_masternode_processor::chain::params::DUFFS;
+use dash_spv_masternode_processor::crypto::byte_util::Random;
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::models::MasternodeEntry;
 use dash_spv_masternode_processor::secp256k1::rand::{self, Rng};
@@ -12,9 +13,9 @@ use dash_spv_masternode_processor::tx::{Transaction, TransactionInput, Transacti
 use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
+use crate::coinjoin_client_manager::CoinJoinClientManager;
 use crate::constants::{COINJOIN_DENOM_OUTPUTS_THRESHOLD, COINJOIN_ENTRY_MAX_SIZE, DEFAULT_COINJOIN_DENOMS_GOAL, DEFAULT_COINJOIN_DENOMS_HARDCAP};
-use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
-use crate::messages::CoinJoinEntry;
+use crate::messages::{CoinJoinAcceptMessage, CoinJoinEntry};
 use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::reserve_destination::ReserveDestination;
@@ -29,11 +30,9 @@ use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::utils::transaction_builder::TransactionBuilder;
 use crate::wallet_ex::WalletEx;
 
-static mut NEXT_ID: i32 = 0;
-
 pub struct CoinJoinClientSession {
-    id: i32,
-    coinjoin: CoinJoin,
+    id: UInt256,
+    coinjoin: Rc<RefCell<CoinJoin>>,
     mixing_wallet: Rc<RefCell<WalletEx>>,
     base_session: CoinJoinBaseSession,
     options: CoinJoinClientOptions,
@@ -45,48 +44,20 @@ pub struct CoinJoinClientSession {
     tx_my_collateral: Option<Transaction>,
     is_my_collateral_valid: bool,
     collateral_session_map: HashMap<UInt256, i32>,
-    str_auto_denom_result: String
+    str_auto_denom_result: String,
+    joined: bool // did we join a session (true), or start a session (false)
 }
 
 impl CoinJoinClientSession {
     pub fn new(
-        coinjoin: CoinJoin,
+        coinjoin: Rc<RefCell<CoinJoin>>,
         options: CoinJoinClientOptions,
-        sign_transaction: SignTransaction,
-        get_wallet_transaction: GetWalletTransaction,
-        destroy_transaction: DestroyWalletTransaction,
-        is_mine: IsMineInput,
-        available_coins: AvailableCoins,
-        destroy_gathered_outputs: DestroyGatheredOutputs,
-        selected_coins: SelectCoinsGroupedByAddresses,
-        destroy_selected_coins: DestroySelectedCoins,
-        inputs_with_amount: InputsWithAmount,
-        fresh_coinjoin_key: FreshCoinJoinAddress,
-        commit_transaction: CommitTransaction,
-        context: *const std::ffi::c_void
+        wallet_ex: Rc<RefCell<WalletEx>>
     ) -> Self {
-        unsafe { NEXT_ID += 1; } // TODO
-
-        let wallet_ex = Rc::new(RefCell::new(WalletEx::new(
-            context, 
-            options.clone(), 
-            get_wallet_transaction, 
-            sign_transaction,
-            destroy_transaction, 
-            is_mine, 
-            available_coins, 
-            destroy_gathered_outputs,
-            selected_coins, 
-            destroy_selected_coins,
-            inputs_with_amount,
-            fresh_coinjoin_key,
-            commit_transaction
-        )));
-
         Self {
-            id: unsafe { NEXT_ID }, 
+            id: UInt256::random(),
             coinjoin: coinjoin,
-            mixing_wallet: wallet_ex.clone(),
+            mixing_wallet: wallet_ex,
             base_session: CoinJoinBaseSession::new(),
             key_holder_storage: KeyHolderStorage::new(),
             options: options,
@@ -97,19 +68,15 @@ impl CoinJoinClientSession {
             tx_my_collateral: None,
             is_my_collateral_valid: false,
             collateral_session_map: HashMap::new(),
-            str_auto_denom_result: String::new()
+            str_auto_denom_result: String::new(),
+            joined: false
         }
     }
 
-    pub fn do_automatic_denominating(&mut self, dry_run: bool, balance_info: Balance) -> u64 {
+    pub fn do_automatic_denominating(&mut self, client_manager: &mut CoinJoinClientManager, dry_run: bool, balance_info: Balance) -> u64 {
         if self.base_session.state != PoolState::Idle || !self.options.enable_coinjoin {
             return 0;
         }
-
-        // if (getEntriesCount() > 0) { TODO: statuses
-        //     setStatus(PoolStatus.MIXING);
-        //     return false;
-        // }
 
         if self.base_session.entries.len() > 0 {
             self.set_status(PoolStatus::Mixing);
@@ -195,7 +162,7 @@ impl CoinJoinClientSession {
         self.last_create_denominated_result = true;
         
         if balance_anonimizable_non_denom >= value_min + CoinJoin::get_max_collateral_amount() && balance_to_denominate > 0 {
-            self.last_create_denominated_result = self.create_denominated(balance_to_denominate, dry_run);
+            self.last_create_denominated_result = self.create_denominated(client_manager, balance_to_denominate, dry_run);
         }
 
         if dry_run {
@@ -203,18 +170,19 @@ impl CoinJoinClientSession {
             return if self.last_create_denominated_result { balance_needs_anonymized } else { 0 };
         }
 
+        // This part is moved into finish_automatic_denominating:
         // let balance_denominated_unconf = balance_info.denominated_untrusted_pending;
         // self.finish_automatic_denominating(balance_denominated_unconf, balance_needs_anonymized)
 
         return balance_needs_anonymized;
     }
 
-    pub fn finish_automatic_denominating(&mut self, balance_denominated_unconf: u64, balance_needs_anonymized: u64) -> bool {
+    pub fn finish_automatic_denominating(&mut self, client_manager: &mut CoinJoinClientManager, balance_denominated_unconf: u64, balance_needs_anonymized: u64) -> bool {
         println!("[RUST] CoinJoin: finish_automatic_denominating: {}, {}", balance_denominated_unconf.to_friendly_string(), balance_needs_anonymized.to_friendly_string());
 
         // check if we have the collateral sized inputs
         if !self.mixing_wallet.borrow_mut().has_collateral_inputs(true) {
-            return !self.mixing_wallet.borrow_mut().has_collateral_inputs(false) && self.make_collateral_amounts();
+            return !self.mixing_wallet.borrow_mut().has_collateral_inputs(false) && self.make_collateral_amounts(client_manager);
         }
 
         if self.base_session.session_id != 0 {
@@ -244,7 +212,7 @@ impl CoinJoinClientSession {
                 }
             },
             Some(collateral) => {
-                if !self.is_my_collateral_valid || !self.coinjoin.is_collateral_valid(&collateral, true) {
+                if !self.is_my_collateral_valid || !self.coinjoin.borrow().is_collateral_valid(&collateral, true) {
                     println!("[RUST] CoinJoin: invalid collateral, recreating... [id: {}] ", self.id);
                     let output = &collateral.outputs[0];
                     
@@ -270,12 +238,12 @@ impl CoinJoinClientSession {
         println!("[RUST] CoinJoin: moved to queue joining/creating");
 
         // Always attempt to join an existing queue
-        if self.join_existing_queue(balance_needs_anonymized) {
+        if self.join_existing_queue(client_manager, balance_needs_anonymized) {
             return true;
         }
 
         // If we were unable to find/join an existing queue then start a new one.
-        if self.start_new_queue(balance_needs_anonymized) {
+        if self.start_new_queue(client_manager, balance_needs_anonymized) {
             return true;
         }
         
@@ -284,7 +252,7 @@ impl CoinJoinClientSession {
         return false;
     }
 
-    fn create_denominated(&mut self, balance_to_denominate: u64, dry_run: bool) -> bool {
+    fn create_denominated(&mut self, client_manager: &mut CoinJoinClientManager, balance_to_denominate: u64, dry_run: bool) -> bool {
         if !self.options.enable_coinjoin {
             return false;
         }
@@ -308,7 +276,7 @@ impl CoinJoinClientSession {
         println!("[RUST] CoinJoin: has_collateral_inputs: {}", !create_mixing_collaterals);
     
         for item in vec_tally {
-            if !self.create_denominated_with_item(&item, balance_to_denominate, create_mixing_collaterals, dry_run) {
+            if !self.create_denominated_with_item(client_manager, &item, balance_to_denominate, create_mixing_collaterals, dry_run) {
                 continue;
             }
 
@@ -321,6 +289,7 @@ impl CoinJoinClientSession {
 
     fn create_denominated_with_item(
         &mut self, 
+        client_manager: &mut CoinJoinClientManager,
         tally_item: &CompactTallyItem, 
         balance_to_denominate: u64, 
         create_mixing_collaterals: bool, 
@@ -536,14 +505,14 @@ impl CoinJoinClientSession {
             }
 
             // use the same nCachedLastSuccessBlock as for DS mixing to prevent race
-            // m_manager.UpdatedSuccessBlock(); // TODO
+            client_manager.updated_success_block();
             println!("[RUST] CoinJoinClientSession -- 4: {}\n", str_result);
         }
 
         return true;
     }
 
-    fn make_collateral_amounts(&mut self) -> bool {
+    fn make_collateral_amounts(&mut self, client_manager: &mut CoinJoinClientManager) -> bool {
         if !self.options.enable_coinjoin {
             return false;
         }
@@ -566,7 +535,7 @@ impl CoinJoinClientSession {
 
         // First try to use only non-denominated funds
         for item in &vec_tally {
-            if !self.make_collateral_amounts_with_item(item, false) {
+            if !self.make_collateral_amounts_with_item(client_manager, item, false) {
                 continue;
             }
 
@@ -575,7 +544,7 @@ impl CoinJoinClientSession {
 
         // There should be at least some denominated funds we should be able to break in pieces to continue mixing
         for item in &vec_tally {
-            if !self.make_collateral_amounts_with_item(item, true) {
+            if !self.make_collateral_amounts_with_item(client_manager, item, true) {
                 continue;
             }
 
@@ -587,7 +556,7 @@ impl CoinJoinClientSession {
         return false;
     }
 
-    fn make_collateral_amounts_with_item(&mut self, tally_item: &CompactTallyItem, try_denominated: bool) -> bool {
+    fn make_collateral_amounts_with_item(&mut self, client_manager: &mut CoinJoinClientManager, tally_item: &CompactTallyItem, try_denominated: bool) -> bool {
         if !self.options.enable_coinjoin {
             return false;
         }
@@ -688,31 +657,37 @@ impl CoinJoinClientSession {
             return false;
         }
 
-        // mixingWallet.getContext().coinJoinManager.coinJoinClientManagers.get(mixingWallet.getDescription()).updatedSuccessBlock(); TODO
-        // log.info("coinjoin: txid: {}", strResult);
-        // queueTransactionListeners(txBuilder.getTransaction(), CoinJoinTransactionType.MakeCollateralInputs);
+        client_manager.updated_success_block();
+        println!("[RUST] CoinJoin: txid: {}", str_result);
+        // queueTransactionListeners(txBuilder.getTransaction(), CoinJoinTransactionType.MakeCollateralInputs); TODO:
 
         return true;
     }
 
 
-    pub fn set_status(&self, pool_status: PoolStatus) {
-        // TODO
-            // strAutoDenomResult = CoinJoin.getStatusById(poolStatus);
-            // if (poolStatus.isError())
-            //     log.error("coinjoin: {}", strAutoDenomResult);
-            // else if (poolStatus.isWarning())
-            //     log.warn("coinjoin: {}", strAutoDenomResult);
-            // else
-            //     log.info("coinjoin: {}", strAutoDenomResult);
+    pub fn set_status(&mut self, pool_status: PoolStatus) {
+        self.str_auto_denom_result = CoinJoin::get_status_message(pool_status).to_string();
+
+        if pool_status.is_error() {
+            println!("[RUST] CoinJoin error: {}", self.str_auto_denom_result);
+        } else if pool_status.is_warning() {
+            println!("[RUST] CoinJoin warning: {}", self.str_auto_denom_result);
+        } else {
+            println!("[RUST] CoinJoin: {}", self.str_auto_denom_result);
+        }
+
+        self.base_session.status = pool_status;
     
-            // status.set(poolStatus);
-            // if (poolStatus.shouldStop()) {
-            //     log.info("Session has nothing to do: {}", poolStatus);
-            //     if (poolStatus.isError())
-            //         log.error("Session has an error: {}", poolStatus);
+        if pool_status.should_stop() {
+            println!("[RUST] CoinJoin: Session has nothing to do: {:?}", pool_status);
+            
+            if pool_status.is_error() {
+                println!("[RUST] CoinJoin: Session has an error: {:?}", pool_status);
+            }
+            
+            // TODO:
             //     hasNothingToDo.set(true);
-            // }
+        }
     }
 
     fn unlock_coins(&mut self) {
@@ -728,15 +703,16 @@ impl CoinJoinClientSession {
     }
 
     fn set_null(&mut self) {
-        // if (mixingMasternode != null) { TODO
-        //     if (context.coinJoinManager.isMasternodeOrDisconnectRequested(mixingMasternode.getService())) {
-        //         if (!context.coinJoinManager.disconnectMasternode(mixingMasternode)) {
-        //             log.info("not closing existing masternode: {}", mixingMasternode.getService().getSocketAddress());
-        //         }
-        //     } else {
-        //         log.info("not closing masternode since it is not found: {}", mixingMasternode.getService().getSocketAddress());
-        //     }
-        // }
+        if let Some(dmn) = self.mixing_masternode.clone() {
+            if self.mixing_wallet.borrow().is_masternode_or_disconnect_requested(dmn.socket_address) {
+                // if (!context.coinJoinManager.disconnectMasternode(mixingMasternode)) { TODO
+                //     log.info("not closing existing masternode: {}", mixingMasternode.getService().getSocketAddress());
+                // }
+            } else {
+                println!("[RUST] CoinJoin: not closing masternode since it is not found: {}", dmn.socket_address);
+            }
+        }
+
         self.mixing_masternode = None;
         self.pending_dsa_request = None;
         self.base_session.set_null();
@@ -825,15 +801,155 @@ impl CoinJoinClientSession {
         return false;
     }
 
-    fn join_existing_queue(&self, balance_needs_anonymized: u64) -> bool {
-        // TODO
+    fn join_existing_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
+        if !self.options.enable_coinjoin {
+            return false;
+        }
 
+        let mn_list = client_manager.get_mn_list();// TODO: at_chain_tip ?
+        let mut dsq_option = self.mixing_wallet.borrow_mut().client_queue_manager.get_queue_item_and_try();
+
+        while let Some(dsq) = dsq_option.clone() {
+            let dmn = mn_list.masternode_for(dsq.pro_tx_hash);
+
+            match (dmn, self.tx_my_collateral.clone()) {
+                (None, _) => {
+                    println!("coinjoin: dsq masternode is not in masternode list, masternode={}", dsq.pro_tx_hash);
+                    dsq_option = self.mixing_wallet.borrow_mut().client_queue_manager.get_queue_item_and_try();
+                    continue;
+                },
+                (Some(dmn), Some(tx))  => {
+                    println!("coinjoin: trying existing queue: {:?}", dsq);
+
+                    let mut vec_tx_dsin_tmp = Vec::new();
+
+                    if !self.mixing_wallet.borrow_mut().select_tx_dsins_by_denomination(dsq.denomination, balance_needs_anonymized, &mut vec_tx_dsin_tmp) {
+                        println!("coinjoin: couldn't match denomination {} ({})", dsq.denomination, CoinJoin::denomination_to_string(dsq.denomination));
+                        dsq_option = self.mixing_wallet.borrow_mut().client_queue_manager.get_queue_item_and_try();
+                        continue;
+                    }
+
+                    client_manager.add_used_masternode(dsq.pro_tx_hash);
+
+                    if self.mixing_wallet.borrow().is_masternode_or_disconnect_requested(dmn.socket_address) {
+                        println!("coinjoin: skipping masternode connection, addr={}", dmn.socket_address);
+                        dsq_option = self.mixing_wallet.borrow_mut().client_queue_manager.get_queue_item_and_try();
+                        continue;
+                    }
+
+                    self.base_session.session_denom = dsq.denomination;
+                    self.mixing_masternode = Some(dmn.clone());
+                    self.pending_dsa_request = Some(PendingDsaRequest::new(
+                        dmn.socket_address,
+                        CoinJoinAcceptMessage::new(
+                                self.base_session.session_denom,
+                                tx
+                            )
+                    ));
+                    // coinjoin_manager.add_pending_masternode(self); TODO pass uuid of the session?
+                    self.base_session.state = PoolState::Queue;
+                    self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+                    println!("[RUST] CoinJoin: join existing queue -> pending connection, sessionDenom: {} ({}), addr={}",
+                             self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
+                    self.set_status(PoolStatus::Connecting);
+                    self.joined = true;
+                    break;
+                }
+                (Some(_), None) => {
+                    println!("[RUST] CoinJoin: tx_collateral is missing");
+                }
+            }
+        }
+
+        self.set_status(PoolStatus::WarnNoMixingQueues);
         return false;
     }
 
-    fn start_new_queue(&self, balance_needs_anonymized: u64) -> bool {
-        // TODO
+    fn start_new_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
+        if !self.options.enable_coinjoin {
+            return false;
+        }
+        if balance_needs_anonymized <= 0 {
+            return false;
+        }
 
+        let mut tries = 0;
+        let mn_list = client_manager.get_mn_list();
+        let mn_count = mn_list.masternodes.values().filter(|x| x.is_valid).count();
+        let mut set_amounts = HashSet::new();
+
+        if !self.mixing_wallet.borrow_mut().select_denominated_amounts(balance_needs_anonymized, &mut set_amounts) {
+            if !self.last_create_denominated_result {
+                self.set_status(PoolStatus::ErrNoInputs);
+            }
+            return false;
+        }
+
+        while tries < 10 {
+            let dmn = client_manager.get_random_not_used_masternode();
+
+            match dmn {
+                None => {
+                    self.set_status(PoolStatus::ErrMasternodeNotFound);
+                    return false;
+                },
+                Some(dmn) => {
+                    client_manager.add_used_masternode(dmn.provider_registration_transaction_hash);
+                    
+                    {
+                        let mut wallet = self.mixing_wallet.borrow_mut();
+                        let metadata_manager = wallet.get_metadata_manager();
+                        let last_dsq = metadata_manager.get_meta_info(dmn.provider_registration_transaction_hash, true).unwrap().last_dsq;
+                        let dsq_threshold = metadata_manager.get_dsq_threshold(dmn.provider_registration_transaction_hash, mn_count as u64);
+                        
+                        if last_dsq != 0 && dsq_threshold > metadata_manager.dsq_count {
+                            println!("coinjoin: warning: Too early to mix on this masternode! masternode={} addr={} nLastDsq={} nDsqThreshold={} nDsqCount={}",
+                                    dmn.provider_registration_transaction_hash, dmn.socket_address, last_dsq, dsq_threshold, metadata_manager.dsq_count);
+                            tries += 1;
+                            continue;
+                        }
+
+                        if wallet.is_masternode_or_disconnect_requested(dmn.socket_address) {
+                            println!("coinjoin: warning: skipping masternode connection, addr={}", dmn.socket_address);
+                            tries += 1;
+                            continue;
+                        }
+                    }
+
+                    println!("[RUST] CoinJoin: attempt {} connection to masternode {}, protx: {}", tries + 1, dmn.socket_address, dmn.provider_registration_transaction_hash);
+
+                    while self.base_session.session_denom == 0 {
+                        for amount in &set_amounts {
+                            if set_amounts.len() > 1 && rand::random::<bool>() {
+                                continue;
+                            }
+                            self.base_session.session_denom = CoinJoin::amount_to_denomination(*amount);
+                            break;
+                        }
+                    }
+
+                    self.mixing_masternode = Some(dmn.clone());
+                    // coinjoin_manager.add_pending_masternode(self); TODO
+                    self.pending_dsa_request = Some(PendingDsaRequest::new(
+                        dmn.socket_address,
+                        CoinJoinAcceptMessage::new(
+                            self.base_session.session_denom,
+                            self.tx_my_collateral.clone().unwrap() // Assuming tx_my_collateral is always Some here
+                        )
+                    ));
+                    self.base_session.state = PoolState::Queue;
+                    self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+                    println!("coinjoin: start new queue -> pending connection, sessionDenom: {} ({}), addr={}",
+                            self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
+                    // coinjoin_manager.start_async(); TODO
+                    self.set_status(PoolStatus::Connecting);
+                    self.joined = false;
+                    
+                    return true;
+                }
+            }
+        }
+        self.str_auto_denom_result = "Failed to start a new mixing queue".to_string();
         return false;
     }
 

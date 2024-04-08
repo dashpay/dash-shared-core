@@ -5,10 +5,11 @@ use ferment_interfaces::boxed;
 
 use crate::{constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, IsBlockchainSynced, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage, models::CoinJoinClientOptions};
 
+#[derive(Debug)]
 pub struct CoinJoinClientQueueManager {
     coinjoin_queue: Vec<CoinJoinQueueMessage>,
     spamming_masternodes: HashMap<UInt256, u64>,
-    masternode_metadata_manager: MasternodeMetadataManager,
+    pub masternode_metadata_manager: MasternodeMetadataManager,
     coinjoin_options: CoinJoinClientOptions,
     masternode_by_hash: MasternodeByHash,
     destroy_masternode: DestroyMasternode,
