@@ -11,6 +11,15 @@ pub struct CoinJoinAcceptMessage {
     pub tx_collateral: Transaction,
 }
 
+impl CoinJoinAcceptMessage {
+    pub fn new(denomination: u32, tx_collateral: Transaction) -> Self {
+        return Self {
+            denomination,
+            tx_collateral
+        };
+    }
+}
+
 impl encode::Encodable for CoinJoinAcceptMessage {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {

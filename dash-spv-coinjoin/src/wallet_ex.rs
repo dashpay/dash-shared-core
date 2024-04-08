@@ -1,6 +1,7 @@
 use std::collections::{HashSet, HashMap};
 use std::slice;
 use byte::{BytesExt, LE};
+use dash_spv_masternode_processor::common::SocketAddress;
 use rand::seq::SliceRandom;
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::UInt256;
@@ -15,10 +16,12 @@ use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
-use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsMineInput, SelectCoinsGroupedByAddresses, SignTransaction};
+use crate::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
+use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyMasternode, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SignTransaction, ValidMasternodeCount};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
+use crate::masternode_meta_data_manager::MasternodeMetadataManager;
 use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::tx_destination::TxDestination;
@@ -40,6 +43,7 @@ pub struct WalletEx {
     // TODO: we may not need keyUsage, it is used as a way to audit unusedKeys
     key_usage: HashMap<UInt256, bool>,
     coinjoin_salt: UInt256,
+    pub client_queue_manager: CoinJoinClientQueueManager,
     get_wallet_transaction: GetWalletTransaction,
     sign_transaction: SignTransaction,
     destroy_transaction: DestroyWalletTransaction,
@@ -50,7 +54,8 @@ pub struct WalletEx {
     destroy_selected_coins: DestroySelectedCoins,
     inputs_with_amount: InputsWithAmount,
     fresh_coinjoin_address: FreshCoinJoinAddress,
-    commit_transaction: CommitTransaction
+    commit_transaction: CommitTransaction,
+    is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested
 }
 
 impl WalletEx {
@@ -67,11 +72,16 @@ impl WalletEx {
         destroy_selected_coins: DestroySelectedCoins,
         inputs_with_amount: InputsWithAmount,
         fresh_coinjoin_address: FreshCoinJoinAddress,
-        commit_transaction: CommitTransaction
+        commit_transaction: CommitTransaction,
+        masternode_by_hash: MasternodeByHash,
+        destroy_masternode: DestroyMasternode,
+        valid_mns_count: ValidMasternodeCount,
+        is_synced: IsBlockchainSynced,
+        is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested
     ) -> Self {
         WalletEx {
             opaque_context,
-            options,
+            options: options.clone(),
             locked_coins_set: HashSet::new(),
             anonymizable_tally_cached_non_denom: false,
             vec_anonymizable_tally_cached_non_denom: Vec::new(),
@@ -79,6 +89,15 @@ impl WalletEx {
             vec_anonymizable_tally_cached: Vec::new(),
             map_outpoint_rounds_cache: HashMap::new(),
             coinjoin_salt: UInt256([0;32]), // TODO: InitCoinJoinSalt ?
+            client_queue_manager: CoinJoinClientQueueManager::new(
+                MasternodeMetadataManager::new(), 
+                options, 
+                masternode_by_hash, 
+                destroy_masternode, 
+                valid_mns_count, 
+                is_synced, 
+                opaque_context
+            ),
             unused_keys: HashMap::with_capacity(1024),
             key_usage: HashMap::new(),
             get_wallet_transaction,
@@ -91,7 +110,8 @@ impl WalletEx {
             destroy_selected_coins,
             inputs_with_amount,
             fresh_coinjoin_address,
-            commit_transaction
+            commit_transaction,
+            is_masternode_or_disconnect_requested
         }
     }
 
@@ -429,7 +449,7 @@ impl WalletEx {
         }
     }
 
-    pub fn select_tx_dsins_by_denomination(&mut self, denom: i32, value_max: u64, vec_tx_dsin_ret: &mut Vec<CoinJoinTransactionInput>) -> bool {
+    pub fn select_tx_dsins_by_denomination(&mut self, denom: u32, value_max: u64, vec_tx_dsin_ret: &mut Vec<CoinJoinTransactionInput>) -> bool {
         let mut value_total: u64 = 0;
         let mut set_recent_tx_ids = HashSet::new();
         vec_tx_dsin_ret.clear();
@@ -481,6 +501,36 @@ impl WalletEx {
         }
     
         return value_total > 0;
+    }
+
+    pub fn select_denominated_amounts(&mut self, value_max: u64, set_amounts_ret: &mut HashSet<u64>) -> bool {
+        let mut value_total: u64 = 0;
+        set_amounts_ret.clear();
+
+        let mut coin_control = CoinControl::new();
+        coin_control.coin_type = CoinType::OnlyReadyToMix;
+        let mut coins = self.available_coins(true, coin_control);
+
+        // larger denoms first
+        coins.sort_by(|a, b| b.output.amount.cmp(&a.output.amount));
+
+        for out in coins.iter() {
+            let value = out.output.amount;
+            if value_total + value <= value_max {
+                value_total += value;
+                set_amounts_ret.insert(value);
+            }
+        }
+
+        return value_total >= CoinJoin::get_smallest_denomination()
+    }
+
+    pub fn get_metadata_manager(&mut self) -> &mut MasternodeMetadataManager {
+        return &mut self.client_queue_manager.masternode_metadata_manager;
+    }
+
+    pub fn is_masternode_or_disconnect_requested(&self, address: SocketAddress) -> bool {
+        return unsafe { (self.is_masternode_or_disconnect_requested)(boxed(address.ip_address.0), address.port, self.opaque_context) };
     }
 
     fn clear_anonymizable_caches(&mut self) {
