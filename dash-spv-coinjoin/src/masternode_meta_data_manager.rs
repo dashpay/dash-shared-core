@@ -2,12 +2,20 @@ use std::collections::HashMap;
 use dash_spv_masternode_processor::crypto::UInt256;
 use crate::models::masternode_meta_info::MasternodeMetaInfo;
 
+#[derive(Debug)]
 pub(crate) struct MasternodeMetadataManager {
     meta_infos: HashMap<UInt256, MasternodeMetaInfo>,
     pub dsq_count: i64
 }
 
 impl MasternodeMetadataManager {
+    pub fn new() -> MasternodeMetadataManager {
+        return Self {
+            meta_infos: HashMap::new(),
+            dsq_count: 0
+        };
+    }
+
     pub fn get_meta_info(&mut self, pro_tx_hash: UInt256, create: bool) -> Option<MasternodeMetaInfo> {
         if let Some(info) = self.meta_infos.get(&pro_tx_hash) {
             return Some(info.clone());

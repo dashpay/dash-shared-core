@@ -64,13 +64,13 @@ impl CoinJoin {
         Self::amount_to_denomination(input_amount) > 0
     }
 
-    pub fn is_valid_denomination(n_denom: i32) -> bool {
+    pub fn is_valid_denomination(n_denom: u32) -> bool {
         Self::denomination_to_amount(n_denom) > 0
     }
 
     /// Return a bitshifted integer representing a denomination in STANDARD_DENOMINATIONS
     /// or 0 if none was found
-    pub fn amount_to_denomination(input_amount: u64) -> i32 {
+    pub fn amount_to_denomination(input_amount: u64) -> u32 {
         for (i, &denom) in Self::STANDARD_DENOMINATIONS.iter().enumerate() {
             if input_amount == denom {
                 return 1 << i;
@@ -84,7 +84,7 @@ impl CoinJoin {
     /// - one of standard denominations from STANDARD_DENOMINATIONS based on the provided bitshifted integer
     /// - 0 for non-initialized sessions (nDenom = 0)
     /// - a value below 0 if an error occurred while converting from one to another
-    pub fn denomination_to_amount(n_denom: i32) -> i64 {
+    pub fn denomination_to_amount(n_denom: u32) -> i64 {
         if n_denom == 0 {
             // not initialized
             return 0;
@@ -92,7 +92,7 @@ impl CoinJoin {
     
         let n_max_denoms = Self::STANDARD_DENOMINATIONS.len();
     
-        if n_denom >= (1 << n_max_denoms) || n_denom < 0 {
+        if n_denom >= (1 << n_max_denoms) {
             // out of bounds
             return -1;
         }
@@ -118,8 +118,8 @@ impl CoinJoin {
         Self::STANDARD_DENOMINATIONS[0] * COINJOIN_ENTRY_MAX_SIZE
     }    
 
-    pub fn denomination_to_string(n_denom: i32) -> String {
-        match Self::denomination_to_amount(n_denom) {
+    pub fn denomination_to_string(denom: u32) -> String {
+        match Self::denomination_to_amount(denom) {
             0 => "N/A".to_string(),
             -1 => "out-of-bounds".to_string(),
             -2 => "non-denom".to_string(),

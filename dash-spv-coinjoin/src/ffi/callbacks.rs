@@ -68,11 +68,6 @@ pub type DestroySelectedCoins = unsafe extern "C" fn(
     selected_coins: *mut SelectedCoins,
 );
 
-pub type IsMineAddress = unsafe extern "C" fn(
-    address: *mut [u8; 32],
-    context: *const c_void,
-) -> bool;
-
 pub type InputsWithAmount = unsafe extern "C" fn(
     amount: u64,
     context: *const c_void,
@@ -113,3 +108,9 @@ pub type GetMasternodeList = unsafe extern "C" fn(
 pub type DestroyMasternodeList = unsafe extern "C" fn(
     mn_list: *mut types::MasternodeList,
 );
+
+pub type IsMasternodeOrDisconnectRequested = unsafe extern "C" fn(
+    ip_address: *mut [u8; 16],
+    port: u16,
+    context: *const c_void
+) -> bool;
