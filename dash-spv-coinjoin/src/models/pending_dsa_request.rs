@@ -6,8 +6,8 @@ use crate::messages::CoinJoinAcceptMessage;
 
 #[derive(Debug)]
 pub(crate) struct PendingDsaRequest {
-    addr: SocketAddress,
-    dsa: CoinJoinAcceptMessage,
+    pub addr: SocketAddress,
+    pub dsa: CoinJoinAcceptMessage,
     time_created: SystemTime,
 }
 
