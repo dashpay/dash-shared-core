@@ -114,3 +114,10 @@ pub type IsMasternodeOrDisconnectRequested = unsafe extern "C" fn(
     port: u16,
     context: *const c_void
 ) -> bool;
+
+pub type SendMessage = unsafe extern "C" fn(
+    message: *mut ByteArray,
+    ip_address: *mut [u8; 16],
+    port: u16,
+    context: *const c_void
+) -> bool;

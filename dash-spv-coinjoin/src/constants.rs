@@ -1,5 +1,11 @@
 use dash_spv_masternode_processor::chain::params::{MAX_MONEY, DUFFS};
 
+pub const COINJOIN_AUTO_TIMEOUT_MIN: i32 = 5;
+pub const COINJOIN_AUTO_TIMEOUT_MAX: i32 = 15;
+
+pub const COINJOIN_QUEUE_TIMEOUT: u64 = 30;
+pub const COINJOIN_SIGNING_TIMEOUT: u64 = 15;
+
 pub const COINJOIN_ENTRY_MAX_SIZE: u64 = 9;
 
 pub const MIN_COINJOIN_SESSIONS: i32 = 1;
@@ -38,5 +44,3 @@ pub const COINJOIN_RANDOM_ROUNDS: i32 = 3;
 
 // If feePerKb is lower than this, Dash Core will treat it as if there were no fee.
 pub const REFERENCE_DEFAULT_MIN_TX_FEE: u64 = 1000; // 0.01 mDASH
-
-pub const COINJOIN_QUEUE_TIMEOUT: i64 = 30;

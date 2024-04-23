@@ -8,7 +8,7 @@ use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SignTransaction, ValidMasternodeCount};
+use dash_spv_coinjoin::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -39,7 +39,8 @@ pub unsafe extern "C" fn register_wallet_ex(
     destroy_gathered_outputs: DestroyGatheredOutputs,
     selected_coins: SelectCoinsGroupedByAddresses,
     destroy_selected_coins: DestroySelectedCoins,
-    is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested
+    is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
+    send_message: SendMessage
 ) -> *mut WalletEx {
     let wallet_ex =  WalletEx::new(
         context, 
@@ -59,7 +60,8 @@ pub unsafe extern "C" fn register_wallet_ex(
         destroy_masternode, 
         valid_mns_count, 
         is_synced,
-        is_masternode_or_disconnect_requested
+        is_masternode_or_disconnect_requested,
+        send_message
     );
 
     println!("[RUST] CoinJoin: register_wallet_ex");
@@ -97,7 +99,7 @@ pub unsafe extern "C" fn register_client_manager(
         destroy_mn_list,
         context
     );
-    println!("[RUST] CoinJoin: register_sesregister_client_managersion");
+    println!("[RUST] CoinJoin: register_client_manager");
     boxed(client_manager)
 }
 
@@ -106,7 +108,7 @@ pub unsafe extern "C" fn run_client_manager(
     client_manager: *mut CoinJoinClientManager,
     balance_info: Balance
 ) {
-    (*client_manager).do_automatic_denominating(balance_info, false);
+    (*client_manager).do_maintenance(balance_info);
 }
 
 #[no_mangle]

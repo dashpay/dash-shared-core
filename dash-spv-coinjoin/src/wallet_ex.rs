@@ -2,6 +2,7 @@ use std::collections::{HashSet, HashMap};
 use std::slice;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::common::SocketAddress;
+use dash_spv_masternode_processor::ffi::ByteArray;
 use rand::seq::SliceRandom;
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::UInt256;
@@ -17,7 +18,7 @@ use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
 use crate::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
-use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyMasternode, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SignTransaction, ValidMasternodeCount};
+use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyMasternode, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
@@ -31,7 +32,7 @@ use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
 pub struct WalletEx {
-    opaque_context: *const std::ffi::c_void,
+    context: *const std::ffi::c_void,
     options: CoinJoinClientOptions,
     pub locked_coins_set: HashSet<TxOutPoint>,
     anonymizable_tally_cached_non_denom: bool,
@@ -55,12 +56,14 @@ pub struct WalletEx {
     inputs_with_amount: InputsWithAmount,
     fresh_coinjoin_address: FreshCoinJoinAddress,
     commit_transaction: CommitTransaction,
-    is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested
+    is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
+    is_synced: IsBlockchainSynced,
+    send_message: SendMessage
 }
 
 impl WalletEx {
     pub fn new(
-        opaque_context: *const std::ffi::c_void,
+        context: *const std::ffi::c_void,
         options: CoinJoinClientOptions,
         get_wallet_transaction: GetWalletTransaction,
         sign_transaction: SignTransaction,
@@ -77,10 +80,11 @@ impl WalletEx {
         destroy_masternode: DestroyMasternode,
         valid_mns_count: ValidMasternodeCount,
         is_synced: IsBlockchainSynced,
-        is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested
+        is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
+        send_message: SendMessage
     ) -> Self {
         WalletEx {
-            opaque_context,
+            context,
             options: options.clone(),
             locked_coins_set: HashSet::new(),
             anonymizable_tally_cached_non_denom: false,
@@ -96,7 +100,7 @@ impl WalletEx {
                 destroy_masternode, 
                 valid_mns_count, 
                 is_synced, 
-                opaque_context
+                context
             ),
             unused_keys: HashMap::with_capacity(1024),
             key_usage: HashMap::new(),
@@ -111,7 +115,9 @@ impl WalletEx {
             inputs_with_amount,
             fresh_coinjoin_address,
             commit_transaction,
-            is_masternode_or_disconnect_requested
+            is_masternode_or_disconnect_requested,
+            is_synced,
+            send_message
         }
     }
 
@@ -253,7 +259,7 @@ impl WalletEx {
         let mut vec_gathered_outputs: Vec<InputCoin> = Vec::new();
         
         unsafe {
-            let gathered_outputs = (self.available_coins)(only_safe, coin_control.encode(), self, self.opaque_context);
+            let gathered_outputs = (self.available_coins)(only_safe, coin_control.encode(), self, self.context);
             (0..(*gathered_outputs).item_count)
                 .into_iter()
                 .map(|i| (**(*gathered_outputs).items.add(i)).decode())
@@ -291,7 +297,7 @@ impl WalletEx {
         let mut vec_tally_ret: Vec<CompactTallyItem> = Vec::new();
 
         unsafe {
-            let selected_coins = (self.select_coins)(skip_denominated, anonymizable, skip_unconfirmed, max_outpoints_per_address, self, self.opaque_context);
+            let selected_coins = (self.select_coins)(skip_denominated, anonymizable, skip_unconfirmed, max_outpoints_per_address, self, self.context);
             (0..(*selected_coins).item_count)
                 .into_iter()
                 .map(|i| (**(*selected_coins).items.add(i)).decode())
@@ -352,7 +358,7 @@ impl WalletEx {
 
     pub fn get_wallet_transaction(&self, hash: UInt256) -> Option<Transaction> {
         unsafe {
-            let wtx = (self.get_wallet_transaction)(boxed(hash.0), self.opaque_context);
+            let wtx = (self.get_wallet_transaction)(boxed(hash.0), self.context);
             
             if wtx.is_null() {
                 return None;
@@ -368,7 +374,7 @@ impl WalletEx {
      * Count the number of unspent outputs that have a certain value
      */
     pub fn count_input_with_amount(&self, value: u64) -> u32 {
-        return unsafe { (self.inputs_with_amount)(value, self.opaque_context) };
+        return unsafe { (self.inputs_with_amount)(value, self.context) };
     }
 
     pub fn get_unused_key(&mut self, internal: bool) -> TxDestination {
@@ -426,7 +432,7 @@ impl WalletEx {
                     .map(|input| boxed((*input).clone()))
                     .collect()
             );
-            result = (self.commit_transaction)(boxed, vec_send.len(), self.opaque_context);
+            result = (self.commit_transaction)(boxed, vec_send.len(), self.context);
             let vec = unbox_vec_ptr(boxed, vec_send.len());
             unbox_any_vec(vec);
         }
@@ -436,7 +442,7 @@ impl WalletEx {
 
     pub fn sign_transaction(&self, tx: &Transaction) -> Option<Transaction> {
         unsafe {
-            let raw_tx = (self.sign_transaction)(boxed(tx.encode()), self.opaque_context);
+            let raw_tx = (self.sign_transaction)(boxed(tx.encode()), self.context);
 
             if raw_tx.is_null() {
                 return None;
@@ -530,7 +536,16 @@ impl WalletEx {
     }
 
     pub fn is_masternode_or_disconnect_requested(&self, address: SocketAddress) -> bool {
-        return unsafe { (self.is_masternode_or_disconnect_requested)(boxed(address.ip_address.0), address.port, self.opaque_context) };
+        return unsafe { (self.is_masternode_or_disconnect_requested)(boxed(address.ip_address.0), address.port, self.context) };
+    }
+
+    pub fn is_synced(&self) -> bool {
+        unsafe { return (self.is_synced)(self.context); }
+    }
+
+    pub fn send_message(&mut self, message: Vec<u8>, address: SocketAddress) -> bool {
+        // TODO: free address and message?
+        return unsafe { (self.send_message)(boxed(ByteArray::from(message)), boxed(address.ip_address.0), address.port, self.context) };
     }
 
     fn clear_anonymizable_caches(&mut self) {
@@ -539,21 +554,20 @@ impl WalletEx {
     }
 
     fn is_mine_input(&self, txin: &TransactionInput) -> bool {
-        unsafe { (self.is_mine_input)(boxed(txin.input_hash.0), txin.index, self.opaque_context) }
+        unsafe { (self.is_mine_input)(boxed(txin.input_hash.0), txin.index, self.context) }
     }
 
     fn fresh_receive_key(&mut self, internal: bool) -> Vec<u8> {
         let fresh_key = unsafe {
-            let data = (self.fresh_coinjoin_address)(internal, self.opaque_context);
-            let result = slice::from_raw_parts(data.ptr, data.len);
+            let data = (self.fresh_coinjoin_address)(internal, self.context);
+            let result = slice::from_raw_parts(data.ptr, data.len).to_vec();
             unbox_vec_ptr(data.ptr as *mut u8, data.len);
             result
         };
 
-        let result = fresh_key.to_vec();
-        println!("[RUST] WalletEx - fresh key: {:?}", address::with_script_pub_key(&result, &self.options.chain_type.script_map()));
-        self.key_usage.insert(UInt256::sha256(fresh_key), true);
+        println!("[RUST] WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.chain_type.script_map()));
+        self.key_usage.insert(UInt256::sha256(&fresh_key), true);
 
-        return result;
+        return fresh_key;
     }
 }

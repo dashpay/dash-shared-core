@@ -123,7 +123,7 @@ impl CoinJoinClientQueueManager {
         }
     }
 
-    pub fn do_maintainence(&mut self) {
+    pub fn do_maintenance(&mut self) {
         if !self.coinjoin_options.enable_coinjoin {
             return;
         }

@@ -8,6 +8,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define COINJOIN_AUTO_TIMEOUT_MIN 5
+
+#define COINJOIN_AUTO_TIMEOUT_MAX 15
+
+#define COINJOIN_QUEUE_TIMEOUT 30
+
+#define COINJOIN_SIGNING_TIMEOUT 15
+
 #define COINJOIN_ENTRY_MAX_SIZE 9
 
 #define MIN_COINJOIN_SESSIONS 1
@@ -49,7 +57,5 @@
 #define COINJOIN_RANDOM_ROUNDS 3
 
 #define REFERENCE_DEFAULT_MIN_TX_FEE 1000
-
-#define COINJOIN_QUEUE_TIMEOUT 30
 
 #endif /* example_h */

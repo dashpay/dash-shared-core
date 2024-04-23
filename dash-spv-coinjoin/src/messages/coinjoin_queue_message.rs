@@ -25,8 +25,8 @@ pub struct CoinJoinQueueMessage {
 
 impl CoinJoinQueueMessage {
     pub fn is_time_out_of_bounds(&self, current_time: i64) -> bool {
-        return current_time.saturating_sub(self.time) > COINJOIN_QUEUE_TIMEOUT || 
-            self.time.saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT
+        return current_time.saturating_sub(self.time) as u64 > COINJOIN_QUEUE_TIMEOUT || 
+            self.time.saturating_sub(current_time) as u64 > COINJOIN_QUEUE_TIMEOUT
     }
 
     pub fn check_signature(&self, key: OperatorPublicKey) -> bool { // TODO: recheck test

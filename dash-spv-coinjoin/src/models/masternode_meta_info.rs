@@ -1,7 +1,7 @@
 use dash_spv_masternode_processor::crypto::UInt256;
 
 #[derive(Debug, Clone)]
-pub(crate) struct MasternodeMetaInfo {
+pub struct MasternodeMetaInfo {
     pub pro_tx_hash: UInt256,
     // the dsq count from the last dsq broadcast of this node
     pub last_dsq: i64,

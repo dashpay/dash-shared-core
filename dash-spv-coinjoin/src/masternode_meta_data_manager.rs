@@ -3,7 +3,7 @@ use dash_spv_masternode_processor::crypto::UInt256;
 use crate::models::masternode_meta_info::MasternodeMetaInfo;
 
 #[derive(Debug)]
-pub(crate) struct MasternodeMetadataManager {
+pub struct MasternodeMetadataManager {
     meta_infos: HashMap<UInt256, MasternodeMetaInfo>,
     pub dsq_count: i64
 }
