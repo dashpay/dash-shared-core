@@ -99,7 +99,7 @@ impl CoinJoinClientManager {
         }
     }
 
-    pub fn do_automatic_denominating(&mut self, balance_info: Balance, dry_run: bool) -> u64 {
+    pub fn do_automatic_denominating(&mut self, balance_info: Balance, dry_run: bool) -> bool {
         // TODO: finish method
 
         let mut session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone());
@@ -108,9 +108,9 @@ impl CoinJoinClientManager {
         
         return result;
     }
-    pub fn finish_automatic_denominating(&mut self, balance_denominated_unconf: u64, balance_needs_anonymized: u64) -> bool {
+    pub fn finish_automatic_denominating(&mut self) -> bool {
         if let Some(mut session) = self.deq_sessions.pop_back() {
-            session.finish_automatic_denominating(self, balance_denominated_unconf, balance_needs_anonymized);
+            session.finish_automatic_denominating(self);
             self.deq_sessions.push_back(session);
 
             return true

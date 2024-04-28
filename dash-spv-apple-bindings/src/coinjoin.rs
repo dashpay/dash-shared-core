@@ -63,8 +63,7 @@ pub unsafe extern "C" fn register_wallet_ex(
     );
 
     println!("[RUST] CoinJoin: register_wallet_ex");
-    let wallet_ex_rc = Rc::new(RefCell::new(wallet_ex));
-    return Rc::into_raw(wallet_ex_rc) as *mut WalletEx; // TODO: check refs count before dropping
+    return boxed(wallet_ex);
 }
 
 #[no_mangle]
@@ -78,10 +77,6 @@ pub unsafe extern "C" fn register_client_manager(
     has_chain_lock: HasChainLock,
     destroy_input_value: DestroyInputValue
 ) -> *mut CoinJoinClientManager {
-    let wallet_ex_rc = Rc::from_raw(wallet_ex_ptr as *mut RefCell<WalletEx>);
-    // Increment the strong count to avoid deallocation when Rc goes out of scope here
-    std::mem::forget(wallet_ex_rc.clone());
-
     let coinjoin = CoinJoin::new(
         get_input_value_by_prevout_hash,
         has_chain_lock,
@@ -90,7 +85,7 @@ pub unsafe extern "C" fn register_client_manager(
     );
 
     let client_manager = CoinJoinClientManager::new(
-        wallet_ex_rc,
+        Rc::new(RefCell::new(std::ptr::read(wallet_ex_ptr))),
         Rc::new(RefCell::new(coinjoin)),
         std::ptr::read(options_ptr), 
         get_masternode_list,
@@ -111,12 +106,10 @@ pub unsafe extern "C" fn run_client_manager(
 
 #[no_mangle]
 pub unsafe extern "C" fn finish_automatic_denominating(
-    manager: *mut CoinJoinClientManager,
-    balance_denominated_unconf: u64, 
-    balance_needs_anonymized: u64
+    manager: *mut CoinJoinClientManager
 ) -> bool {
     println!("[RUST] CoinJoin: session.finish_automatic_denominating");
-    return (*manager).finish_automatic_denominating(balance_denominated_unconf, balance_needs_anonymized);
+    return (*manager).finish_automatic_denominating();
 }
 
 #[no_mangle]

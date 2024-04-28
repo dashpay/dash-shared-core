@@ -1,5 +1,6 @@
 use std::collections::{HashSet, HashMap};
 use std::slice;
+use uuid::Uuid;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::common::SocketAddress;
 use dash_spv_masternode_processor::ffi::ByteArray;
@@ -58,7 +59,8 @@ pub struct WalletEx {
     commit_transaction: CommitTransaction,
     is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
     is_synced: IsBlockchainSynced,
-    send_message: SendMessage
+    send_message: SendMessage,
+    uuid: Uuid
 }
 
 impl WalletEx {
@@ -117,7 +119,8 @@ impl WalletEx {
             commit_transaction,
             is_masternode_or_disconnect_requested,
             is_synced,
-            send_message
+            send_message,
+            uuid: Uuid::new_v4()
         }
     }
 
@@ -157,8 +160,8 @@ impl WalletEx {
         true
     }
 
-
     pub fn get_real_outpoint_coinjoin_rounds(&mut self, outpoint: TxOutPoint, rounds: i32) -> i32 {
+        println!("[RUST] CoinJoin: get_real_outpoint_coinjoin_rounds, uuid: {:?}", self.uuid);
         let rounds_max = MAX_COINJOIN_ROUNDS + self.options.coinjoin_random_rounds;
 
         if rounds >= rounds_max {
@@ -177,7 +180,7 @@ impl WalletEx {
         if wtx.is_none() {
             // no such tx in this wallet
             rounds_ref = -1;
-            println!("FAILED    {:?} {} (no such tx)", outpoint, rounds_ref);
+            println!("[RUST] CoinJoin: FAILED    {:?} {} (no such tx)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -187,7 +190,7 @@ impl WalletEx {
         if outpoint.index >= transaction.outputs.len() as u32 {
             // should never actually hit this
             rounds_ref = -4;
-            println!("FAILED    {:?} {} (bad index)", outpoint, rounds_ref);
+            println!("[RUST] CoinJoin: FAILED    {:?} {} (bad index)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -196,7 +199,7 @@ impl WalletEx {
 
         if CoinJoin::is_collateral_amount(tx_out.amount) {
             rounds_ref = -3;
-            println!("UPDATED    {:?} {} (collateral)", outpoint, rounds_ref);
+            println!("[RUST] CoinJoin: UPDATED    {:?} {} (collateral)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -204,7 +207,7 @@ impl WalletEx {
         // make sure the final output is non-denominate
         if !CoinJoin::is_denominated_amount(tx_out.amount) {
             rounds_ref = -2;
-            println!("UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
+            println!("[RUST] CoinJoin: UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -213,7 +216,7 @@ impl WalletEx {
             if !CoinJoin::is_denominated_amount(out.amount) {
                 // this one is denominated but there is another non-denominated output found in the same tx
                 rounds_ref = 0;
-                println!("UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
+                println!("[RUST] CoinJoin: UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
                 self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
                 return rounds_ref;
             }
@@ -242,7 +245,7 @@ impl WalletEx {
             0
         };
 
-        println!("UPDATED    {:?} {} (coinjoin)", outpoint, rounds_ref);
+        println!("[RUST] CoinJoin: UPDATED    {:?} {} (coinjoin)", outpoint, rounds_ref);
         self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
         rounds_ref
     }
