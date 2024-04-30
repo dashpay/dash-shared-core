@@ -19,6 +19,10 @@ ferment-interfaces = { path = "../../ferment/ferment-interfaces" }
 ferment-macro = { path = "../../ferment/ferment-macro" }
 byte = "0.2"
 
+[dependencies.uuid]
+version = "1.8.0"
+features = [ "v4" ]
+
 [build-dependencies]
 cbindgen = "0.24.3"
 ferment = { path = "../../ferment/ferment" }
