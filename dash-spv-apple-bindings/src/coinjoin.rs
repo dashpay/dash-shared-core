@@ -136,7 +136,6 @@ pub unsafe extern "C" fn unregister_wallet_ex(wallet_ex_ptr: *mut WalletEx) {
 pub unsafe extern "C" fn is_denominated_amount(
     amount: u64,
 ) -> bool {
-    println!("[RUST] CoinJoin call is_denominated_amount with amount {}", amount);
     return CoinJoin::is_denominated_amount(amount);
 }
 
@@ -144,7 +143,6 @@ pub unsafe extern "C" fn is_denominated_amount(
 pub unsafe extern "C" fn is_collateral_amount(
     amount: u64,
 ) -> bool {
-    println!("[RUST] CoinJoin call is_collateral_amount with amount {}", amount);
     return CoinJoin::is_collateral_amount(amount);
 }
 
@@ -154,7 +152,6 @@ pub unsafe extern "C" fn is_fully_mixed(
     prevout_hash: *mut [u8; 32],
     index: u32,
 ) -> bool {
-    println!("[RUST] CoinJoin call wallet_ex.is_fully_mixed");
     return (*wallet_ex).is_fully_mixed(TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
@@ -164,7 +161,6 @@ pub unsafe extern "C" fn is_locked_coin(
     prevout_hash: *mut [u8; 32],
     index: u32,
 ) -> bool {
-    println!("[RUST] CoinJoin call wallet_ex.is_locked_coin");
     return (*wallet_ex).locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 

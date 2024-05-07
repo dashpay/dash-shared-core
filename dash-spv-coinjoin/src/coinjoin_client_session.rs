@@ -285,7 +285,7 @@ impl CoinJoinClientSession {
 
     pub fn process_pending_dsa_request(&mut self) -> bool {
         if let Some(pending_request) = &self.pending_dsa_request {
-            println!("[RUST] CoinJoin: valid collateral before sending: {}", 
+            println!("[RUST] CoinJoin: valid collateral before sending: {}",
                 self.coinjoin.borrow().is_collateral_valid(&pending_request.dsa.tx_collateral, true));
             self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
             let mut buffer = vec![];
@@ -303,6 +303,8 @@ impl CoinJoinClientSession {
             }
     
             return sent_message;
+        } else {
+            println!("[RUST] CoinJoin: no pending DSA request");
         }
 
         return false;
@@ -837,6 +839,7 @@ impl CoinJoinClientSession {
             signature: None, 
             sequence: 0 // TODO: recheck
         }];
+        println!("[RUST] CoinJoin: checking inputs: {:?}", inputs);
         let mut tx_collateral = Transaction {
             inputs: inputs,
             outputs: Vec::new(),
@@ -914,17 +917,17 @@ impl CoinJoinClientSession {
 
             match (dmn, self.tx_my_collateral.clone()) {
                 (None, _) => {
-                    println!("coinjoin: dsq masternode is not in masternode list, masternode={}", dsq.pro_tx_hash);
+                    println!("[RUST] CoinJoin: dsq masternode is not in masternode list, masternode={}", dsq.pro_tx_hash);
                     dsq_option = self.mixing_wallet.borrow_mut().client_queue_manager.get_queue_item_and_try();
                     continue;
                 },
                 (Some(dmn), Some(tx))  => {
-                    println!("coinjoin: trying existing queue: {:?}", dsq);
+                    println!("[RUST] CoinJoin: trying existing queue: {:?}", dsq);
 
                     let mut vec_tx_dsin_tmp = Vec::new();
 
                     if !self.mixing_wallet.borrow_mut().select_tx_dsins_by_denomination(dsq.denomination, balance_needs_anonymized, &mut vec_tx_dsin_tmp) {
-                        println!("coinjoin: couldn't match denomination {} ({})", dsq.denomination, CoinJoin::denomination_to_string(dsq.denomination));
+                        println!("[RUST] CoinJoin: couldn't match denomination {} ({})", dsq.denomination, CoinJoin::denomination_to_string(dsq.denomination));
                         dsq_option = self.mixing_wallet.borrow_mut().client_queue_manager.get_queue_item_and_try();
                         continue;
                     }
@@ -932,7 +935,7 @@ impl CoinJoinClientSession {
                     client_manager.add_used_masternode(dsq.pro_tx_hash);
 
                     if self.mixing_wallet.borrow().is_masternode_or_disconnect_requested(dmn.socket_address) {
-                        println!("coinjoin: skipping masternode connection, addr={}", dmn.socket_address);
+                        println!("[RUST] CoinJoin: skipping masternode connection, addr={}", dmn.socket_address);
                         dsq_option = self.mixing_wallet.borrow_mut().client_queue_manager.get_queue_item_and_try();
                         continue;
                     }
@@ -1005,14 +1008,14 @@ impl CoinJoinClientSession {
                         let dsq_threshold = metadata_manager.get_dsq_threshold(dmn.provider_registration_transaction_hash, mn_count as u64);
                         
                         if last_dsq != 0 && dsq_threshold > metadata_manager.dsq_count {
-                            println!("coinjoin: warning: Too early to mix on this masternode! masternode={} addr={} nLastDsq={} nDsqThreshold={} nDsqCount={}",
+                            println!("[RUST] CoinJoin: warning: Too early to mix on this masternode! masternode={} addr={} nLastDsq={} nDsqThreshold={} nDsqCount={}",
                                     dmn.provider_registration_transaction_hash, dmn.socket_address, last_dsq, dsq_threshold, metadata_manager.dsq_count);
                             tries += 1;
                             continue;
                         }
 
                         if wallet.is_masternode_or_disconnect_requested(dmn.socket_address) {
-                            println!("coinjoin: warning: skipping masternode connection, addr={}", dmn.socket_address);
+                            println!("[RUST] CoinJoin: warning: skipping masternode connection, addr={}", dmn.socket_address);
                             tries += 1;
                             continue;
                         }
@@ -1041,7 +1044,7 @@ impl CoinJoinClientSession {
                     ));
                     self.base_session.state = PoolState::Queue;
                     self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
-                    println!("coinjoin: start new queue -> pending connection, sessionDenom: {} ({}), addr={}",
+                    println!("[RUST] CoinJoin: start new queue -> pending connection, sessionDenom: {} ({}), addr={}",
                             self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
                     // coinjoin_manager.start_async(); TODO
                     self.set_status(PoolStatus::Connecting);
