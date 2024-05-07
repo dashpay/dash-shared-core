@@ -172,6 +172,8 @@ impl CoinJoinClientManager {
     }
 
     pub fn process_pending_dsa_request(&mut self) {
+        println!("[RUST] CoinJoin: enum deq_sessions for process_pending_dsa_request");
+
         for session in self.deq_sessions.iter_mut() {
             if session.process_pending_dsa_request() {
                 self.str_auto_denom_result = "Mixing in progress...".to_string();

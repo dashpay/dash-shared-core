@@ -1,6 +1,5 @@
 use std::collections::{HashSet, HashMap};
 use std::slice;
-use uuid::Uuid;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::common::SocketAddress;
 use dash_spv_masternode_processor::ffi::ByteArray;
@@ -59,8 +58,7 @@ pub struct WalletEx {
     commit_transaction: CommitTransaction,
     is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
     is_synced: IsBlockchainSynced,
-    send_message: SendMessage,
-    uuid: Uuid
+    send_message: SendMessage
 }
 
 impl WalletEx {
@@ -119,8 +117,7 @@ impl WalletEx {
             commit_transaction,
             is_masternode_or_disconnect_requested,
             is_synced,
-            send_message,
-            uuid: Uuid::new_v4()
+            send_message
         }
     }
 
@@ -161,7 +158,6 @@ impl WalletEx {
     }
 
     pub fn get_real_outpoint_coinjoin_rounds(&mut self, outpoint: TxOutPoint, rounds: i32) -> i32 {
-        println!("[RUST] CoinJoin: get_real_outpoint_coinjoin_rounds, uuid: {:?}", self.uuid);
         let rounds_max = MAX_COINJOIN_ROUNDS + self.options.coinjoin_random_rounds;
 
         if rounds >= rounds_max {
@@ -426,7 +422,7 @@ impl WalletEx {
     }
 
     pub fn commit_transaction(&self, vec_send: &Vec<Recipient>) -> bool {
-        let mut result = false;
+        let result: bool;
 
         unsafe {
             let boxed = boxed_vec(
