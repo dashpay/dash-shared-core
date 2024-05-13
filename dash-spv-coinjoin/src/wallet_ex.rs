@@ -2,6 +2,7 @@ use std::collections::{HashSet, HashMap};
 use std::slice;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::common::SocketAddress;
+use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::ffi::ByteArray;
 use rand::seq::SliceRandom;
 use dash_spv_masternode_processor::consensus::Encodable;
@@ -18,7 +19,7 @@ use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
 use crate::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
-use crate::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyMasternode, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
+use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyMasternode, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
@@ -58,7 +59,8 @@ pub struct WalletEx {
     commit_transaction: CommitTransaction,
     is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
     is_synced: IsBlockchainSynced,
-    send_message: SendMessage
+    send_message: SendMessage,
+    add_pending_masternode: AddPendingMasternode
 }
 
 impl WalletEx {
@@ -81,7 +83,8 @@ impl WalletEx {
         valid_mns_count: ValidMasternodeCount,
         is_synced: IsBlockchainSynced,
         is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
-        send_message: SendMessage
+        send_message: SendMessage,
+        add_pending_masternode: AddPendingMasternode
     ) -> Self {
         WalletEx {
             context,
@@ -117,7 +120,8 @@ impl WalletEx {
             commit_transaction,
             is_masternode_or_disconnect_requested,
             is_synced,
-            send_message
+            send_message,
+            add_pending_masternode
         }
     }
 
@@ -545,6 +549,20 @@ impl WalletEx {
     pub fn send_message(&mut self, message: Vec<u8>, address: SocketAddress) -> bool {
         // TODO: free address and message?
         return unsafe { (self.send_message)(boxed(ByteArray::from(message)), boxed(address.ip_address.0), address.port, self.context) };
+    }
+
+    pub fn add_pending_masternode(&mut self, pro_tx_hash: UInt256, session_id: UInt256) -> bool {
+        return unsafe {
+            let pro_tx_hash_ptr = boxed(pro_tx_hash.0);
+            let session_id_ptr = boxed(session_id.0);
+            
+            let result = (self.add_pending_masternode)(pro_tx_hash_ptr, session_id_ptr, self.context);
+            
+            unbox_any(pro_tx_hash_ptr);
+            unbox_any(session_id_ptr);
+
+            result
+        };
     }
 
     fn clear_anonymizable_caches(&mut self) {

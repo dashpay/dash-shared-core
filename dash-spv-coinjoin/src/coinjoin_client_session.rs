@@ -949,7 +949,7 @@ impl CoinJoinClientSession {
                                 tx
                             )
                     ));
-                    // coinjoin_manager.add_pending_masternode(self); TODO pass uuid of the session?
+                    self.mixing_wallet.borrow_mut().add_pending_masternode(dmn.provider_registration_transaction_hash, self.id);
                     self.base_session.state = PoolState::Queue;
                     self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
                     println!("[RUST] CoinJoin: join existing queue -> pending connection, sessionDenom: {} ({}), addr={}",
@@ -1034,7 +1034,7 @@ impl CoinJoinClientSession {
                     }
 
                     self.mixing_masternode = Some(dmn.clone());
-                    // coinjoin_manager.add_pending_masternode(self); TODO
+                    self.mixing_wallet.borrow_mut().add_pending_masternode(dmn.provider_registration_transaction_hash, self.id);
                     self.pending_dsa_request = Some(PendingDsaRequest::new(
                         dmn.socket_address,
                         CoinJoinAcceptMessage::new(

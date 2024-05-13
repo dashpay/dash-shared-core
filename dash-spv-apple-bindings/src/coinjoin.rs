@@ -8,7 +8,7 @@ use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
+use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -38,7 +38,8 @@ pub unsafe extern "C" fn register_wallet_ex(
     selected_coins: SelectCoinsGroupedByAddresses,
     destroy_selected_coins: DestroySelectedCoins,
     is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
-    send_message: SendMessage
+    send_message: SendMessage,
+    add_pending_masternode: AddPendingMasternode
 ) -> *mut WalletEx {
     let wallet_ex =  WalletEx::new(
         context, 
@@ -59,7 +60,8 @@ pub unsafe extern "C" fn register_wallet_ex(
         valid_mns_count, 
         is_synced,
         is_masternode_or_disconnect_requested,
-        send_message
+        send_message,
+        add_pending_masternode
     );
 
     println!("[RUST] CoinJoin: register_wallet_ex");
@@ -97,10 +99,11 @@ pub unsafe extern "C" fn register_client_manager(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn run_client_manager(
+pub unsafe extern "C" fn run_client_manager( // TODO: temp method for testing
     client_manager: *mut CoinJoinClientManager,
     balance_info: Balance
 ) {
+    (*client_manager).start_mixing();
     (*client_manager).do_maintenance(balance_info);
 }
 
@@ -276,4 +279,18 @@ pub unsafe extern "C" fn process_send_coinjoin_queue(
     let result = messages::SendCoinJoinQueue::consensus_decode(&mut cursor).unwrap();
 
     boxed(result)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_waiting_for_new_block(
+    client_manager: *mut CoinJoinClientManager
+) -> bool {
+    return (*client_manager).is_waiting_for_new_block();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_mixing(
+    client_manager: *mut CoinJoinClientManager
+)-> bool {
+    return (*client_manager).is_mixing;
 }
