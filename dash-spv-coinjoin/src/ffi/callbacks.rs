@@ -121,3 +121,9 @@ pub type SendMessage = unsafe extern "C" fn(
     port: u16,
     context: *const c_void
 ) -> bool;
+
+pub type AddPendingMasternode = unsafe extern "C" fn(
+    pro_tx_hash: *mut [u8; 32],
+    session_id: *mut [u8; 32],
+    context: *const c_void
+) -> bool;

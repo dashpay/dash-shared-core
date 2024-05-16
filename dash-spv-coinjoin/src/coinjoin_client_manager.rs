@@ -3,6 +3,8 @@ use std::{cell::RefCell, collections::{HashSet, VecDeque}, ffi::c_void, rc::Rc};
 
 use crate::{coinjoin::CoinJoin, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList}, messages::PoolStatus, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
+pub const MIN_BLOCKS_TO_WAIT: i32 = 1;
+
 pub struct CoinJoinClientManager {
     wallet_ex: Rc<RefCell<WalletEx>>,
     coinjoin: Rc<RefCell<CoinJoin>>,
@@ -12,7 +14,7 @@ pub struct CoinJoinClientManager {
     cached_block_height: i32, // Keep track of current block height
     tick: i32,
     do_auto_next_run: i32,
-    is_mixing: bool,
+    pub is_mixing: bool,
     deq_sessions: VecDeque<CoinJoinClientSession>,
     continue_mixing_on_status: Vec<PoolStatus>,
     str_auto_denom_result: String,
@@ -51,6 +53,21 @@ impl CoinJoinClientManager {
             destroy_mn_list,
             context
         }
+    }
+
+    pub fn start_mixing(&mut self) -> bool {
+        // self.queue_mixing_started_listeners(); TODO
+        
+        if !self.is_mixing {
+            self.is_mixing = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    pub fn stop_mixing(&mut self) {
+        self.is_mixing = false;
     }
 
     pub fn do_maintenance(&mut self, balance_info: Balance) {
@@ -189,6 +206,18 @@ impl CoinJoinClientManager {
         }
         
         return sessions_status;
+    }
+
+    pub fn is_waiting_for_new_block(&self) -> bool {
+        if !self.wallet_ex.borrow().is_synced() {
+            return true;
+        }
+
+        if self.options.coinjoin_multi_session {
+            return false;
+        }
+
+        return self.cached_block_height - self.cached_last_success_block < MIN_BLOCKS_TO_WAIT;
     }
 
     fn get_valid_mns_count(&self, mn_list: &MasternodeList) -> usize {
