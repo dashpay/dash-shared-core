@@ -1,7 +1,7 @@
-use dash_spv_masternode_processor::{crypto::UInt256, ffi::from::FromFFI, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
+use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::from::FromFFI, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::{HashSet, VecDeque}, ffi::c_void, rc::Rc};
 
-use crate::{coinjoin::CoinJoin, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList}, messages::PoolStatus, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
+use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList}, messages::{CoinJoinQueueMessage, PoolState, PoolStatus}, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub const MIN_BLOCKS_TO_WAIT: i32 = 1;
 
@@ -70,7 +70,7 @@ impl CoinJoinClientManager {
         self.is_mixing = false;
     }
 
-    pub fn do_maintenance(&mut self, balance_info: Balance) {
+    pub fn do_maintenance(&mut self, balance_info: Balance, queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>) {
         if !self.options.enable_coinjoin {
             println!("[RUST] CoinJoin: not enabled");
             return;
@@ -88,7 +88,7 @@ impl CoinJoinClientManager {
 
         if self.do_auto_next_run >= self.tick {
             println!("[RUST] CoinJoin: do_auto_next_run >= tick");
-            self.do_automatic_denominating(balance_info, false);
+            self.do_automatic_denominating(balance_info, queue_manager, false);
             let mut rng = rand::thread_rng();
             self.do_auto_next_run = self.tick + COINJOIN_AUTO_TIMEOUT_MIN + rng.gen_range(0..COINJOIN_AUTO_TIMEOUT_MAX - COINJOIN_AUTO_TIMEOUT_MIN);
         }
@@ -116,10 +116,10 @@ impl CoinJoinClientManager {
         }
     }
 
-    pub fn do_automatic_denominating(&mut self, balance_info: Balance, dry_run: bool) -> bool {
+    pub fn do_automatic_denominating(&mut self, balance_info: Balance, queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>, dry_run: bool) -> bool {
         // TODO: finish method
 
-        let mut session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone());
+        let mut session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone(), queue_manager);
         let result = session.do_automatic_denominating(self, dry_run, balance_info);
         self.deq_sessions.push_back(session);
         
@@ -135,6 +135,7 @@ impl CoinJoinClientManager {
 
         return false;
     }
+
     pub fn add_used_masternode(&mut self, pro_tx_hash: UInt256) {
         self.masternodes_used.insert(pro_tx_hash);
     }
@@ -218,6 +219,36 @@ impl CoinJoinClientManager {
         }
 
         return self.cached_block_height - self.cached_last_success_block < MIN_BLOCKS_TO_WAIT;
+    }
+
+    pub fn try_submit_denominate(&mut self, mn_addr: SocketAddress) -> bool {
+        for session in self.deq_sessions.iter_mut() {
+            if let Some(mn_mixing) = &session.mixing_masternode {
+                if mn_mixing.socket_address == mn_addr && session.base_session.state == PoolState::Queue {
+                    session.submit_denominate();
+                    return true;
+                } else {
+                    println!("[RUST] CoinJoin: mixingMasternode {} != mnAddr {} or {:?} != {:?}", mn_mixing.socket_address, mn_addr, session.base_session.state, PoolState::Queue);
+                }
+            } else {
+                println!("[RUST] CoinJoin: mixingMasternode is None");
+            }
+        }
+
+        return false;
+    }
+
+    pub fn mark_already_joined_queue_as_tried(&mut self, dsq: &mut CoinJoinQueueMessage) -> bool {
+        for session in self.deq_sessions.iter_mut() {
+            if let Some(mn_mixing) = &session.mixing_masternode {
+                if mn_mixing.provider_registration_transaction_hash == dsq.pro_tx_hash {
+                    dsq.tried = true;
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     fn get_valid_mns_count(&self, mn_list: &MasternodeList) -> usize {

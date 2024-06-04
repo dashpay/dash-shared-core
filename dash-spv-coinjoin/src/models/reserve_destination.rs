@@ -19,7 +19,7 @@ use super::tx_destination::TxDestination;
  * If an address is reserved and KeepDestination() is not called, then the address will be
  * returned when the ReserveDestination goes out of scope.
  */
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ReserveDestination {
     wallet_ex: Rc<RefCell<WalletEx>>,
     pub address: TxDestination,

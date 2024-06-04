@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::ffi::{c_char, c_void};
 use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types::{self, MasternodeEntry};
 use crate::ffi::selected_coins::SelectedCoins;
@@ -115,7 +115,14 @@ pub type IsMasternodeOrDisconnectRequested = unsafe extern "C" fn(
     context: *const c_void
 ) -> bool;
 
+pub type DisconnectMasternode = unsafe extern "C" fn(
+    ip_address: *mut [u8; 16],
+    port: u16,
+    context: *const c_void
+) -> bool;
+
 pub type SendMessage = unsafe extern "C" fn(
+    message_type: *mut c_char,
     message: *mut ByteArray,
     ip_address: *mut [u8; 16],
     port: u16,

@@ -1,12 +1,12 @@
-use std::{collections::HashMap, time::Instant};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Instant};
 
 use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::from::FromFFI, models::MasternodeEntry};
 use ferment_interfaces::boxed;
 
-use crate::{constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, IsBlockchainSynced, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage, models::CoinJoinClientOptions};
+use crate::{coinjoin_client_manager::CoinJoinClientManager, constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, IsBlockchainSynced, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage, models::CoinJoinClientOptions};
 
-#[derive(Debug)]
 pub struct CoinJoinClientQueueManager {
+    coinjoin_client_manager: Rc<RefCell<CoinJoinClientManager>>,
     coinjoin_queue: Vec<CoinJoinQueueMessage>,
     spamming_masternodes: HashMap<UInt256, u64>,
     pub masternode_metadata_manager: MasternodeMetadataManager,
@@ -20,6 +20,7 @@ pub struct CoinJoinClientQueueManager {
 
 impl CoinJoinClientQueueManager {
     pub fn new(
+        coinjoin_client_manager: Rc<RefCell<CoinJoinClientManager>>,
         masternode_metadata_manager: MasternodeMetadataManager,
         coinjoin_options: CoinJoinClientOptions,
         masternode_by_hash: MasternodeByHash,
@@ -29,6 +30,7 @@ impl CoinJoinClientQueueManager {
         context: *const std::ffi::c_void
     ) -> Self {
         Self {
+            coinjoin_client_manager,
             coinjoin_queue: Vec::new(),
             spamming_masternodes: HashMap::new(),
             masternode_by_hash,
@@ -60,7 +62,9 @@ impl CoinJoinClientQueueManager {
         None
     }
 
-    pub fn process_ds_queue(&mut self, from_peer: SocketAddress, dsq: CoinJoinQueueMessage) {
+    pub fn process_ds_queue(&mut self, from_peer: SocketAddress, message: CoinJoinQueueMessage) {
+        let mut dsq = message.clone();
+
         // process every dsq only once
         for q in self.coinjoin_queue.iter() {
             if q == &dsq {
@@ -89,7 +93,6 @@ impl CoinJoinClientQueueManager {
                 return;
             }
 
-
             // if the queue is ready, submit if we can
             if dsq.ready && self.is_try_submit_denominate(&dmn) {
                 println!("[RUST] CoinJoin: DSQUEUE -- CoinJoin queue ({:?}) is ready on masternode {}", dsq, dmn.socket_address);
@@ -113,11 +116,7 @@ impl CoinJoinClientQueueManager {
                 self.masternode_metadata_manager.allow_mixing(dmn.provider_registration_transaction_hash);
                 println!("[RUST] CoinJoin: DSQUEUE -- new CoinJoin queue ({:?}) from masternode {}", dsq, dmn.socket_address);
                 
-                // TODO
-                // foreach manager in CoinJoinClientManagers {
-                    // coinJoinClientManager.markAlreadyJoinedQueueAsTried(dsq);
-                // }
-
+                self.coinjoin_client_manager.borrow_mut().mark_already_joined_queue_as_tried(&mut dsq);
                 self.coinjoin_queue.push(dsq);
             }
         }
@@ -156,12 +155,7 @@ impl CoinJoinClientQueueManager {
     }
 
     fn is_try_submit_denominate(&self, dmn: &MasternodeEntry) -> bool {
-        // TODO
-        // foreach manager in CoinJoinClientManagers {
-            // coinJoinClientManager.trySubmitDenominate(dmn.getService());
-        // }
-
-        return false;
+        return self.coinjoin_client_manager.borrow_mut().try_submit_denominate(dmn.socket_address.clone());
     }
 
     fn is_synced(&self) -> bool {

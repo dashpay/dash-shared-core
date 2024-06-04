@@ -1,6 +1,7 @@
 use std::io::{Read, Write, Error};
 use dash_spv_masternode_processor::consensus::encode;
 use crate::messages::pool_message::PoolMessage;
+use crate::messages::coinjoin_message::CoinJoinMessage;
 
 // dsc
 #[repr(C)]
@@ -9,6 +10,12 @@ use crate::messages::pool_message::PoolMessage;
 pub struct CoinJoinCompleteMessage {
     pub msg_session_id: i32,
     pub msg_message_id: PoolMessage,
+}
+
+impl CoinJoinMessage for CoinJoinCompleteMessage {
+    fn get_message_type(&self) -> String {
+        return "dsc".to_string();
+    }
 }
 
 impl encode::Encodable for CoinJoinCompleteMessage {
