@@ -1261,13 +1261,13 @@ impl CoinJoinClientSession {
             tx_collateral: self.tx_my_collateral.as_ref().unwrap().clone() 
         };
         self.base_session.entries.push(entry.clone());
-        self.relay(entry);
+        self.relay(&entry);
         self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
 
         return true;
     }
 
-    fn relay(&self, entry: CoinJoinEntry) {
+    fn relay(&self, entry: &CoinJoinEntry) {
         if let Some(mn) = self.mixing_masternode.clone() {
             println!("[RUST] CoinJoin: Sending {:?} to {}", entry, self.base_session.session_id);
 
