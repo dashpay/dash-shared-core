@@ -1,6 +1,7 @@
 use std::io::{Read, Write, Error};
 use dash_spv_masternode_processor::consensus::encode;
 use dash_spv_masternode_processor::tx::transaction::{Transaction, TransactionType};
+use crate::messages::coinjoin_message::CoinJoinMessage;
 
 // dsa
 #[repr(C)]
@@ -17,6 +18,12 @@ impl CoinJoinAcceptMessage {
             denomination,
             tx_collateral
         };
+    }
+}
+
+impl CoinJoinMessage for CoinJoinAcceptMessage {
+    fn get_message_type(&self) -> String {
+        return "dsa".to_string();
     }
 }
 

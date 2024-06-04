@@ -1,5 +1,6 @@
 use std::io::{Error, Read, Write};
 use dash_spv_masternode_processor::consensus::encode;
+use crate::messages::coinjoin_message::CoinJoinMessage;
 
 // senddsq
 #[repr(C)]
@@ -7,6 +8,12 @@ use dash_spv_masternode_processor::consensus::encode;
 #[ferment_macro::export]
 pub struct SendCoinJoinQueue {
     pub send: bool,
+}
+
+impl CoinJoinMessage for SendCoinJoinQueue {
+    fn get_message_type(&self) -> String {
+        return "senddsq".to_string();
+    }
 }
 
 impl encode::Encodable for SendCoinJoinQueue {

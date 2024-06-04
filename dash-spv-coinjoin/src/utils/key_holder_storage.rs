@@ -2,7 +2,6 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{utils::key_holder::KeyHolder, wallet_ex::WalletEx};
 
-#[derive(Debug)]
 pub(crate) struct KeyHolderStorage {
     storage: Vec<KeyHolder>,
 }
