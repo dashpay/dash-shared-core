@@ -1,6 +1,7 @@
 use std::io::{Error, Read, Write};
 use dash_spv_masternode_processor::tx::transaction::TransactionInput;
 use dash_spv_masternode_processor::consensus::encode;
+use crate::messages::coinjoin_message::CoinJoinMessage;
 
 // dss
 // #[repr(C)]
@@ -8,6 +9,12 @@ use dash_spv_masternode_processor::consensus::encode;
 // #[ferment_macro::export]
 pub struct CoinJoinSignedInputs {
     pub inputs: Vec<TransactionInput>,
+}
+
+impl CoinJoinMessage for CoinJoinSignedInputs {
+    fn get_message_type(&self) -> String {
+        return "dss".to_string();
+    }
 }
 
 impl encode::Encodable for CoinJoinSignedInputs {
