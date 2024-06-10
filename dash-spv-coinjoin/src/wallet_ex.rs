@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::collections::{HashSet, HashMap};
-use std::rc::Rc;
 use std::slice;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::common::SocketAddress;
@@ -21,7 +19,6 @@ use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
-use crate::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
 use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;

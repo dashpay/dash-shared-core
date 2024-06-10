@@ -15,12 +15,15 @@ use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, Co
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
+use dash_spv_masternode_processor::common::SocketAddress;
 use dash_spv_masternode_processor::consensus::Decodable;
 use ferment_interfaces::{boxed, unbox_any};
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::{UInt128, UInt256};
 use dash_spv_masternode_processor::ffi::from::FromFFI;
+use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
 use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
+use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types;
 
 #[no_mangle]
@@ -320,4 +323,24 @@ pub unsafe extern "C" fn is_mixing(
     client_manager: *mut CoinJoinClientManager
 )-> bool {
     return (*client_manager).is_mixing;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn process_ds_queue(
+    client_queue_manager_ptr: *mut CoinJoinClientQueueManager,
+    peer_address: *const u8,
+    peer_port: u16,
+    message: *mut ByteArray
+) {
+    let mut queue_manager = std::ptr::read(client_queue_manager_ptr);
+    let from_peer = SocketAddress {
+        ip_address: UInt128::from_const(peer_address).unwrap_or(UInt128::MIN),
+        port: peer_port
+    };
+    let bytearray: ByteArray = std::ptr::read(message);
+    let data = std::slice::from_raw_parts(bytearray.ptr, bytearray.len);
+
+    let mut cursor = Cursor::new(data);
+    let message = messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
+    queue_manager.process_ds_queue(from_peer, message);
 }
