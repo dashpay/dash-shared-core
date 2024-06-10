@@ -1,5 +1,6 @@
 use std::io::{Error, Read, Write};
-use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, UInt256};
+use dash_spv_masternode_processor::consensus::encode::VarInt;
+use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable, UInt256};
 use dash_spv_masternode_processor::consensus::{encode, Encodable};
 use dash_spv_masternode_processor::crypto::UInt768;
 use dash_spv_masternode_processor::hashes::hex::ToHex;
@@ -25,15 +26,16 @@ pub struct CoinJoinQueueMessage {
 }
 
 impl CoinJoinQueueMessage {
-    pub fn is_time_out_of_bounds(&self, current_time: i64) -> bool {
-        return current_time.saturating_sub(self.time) as u64 > COINJOIN_QUEUE_TIMEOUT || 
-            self.time.saturating_sub(current_time) as u64 > COINJOIN_QUEUE_TIMEOUT
+    pub fn is_time_out_of_bounds(&self, current_time: u64) -> bool {
+        return current_time.saturating_sub(self.time as u64) > COINJOIN_QUEUE_TIMEOUT || 
+            (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT
     }
 
     pub fn check_signature(&self, key: OperatorPublicKey) -> bool { // TODO: recheck test
         if let Some(ref signature) = self.signature {
+            println!("[RUST] dsq signature {:?}", signature.as_bytes().to_hex());
             let hash = self.get_signature_hash();
-            println!("sig hash: {:?}", hash.as_bytes().to_hex());
+            println!("[RUST] dsq: sig hash: {:?}", hash.as_bytes().to_hex());
             let verified = BLSKey::key_with_public_key(
                 key.data, 
                 key.is_legacy()
@@ -44,9 +46,9 @@ impl CoinJoinQueueMessage {
             }
 
             return verified;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     pub fn get_signature_hash(&self) -> UInt256 {
@@ -89,6 +91,7 @@ impl encode::Decodable for CoinJoinQueueMessage {
         let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
         let time = i64::consensus_decode(&mut d)?;
         let ready: bool = bool::consensus_decode(&mut d)?;
+        let _signature_len = VarInt::consensus_decode(&mut d)?;
         let signature: Option<UInt768> = UInt768::consensus_decode(&mut d).ok();
         
         Ok(CoinJoinQueueMessage { denomination, pro_tx_hash, time, ready, signature, tried: false })
