@@ -8,6 +8,7 @@ pub const MIN_BLOCKS_TO_WAIT: i32 = 1;
 pub struct CoinJoinClientManager {
     wallet_ex: Rc<RefCell<WalletEx>>,
     coinjoin: Rc<RefCell<CoinJoin>>,
+    pub queue_queue_manager: Option<Rc<RefCell<CoinJoinClientQueueManager>>>,
     options: CoinJoinClientOptions,
     masternodes_used: HashSet<UInt256>,
     cached_last_success_block: i32,
@@ -37,6 +38,7 @@ impl CoinJoinClientManager {
         Self {
             wallet_ex,
             coinjoin,
+            queue_queue_manager: None,
             options,
             masternodes_used: HashSet::new(),
             cached_last_success_block: 0,
@@ -55,6 +57,10 @@ impl CoinJoinClientManager {
         }
     }
 
+    pub fn set_client_queue_manager(&mut self, queue_queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>) {
+        self.queue_queue_manager = Some(queue_queue_manager);
+    }
+
     pub fn start_mixing(&mut self) -> bool {
         // self.queue_mixing_started_listeners(); TODO
         
@@ -70,7 +76,7 @@ impl CoinJoinClientManager {
         self.is_mixing = false;
     }
 
-    pub fn do_maintenance(&mut self, balance_info: Balance, queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>) {
+    pub fn do_maintenance(&mut self, balance_info: Balance) {
         if !self.options.enable_coinjoin {
             println!("[RUST] CoinJoin: not enabled");
             return;
@@ -88,7 +94,7 @@ impl CoinJoinClientManager {
 
         if self.do_auto_next_run >= self.tick {
             println!("[RUST] CoinJoin: do_auto_next_run >= tick");
-            self.do_automatic_denominating(balance_info, queue_manager, false);
+            self.do_automatic_denominating(balance_info, false);
             let mut rng = rand::thread_rng();
             self.do_auto_next_run = self.tick + COINJOIN_AUTO_TIMEOUT_MIN + rng.gen_range(0..COINJOIN_AUTO_TIMEOUT_MAX - COINJOIN_AUTO_TIMEOUT_MIN);
         }
@@ -116,15 +122,20 @@ impl CoinJoinClientManager {
         }
     }
 
-    pub fn do_automatic_denominating(&mut self, balance_info: Balance, queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>, dry_run: bool) -> bool {
+    pub fn do_automatic_denominating(&mut self, balance_info: Balance, dry_run: bool) -> bool {
         // TODO: finish method
 
-        let mut session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone(), queue_manager);
-        let result = session.do_automatic_denominating(self, dry_run, balance_info);
-        self.deq_sessions.push_back(session);
-        
-        return result;
+        if let Some(queue_manager) = &self.queue_queue_manager {    
+            let mut session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone(), queue_manager.clone());
+            let result = session.do_automatic_denominating(self, dry_run, balance_info);
+            self.deq_sessions.push_back(session);
+            
+            return result;
+        } else {
+            return false;
+        }
     }
+    
     pub fn finish_automatic_denominating(&mut self) -> bool {
         if let Some(mut session) = self.deq_sessions.pop_back() {
             session.finish_automatic_denominating(self);

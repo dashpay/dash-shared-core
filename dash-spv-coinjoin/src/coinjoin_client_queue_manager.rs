@@ -66,6 +66,8 @@ impl CoinJoinClientQueueManager {
     }
 
     pub fn process_ds_queue(&mut self, from_peer: SocketAddress, mut dsq: CoinJoinQueueMessage) {
+        let mut client_manager = self.coinjoin_client_manager.borrow_mut();
+
         // process every dsq only once
         for q in self.coinjoin_queue.iter() {
             if q == &dsq {
@@ -97,8 +99,6 @@ impl CoinJoinClientQueueManager {
                 println!("[RUST] CoinJoin: DSQUEUE signature check failed");
                 return;
             }
-
-            let mut client_manager = self.coinjoin_client_manager.borrow_mut();
 
             // if the queue is ready, submit if we can
             if dsq.ready && client_manager.try_submit_denominate(dmn.socket_address.clone()) {
