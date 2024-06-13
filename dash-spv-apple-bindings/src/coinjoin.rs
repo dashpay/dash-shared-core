@@ -103,7 +103,7 @@ pub unsafe extern "C" fn register_client_manager(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn register_client_queue_manager(
+pub unsafe extern "C" fn add_client_queue_manager(
     client_manager_ptr: *mut CoinJoinClientManager,
     options_ptr: *mut CoinJoinClientOptions,
     masternode_by_hash: MasternodeByHash,
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn register_client_queue_manager(
     valid_mns_count: ValidMasternodeCount,
     is_synced: IsBlockchainSynced,
     context: *const c_void
-) -> *mut CoinJoinClientQueueManager {
+) {
     let client_queue_manager = CoinJoinClientQueueManager::new(
         Rc::new(RefCell::new(std::ptr::read(client_manager_ptr))),
         MasternodeMetadataManager::new(), 
@@ -123,18 +123,18 @@ pub unsafe extern "C" fn register_client_queue_manager(
         context
     );
 
-    println!("[RUST] CoinJoin: register_client_queue_manager");
-    boxed(client_queue_manager)
+    (*client_manager_ptr).set_client_queue_manager(Rc::new(RefCell::new(client_queue_manager)));
+
+    println!("[RUST] CoinJoin: add_client_queue_manager");
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn run_client_manager( // TODO: temp method for testing
     client_manager: *mut CoinJoinClientManager,
-    client_queue_manager_ptr: *mut CoinJoinClientQueueManager,
     balance_info: Balance
 ) {
     (*client_manager).start_mixing();
-    (*client_manager).do_maintenance(balance_info, Rc::new(RefCell::new(std::ptr::read(client_queue_manager_ptr))));
+    (*client_manager).do_maintenance(balance_info);
 }
 
 #[no_mangle]
@@ -327,12 +327,11 @@ pub unsafe extern "C" fn is_mixing(
 
 #[no_mangle]
 pub unsafe extern "C" fn process_ds_queue(
-    client_queue_manager_ptr: *mut CoinJoinClientQueueManager,
+    client_manager: *mut CoinJoinClientManager,
     peer_address: *const u8,
     peer_port: u16,
     message: *mut ByteArray
 ) {
-    let mut queue_manager = std::ptr::read(client_queue_manager_ptr);
     let from_peer = SocketAddress {
         ip_address: UInt128::from_const(peer_address).unwrap_or(UInt128::MIN),
         port: peer_port
@@ -342,5 +341,5 @@ pub unsafe extern "C" fn process_ds_queue(
 
     let mut cursor = Cursor::new(data);
     let message = messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
-    queue_manager.process_ds_queue(from_peer, message);
+    (*client_manager).queue_queue_manager.as_ref().unwrap().borrow_mut().process_ds_queue(from_peer, message);
 }

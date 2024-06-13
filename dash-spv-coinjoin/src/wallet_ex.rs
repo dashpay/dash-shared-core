@@ -312,7 +312,7 @@ impl WalletEx {
             }
         }
         
-        println!("[RUST] CoinJoin, vec_tally_ret items: {:?}", vec_tally_ret);
+        // println!("[RUST] CoinJoin, vec_tally_ret items: {:?}", vec_tally_ret);
 
         return vec_tally_ret;
     }
