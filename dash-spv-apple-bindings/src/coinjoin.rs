@@ -15,12 +15,15 @@ use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, Co
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
+use dash_spv_masternode_processor::common::SocketAddress;
 use dash_spv_masternode_processor::consensus::Decodable;
 use ferment_interfaces::{boxed, unbox_any};
-use dash_spv_masternode_processor::crypto::UInt256;
+use dash_spv_masternode_processor::crypto::{UInt128, UInt256};
 use dash_spv_masternode_processor::ffi::from::FromFFI;
+use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
 use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
+use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types;
 
 #[no_mangle]
@@ -100,7 +103,7 @@ pub unsafe extern "C" fn register_client_manager(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn register_client_queue_manager(
+pub unsafe extern "C" fn add_client_queue_manager(
     client_manager_ptr: *mut CoinJoinClientManager,
     options_ptr: *mut CoinJoinClientOptions,
     masternode_by_hash: MasternodeByHash,
@@ -108,7 +111,7 @@ pub unsafe extern "C" fn register_client_queue_manager(
     valid_mns_count: ValidMasternodeCount,
     is_synced: IsBlockchainSynced,
     context: *const c_void
-) -> *mut CoinJoinClientQueueManager {
+) {
     let client_queue_manager = CoinJoinClientQueueManager::new(
         Rc::new(RefCell::new(std::ptr::read(client_manager_ptr))),
         MasternodeMetadataManager::new(), 
@@ -120,18 +123,18 @@ pub unsafe extern "C" fn register_client_queue_manager(
         context
     );
 
-    println!("[RUST] CoinJoin: register_client_queue_manager");
-    boxed(client_queue_manager)
+    (*client_manager_ptr).set_client_queue_manager(Rc::new(RefCell::new(client_queue_manager)));
+
+    println!("[RUST] CoinJoin: add_client_queue_manager");
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn run_client_manager( // TODO: temp method for testing
     client_manager: *mut CoinJoinClientManager,
-    client_queue_manager_ptr: *mut CoinJoinClientQueueManager,
     balance_info: Balance
 ) {
     (*client_manager).start_mixing();
-    (*client_manager).do_maintenance(balance_info, Rc::new(RefCell::new(std::ptr::read(client_queue_manager_ptr))));
+    (*client_manager).do_maintenance(balance_info);
 }
 
 #[no_mangle]
@@ -320,4 +323,23 @@ pub unsafe extern "C" fn is_mixing(
     client_manager: *mut CoinJoinClientManager
 )-> bool {
     return (*client_manager).is_mixing;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn process_ds_queue(
+    client_manager: *mut CoinJoinClientManager,
+    peer_address: *const u8,
+    peer_port: u16,
+    message: *mut ByteArray
+) {
+    let from_peer = SocketAddress {
+        ip_address: UInt128::from_const(peer_address).unwrap_or(UInt128::MIN),
+        port: peer_port
+    };
+    let bytearray: ByteArray = std::ptr::read(message);
+    let data = std::slice::from_raw_parts(bytearray.ptr, bytearray.len);
+
+    let mut cursor = Cursor::new(data);
+    let message = messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
+    (*client_manager).queue_queue_manager.as_ref().unwrap().borrow_mut().process_ds_queue(from_peer, message);
 }

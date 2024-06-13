@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use dash_spv_masternode_processor::blockdata::opcodes::all::OP_RETURN;
 use dash_spv_masternode_processor::chain::params::DUFFS;
 use dash_spv_masternode_processor::consensus::Encodable;
-use dash_spv_masternode_processor::crypto::byte_util::Random;
+use dash_spv_masternode_processor::crypto::byte_util::{Random, Reversable};
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::models::MasternodeEntry;
 use dash_spv_masternode_processor::secp256k1::rand::{self, Rng};
@@ -292,7 +292,8 @@ impl CoinJoinClientSession {
         if let Some(pending_request) = &self.pending_dsa_request {
             println!("[RUST] CoinJoin: valid collateral before sending: {}",
                 self.coinjoin.borrow().is_collateral_valid(&pending_request.dsa.tx_collateral, true));
-            self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+            let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            self.base_session.time_last_successful_step = current_time;
             let mut buffer = vec![];
             pending_request.dsa.consensus_encode(&mut buffer).unwrap();
             let sent_message = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), pending_request.addr);
@@ -308,8 +309,6 @@ impl CoinJoinClientSession {
             }
     
             return sent_message;
-        } else {
-            println!("[RUST] CoinJoin: no pending DSA request");
         }
 
         return false;
@@ -756,7 +755,8 @@ impl CoinJoinClientSession {
         match self.base_session.state {
             PoolState::Idle => return false,
             PoolState::Error => {
-                if self.base_session.time_last_successful_step + 10 >= Instant::now().elapsed().as_secs() {
+                let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                if self.base_session.time_last_successful_step + 10 >= current_time {
                     // reset after being in POOL_STATE_ERROR for 10 or more seconds
                     println!("[RUST] CoinJoin: resetting session {}", self.id);
                     self.set_null();
@@ -772,7 +772,8 @@ impl CoinJoinClientSession {
             _ => COINJOIN_QUEUE_TIMEOUT,
         };
         
-        let is_timeout = self.base_session.time_last_successful_step + timeout + lag_time >= Instant::now().elapsed().as_secs();
+        let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let is_timeout = self.base_session.time_last_successful_step + timeout + lag_time >= current_time;
 
         if !is_timeout {
             return false;
@@ -787,7 +788,8 @@ impl CoinJoinClientSession {
         self.set_status(PoolStatus::Timeout);
         self.unlock_coins();
         self.key_holder_storage.return_all();
-        self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+        let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        self.base_session.time_last_successful_step = current_time;
         self.str_last_message = CoinJoin::get_message_by_id(PoolMessage::ErrSession).to_string();
 
         return true;
@@ -915,25 +917,27 @@ impl CoinJoinClientSession {
         }
 
         let mn_list = client_manager.get_mn_list();// TODO: at_chain_tip ?
-        let mut dsq_option = self.queue_manager.borrow_mut().get_queue_item_and_try();
+        let queue_manager_rc = self.queue_manager.clone();
+        let mut queue_manager = queue_manager_rc.borrow_mut();
+        let mut dsq_option = queue_manager.get_queue_item_and_try();
 
         while let Some(dsq) = dsq_option.clone() {
-            let dmn = mn_list.masternode_for(dsq.pro_tx_hash);
+            let dmn = mn_list.masternode_for(dsq.pro_tx_hash.reversed());
 
             match (dmn, self.tx_my_collateral.clone()) {
                 (None, _) => {
                     println!("[RUST] CoinJoin: dsq masternode is not in masternode list, masternode={}", dsq.pro_tx_hash);
-                    dsq_option = self.queue_manager.borrow_mut().get_queue_item_and_try();
+                    dsq_option = queue_manager.get_queue_item_and_try();
                     continue;
                 },
-                (Some(dmn), Some(tx))  => {
+                (Some(dmn), Some(tx)) => {
                     println!("[RUST] CoinJoin: trying existing queue: {:?}", dsq);
 
                     let mut vec_tx_dsin_tmp = Vec::new();
 
                     if !self.mixing_wallet.borrow_mut().select_tx_dsins_by_denomination(dsq.denomination, balance_needs_anonymized, &mut vec_tx_dsin_tmp) {
                         println!("[RUST] CoinJoin: couldn't match denomination {} ({})", dsq.denomination, CoinJoin::denomination_to_string(dsq.denomination));
-                        dsq_option = self.queue_manager.borrow_mut().get_queue_item_and_try();
+                        dsq_option = queue_manager.get_queue_item_and_try();
                         continue;
                     }
 
@@ -941,7 +945,7 @@ impl CoinJoinClientSession {
 
                     if self.mixing_wallet.borrow().is_masternode_or_disconnect_requested(dmn.socket_address) {
                         println!("[RUST] CoinJoin: skipping masternode connection, addr={}", dmn.socket_address);
-                        dsq_option = self.queue_manager.borrow_mut().get_queue_item_and_try();
+                        dsq_option = queue_manager.get_queue_item_and_try();
                         continue;
                     }
 
@@ -956,12 +960,13 @@ impl CoinJoinClientSession {
                     ));
                     self.mixing_wallet.borrow_mut().add_pending_masternode(dmn.provider_registration_transaction_hash, self.id);
                     self.base_session.state = PoolState::Queue;
-                    self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+                    let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                    self.base_session.time_last_successful_step = current_time;
                     println!("[RUST] CoinJoin: join existing queue -> pending connection, sessionDenom: {} ({}), addr={}",
                              self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
                     self.set_status(PoolStatus::Connecting);
                     self.joined = true;
-                    break;
+                    return true;
                 }
                 (Some(_), None) => {
                     println!("[RUST] CoinJoin: tx_collateral is missing");
@@ -1047,7 +1052,8 @@ impl CoinJoinClientSession {
                         )
                     ));
                     self.base_session.state = PoolState::Queue;
-                    self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+                    let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                    self.base_session.time_last_successful_step = current_time;
                     println!("[RUST] CoinJoin: start new queue -> pending connection, sessionDenom: {} ({}), addr={}",
                             self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
                     // coinjoin_manager.start_async(); TODO
@@ -1262,7 +1268,8 @@ impl CoinJoinClientSession {
         };
         self.base_session.entries.push(entry.clone());
         self.relay(&entry);
-        self.base_session.time_last_successful_step = Instant::now().elapsed().as_secs();
+        let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        self.base_session.time_last_successful_step = current_time;
 
         return true;
     }

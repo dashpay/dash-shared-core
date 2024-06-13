@@ -124,7 +124,7 @@ impl CoinJoin {
             -1 => "out-of-bounds".to_string(),
             -2 => "non-denom".to_string(),
             -3 => "to-amount-error".to_string(),
-            n => n.to_friendly_string(),
+            n => format!("{}", n),
         }
     }
 
