@@ -4,7 +4,7 @@ use dash_spv_masternode_processor::consensus::encode;
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_state::PoolState;
 use crate::messages::pool_status_update::PoolStatusUpdate;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dssu
 #[repr(C)]
@@ -17,7 +17,7 @@ pub struct CoinJoinStatusUpdate {
     pub message_id: PoolMessage,
 }
 
-impl CoinJoinMessage for CoinJoinStatusUpdate {
+impl CoinJoinMessageType for CoinJoinStatusUpdate {
     fn get_message_type(&self) -> String {
         return "dssu".to_string();
     }

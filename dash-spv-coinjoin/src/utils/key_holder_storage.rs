@@ -21,6 +21,19 @@ impl KeyHolderStorage {
         return script;
     }
 
+    pub fn keep_all(&mut self) {
+        let mut tmp = self.storage.clone();
+        self.storage.clear();
+
+        if !tmp.is_empty() {
+            for key_holder in &mut tmp {
+                key_holder.keep_key();
+            }
+
+            println!("[RUST] CoinJoin: keepAll: {} keys kept", tmp.len());
+        }
+    }
+
     pub fn return_all(&mut self) {
         for key_holder in &mut self.storage {
             key_holder.return_key();

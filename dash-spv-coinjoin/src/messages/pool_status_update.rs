@@ -1,8 +1,8 @@
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PoolStatusUpdate {
-    StatusRejected = 0,
-    StatusAccepted = 1,
+    Rejected = 0,
+    Accepted = 1,
 }
 
 impl PoolStatusUpdate {
@@ -12,8 +12,8 @@ impl PoolStatusUpdate {
 
     pub fn from_value(value: i32) -> Self {
         match value {
-            0 => PoolStatusUpdate::StatusRejected,
-            _ => PoolStatusUpdate::StatusAccepted,
+            0 => PoolStatusUpdate::Rejected,
+            _ => PoolStatusUpdate::Accepted,
         }
     }
 }

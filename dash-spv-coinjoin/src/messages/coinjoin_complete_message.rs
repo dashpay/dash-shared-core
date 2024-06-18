@@ -1,7 +1,7 @@
 use std::io::{Read, Write, Error};
 use dash_spv_masternode_processor::consensus::encode;
 use crate::messages::pool_message::PoolMessage;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dsc
 #[repr(C)]
@@ -12,7 +12,7 @@ pub struct CoinJoinCompleteMessage {
     pub msg_message_id: PoolMessage,
 }
 
-impl CoinJoinMessage for CoinJoinCompleteMessage {
+impl CoinJoinMessageType for CoinJoinCompleteMessage {
     fn get_message_type(&self) -> String {
         return "dsc".to_string();
     }

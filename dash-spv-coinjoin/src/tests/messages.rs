@@ -1,5 +1,4 @@
 use std::io::Cursor;
-use byte::BytesExt;
 use dash_spv_masternode_processor::consensus::{Decodable, Encodable};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};
 use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable};
@@ -78,7 +77,7 @@ pub fn test_coinjoin_status_update_from_payload() {
 
     assert_eq!(783283, dssu.session_id);
     assert_eq!(messages::PoolState::Queue, dssu.pool_state);
-    assert_eq!(messages::PoolStatusUpdate::StatusRejected, dssu.status_update);
+    assert_eq!(messages::PoolStatusUpdate::Rejected, dssu.status_update);
     assert_eq!(messages::PoolMessage::ErrDenom, dssu.message_id);
 
     payload = Vec::from_hex("d7d20700030000000100000013000000").unwrap();
@@ -87,7 +86,7 @@ pub fn test_coinjoin_status_update_from_payload() {
 
     assert_eq!(512727, dssu.session_id);
     assert_eq!(messages::PoolState::Signing, dssu.pool_state);
-    assert_eq!(messages::PoolStatusUpdate::StatusAccepted, dssu.status_update);
+    assert_eq!(messages::PoolStatusUpdate::Accepted, dssu.status_update);
     assert_eq!(messages::PoolMessage::MsgNoErr, dssu.message_id);
 }
 
@@ -99,13 +98,13 @@ pub fn test_coinjoin_status_update_from_ctor() {
 
     assert_eq!(830047, dssu.session_id);
     assert_eq!(messages::PoolState::Queue, dssu.pool_state);
-    assert_eq!(messages::PoolStatusUpdate::StatusAccepted, dssu.status_update);
+    assert_eq!(messages::PoolStatusUpdate::Accepted, dssu.status_update);
     assert_eq!(messages::PoolMessage::MsgNoErr, dssu.message_id);
    
     let from_ctor = messages::CoinJoinStatusUpdate {
         session_id: 830047,
         pool_state: messages::PoolState::Queue,
-        status_update: messages::PoolStatusUpdate::StatusAccepted,
+        status_update: messages::PoolStatusUpdate::Accepted,
         message_id: messages::PoolMessage::MsgNoErr
     };
 

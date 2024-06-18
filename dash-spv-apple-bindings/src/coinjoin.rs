@@ -1,14 +1,16 @@
 use core::slice;
 use std::cell::RefCell;
 use std::io::Cursor;
-use std::ffi::c_void;
+use std::ffi::{c_void, CStr};
+use std::os::raw::c_char;
 use std::rc::Rc;
 
 use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use dash_spv_coinjoin::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
 
 use dash_spv_coinjoin::masternode_meta_data_manager::MasternodeMetadataManager;
-use dash_spv_coinjoin::messages;
+use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
+use dash_spv_coinjoin::{ffi, messages};
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
 use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
@@ -146,11 +148,35 @@ pub unsafe extern "C" fn finish_automatic_denominating(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn mixing_masternode_address(
+    manager: *mut CoinJoinClientManager,
+    client_session_id: *mut [u8; 32]
+) -> *mut ffi::socket_addres::SocketAddress {
+    if let Some(address) = (*manager).mixing_masternode_address(UInt256(*(client_session_id))) {
+        return boxed(ffi::socket_addres::SocketAddress {
+            ip_address: boxed(address.ip_address.0),
+            port: address.port
+        });
+    } else {
+        return std::ptr::null_mut();
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn destroy_transaction(
     tx: *mut types::Transaction
 ) {
     println!("[RUST] CoinJoin 💀 destroy_transaction");
     let unboxed = unbox_any(tx);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn destroy_socket_address(
+    socket_address: *mut ffi::socket_addres::SocketAddress
+) {
+    println!("[RUST] CoinJoin 💀 destroy_socket_address");
+    let unboxed = unbox_any(socket_address);
+    let _ = unbox_any(unboxed.ip_address);
 }
 
 #[no_mangle]
@@ -204,75 +230,86 @@ pub unsafe extern "C" fn coinjoin_get_smallest_denomination() -> u64 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_accept_message(
-    message: *const u8,
-    message_length: usize
-) -> *mut messages::CoinJoinAcceptMessage {
-    let message: &[u8] = slice::from_raw_parts(message, message_length);
-    let mut cursor = Cursor::new(message);
-    let result = messages::CoinJoinAcceptMessage::consensus_decode(&mut cursor).unwrap();
+pub unsafe extern "C" fn process_coinjoin_message(
+    client_manager: *mut CoinJoinClientManager,
+    peer_address: *const u8,
+    peer_port: u16,
+    message: *mut ByteArray,
+    message_type: *const c_char
+) {
+    let c_str = unsafe { CStr::from_ptr(message_type) };
+    let message = match c_str.to_str().unwrap() {
+        "dssu" => CoinJoinMessage::StatusUpdate(process_coinjoin_status_update((*message).ptr, (*message).len)),
+        "dsf" => CoinJoinMessage::FinalTransaction(process_coinjoin_final_transaction((*message).ptr, (*message).len)),
+        "dsc" => CoinJoinMessage::Complete(process_coinjoin_complete_message((*message).ptr, (*message).len)),
+        _ => panic!("Unsupported message type")
+    };
 
-    boxed(result)
+    let from_peer = SocketAddress {
+        ip_address: UInt128::from_const(peer_address).unwrap_or(UInt128::MIN),
+        port: peer_port
+    };
+    
+    (*client_manager).process_message(from_peer, message);
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_broadcast_tx(
+unsafe fn process_coinjoin_accept_message(
     message: *const u8,
     message_length: usize
-) -> *mut CoinJoinBroadcastTx {
+) -> messages::CoinJoinAcceptMessage {
     let message: &[u8] = slice::from_raw_parts(message, message_length);
     let mut cursor = Cursor::new(message);
-    let result = CoinJoinBroadcastTx::consensus_decode(&mut cursor).unwrap();
-
-    boxed(result)
+    
+    return messages::CoinJoinAcceptMessage::consensus_decode(&mut cursor).unwrap();
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_complete_message(
+unsafe fn process_coinjoin_broadcast_tx(
     message: *const u8,
     message_length: usize
-) -> *mut messages::CoinJoinCompleteMessage {
+) -> CoinJoinBroadcastTx {
     let message: &[u8] = slice::from_raw_parts(message, message_length);
     let mut cursor = Cursor::new(message);
-    let result = messages::CoinJoinCompleteMessage::consensus_decode(&mut cursor).unwrap();
-
-    boxed(result)
+    
+    return CoinJoinBroadcastTx::consensus_decode(&mut cursor).unwrap();
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_entry(
+unsafe fn process_coinjoin_complete_message(
     message: *const u8,
     message_length: usize
-) -> *mut messages::CoinJoinEntry {
+) -> messages::CoinJoinCompleteMessage {
     let message: &[u8] = slice::from_raw_parts(message, message_length);
     let mut cursor = Cursor::new(message);
-    let result = messages::CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
-
-    boxed(result)
+    
+    return messages::CoinJoinCompleteMessage::consensus_decode(&mut cursor).unwrap();
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_final_transaction(
+unsafe fn process_coinjoin_entry(
     message: *const u8,
     message_length: usize
-) -> *mut messages::CoinJoinFinalTransaction {
+) -> messages::CoinJoinEntry {
     let message: &[u8] = slice::from_raw_parts(message, message_length);
     let mut cursor = Cursor::new(message);
-    let result = messages::CoinJoinFinalTransaction::consensus_decode(&mut cursor).unwrap();
-
-    boxed(result)
+    return messages::CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_queue_message(
+unsafe fn process_coinjoin_final_transaction(
     message: *const u8,
     message_length: usize
-) -> *mut messages::CoinJoinQueueMessage {
+) -> messages::CoinJoinFinalTransaction {
     let message: &[u8] = slice::from_raw_parts(message, message_length);
     let mut cursor = Cursor::new(message);
-    let result = messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
+    
+    return messages::CoinJoinFinalTransaction::consensus_decode(&mut cursor).unwrap();
+}
 
-    boxed(result)
+unsafe fn process_coinjoin_queue_message(
+    message: *const u8,
+    message_length: usize
+) -> messages::CoinJoinQueueMessage {
+    let message: &[u8] = slice::from_raw_parts(message, message_length);
+    let mut cursor = Cursor::new(message);
+    
+    return messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
 }
 
 #[no_mangle]
@@ -287,16 +324,14 @@ pub unsafe extern "C" fn process_coinjoin_signed_inputs(
     boxed(result)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_status_update(
+unsafe fn process_coinjoin_status_update(
     message: *const u8,
     message_length: usize
-) -> *mut messages::CoinJoinStatusUpdate {
+) -> messages::CoinJoinStatusUpdate {
     let message: &[u8] = slice::from_raw_parts(message, message_length);
     let mut cursor = Cursor::new(message);
-    let result = messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
-
-    boxed(result)
+    
+    return messages::CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap();
 }
 
 #[no_mangle]
@@ -336,10 +371,6 @@ pub unsafe extern "C" fn process_ds_queue(
         ip_address: UInt128::from_const(peer_address).unwrap_or(UInt128::MIN),
         port: peer_port
     };
-    let bytearray: ByteArray = std::ptr::read(message);
-    let data = std::slice::from_raw_parts(bytearray.ptr, bytearray.len);
-
-    let mut cursor = Cursor::new(data);
-    let message = messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
+    let message = process_coinjoin_queue_message((*message).ptr, (*message).len);
     (*client_manager).queue_queue_manager.as_ref().unwrap().borrow_mut().process_ds_queue(from_peer, message);
 }
