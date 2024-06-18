@@ -1,7 +1,7 @@
 use std::io::{Error, Read, Write};
 use dash_spv_masternode_processor::tx::transaction::TransactionInput;
 use dash_spv_masternode_processor::consensus::encode;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dss
 // #[repr(C)]
@@ -11,7 +11,7 @@ pub struct CoinJoinSignedInputs {
     pub inputs: Vec<TransactionInput>,
 }
 
-impl CoinJoinMessage for CoinJoinSignedInputs {
+impl CoinJoinMessageType for CoinJoinSignedInputs {
     fn get_message_type(&self) -> String {
         return "dss".to_string();
     }

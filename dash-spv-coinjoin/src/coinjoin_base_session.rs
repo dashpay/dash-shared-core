@@ -17,7 +17,7 @@ pub struct CoinJoinBaseSession {
     pub state: PoolState,
     pub status: PoolStatus,
     pub time_last_successful_step: u64,
-    pub session_id: u32,
+    pub session_id: i32,
     pub session_denom: u32, // Users must submit a denom matching this,
 }
 

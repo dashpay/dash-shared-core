@@ -6,7 +6,7 @@ use dash_spv_masternode_processor::crypto::UInt768;
 use dash_spv_masternode_processor::hashes::hex::ToHex;
 use dash_spv_masternode_processor::keys::{BLSKey, IKey};
 use dash_spv_masternode_processor::models::OperatorPublicKey;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 use crate::constants::COINJOIN_QUEUE_TIMEOUT;
 
@@ -61,7 +61,7 @@ impl CoinJoinQueueMessage {
     }
 }
 
-impl CoinJoinMessage for CoinJoinQueueMessage {
+impl CoinJoinMessageType for CoinJoinQueueMessage {
     fn get_message_type(&self) -> String {
         return "dsq".to_string();
     }

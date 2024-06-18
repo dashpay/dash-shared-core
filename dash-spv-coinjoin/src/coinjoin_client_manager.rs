@@ -1,7 +1,7 @@
 use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::from::FromFFI, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::{HashSet, VecDeque}, ffi::c_void, rc::Rc};
 
-use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList}, messages::{CoinJoinQueueMessage, PoolState, PoolStatus}, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
+use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub const MIN_BLOCKS_TO_WAIT: i32 = 1;
 
@@ -59,6 +59,28 @@ impl CoinJoinClientManager {
 
     pub fn set_client_queue_manager(&mut self, queue_queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>) {
         self.queue_queue_manager = Some(queue_queue_manager);
+    }
+
+    pub fn process_message(&mut self, from: SocketAddress, message: CoinJoinMessage) {
+        if !self.options.enable_coinjoin {
+            return;
+        }
+
+        if !self.wallet_ex.borrow().is_synced() {
+            return;
+        }
+
+        // if message.is_status_update() || message.is_final_transaction() || message.is_complete() { // TODO: add a check if other types added
+            let mut update_success_block = false;
+
+            for session in &mut self.deq_sessions {
+                update_success_block = session.process_message(&from, &message);
+            }
+
+            if update_success_block {
+                self.updated_success_block();
+            }
+        // }
     }
 
     pub fn start_mixing(&mut self) -> bool {
@@ -233,6 +255,8 @@ impl CoinJoinClientManager {
     }
 
     pub fn try_submit_denominate(&mut self, mn_addr: SocketAddress) -> bool {
+        println!("[RUST] CoinJoin: try_submit_denominate");
+
         for session in self.deq_sessions.iter_mut() {
             if let Some(mn_mixing) = &session.mixing_masternode {
                 if mn_mixing.socket_address == mn_addr && session.base_session.state == PoolState::Queue {
@@ -260,6 +284,18 @@ impl CoinJoinClientManager {
         }
 
         return false;
+    }
+
+    pub fn mixing_masternode_address(&self, client_session_id: UInt256) -> Option<SocketAddress> {
+        for session in self.deq_sessions.iter() {
+            if session.id == client_session_id {
+                if let Some(mixing_mn) = &session.mixing_masternode {
+                    return Some(mixing_mn.socket_address);
+                }
+            }
+        }
+
+        return None;
     }
 
     fn get_valid_mns_count(&self, mn_list: &MasternodeList) -> usize {

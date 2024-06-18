@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{wallet_ex::WalletEx, models::{reserve_destination::ReserveDestination, tx_destination::TxDestination}};
 
+#[derive(Clone)]
 pub(crate) struct KeyHolder {
     reserve_destination: ReserveDestination, // TODO(dashj): use ReserveKey
     pub destination: TxDestination,

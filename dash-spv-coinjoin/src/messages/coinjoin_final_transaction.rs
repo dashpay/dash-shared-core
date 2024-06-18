@@ -1,7 +1,7 @@
 use std::io::{Error, Read, Write};
 use dash_spv_masternode_processor::tx::transaction::{Transaction, TransactionType};
 use dash_spv_masternode_processor::consensus::encode;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dsf
 #[repr(C)]
@@ -12,7 +12,7 @@ pub struct CoinJoinFinalTransaction {
     pub tx: Transaction,
 }
 
-impl CoinJoinMessage for CoinJoinFinalTransaction {
+impl CoinJoinMessageType for CoinJoinFinalTransaction {
     fn get_message_type(&self) -> String {
         return "dsf".to_string();
     }
