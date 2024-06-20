@@ -8,7 +8,7 @@ use dash_spv_masternode_processor::ffi::to::ToFFI;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 
 use crate::ffi::callbacks::HasChainLock;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dstx
 // #[repr(C)]
@@ -53,7 +53,7 @@ impl CoinJoinBroadcastTx {
     }
 }
 
-impl CoinJoinMessage for CoinJoinBroadcastTx {
+impl CoinJoinMessageType for CoinJoinBroadcastTx {
     fn get_message_type(&self) -> String {
         return "dstx".to_string();
     }

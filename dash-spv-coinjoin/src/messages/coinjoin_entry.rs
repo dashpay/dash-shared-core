@@ -2,7 +2,7 @@ use std::io::{Read, Write, Error};
 use dash_spv_masternode_processor::consensus::encode;
 use dash_spv_masternode_processor::tx::transaction::{TransactionInput, TransactionOutput, Transaction, TransactionType};
 use dash_spv_masternode_processor::consensus::encode::VarInt;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dsi
 // A client's transaction in the mixing pool
@@ -15,7 +15,7 @@ pub struct CoinJoinEntry {
     pub tx_collateral: Transaction,
 }
 
-impl CoinJoinMessage for CoinJoinEntry {
+impl CoinJoinMessageType for CoinJoinEntry {
     fn get_message_type(&self) -> String {
         return "dsi".to_string();
     }

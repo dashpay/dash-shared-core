@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use dash_spv_masternode_processor::blockdata::opcodes::all::OP_RETURN;
 use dash_spv_masternode_processor::chain::params::DUFFS;
+use dash_spv_masternode_processor::common::SocketAddress;
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::byte_util::{Random, Reversable};
 use dash_spv_masternode_processor::crypto::UInt256;
@@ -17,7 +18,7 @@ use crate::coinjoin::CoinJoin;
 use crate::coinjoin_client_manager::CoinJoinClientManager;
 use crate::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
 use crate::constants::{COINJOIN_DENOM_OUTPUTS_THRESHOLD, COINJOIN_ENTRY_MAX_SIZE, COINJOIN_QUEUE_TIMEOUT, COINJOIN_SIGNING_TIMEOUT, DEFAULT_COINJOIN_DENOMS_GOAL, DEFAULT_COINJOIN_DENOMS_HARDCAP};
-use crate::messages::{CoinJoinAcceptMessage, CoinJoinEntry, PoolMessage};
+use crate::messages::{CoinJoinAcceptMessage, CoinJoinCompleteMessage, CoinJoinEntry, CoinJoinStatusUpdate, PoolMessage, PoolStatusUpdate};
 use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::reserve_destination::ReserveDestination;
@@ -31,10 +32,10 @@ use crate::utils::key_holder_storage::KeyHolderStorage;
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::utils::transaction_builder::TransactionBuilder;
 use crate::wallet_ex::WalletEx;
-use crate::messages::coinjoin_message::CoinJoinMessage;
+use crate::messages::coinjoin_message::{CoinJoinMessageType, CoinJoinMessage};
 
 pub struct CoinJoinClientSession {
-    id: UInt256,
+    pub id: UInt256,
     coinjoin: Rc<RefCell<CoinJoin>>,
     mixing_wallet: Rc<RefCell<WalletEx>>,
     queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>,
@@ -1285,5 +1286,151 @@ impl CoinJoinClientSession {
                 println!("[RUST] CoinJoin: failed to send to {} CoinJoinEntry: {:?}", mn.socket_address, entry);
             }
         }
+    }
+
+    pub fn process_message(&mut self, peer: &SocketAddress, message: &CoinJoinMessage) -> bool {
+        match message {
+            CoinJoinMessage::StatusUpdate(status_update) => {
+                self.process_status_update(peer, status_update);
+                return false;
+            },
+            CoinJoinMessage::FinalTransaction(final_tx) => {
+                // self.process_final_transaction(peer, final_tx); TODO
+                return false;
+            },
+            CoinJoinMessage::Complete(complete) => {
+                return self.process_complete(peer, complete);
+            }
+        }
+    }
+
+    fn process_status_update(& mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
+        if self.mixing_masternode.is_none() {
+            println!("[RUST] CoinJoin: mixingMasternode is None, ignoring status update");
+            return;
+        }
+
+        if self.mixing_masternode.as_ref().unwrap().socket_address != *peer {
+            return;
+        }
+
+        self.process_pool_state_update(peer, status_update);
+    }
+
+    /// Process Masternode updates about the progress of mixing
+    fn process_pool_state_update(&mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
+        println!("[RUST] CoinJoin: status update received: {:?} from {}", status_update, peer);
+
+        // do not update state when mixing client state is one of these
+        if self.base_session.state == PoolState::Idle || self.base_session.state == PoolState::Error {
+            return;
+        }
+        
+        if status_update.pool_state < PoolState::pool_state_min() || status_update.pool_state > PoolState::pool_state_max() {
+            println!("[RUST] CoinJoin session: statusUpdate.state is out of bounds: {:?}", status_update.pool_state);
+            return;
+        }
+
+        if status_update.message_id < PoolMessage::msg_pool_min() || status_update.message_id > PoolMessage::msg_pool_max() {
+            println!("[RUST] CoinJoin session: statusUpdate.nMessageID is out of bounds: {:?}", status_update.message_id);
+            return;
+        }
+
+        let mut str_message_tmp = CoinJoin::get_message_by_id(status_update.message_id).to_string();
+        self.str_auto_denom_result = format!("Masternode: {}", str_message_tmp);
+
+        match status_update.status_update {
+            PoolStatusUpdate::Rejected => {
+                println!("[RUST] CoinJoin session: rejected by Masternode {}: {}", peer, str_message_tmp);
+                self.base_session.state = PoolState::Error;
+                self.unlock_coins();
+                self.key_holder_storage.return_all();
+
+                match status_update.message_id {
+                    PoolMessage::ErrInvalidCollateral => {
+                        if let Some(collateral) = &self.tx_my_collateral {
+                            println!("[RUST] CoinJoin: collateral invalid: {}", self.coinjoin.borrow().is_collateral_valid(collateral, true));
+                        } else {
+                            println!("[RUST] CoinJoin: collateral invalid, tx_my_collateral is None");
+                        }
+
+                        self.is_my_collateral_valid = false;
+                        self.set_null(); // for now lets disconnect.  TODO(DashJ): Why is the collateral invalid?
+                    },
+                    _ => {
+                        println!("[RUST] CoinJoin: rejected for other reasons");
+                    }
+                }
+                let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                self.base_session.time_last_successful_step = current_time;
+                self.str_last_message = str_message_tmp;
+            },
+            PoolStatusUpdate::Accepted => {
+                if let Some(collateral) = &self.tx_my_collateral {
+                    if self.base_session.state == status_update.pool_state && 
+                        status_update.pool_state == PoolState::Queue && 
+                        self.base_session.session_id == 0 &&
+                        status_update.session_id != 0
+                    {
+                        // new session id should be set only in POOL_STATE_QUEUE state
+                        self.base_session.session_id = status_update.session_id;
+                        self.collateral_session_map.insert(collateral.tx_hash.unwrap(), status_update.session_id);
+                        self.base_session.time_last_successful_step = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                        str_message_tmp = format!("{} Set SID to {}", str_message_tmp, status_update.session_id);
+                        // queueSessionStartedListeners(MSG_SUCCESS); TODO: listeners
+                    }
+
+                    println!("[RUST] CoinJoin: session: accepted by Masternode: {}", str_message_tmp);
+                } else {
+                    println!("[RUST] CoinJoin: collateral accepted but tx_my_collateral is None");
+                }
+            }
+        }
+    }
+
+    fn process_complete(& mut self, peer: &SocketAddress, complete_message: &CoinJoinCompleteMessage) -> bool {
+        if self.mixing_masternode.is_none() {
+            return false;
+        }
+
+        if self.mixing_masternode.as_ref().unwrap().socket_address != *peer {
+            return false;
+        }
+
+        if complete_message.msg_message_id < PoolMessage::msg_pool_min() || complete_message.msg_message_id > PoolMessage::msg_pool_max() {
+            println!("[RUST] CoinJoin DSCOMPLETE: msgID is out of bounds: {:?}", complete_message.msg_message_id);
+            return false;
+        }
+
+        if self.base_session.session_id != complete_message.msg_session_id {
+            println!("[RUST] CoinJoin DSCOMPLETE: message doesn't match current CoinJoin session: SID: {}  msgID: {}  ({})",
+                    self.base_session.session_id, complete_message.msg_session_id, CoinJoin::get_message_by_id(complete_message.msg_message_id));
+            return false;
+        }
+
+        println!("CoinJoin DSCOMPLETE: msgSID {}  msg {:?} ({})", complete_message.msg_session_id,
+                 complete_message.msg_message_id, CoinJoin::get_message_by_id(complete_message.msg_message_id));
+
+
+        return self.completed_transaction(complete_message.msg_message_id);
+    }
+
+    fn completed_transaction(&mut self, message_id: PoolMessage) -> bool {
+        if message_id == PoolMessage::MsgSuccess {
+            println!("[RUST] CoinJoin: completedTransaction -- success");
+            // queueSessionCompleteListeners(getState(), MSG_SUCCESS); TODO
+            self.key_holder_storage.keep_all();
+            return true;
+        } else {
+            println!("[RUST] CoinJoin: completedTransaction -- error");
+            self.key_holder_storage.return_all();
+        }
+
+        self.unlock_coins();
+        self.set_null();
+        self.set_status(PoolStatus::Complete);
+        self.str_last_message = CoinJoin::get_message_by_id(message_id).to_string();
+
+        return false;
     }
 }

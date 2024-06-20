@@ -18,25 +18,9 @@ impl PendingDsaRequest {
         Self { addr, dsa, time_created: SystemTime::now() }
     }
 
-    pub fn get_dsa(&self) -> &CoinJoinAcceptMessage {
-        &self.dsa
-    }
-
-    pub fn get_address(&self) -> &SocketAddress {
-        &self.addr
-    }
-
     pub fn is_expired(&self) -> bool {
         self.time_created.elapsed().unwrap() > TIMEOUT
     }
-
-    // pub fn eq(&self, other: &Self) -> bool {
-    //     self.addr == other.addr && self.dsa == other.dsa
-    // }
-
-    // pub fn bool(&self) -> bool {
-    //     !self.eq(&Self::new())
-    // }
 }
 
 impl std::fmt::Display for PendingDsaRequest {

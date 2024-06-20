@@ -1,5 +1,5 @@
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PoolMessage {
     ErrAlreadyHave = 0,
     ErrDenom = 1,
