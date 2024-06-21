@@ -17,7 +17,7 @@ use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, Co
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
-use dash_spv_masternode_processor::common::SocketAddress;
+use dash_spv_masternode_processor::common::{self, SocketAddress};
 use dash_spv_masternode_processor::consensus::Decodable;
 use ferment_interfaces::{boxed, unbox_any};
 use dash_spv_masternode_processor::crypto::{UInt128, UInt256};
@@ -242,6 +242,7 @@ pub unsafe extern "C" fn process_coinjoin_message(
         "dssu" => CoinJoinMessage::StatusUpdate(process_coinjoin_status_update((*message).ptr, (*message).len)),
         "dsf" => CoinJoinMessage::FinalTransaction(process_coinjoin_final_transaction((*message).ptr, (*message).len)),
         "dsc" => CoinJoinMessage::Complete(process_coinjoin_complete_message((*message).ptr, (*message).len)),
+        "dstx" => CoinJoinMessage::BroadcastTx(process_coinjoin_broadcast_tx((*message).ptr, (*message).len)),
         _ => panic!("Unsupported message type")
     };
 
@@ -251,6 +252,19 @@ pub unsafe extern "C" fn process_coinjoin_message(
     };
     
     (*client_manager).process_message(from_peer, message);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn notify_new_best_block(
+    client_manager: *mut CoinJoinClientManager,
+    block_hash: *mut [u8; 32],
+    block_height: u32
+) {
+    let block = common::Block::new(
+        block_height,
+        UInt256(*(block_hash))
+    );
+    (*client_manager).update_block_tip(block);
 }
 
 unsafe fn process_coinjoin_accept_message(
