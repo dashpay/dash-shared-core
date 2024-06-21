@@ -1298,6 +1298,10 @@ impl CoinJoinClientSession {
                 // self.process_final_transaction(peer, final_tx); TODO
                 return false;
             },
+            CoinJoinMessage::BroadcastTx(broadcast_tx) => {
+                self.coinjoin.borrow_mut().add_dstx(broadcast_tx.clone());
+                return false;
+            },
             CoinJoinMessage::Complete(complete) => {
                 return self.process_complete(peer, complete);
             }
