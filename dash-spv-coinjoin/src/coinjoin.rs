@@ -209,10 +209,6 @@ impl CoinJoin {
         -1 * (input_amount / DUFFS) as i64
     }
 
-    pub fn check_dstxs(&mut self, block: Block) {
-        self.map_dstx.retain(|_, tx| !tx.is_expired(block, self.has_chain_lock, self.opaque_context));
-    }
-
     pub fn add_dstx(&mut self, dstx: CoinJoinBroadcastTx) {
         if let Some(tx_hash) = dstx.tx.tx_hash {
             self.map_dstx.insert(tx_hash, dstx);
@@ -344,5 +340,9 @@ impl CoinJoin {
             (self.destroy_input_value)(input_ptr);
             Some(input_value)
         }
+    }
+
+    fn check_dstxs(&mut self, block: Block) {
+        self.map_dstx.retain(|_, tx| !tx.is_expired(block, self.has_chain_lock, self.opaque_context));
     }
 }
