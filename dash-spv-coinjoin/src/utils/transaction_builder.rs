@@ -159,7 +159,7 @@ impl<'a> TransactionBuilder {
         return false;
     }
 
-    pub fn commit(&mut self, str_result: &mut String) -> bool {
+    pub fn commit(&mut self, str_result: &mut String, is_denominating: bool) -> bool {
         let vec_send: Vec<Recipient> = self.outputs
             .iter()
             .filter(|x| x.script.is_some())
@@ -172,7 +172,7 @@ impl<'a> TransactionBuilder {
 
         println!("[RUST] CoinJoin tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
 
-        if !self.wallet_ex.borrow().commit_transaction(&vec_send) {
+        if !self.wallet_ex.borrow().commit_transaction(&vec_send, is_denominating) {
             println!("[RUST] CoinJoin tx_builder.commit: Failed to commit transaction");
             str_result.push_str("Failed to commit transaction");
             return false;

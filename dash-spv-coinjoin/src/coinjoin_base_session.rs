@@ -45,7 +45,7 @@ impl CoinJoinBaseSession {
         }
     }
 
-    pub fn is_valid_in_outs(&self, vin: Vec<TransactionInput>, vout: Vec<TransactionOutput>) -> ValidInOuts {
+    pub fn is_valid_in_outs(&self, vin: &Vec<TransactionInput>, vout: &Vec<TransactionOutput>) -> ValidInOuts {
         let mut set_scrip_pub_keys = HashSet::new();
         let mut result = ValidInOuts::new();
         
