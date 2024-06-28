@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -18,7 +19,7 @@ use crate::coinjoin::CoinJoin;
 use crate::coinjoin_client_manager::CoinJoinClientManager;
 use crate::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
 use crate::constants::{COINJOIN_DENOM_OUTPUTS_THRESHOLD, COINJOIN_ENTRY_MAX_SIZE, COINJOIN_QUEUE_TIMEOUT, COINJOIN_SIGNING_TIMEOUT, DEFAULT_COINJOIN_DENOMS_GOAL, DEFAULT_COINJOIN_DENOMS_HARDCAP};
-use crate::messages::{CoinJoinAcceptMessage, CoinJoinCompleteMessage, CoinJoinEntry, CoinJoinStatusUpdate, PoolMessage, PoolStatusUpdate};
+use crate::messages::{CoinJoinAcceptMessage, CoinJoinCompleteMessage, CoinJoinEntry, CoinJoinFinalTransaction, CoinJoinSignedInputs, CoinJoinStatusUpdate, PoolMessage, PoolStatusUpdate};
 use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::reserve_destination::ReserveDestination;
@@ -297,7 +298,7 @@ impl CoinJoinClientSession {
             self.base_session.time_last_successful_step = current_time;
             let mut buffer = vec![];
             pending_request.dsa.consensus_encode(&mut buffer).unwrap();
-            let sent_message = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), pending_request.addr);
+            let sent_message = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr);
             println!("[RUST] CoinJoin: sending {:?} to {}", pending_request.dsa, pending_request.addr);
 
             if sent_message {
@@ -351,7 +352,7 @@ impl CoinJoinClientSession {
     }
 
     fn create_denominated_with_item(
-        &mut self, 
+        &mut self,
         client_manager: &mut CoinJoinClientManager,
         tally_item: &CompactTallyItem, 
         balance_to_denominate: u64, 
@@ -562,7 +563,7 @@ impl CoinJoinClientSession {
         if !dry_run {
             let mut str_result = String::new();
             
-            if !tx_builder.commit(&mut str_result) {
+            if !tx_builder.commit(&mut str_result, true) {
                 println!("[RUST] CoinJoinClientSession -- 4 - Commit failed: {}\n", str_result);
                 return false;
             }
@@ -715,7 +716,7 @@ impl CoinJoinClientSession {
 
         let mut str_result = String::new();
 
-        if !tx_builder.commit(&mut str_result) {
+        if !tx_builder.commit(&mut str_result, false) {
             println!("[RUST] CoinJoin: Commit failed: {}", str_result);
             return false;
         }
@@ -888,10 +889,7 @@ impl CoinJoinClientSession {
             );
         }
 
-        println!("[RUST] CoinJoin before signing: {:?}", tx_collateral);
         if let Some(signed_tx) = self.mixing_wallet.borrow().sign_transaction(&tx_collateral) {
-            println!("[RUST] CoinJoin after signing: {:?}", signed_tx);
-
             if let Some(tx_id) = signed_tx.tx_hash {
                 self.tx_my_collateral = Some(signed_tx);
                 self.is_my_collateral_valid = true;
@@ -1282,7 +1280,7 @@ impl CoinJoinClientSession {
             let mut buffer = vec![];
             entry.consensus_encode(&mut buffer).unwrap();
 
-            if !self.mixing_wallet.borrow_mut().send_message(buffer, entry.get_message_type(), mn.socket_address) {
+            if !self.mixing_wallet.borrow_mut().send_message(buffer, entry.get_message_type(), &mn.socket_address) {
                 println!("[RUST] CoinJoin: failed to send to {} CoinJoinEntry: {:?}", mn.socket_address, entry);
             }
         }
@@ -1295,20 +1293,17 @@ impl CoinJoinClientSession {
                 return false;
             },
             CoinJoinMessage::FinalTransaction(final_tx) => {
-                // self.process_final_transaction(peer, final_tx); TODO
-                return false;
-            },
-            CoinJoinMessage::BroadcastTx(broadcast_tx) => {
-                self.coinjoin.borrow_mut().add_dstx(broadcast_tx.clone());
+                self.process_final_transaction(peer, final_tx);
                 return false;
             },
             CoinJoinMessage::Complete(complete) => {
                 return self.process_complete(peer, complete);
-            }
+            },
+            _ => { return false }
         }
     }
 
-    fn process_status_update(& mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
+    fn process_status_update(&mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
         if self.mixing_masternode.is_none() {
             println!("[RUST] CoinJoin: mixingMasternode is None, ignoring status update");
             return;
@@ -1436,5 +1431,166 @@ impl CoinJoinClientSession {
         self.str_last_message = CoinJoin::get_message_by_id(message_id).to_string();
 
         return false;
+    }
+
+    fn process_final_transaction(&mut self, peer: &SocketAddress, final_tx: &CoinJoinFinalTransaction) {
+        if self.mixing_masternode.is_none() {
+            return;
+        }
+
+        if self.mixing_masternode.as_ref().unwrap().socket_address != *peer {
+            return;
+        }
+
+        if self.base_session.session_id != final_tx.msg_session_id {
+            println!("[RUST] CoinJoin DSFINALTX: message doesn't match current CoinJoin session: sessionID: {}  msgSessionID: {}",
+                    self.base_session.session_id, final_tx.msg_session_id);
+            return;
+        }
+
+        println!("[RUST] CoinJoin DSFINALTX: txNew {:?}", final_tx.tx); /* Continued */
+
+        // check to see if input is spent already? (and probably not confirmed)
+        self.sign_final_transaction(&final_tx.tx, peer);
+    }
+
+    /// As a client, check and sign the final transaction
+    fn sign_final_transaction(&mut self, final_transaction_new: &Transaction, peer: &SocketAddress) {
+        if !self.options.enable_coinjoin {
+            return;
+        }
+
+        if self.mixing_masternode.is_none() {
+            return;
+        }
+
+        let mut final_mutable_transaction = final_transaction_new.clone();
+        // TODO: DashJ has a lot of code here to connect inputs, might be not nessesary in our case
+        println!("[RUST] CoinJoin: finalMutableTx {:?}", final_mutable_transaction);
+
+        // STEP 1: check final transaction general rules
+
+        // Make sure it's BIP69 compliant
+        final_mutable_transaction.inputs.sort_by(Self::compare_input_bip69);
+        final_mutable_transaction.outputs.sort_by(Self::compare_output_bip69);
+
+        if UInt256::sha256d(final_mutable_transaction.to_data()) != UInt256::sha256d(final_transaction_new.to_data()) {
+            println!("[RUST] CoinJoin: ERROR! Masternode {} is not BIP69 compliant!", self.mixing_masternode.as_ref().unwrap().provider_registration_transaction_hash);
+            self.unlock_coins();
+            self.key_holder_storage.return_all();
+            self.set_null();
+            return;
+        }
+
+        // Make sure all inputs/outputs are valid
+        let is_valid_ins_outs = self.base_session.is_valid_in_outs(&final_mutable_transaction.inputs, &final_mutable_transaction.outputs);
+
+        if !is_valid_ins_outs.result {
+            println!("[RUST] CoinJoin: ERROR! IsValidInOuts() failed: {}", CoinJoin::get_message_by_id(is_valid_ins_outs.message_id));
+            self.unlock_coins();
+            self.key_holder_storage.return_all();
+            self.set_null();
+            return;
+        }
+
+        // STEP 2: make sure our own inputs/outputs are present, otherwise refuse to sign
+        let mut coins = vec![];
+
+        for entry in &self.base_session.entries {
+            // Check that the final transaction has all our outputs
+            for txout in &entry.mixing_outputs {
+                let found = final_mutable_transaction.outputs.iter().any(|txout_final| 
+                    txout_final.amount == txout.amount && txout_final.script == txout.script
+                );
+                
+                if !found {
+                    // Something went wrong and we'll refuse to sign. It's possible we'll be charged collateral. But that's
+                    // better than signing if the transaction doesn't look like what we wanted.
+                    println!("[RUST] CoinJoin: an output is missing, refusing to sign! txout={:?}", txout);
+                    self.unlock_coins();
+                    self.key_holder_storage.return_all();
+                    self.set_null();
+                    return;
+                }
+            }
+        
+            for txin in &entry.mixing_inputs {
+                /* Sign my transaction and all outputs */
+                let mut my_input_index: Option<usize> = None;
+
+                for (i, txin_final) in final_mutable_transaction.inputs.iter().enumerate() {
+                    if txin_final.input_hash == txin.input_hash && txin_final.index == txin.index {
+                        my_input_index = Some(i);
+                        break;
+                    }
+                }
+
+                if let Some(index) = my_input_index {
+                    println!("[RUST] CoinJoin: found my input {}", index);
+                    // add a pair with an empty value
+                    coins.push(final_mutable_transaction.inputs[index].clone());
+                } else {
+                    // Can't find one of my own inputs, refuse to sign. It's possible we'll be charged collateral. But that's
+                    // better than signing if the transaction doesn't look like what we wanted.
+                    println!("[RUST] CoinJoin: missing input! txdsin={:?}", txin);
+                    self.unlock_coins();
+                    self.key_holder_storage.return_all();
+                    self.set_null();
+                    return;
+                }
+            }
+        }
+
+        // TODO: ANYONE_CAN_SPEND
+        let signed_tx = self.mixing_wallet.borrow_mut().sign_transaction(&final_mutable_transaction);
+
+        if let Some(tx) = signed_tx {
+            let mut signed_inputs = vec![];
+            
+            for txin in &tx.inputs {
+                if coins.iter().any(|coin| coin.input_hash == txin.input_hash && coin.index == txin.index) {
+                    signed_inputs.push(txin.clone());
+                }
+            }
+
+            if signed_inputs.is_empty() {
+                println!("[RUST] CoinJoin: can't sign anything!");
+                self.unlock_coins();
+                self.key_holder_storage.return_all();
+                self.set_null();
+                return;
+            }
+
+            // push all of our signatures to the Masternode
+            println!("[RUST] CoinJoin: pushing signed inputs to the masternode, finalMutableTransaction={:?}", final_mutable_transaction);
+            let message = CoinJoinSignedInputs {
+                inputs: signed_inputs
+            };
+            let mut buffer = vec![];
+            message.consensus_encode(&mut buffer).unwrap();
+            self.mixing_wallet.borrow_mut().send_message(buffer, message.get_message_type(), peer);
+            self.base_session.state = PoolState::Signing;
+            self.base_session.time_last_successful_step = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        } else {
+            println!("[RUST] CoinJoin: sign_transaction returned false for the tx");
+        }
+    }
+
+    fn compare_input_bip69(a: &TransactionInput, b: &TransactionInput) -> Ordering {
+        if a.input_hash == b.input_hash {
+            return a.index.cmp(&b.index);
+        }
+    
+        let rev_hash_a: Vec<u8> = a.input_hash.reversed().0.to_vec();
+        let rev_hash_b: Vec<u8> = b.input_hash.reversed().0.to_vec();
+        
+        rev_hash_a.cmp(&rev_hash_b)
+    }
+    
+    fn compare_output_bip69(a: &TransactionOutput, b: &TransactionOutput) -> Ordering {
+        match a.amount.cmp(&b.amount) {
+            Ordering::Equal => a.script.cmp(&b.script),
+            other => other,
+        }
     }
 }
