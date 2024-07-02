@@ -563,7 +563,7 @@ impl CoinJoinClientSession {
         if !dry_run {
             let mut str_result = String::new();
             
-            if !tx_builder.commit(&mut str_result, true) {
+            if !tx_builder.commit(&mut str_result, true, self.id) {
                 println!("[RUST] CoinJoinClientSession -- 4 - Commit failed: {}\n", str_result);
                 return false;
             }
@@ -716,7 +716,7 @@ impl CoinJoinClientSession {
 
         let mut str_result = String::new();
 
-        if !tx_builder.commit(&mut str_result, false) {
+        if !tx_builder.commit(&mut str_result, false, self.id) {
             println!("[RUST] CoinJoin: Commit failed: {}", str_result);
             return false;
         }

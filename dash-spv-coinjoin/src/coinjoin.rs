@@ -14,7 +14,6 @@ use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
-use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
 // #[ferment_macro::export]

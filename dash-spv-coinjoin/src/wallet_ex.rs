@@ -414,18 +414,18 @@ impl WalletEx {
         }
     }
 
-    pub fn commit_transaction(&self, vec_send: &Vec<Recipient>, is_denominating: bool) -> bool {
+    pub fn commit_transaction(&self, vec_send: &Vec<Recipient>, is_denominating: bool, client_session_id: UInt256) -> bool {
         let result: bool;
 
         unsafe {
-            let boxed = boxed_vec(
+            let boxed_vec = boxed_vec(
                 vec_send
                     .iter()
                     .map(|input| boxed((*input).clone()))
                     .collect()
             );
-            result = (self.commit_transaction)(boxed, vec_send.len(), is_denominating, self.context);
-            let vec = unbox_vec_ptr(boxed, vec_send.len());
+            result = (self.commit_transaction)(boxed_vec, vec_send.len(), is_denominating, boxed(client_session_id.0), self.context);
+            let vec = unbox_vec_ptr(boxed_vec, vec_send.len());
             unbox_any_vec(vec);
         }
 
