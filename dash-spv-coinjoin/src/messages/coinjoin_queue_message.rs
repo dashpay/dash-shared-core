@@ -1,6 +1,6 @@
 use std::io::{Error, Read, Write};
 use dash_spv_masternode_processor::consensus::encode::VarInt;
-use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable, UInt256};
+use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, UInt256};
 use dash_spv_masternode_processor::consensus::{encode, Encodable};
 use dash_spv_masternode_processor::crypto::UInt768;
 use dash_spv_masternode_processor::hashes::hex::ToHex;

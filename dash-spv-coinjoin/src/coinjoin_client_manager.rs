@@ -235,12 +235,15 @@ impl CoinJoinClientManager {
         return false;
     }
     
-    pub fn finish_automatic_denominating(&mut self) -> bool {
-        if let Some(mut session) = self.deq_sessions.pop_back() {
-            session.finish_automatic_denominating(self);
-            self.deq_sessions.push_back(session);
+    pub fn finish_automatic_denominating(&mut self, client_session_id: UInt256) -> bool {
+        while let Some(mut session) = self.deq_sessions.pop_back() {
+            if session.id == client_session_id {
+                session.finish_automatic_denominating(self);
+                self.deq_sessions.push_back(session);
+                return true;
+            }
 
-            return true
+            self.deq_sessions.push_back(session);
         }
 
         return false;

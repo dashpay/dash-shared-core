@@ -141,10 +141,11 @@ pub unsafe extern "C" fn run_client_manager( // TODO: temp method for testing
 
 #[no_mangle]
 pub unsafe extern "C" fn finish_automatic_denominating(
-    manager: *mut CoinJoinClientManager
+    manager: *mut CoinJoinClientManager,
+    client_session_id: *mut [u8; 32]
 ) -> bool {
     println!("[RUST] CoinJoin: session.finish_automatic_denominating");
-    return (*manager).finish_automatic_denominating();
+    return (*manager).finish_automatic_denominating(UInt256(*(client_session_id)));
 }
 
 #[no_mangle]
