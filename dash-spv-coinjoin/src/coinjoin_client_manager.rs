@@ -1,5 +1,5 @@
 use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::from::FromFFI, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
-use std::{cell::RefCell, collections::{HashSet, VecDeque}, ffi::c_void, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
 
 use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
@@ -10,7 +10,9 @@ pub struct CoinJoinClientManager {
     coinjoin: Rc<RefCell<CoinJoin>>,
     pub queue_queue_manager: Option<Rc<RefCell<CoinJoinClientQueueManager>>>,
     options: CoinJoinClientOptions,
-    masternodes_used: HashSet<UInt256>,
+    masternodes_used: Vec<UInt256>,
+    last_masternode_used: usize,
+    last_time_report_too_recent: u64,
     cached_last_success_block: i32,
     cached_block_height: i32, // Keep track of current block height
     tick: i32,
@@ -40,7 +42,9 @@ impl CoinJoinClientManager {
             coinjoin,
             queue_queue_manager: None,
             options,
-            masternodes_used: HashSet::new(),
+            masternodes_used: vec![],
+            last_masternode_used: 0,
+            last_time_report_too_recent: 0,
             cached_last_success_block: 0,
             cached_block_height: 0,
             tick: 0,
@@ -70,7 +74,9 @@ impl CoinJoinClientManager {
             return;
         }
 
-        // if message.is_status_update() || message.is_final_transaction() || message.is_complete() { // TODO: add a check if other types added
+        if let CoinJoinMessage::BroadcastTx(broadcast_tx) = message {
+            self.coinjoin.borrow_mut().add_dstx(broadcast_tx.clone());
+        } else {
             let mut update_success_block = false;
 
             for session in &mut self.deq_sessions {
@@ -80,7 +86,7 @@ impl CoinJoinClientManager {
             if update_success_block {
                 self.updated_success_block();
             }
-        // }
+        }
     }
 
     pub fn start_mixing(&mut self) -> bool {
@@ -145,32 +151,106 @@ impl CoinJoinClientManager {
     }
 
     pub fn do_automatic_denominating(&mut self, balance_info: Balance, dry_run: bool) -> bool {
-        // TODO: finish method
-
-        if let Some(queue_manager) = &self.queue_queue_manager {    
-            let mut session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone(), queue_manager.clone());
-            let result = session.do_automatic_denominating(self, dry_run, balance_info);
-            self.deq_sessions.push_back(session);
-            
-            return result;
-        } else {
+        if !self.options.enable_coinjoin || (!dry_run && !self.is_mixing) {
             return false;
         }
+
+        if !self.wallet_ex.borrow().is_synced() {
+            println!("[RUST] CoinJoin: wallet is not synced.");
+            self.str_auto_denom_result = "Wallet is not synced.".to_string();
+            return false;
+        }
+
+        // TODO: recheck
+        // if (!dryRun && mixingWallet.isEncrypted() && context.coinJoinManager.requestKeyParameter(mixingWallet) == null) {
+        //     strAutoDenomResult = "Wallet is locked.";
+        //     return false;
+        // }
+
+        let mn_count_enabled = self.get_valid_mns_count(&self.get_mn_list());
+
+        // If we've used 90% of the Masternode list then drop the oldest first ~30%
+        let threshold_high = (mn_count_enabled as f64 * 0.9) as usize;
+        let threshold_low = (threshold_high as f64 * 0.7) as usize;
+
+        if !self.is_waiting_for_new_block() {
+            if self.masternodes_used.len() != self.last_masternode_used {
+                println!("[RUST] CoinJoin: Checking masternodesUsed: size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
+                self.last_masternode_used = self.masternodes_used.len();
+            }
+        }
+
+        if self.masternodes_used.len() > threshold_high {
+            // remove the first masternodesUsed.size() - thresholdLow masternodes
+            // this might be a problem for SPV
+            self.masternodes_used.drain(0..(self.masternodes_used.len() - threshold_low));
+            println!("[RUST] CoinJoin: masternodesUsed: new size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
+        }
+
+        if let Some(queue_manager) = &self.queue_queue_manager {    
+            let mut result = true;
+
+            if self.deq_sessions.len() < self.options.coinjoin_sessions as usize {
+                let new_session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone(), queue_manager.clone());
+                println!("[RUST] CoinJoin: creating new session: {}: ", new_session.id);
+
+                // TODO:
+                // for (ListenerRegistration<SessionCompleteListener> listener : sessionCompleteListeners) {
+                //     newSession.addSessionCompleteListener(listener.executor, listener.listener);
+                // }
+                // for (ListenerRegistration<SessionStartedListener> listener : sessionStartedListeners) {
+                //     newSession.addSessionStartedListener(listener.executor, listener.listener);
+                // }
+                // for (ListenerRegistration<CoinJoinTransactionListener> listener : transactionListeners) {
+                //     newSession.addTransationListener (listener.executor, listener.listener);
+                // }
+
+                self.deq_sessions.push_back(new_session);
+            }
+
+            while let Some(mut session) = self.deq_sessions.pop_back() {
+                 //     if (!checkAutomaticBackup()) return false;
+
+                // we may not need this
+                if !dry_run && self.is_waiting_for_new_block() {
+                    let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                            
+                    if current_time - self.last_time_report_too_recent > 15_000 {
+                        self.str_auto_denom_result = "Last successful action was too recent.".to_string();
+                        println!("[RUST] CoinJoin do_automatic_denominating {}", self.str_auto_denom_result);
+                        self.last_time_report_too_recent = current_time;
+                    }
+                            
+                    self.deq_sessions.push_back(session);
+                    return false;
+                }
+                
+                result &= session.do_automatic_denominating(self, dry_run, balance_info.clone());
+                self.deq_sessions.push_back(session);
+            }
+
+            return result;
+        }
+
+        return false;
     }
     
-    pub fn finish_automatic_denominating(&mut self) -> bool {
-        if let Some(mut session) = self.deq_sessions.pop_back() {
-            session.finish_automatic_denominating(self);
-            self.deq_sessions.push_back(session);
+    pub fn finish_automatic_denominating(&mut self, client_session_id: UInt256) -> bool {
+        while let Some(mut session) = self.deq_sessions.pop_back() {
+            if session.id == client_session_id {
+                session.finish_automatic_denominating(self);
+                self.deq_sessions.push_back(session);
+                return true;
+            }
 
-            return true
+            self.deq_sessions.push_back(session);
         }
 
         return false;
     }
 
     pub fn add_used_masternode(&mut self, pro_tx_hash: UInt256) {
-        self.masternodes_used.insert(pro_tx_hash);
+        self.masternodes_used.push(pro_tx_hash);
     }
 
     pub fn get_random_not_used_masternode(&self) -> Option<MasternodeEntry> {
@@ -322,7 +402,7 @@ impl CoinJoinClientManager {
         println!("[RUST] CoinJoin: trigger_mixing_finished");
         if self.stop_on_nothing_to_do {
             self.mixing_finished = true;
-            // self.queue_mixing_complete_listeners();
+            // TODO: self.queue_mixing_complete_listeners();
         }
     }
 }

@@ -3,7 +3,7 @@ use crate::messages::pool_message::PoolMessage;
 pub struct ValidInOuts {
     pub result: bool,
     pub message_id: PoolMessage,
-    pub consume_collateral: bool,
+    pub consume_collateral: bool
 }
 
 impl ValidInOuts {

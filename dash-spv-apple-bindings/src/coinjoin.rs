@@ -141,10 +141,11 @@ pub unsafe extern "C" fn run_client_manager( // TODO: temp method for testing
 
 #[no_mangle]
 pub unsafe extern "C" fn finish_automatic_denominating(
-    manager: *mut CoinJoinClientManager
+    manager: *mut CoinJoinClientManager,
+    client_session_id: *mut [u8; 32]
 ) -> bool {
     println!("[RUST] CoinJoin: session.finish_automatic_denominating");
-    return (*manager).finish_automatic_denominating();
+    return (*manager).finish_automatic_denominating(UInt256(*(client_session_id)));
 }
 
 #[no_mangle]
@@ -324,18 +325,6 @@ unsafe fn process_coinjoin_queue_message(
     let mut cursor = Cursor::new(message);
     
     return messages::CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn process_coinjoin_signed_inputs(
-    message: *const u8,
-    message_length: usize
-) -> *mut messages::CoinJoinSignedInputs {
-    let message: &[u8] = slice::from_raw_parts(message, message_length);
-    let mut cursor = Cursor::new(message);
-    let result = messages::CoinJoinSignedInputs::consensus_decode(&mut cursor).unwrap();
-
-    boxed(result)
 }
 
 unsafe fn process_coinjoin_status_update(

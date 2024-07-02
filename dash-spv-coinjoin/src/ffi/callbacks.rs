@@ -81,6 +81,8 @@ pub type FreshCoinJoinAddress = unsafe extern "C" fn(
 pub type CommitTransaction = unsafe extern "C" fn(
     items: *mut *mut Recipient,
     item_count: usize,
+    is_denominating: bool,
+    client_session_id: *mut [u8; 32],
     context: *const c_void
 ) -> bool;
 

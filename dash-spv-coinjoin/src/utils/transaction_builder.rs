@@ -5,6 +5,7 @@ use std::rc::Rc;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::TX_MIN_OUTPUT_AMOUNT;
 use dash_spv_masternode_processor::consensus::Encodable;
+use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput, TransactionOutput, TransactionType};
 use dash_spv_masternode_processor::util::data_append::DataAppend;
@@ -159,7 +160,7 @@ impl<'a> TransactionBuilder {
         return false;
     }
 
-    pub fn commit(&mut self, str_result: &mut String) -> bool {
+    pub fn commit(&mut self, str_result: &mut String, is_denominating: bool, client_session_id: UInt256) -> bool {
         let vec_send: Vec<Recipient> = self.outputs
             .iter()
             .filter(|x| x.script.is_some())
@@ -172,7 +173,7 @@ impl<'a> TransactionBuilder {
 
         println!("[RUST] CoinJoin tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
 
-        if !self.wallet_ex.borrow().commit_transaction(&vec_send) {
+        if !self.wallet_ex.borrow().commit_transaction(&vec_send, is_denominating, client_session_id) {
             println!("[RUST] CoinJoin tx_builder.commit: Failed to commit transaction");
             str_result.push_str("Failed to commit transaction");
             return false;
