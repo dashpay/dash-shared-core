@@ -128,6 +128,7 @@ pub type SendMessage = unsafe extern "C" fn(
     message: *mut ByteArray,
     ip_address: *mut [u8; 16],
     port: u16,
+    warn: bool,
     context: *const c_void
 ) -> bool;
 
@@ -136,3 +137,7 @@ pub type AddPendingMasternode = unsafe extern "C" fn(
     session_id: *mut [u8; 32],
     context: *const c_void
 ) -> bool;
+
+pub type StartManagerAsync = unsafe extern "C" fn(
+    context: *const c_void
+);

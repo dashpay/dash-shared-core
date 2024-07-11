@@ -13,7 +13,7 @@ use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
 use dash_spv_coinjoin::{ffi, messages};
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, ValidMasternodeCount};
+use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync, ValidMasternodeCount};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -45,7 +45,8 @@ pub unsafe extern "C" fn register_wallet_ex(
     is_masternode_or_disconnect_requested: IsMasternodeOrDisconnectRequested,
     disconnect_masternode: DisconnectMasternode,
     send_message: SendMessage,
-    add_pending_masternode: AddPendingMasternode
+    add_pending_masternode: AddPendingMasternode,
+    start_manager_async: StartManagerAsync
 ) -> *mut WalletEx {
     let wallet_ex =  WalletEx::new(
         context, 
@@ -65,7 +66,8 @@ pub unsafe extern "C" fn register_wallet_ex(
         is_masternode_or_disconnect_requested,
         disconnect_masternode,
         send_message,
-        add_pending_masternode
+        add_pending_masternode,
+        start_manager_async
     );
 
     println!("[RUST] CoinJoin: register_wallet_ex");
@@ -129,12 +131,35 @@ pub unsafe extern "C" fn add_client_queue_manager(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn run_client_manager( // TODO: temp method for testing
+pub unsafe extern "C" fn start_mixing(
+    client_manager: *mut CoinJoinClientManager
+) -> bool {
+    return (*client_manager).start_mixing();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_stop_on_nothing_to_do(
+    client_manager: *mut CoinJoinClientManager,
+    stop_on_nothing_to_do: bool
+) {
+    (*client_manager).set_stop_on_nothing_to_do(stop_on_nothing_to_do);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn do_maintenance(
     client_manager: *mut CoinJoinClientManager,
     balance_info: Balance
 ) {
-    (*client_manager).start_mixing();
     (*client_manager).do_maintenance(balance_info);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn do_automatic_denominating(
+    client_manager: *mut CoinJoinClientManager,
+    balance_info: Balance,
+    dry_run: bool
+) -> bool {
+    return (*client_manager).do_automatic_denominating(balance_info, dry_run);
 }
 
 #[no_mangle]
@@ -242,7 +267,7 @@ pub unsafe extern "C" fn process_coinjoin_message(
         "dsf" => CoinJoinMessage::FinalTransaction(process_coinjoin_final_transaction((*message).ptr, (*message).len)),
         "dsc" => CoinJoinMessage::Complete(process_coinjoin_complete_message((*message).ptr, (*message).len)),
         "dstx" => CoinJoinMessage::BroadcastTx(process_coinjoin_broadcast_tx((*message).ptr, (*message).len)),
-        _ => panic!("Unsupported message type")
+        _ => panic!("CoinJoin: Unsupported message type")
     };
 
     let from_peer = SocketAddress {
