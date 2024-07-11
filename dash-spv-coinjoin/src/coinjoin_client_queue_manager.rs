@@ -66,6 +66,7 @@ impl CoinJoinClientQueueManager {
     }
 
     pub fn process_ds_queue(&mut self, from_peer: SocketAddress, mut dsq: CoinJoinQueueMessage) {
+        println!("[RUST] CoinJoin: process_ds_queue");
         let mut client_manager = self.coinjoin_client_manager.borrow_mut();
 
         // process every dsq only once
@@ -134,14 +135,6 @@ impl CoinJoinClientQueueManager {
     }
 
     pub fn do_maintenance(&mut self) {
-        if !self.coinjoin_options.enable_coinjoin {
-            return;
-        }
-
-        if !self.is_synced() {
-            return;
-        }
-
         self.check_queue();
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         self.spamming_masternodes.retain(|_, v| (*v + COINJOIN_QUEUE_TIMEOUT as u64) > current_time);

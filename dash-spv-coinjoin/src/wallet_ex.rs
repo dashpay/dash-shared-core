@@ -1,4 +1,5 @@
 use std::collections::{HashSet, HashMap};
+use std::ffi::CString;
 use std::slice;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::common::SocketAddress;
@@ -19,7 +20,7 @@ use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
-use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction};
+use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
@@ -58,7 +59,8 @@ pub struct WalletEx {
     disconnect_masternode: DisconnectMasternode,
     is_synced: IsBlockchainSynced,
     send_message: SendMessage,
-    add_pending_masternode: AddPendingMasternode
+    add_pending_masternode: AddPendingMasternode,
+    start_manager_async: StartManagerAsync
 }
 
 impl WalletEx {
@@ -81,7 +83,7 @@ impl WalletEx {
         disconnect_masternode: DisconnectMasternode,
         send_message: SendMessage,
         add_pending_masternode: AddPendingMasternode,
-
+        start_manager_async: StartManagerAsync
     ) -> Self {
         WalletEx {
             context,
@@ -110,7 +112,8 @@ impl WalletEx {
             disconnect_masternode,
             is_synced,
             send_message,
-            add_pending_masternode
+            add_pending_masternode,
+            start_manager_async
         }
     }
 
@@ -545,9 +548,27 @@ impl WalletEx {
         unsafe { return (self.is_synced)(self.context); }
     }
 
-    pub fn send_message(&mut self, message: Vec<u8>, msg_type: String, address: &SocketAddress) -> bool {
-        // TODO: free address and message?
-        return unsafe { (self.send_message)(msg_type.to_c_string_ptr(), boxed(ByteArray::from(message)), boxed(address.ip_address.0), address.port, self.context) };
+    pub fn send_message(&mut self, message: Vec<u8>, msg_type: String, address: &SocketAddress, warn: bool) -> bool {
+        return unsafe {
+            let message_type = msg_type.to_c_string_ptr();
+            let boxed_ip = boxed(address.ip_address.0);
+            let boxed_message = boxed(ByteArray::from(message));
+            let result = (self.send_message)(
+                message_type,
+                boxed_message,
+                boxed_ip,
+                address.port, 
+                warn, 
+                self.context
+            );
+
+            let _ = CString::from_raw(message_type);
+            unbox_any(boxed_ip);
+            let msg = unbox_any(boxed_message);
+            let _ = Vec::from_raw_parts(msg.ptr as *mut u8, msg.len, msg.len);
+            
+            result
+        };
     }
 
     pub fn add_pending_masternode(&mut self, pro_tx_hash: UInt256, session_id: UInt256) -> bool {
@@ -562,6 +583,10 @@ impl WalletEx {
 
             result
         };
+    }
+
+    pub fn start_manager_async(&self) {
+        unsafe { (self.start_manager_async)(self.context); }
     }
 
     fn clear_anonymizable_caches(&mut self) {

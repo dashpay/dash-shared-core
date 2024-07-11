@@ -66,6 +66,8 @@ impl CoinJoinClientManager {
     }
 
     pub fn process_message(&mut self, from: SocketAddress, message: CoinJoinMessage) {
+        println!("[RUST] CoinJoin: process_message");
+
         if !self.options.enable_coinjoin {
             return;
         }
@@ -100,6 +102,10 @@ impl CoinJoinClientManager {
         return false;
     }
 
+    pub fn set_stop_on_nothing_to_do(&mut self, stop: bool) {
+        self.stop_on_nothing_to_do = stop;
+    }
+
     pub fn stop_mixing(&mut self) {
         self.is_mixing = false;
     }
@@ -113,6 +119,10 @@ impl CoinJoinClientManager {
         if !self.wallet_ex.borrow().is_synced() {
             println!("[RUST] CoinJoin: not synced");
             return;
+        }
+
+        if let Some(queue_manager) = &self.queue_queue_manager {
+            queue_manager.borrow_mut().do_maintenance();
         }
 
         println!("[RUST] CoinJoin: proceed with do_maintenance");
@@ -187,7 +197,7 @@ impl CoinJoinClientManager {
             println!("[RUST] CoinJoin: masternodesUsed: new size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
         }
 
-        if let Some(queue_manager) = &self.queue_queue_manager {    
+        if let Some(queue_manager) = &self.queue_queue_manager {  
             let mut result = true;
 
             if self.deq_sessions.len() < self.options.coinjoin_sessions as usize {
