@@ -298,7 +298,7 @@ impl CoinJoinClientSession {
             self.base_session.time_last_successful_step = current_time;
             let mut buffer = vec![];
             pending_request.dsa.consensus_encode(&mut buffer).unwrap();
-            let sent_message = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr);
+            let sent_message = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr, false);
             println!("[RUST] CoinJoin: sending {:?} to {}", pending_request.dsa, pending_request.addr);
 
             if sent_message {
@@ -1055,7 +1055,7 @@ impl CoinJoinClientSession {
                     self.base_session.time_last_successful_step = current_time;
                     println!("[RUST] CoinJoin: start new queue -> pending connection, sessionDenom: {} ({}), addr={}",
                             self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
-                    // coinjoin_manager.start_async(); TODO
+                    self.mixing_wallet.borrow_mut().start_manager_async();
                     self.set_status(PoolStatus::Connecting);
                     self.joined = false;
                     
@@ -1280,7 +1280,7 @@ impl CoinJoinClientSession {
             let mut buffer = vec![];
             entry.consensus_encode(&mut buffer).unwrap();
 
-            if !self.mixing_wallet.borrow_mut().send_message(buffer, entry.get_message_type(), &mn.socket_address) {
+            if !self.mixing_wallet.borrow_mut().send_message(buffer, entry.get_message_type(), &mn.socket_address, true) {
                 println!("[RUST] CoinJoin: failed to send to {} CoinJoinEntry: {:?}", mn.socket_address, entry);
             }
         }
@@ -1568,7 +1568,7 @@ impl CoinJoinClientSession {
             };
             let mut buffer = vec![];
             message.consensus_encode(&mut buffer).unwrap();
-            self.mixing_wallet.borrow_mut().send_message(buffer, message.get_message_type(), peer);
+            self.mixing_wallet.borrow_mut().send_message(buffer, message.get_message_type(), peer, true);
             self.base_session.state = PoolState::Signing;
             self.base_session.time_last_successful_step = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         } else {
