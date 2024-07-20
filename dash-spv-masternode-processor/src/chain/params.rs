@@ -80,6 +80,7 @@ impl ScriptMap {
 }
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::export]
 pub struct BIP32ScriptMap {
     pub xprv: [u8; 4],
     pub xpub: [u8; 4],
@@ -92,6 +93,7 @@ impl BIP32ScriptMap {
 
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::export]
 pub struct DIP14ScriptMap {
     pub dps: [u8; 4],
     pub dpp: [u8; 4],
@@ -106,6 +108,7 @@ impl DIP14ScriptMap {
 // pub struct Script
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::export]
 pub struct SporkParams {
     pub public_key_hex_string: Option<String>,
     pub private_key_base58_string: Option<String>,
@@ -113,6 +116,7 @@ pub struct SporkParams {
 }
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::export]
 pub struct Params {
     pub chain_type: ChainType,
     /// Mining and Dark Gravity Wave Parameters

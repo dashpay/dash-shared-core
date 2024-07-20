@@ -1,11 +1,10 @@
-use std::ffi::CString;
 use std::os::raw::c_char;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::byte_util::{ConstDecodable, UInt256};
-use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache};
+use dash_spv_masternode_processor::processing::MasternodeProcessorCache;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetCLSignatureByBlockHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveCLSignature, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi_core_provider::FFICoreProvider;
-use crate::types;
+// use crate::types;
 
 
 // /// Initializes logger (it could be initialize only once)
@@ -44,10 +43,8 @@ use crate::types;
 //     }
 // }
 
-/// Register all the callbacks for use across FFI
-/// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn register_processor(
+pub unsafe extern "C" fn create_provider(
     chain_type: ChainType,
     get_merkle_root_by_hash: MerkleRootLookup,
     get_block_height_by_hash: GetBlockHeightByHash,
@@ -64,8 +61,8 @@ pub unsafe extern "C" fn register_processor(
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
     opaque_context: *const std::os::raw::c_void
-) -> *mut MasternodeProcessor {
-    let provider = FFICoreProvider::new(
+) -> FFICoreProvider {
+    FFICoreProvider::new(
         get_merkle_root_by_hash,
         get_block_height_by_hash,
         get_block_hash_by_height,
@@ -82,19 +79,25 @@ pub unsafe extern "C" fn register_processor(
         should_process_diff_with_range,
         opaque_context,
         chain_type
-    );
-    let processor = MasternodeProcessor::new(provider);
-    println!("register_processor: {:?}", processor);
-    ferment_interfaces::boxed(processor)
+    )
 }
 
-/// Unregister all the callbacks for use across FFI
+/// Register all the callbacks for use across FFI
 /// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor) {
-    println!("unregister_processor: {:?}", processor);
-    let unboxed = ferment_interfaces::unbox_any(processor);
-}
+// #[no_mangle]
+// pub unsafe extern "C" fn register_processor<'a>(provider: *mut FFICoreProvider) -> *mut MasternodeProcessor<FFICoreProvider> {
+//     let processor = MasternodeProcessor::new(&*provider);
+//     println!("register_processor: {:?}", processor);
+//     ferment_interfaces::boxed(processor)
+// }
+//
+// /// Unregister all the callbacks for use across FFI
+// /// # Safety
+// #[no_mangle]
+// pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor<FFICoreProvider>) {
+//     println!("unregister_processor: {:?}", processor);
+//     let unboxed = ferment_interfaces::unbox_any(processor);
+// }
 
 /// Initialize opaque cache to store needed information between FFI calls
 /// # Safety
@@ -174,40 +177,43 @@ pub unsafe extern "C" fn processor_destroy_byte_array(data: *const u8, len: usiz
     ferment_interfaces::unbox_vec_ptr(data as *mut u8, len);
 }
 
-/// # Safety
-/// Destroys types::MNListDiffResult
-#[no_mangle]
-pub unsafe extern "C" fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
-    ferment_interfaces::unbox_any(list);
-}
+// /// # Safety
+// /// Destroys types::MNListDiffResult
+// #[no_mangle]
+// pub unsafe extern "C" fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
+//     ferment_interfaces::unbox_any(list);
+// }
+//
+// /// Destroys types::MNListDiffResult
+// /// # Safety
+// #[no_mangle]
+// pub unsafe extern "C" fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
+//     ferment_interfaces::unbox_any(result);
+// }
+//
+// /// Destroys types::LLMQRotationInfoResult
+// /// # Safety
+// #[no_mangle]
+// pub unsafe extern "C" fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
+//     ferment_interfaces::unbox_any(result);
+// }
+//
+// /// Destroys types::LLMQSnapshot
+// /// # Safety
+// #[no_mangle]
+// pub unsafe extern "C" fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
+//     ferment_interfaces::unbox_any(result);
+// }
+//
+// /// @Deprecated --> dash_spv_masternode_processor_common_block_Block_destroy
+// /// Destroys types::Block
+// /// # Safety
+// #[no_mangle]
+// pub unsafe extern "C" fn processor_destroy_block(result: *mut types::Block) {
+//     ferment_interfaces::unbox_any(result);
+// }
+//
 
-/// Destroys types::MNListDiffResult
-/// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
-    ferment_interfaces::unbox_any(result);
-}
-
-/// Destroys types::LLMQRotationInfoResult
-/// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
-    ferment_interfaces::unbox_any(result);
-}
-
-/// Destroys types::LLMQSnapshot
-/// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
-    ferment_interfaces::unbox_any(result);
-}
-
-/// Destroys types::Block
-/// # Safety
-#[no_mangle]
-pub unsafe extern "C" fn processor_destroy_block(result: *mut types::Block) {
-    ferment_interfaces::unbox_any(result);
-}
 
 // Here we have temporary replacement for DSKey from the DashSync
 /// Destroys rust-allocated string
@@ -217,7 +223,7 @@ pub unsafe extern "C" fn processor_destroy_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }
-    let _ = CString::from_raw(ptr);
+    ferment_interfaces::unbox_string(ptr);
 }
 
 /// Destroys UInt160

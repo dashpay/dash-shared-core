@@ -2,7 +2,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_ulong, c_void};
 use std::ptr::null_mut;
 use std::slice;
-use ferment_interfaces::{boxed, boxed_vec, unbox_any};
+use ferment_interfaces as ferment;
+use ferment::{boxed, boxed_vec, unbox_any};
 use dash_spv_masternode_processor::chain::{bip::{bip32, bip38::BIP38}, common::{ChainType, IHaveChainSettings}, derivation::IndexPath};
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, ConstDecodable, Reversable, UInt160, UInt256, UInt384, UInt512, UInt768, Zeroable};
@@ -11,7 +12,7 @@ use dash_spv_masternode_processor::processing::{keys_cache::KeysCache, Processin
 use dash_spv_masternode_processor::util::{address::address, sec_vec::SecVec};
 use crate::ffi::{common::ByteArray, decode_derivation_path, IndexPathData, unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
-/// Destroys
+
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_opaque_key(data: *mut OpaqueKey) {
@@ -187,7 +188,6 @@ pub extern "C" fn key_derive_ecdsa_from_extened_private_key_data_for_index_path(
 /// digest is UInt256
 #[no_mangle]
 pub unsafe extern "C" fn key_sign_message_digest(key: *mut OpaqueKey, digest: *const u8) -> ByteArray {
-    // let key = unsafe { &mut *key };
     let message_digest = UInt256::from_const(digest).unwrap();
     match *key {
         OpaqueKey::ECDSA(ptr) => (&*ptr).compact_sign(message_digest).into(),

@@ -11,6 +11,7 @@ use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::test_helpers::Block;
 use crate::common::{processor_create_cache, register_processor};
 use crate::ffi::{from::FromFFI, to::ToFFI};
+use crate::ffi_core_provider::FFICoreProvider;
 use crate::masternode::{process_mnlistdiff_from_message, process_qrinfo_from_message};
 use crate::types;
 

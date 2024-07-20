@@ -1,3 +1,5 @@
+use std::cmp::min;
+use std::collections::BTreeMap;
 use std::convert::Into;
 use std::io;
 use byte::{BytesExt, TryRead, LE};
@@ -12,9 +14,10 @@ use crate::chain::common::IHaveChainSettings;
 use crate::chain::common::llmq_type::LLMQType;
 use crate::common::{bitset::Bitset, llmq_version::LLMQVersion};
 use crate::consensus::{encode::VarInt, Encodable, Decodable, encode};
-use crate::crypto::byte_util::{AsBytes, UInt256, UInt384, UInt768};
+use crate::crypto::byte_util::{AsBytes, Reversable, UInt256, UInt384, UInt768};
 use crate::keys::BLSKey;
-use crate::models;
+use crate::models::masternode_list::score_masternodes_map;
+use crate::models::MasternodeEntry;
 use crate::processing::CoreProviderError;
 use crate::processing::llmq_validation_status::{LLMQValidationStatus, LLMQPayloadValidationStatus};
 
@@ -175,7 +178,6 @@ impl Decodable for LLMQEntry {
             all_commitment_aggregated_signature,
         );
         Ok(entry)
-
     }
 }
 
@@ -227,7 +229,7 @@ impl LLMQEntry {
         threshold_signature: UInt768,
         all_commitment_aggregated_signature: UInt768,
     ) -> Self {
-        let q_data = Self::generate_data(
+        let q_data = generate_data(
             version,
             llmq_type,
             llmq_hash,
@@ -257,40 +259,9 @@ impl LLMQEntry {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn generate_data(
-        version: LLMQVersion,
-        llmq_type: LLMQType,
-        llmq_hash: UInt256,
-        index: Option<u16>,
-        signers: &Bitset,
-        valid_members: &Bitset,
-        public_key: UInt384,
-        verification_vector_hash: UInt256,
-        threshold_signature: UInt768,
-        all_commitment_aggregated_signature: UInt768,
-    ) -> Vec<u8> {
-        let mut buffer: Vec<u8> = Vec::new();
-        let offset = &mut 0;
-        let llmq_u8: u8 = llmq_type.into();
-        let llmq_v: u16 = version.into();
-        *offset += llmq_v.enc(&mut buffer);
-        *offset += llmq_u8.enc(&mut buffer);
-        *offset += llmq_hash.enc(&mut buffer);
-        if let Some(index) = index {
-            *offset += index.enc(&mut buffer);
-        }
-        *offset += signers.enc(&mut buffer);
-        *offset += valid_members.enc(&mut buffer);
-        *offset += public_key.enc(&mut buffer);
-        *offset += verification_vector_hash.enc(&mut buffer);
-        *offset += threshold_signature.enc(&mut buffer);
-        *offset += all_commitment_aggregated_signature.enc(&mut buffer);
-        buffer
-    }
 
     pub fn to_data(&self) -> Vec<u8> {
-        Self::generate_data(
+        generate_data(
             self.version,
             self.llmq_type,
             self.llmq_hash,
@@ -302,6 +273,30 @@ impl LLMQEntry {
             self.threshold_signature,
             self.all_commitment_aggregated_signature,
         )
+    }
+    pub fn valid_masternodes(&self, chain_type: ChainType, masternodes: BTreeMap<UInt256, MasternodeEntry>, block_height: u32, llmq_modifier: LLMQModifierType) -> Vec<MasternodeEntry> {
+        let llmq_type = self.llmq_type;
+        let hpmn_only = llmq_type == chain_type.platform_type() && !self.version.use_bls_legacy();
+        let quorum_modifier = llmq_modifier.build_llmq_hash();
+        let quorum_count = llmq_type.size();
+        let masternode_count = masternodes.len();
+        let score_dictionary = score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
+        let count = min(masternode_count, score_dictionary.len());
+        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
+        scores.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
+        let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
+        // TODO: is that correct to take count here before checking validity?
+        for score in scores.iter().take(count) {
+            if let Some(masternode) = score_dictionary.get(score) {
+                if masternode.is_valid_at(block_height) {
+                    valid_masternodes.push(masternode.clone());
+                }
+            }
+            if valid_masternodes.len() == quorum_count as usize {
+                break;
+            }
+        }
+        valid_masternodes
     }
 
     pub fn commitment_data(&self) -> Vec<u8> {
@@ -396,7 +391,7 @@ impl LLMQEntry {
 
 impl LLMQEntry {
 
-    pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> Result<LLMQValidationStatus, CoreProviderError> {
+    pub fn verify(&mut self, valid_masternodes: Vec<MasternodeEntry>, block_height: u32) -> Result<LLMQValidationStatus, CoreProviderError> {
         let payload_status = self.validate_payload();
         if !payload_status.is_ok() {
             return Ok(LLMQValidationStatus::InvalidPayload(payload_status));
@@ -406,7 +401,7 @@ impl LLMQEntry {
         Ok(status)
     }
 
-    pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
+    pub fn validate(&mut self, valid_masternodes: Vec<MasternodeEntry>, block_height: u32) -> LLMQValidationStatus {
         let commitment_hash = self.generate_commitment_hash();
         let use_legacy = self.version.use_bls_legacy();
         let operator_keys = valid_masternodes
@@ -442,4 +437,37 @@ impl LLMQEntry {
         println!("••• quorum {:?} validated at {}", self.llmq_type, block_height);
         LLMQValidationStatus::Verified
     }
+}
+
+
+#[allow(clippy::too_many_arguments)]
+pub fn generate_data(
+    version: LLMQVersion,
+    llmq_type: LLMQType,
+    llmq_hash: UInt256,
+    index: Option<u16>,
+    signers: &Bitset,
+    valid_members: &Bitset,
+    public_key: UInt384,
+    verification_vector_hash: UInt256,
+    threshold_signature: UInt768,
+    all_commitment_aggregated_signature: UInt768,
+) -> Vec<u8> {
+    let mut buffer: Vec<u8> = Vec::new();
+    let offset = &mut 0;
+    let llmq_u8: u8 = llmq_type.into();
+    let llmq_v: u16 = version.into();
+    *offset += llmq_v.enc(&mut buffer);
+    *offset += llmq_u8.enc(&mut buffer);
+    *offset += llmq_hash.enc(&mut buffer);
+    if let Some(index) = index {
+        *offset += index.enc(&mut buffer);
+    }
+    *offset += signers.enc(&mut buffer);
+    *offset += valid_members.enc(&mut buffer);
+    *offset += public_key.enc(&mut buffer);
+    *offset += verification_vector_hash.enc(&mut buffer);
+    *offset += threshold_signature.enc(&mut buffer);
+    *offset += all_commitment_aggregated_signature.enc(&mut buffer);
+    buffer
 }

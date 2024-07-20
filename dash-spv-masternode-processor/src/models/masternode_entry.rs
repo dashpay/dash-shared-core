@@ -178,7 +178,7 @@ impl MasternodeEntry {
         update_height: u32,
         protocol_version: u32,
     ) -> Self {
-        let entry_hash = Self::calculate_entry_hash(
+        let entry_hash = calculate_entry_hash(
             version,
             provider_registration_transaction_hash,
             confirmed_hash,
@@ -213,35 +213,6 @@ impl MasternodeEntry {
         }
     }
 
-    pub fn calculate_entry_hash(
-        version: u16,
-        provider_registration_transaction_hash: UInt256,
-        confirmed_hash: UInt256,
-        socket_address: SocketAddress,
-        operator_public_key: OperatorPublicKey,
-        key_id_voting: UInt160,
-        is_valid: u8,
-        mn_type: MasternodeType,
-        platform_http_port: u16,
-        platform_node_id: UInt160,
-        protocol_version: u32,
-    ) -> UInt256 {
-        let mut writer = Vec::<u8>::new();
-        provider_registration_transaction_hash.enc(&mut writer);
-        confirmed_hash.enc(&mut writer);
-        socket_address.enc(&mut writer);
-        operator_public_key.enc(&mut writer);
-        key_id_voting.enc(&mut writer);
-        is_valid.enc(&mut writer);
-        if version >= 2 {
-            u16::from(mn_type).enc(&mut writer);
-            if mn_type == MasternodeType::HighPerformance {
-                platform_http_port.swap_bytes().enc(&mut writer);
-                platform_node_id.enc(&mut writer);
-            }
-        }
-        UInt256::sha256d(writer)
-    }
 
     pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
         self.known_confirmed_at_height
@@ -253,6 +224,13 @@ impl MasternodeEntry {
         self.confirmed_hash = hash;
         if !self.provider_registration_transaction_hash.is_zero() {
             self.update_confirmed_hash_hashed_with_pro_reg_tx_hash();
+        }
+    }
+    pub fn confirm_at_height_if_need(&mut self, block_height: u32) {
+        if !self.confirmed_hash.is_zero() &&
+            self.known_confirmed_at_height.is_some() &&
+            self.known_confirmed_at_height.unwrap() > block_height {
+            self.known_confirmed_at_height = Some(block_height);
         }
     }
 
@@ -303,7 +281,7 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut is_valid = self.is_valid;
-        for (&crate::common::Block { height, .. }, &validity) in &self.previous_validity {
+        for (&Block { height, .. }, &validity) in &self.previous_validity {
             if height <= block_height {
                 continue;
             }
@@ -356,6 +334,22 @@ impl MasternodeEntry {
         used_hash
     }
 
+    pub fn score(&self, modifier: UInt256, block_height: u32) -> Option<UInt256> {
+        if !self.is_valid_at(block_height) ||
+            self.confirmed_hash.is_zero() ||
+            self.confirmed_hash_at(block_height).is_none() {
+            return None;
+        }
+        let mut buffer: Vec<u8> = Vec::new();
+        if let Some(hash) = self.confirmed_hash_hashed_with_pro_reg_tx_hash_at(block_height) {
+            hash.enc(&mut buffer);
+        }
+        modifier.enc(&mut buffer);
+        let score = UInt256::sha256(&buffer);
+        (!score.is_zero() && !score.0.is_empty()).then_some(score)
+    }
+
+
     pub fn unique_id(&self) -> String {
         short_hex_string_from(&self.provider_registration_transaction_hash.0)
     }
@@ -393,3 +387,32 @@ impl MasternodeEntry {
     }
 }
 
+pub fn calculate_entry_hash(
+    version: u16,
+    provider_registration_transaction_hash: UInt256,
+    confirmed_hash: UInt256,
+    socket_address: SocketAddress,
+    operator_public_key: OperatorPublicKey,
+    key_id_voting: UInt160,
+    is_valid: u8,
+    mn_type: MasternodeType,
+    platform_http_port: u16,
+    platform_node_id: UInt160,
+    protocol_version: u32,
+) -> UInt256 {
+    let mut writer = Vec::<u8>::new();
+    provider_registration_transaction_hash.enc(&mut writer);
+    confirmed_hash.enc(&mut writer);
+    socket_address.enc(&mut writer);
+    operator_public_key.enc(&mut writer);
+    key_id_voting.enc(&mut writer);
+    is_valid.enc(&mut writer);
+    if version >= 2 {
+        u16::from(mn_type).enc(&mut writer);
+        if mn_type == MasternodeType::HighPerformance {
+            platform_http_port.swap_bytes().enc(&mut writer);
+            platform_node_id.enc(&mut writer);
+        }
+    }
+    UInt256::sha256d(writer)
+}

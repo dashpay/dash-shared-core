@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use dash_spv_masternode_processor::block_store::init_mainnet_store;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::models;
-use dash_spv_masternode_processor::processing::MasternodeProcessor;
+use dash_spv_masternode_processor::processing::{CoreProvider, MasternodeProcessor};
 use dash_spv_masternode_processor::test_helpers::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
 use crate::common::processor_create_cache;
 use crate::ffi::from::FromFFI;
@@ -81,7 +82,7 @@ fn mainnet_quorum_quarters() {
         context as *mut _ as *mut std::ffi::c_void,
         chain
     );
-    let processor = MasternodeProcessor::new(provider);
+    let processor = MasternodeProcessor::new(Arc::new(provider));
 
     let bytes = chain.load_message("QRINFO_0_1739226.dat");
     let old_bytes = chain.load_message("QRINFO_0_1740902.dat");

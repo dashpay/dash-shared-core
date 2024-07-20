@@ -1,9 +1,8 @@
-use std::cmp::min;
 use std::collections::BTreeMap;
-use crate::chain::common::{chain_type::ChainType, IHaveChainSettings, llmq_type::LLMQType};
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::{Reversable, Zeroable, UInt256};
-use crate::models::{llmq_entry::LLMQEntry, LLMQModifierType, masternode_entry::MasternodeEntry};
+use crate::chain::common::llmq_type::LLMQType;
+use crate::crypto::byte_util::{Reversable, UInt256};
+use crate::models;
+use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry};
 use crate::tx::coinbase_transaction::CoinbaseTransaction;
 use crate::util::data_ops::merkle_root_from_hashes;
 
@@ -45,6 +44,9 @@ impl<'a> std::fmt::Debug for MasternodeList {
 }
 
 impl MasternodeList {
+    pub fn empty(block_hash: UInt256, block_height: u32, quorums_active: bool) -> Self {
+        Self::new(BTreeMap::default(), BTreeMap::new(), block_hash, block_height, quorums_active)
+    }
     pub fn new(
         masternodes: BTreeMap<UInt256, MasternodeEntry>,
         quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
@@ -131,25 +133,6 @@ impl MasternodeList {
         has_valid_quorum_list_root
     }
 
-    pub fn masternode_score(
-        entry: &MasternodeEntry,
-        modifier: UInt256,
-        block_height: u32,
-    ) -> Option<UInt256> {
-        if !entry.is_valid_at(block_height) ||
-            entry.confirmed_hash.is_zero() ||
-            entry.confirmed_hash_at(block_height).is_none() {
-            return None;
-        }
-        let mut buffer: Vec<u8> = Vec::new();
-        if let Some(hash) = entry.confirmed_hash_hashed_with_pro_reg_tx_hash_at(block_height) {
-            hash.enc(&mut buffer);
-        }
-        modifier.enc(&mut buffer);
-        let score = UInt256::sha256(&buffer);
-        (!score.is_zero() && !score.0.is_empty()).then_some(score)
-    }
-
     pub fn quorum_entry_for_platform_with_quorum_hash(
         &self,
         quorum_hash: UInt256,
@@ -198,50 +181,53 @@ impl MasternodeList {
             .find(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
             .map_or(false, |node| node.is_valid)
     }
-}
 
-impl MasternodeList {
-    pub fn score_masternodes_map(
-        masternodes: BTreeMap<UInt256, MasternodeEntry>,
-        quorum_modifier: UInt256,
-        block_height: u32,
-        hpmn_only: bool,
-    ) -> BTreeMap<UInt256, MasternodeEntry> {
-        masternodes
-            .into_iter()
-            .filter_map(|(_, entry)|
-                if !hpmn_only || entry.mn_type == crate::common::MasternodeType::HighPerformance {
-                    Self::masternode_score(&entry, quorum_modifier, block_height)
-                        .map(|score| (score, entry))
-                } else {
-                    None
+    pub fn usage_info(&self, previous_quarters: [&Vec<Vec<MasternodeEntry>>; 3], skip_removed_masternodes: bool, quorum_count: usize) -> (Vec<MasternodeEntry>, Vec<MasternodeEntry>, Vec<Vec<MasternodeEntry>>) {
+        let mut used_at_h_masternodes = Vec::<models::MasternodeEntry>::new();
+        let mut used_at_h_indexed_masternodes = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
+        for i in 0..quorum_count {
+            // for quarters h - c, h -2c, h -3c
+            for quarter in &previous_quarters {
+                if let Some(quarter_nodes) = quarter.get(i) {
+                    for node in quarter_nodes {
+                        let hash = node.provider_registration_transaction_hash;
+                        if (!skip_removed_masternodes || self.has_masternode(hash)) &&
+                            self.has_valid_masternode(hash) {
+                            if !used_at_h_masternodes.iter().any(|m| m.provider_registration_transaction_hash == hash) {
+                                used_at_h_masternodes.push(node.clone());
+                            }
+                            if !used_at_h_indexed_masternodes[i].iter().any(|m| m.provider_registration_transaction_hash == hash) {
+                                used_at_h_indexed_masternodes[i].push(node.clone());
+                            }
+                        }
+                    }
                 }
-            )
-            .collect()
-    }
-
-    pub fn get_masternodes_for_quorum(quorum: &LLMQEntry, chain_type: ChainType, masternodes: BTreeMap<UInt256, MasternodeEntry>, block_height: u32, llmq_modifier: LLMQModifierType) -> Vec<MasternodeEntry> {
-        let llmq_type = quorum.llmq_type;
-        let hpmn_only = llmq_type == chain_type.platform_type() && !quorum.version.use_bls_legacy();
-        let quorum_modifier = llmq_modifier.build_llmq_hash();
-        let quorum_count = llmq_type.size();
-        let masternodes_in_list_count = masternodes.len();
-        let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
-        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
-        scores.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
-        let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
-        let count = min(masternodes_in_list_count, scores.len());
-        for score in scores.iter().take(count) {
-            if let Some(masternode) = score_dictionary.get_mut(score) {
-                if (*masternode).is_valid_at(block_height) {
-                    valid_masternodes.push((*masternode).clone());
-                }
-            }
-            if valid_masternodes.len() == quorum_count as usize {
-                break;
             }
         }
-        valid_masternodes
+        let unused_at_h_masternodes = self.masternodes.values()
+            .filter(|mn| mn.is_valid && !used_at_h_masternodes.iter().any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash))
+            .cloned()
+            .collect();
+        (used_at_h_masternodes, unused_at_h_masternodes, used_at_h_indexed_masternodes)
+
     }
 }
 
+pub fn score_masternodes_map(
+    masternodes: BTreeMap<UInt256, MasternodeEntry>,
+    quorum_modifier: UInt256,
+    block_height: u32,
+    hpmn_only: bool,
+) -> BTreeMap<UInt256, MasternodeEntry> {
+    masternodes
+        .into_iter()
+        .filter_map(|(_, entry)|
+            if !hpmn_only || entry.mn_type == crate::common::MasternodeType::HighPerformance {
+                entry.score(quorum_modifier, block_height)
+                    .map(|score| (score, entry))
+            } else {
+                None
+            }
+        )
+        .collect()
+}

@@ -1,5 +1,5 @@
 use std::slice;
-use dash_spv_masternode_processor::{models, ok_or_return_processing_error};
+use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_masternode_processor::consensus::encode;
 use dash_spv_masternode_processor::crypto::byte_util::{BytesDecodable, ConstDecodable, UInt256, UInt768};
@@ -29,8 +29,6 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     let cache = &mut *cache;
     println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length);
-    // let result = processor.mn_list_diff_result_from_message(message, is_from_snapshot, protocol_version, cache)
-    //     .map_or(std::ptr::null_mut(), ferment_interfaces::boxed);
     let result = process_mnlist_diff(&processor, message, is_from_snapshot, protocol_version, cache)
         .map_or(std::ptr::null_mut(), ferment_interfaces::boxed);
     println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
@@ -89,21 +87,8 @@ pub unsafe extern "C" fn validate_masternode_list(list: *const types::Masternode
     } else {
         LLMQModifierType::PreCoreV20(quorum.llmq_type, quorum.llmq_hash)
     };
-    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(&quorum, chain_type, list.masternodes, block_height, quorum_modifier_type);
+    let valid_masternodes = quorum.valid_masternodes(chain_type, list.masternodes, block_height, quorum_modifier_type);
     return quorum.validate(valid_masternodes, block_height).is_not_critical();
-}
-
-
-/// # Safety
-#[no_mangle]
-pub extern "C" fn quorum_size_for_type(llmq_type: LLMQType) -> u32 {
-    llmq_type.size()
-}
-
-/// # Safety
-#[no_mangle]
-pub extern "C" fn quorum_threshold_for_type(llmq_type: LLMQType) -> u32 {
-    llmq_type.threshold()
 }
 
 /// quorum_hash: u256
@@ -131,30 +116,6 @@ pub extern "C" fn masternode_hash_confirmed_hash(confirmed_hash: *const u8, pro_
     let confirmed_hash = UInt256::from_const(confirmed_hash).unwrap_or(UInt256::MIN);
     let pro_reg_tx_hash = UInt256::from_const(pro_reg_tx_hash).unwrap_or(UInt256::MIN);
     models::MasternodeEntry::hash_confirmed_hash(confirmed_hash, pro_reg_tx_hash).into()
-}
-
-/// # Safety
-#[no_mangle]
-pub extern "C" fn quorum_type_for_is_locks(chain_type: ChainType) -> LLMQType {
-    chain_type.is_llmq_type()
-}
-
-/// # Safety
-#[no_mangle]
-pub extern "C" fn quorum_type_for_isd_locks(chain_type: ChainType) -> LLMQType {
-    chain_type.isd_llmq_type()
-}
-
-/// # Safety
-#[no_mangle]
-pub extern "C" fn quorum_type_for_chain_locks(chain_type: ChainType) -> LLMQType {
-    chain_type.chain_locks_type()
-}
-
-/// # Safety
-#[no_mangle]
-pub extern "C" fn quorum_type_for_platform(chain_type: ChainType) -> LLMQType {
-    chain_type.platform_type()
 }
 
 /// # Safety
@@ -196,7 +157,7 @@ pub fn process_mnlist_diff(processor: &MasternodeProcessor, message: &[u8], is_f
     match processor.read_list_diff_from_message(message, &mut 0, protocol_version) {
         Ok(list_diff) => {
             if !is_from_snapshot {
-                ok_or_return_processing_error!(processor.provider.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash));
+                processor.provider.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash)?;
             }
             Ok(get_list_diff_result_with_base_lookup(processor, list_diff, LLMQVerificationContext::MNListDiff, cache))
         },
@@ -208,32 +169,31 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
     let mut process_list_diff = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext|
         get_list_diff_result_with_base_lookup(&processor, list_diff, verification_context, cache);
     let read_list_diff = |offset: &mut usize|
-        processor.read_list_diff_from_message(message, offset, protocol_version);
+        processor.read_list_diff_from_message(message, offset, protocol_version).map_err(ProcessingError::from);
     let read_snapshot = |offset: &mut usize|
-        models::LLMQSnapshot::from_bytes(message, offset);
+        models::LLMQSnapshot::from_bytes(message, offset).map_err(ProcessingError::from);
     let read_var_int = |offset: &mut usize|
-        encode::VarInt::from_bytes(message, offset);
+        encode::VarInt::from_bytes(message, offset).map_err(ProcessingError::from);
     let mut get_list_diff_result = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext|
         ferment_interfaces::boxed(process_list_diff(list_diff, verification_context));
 
     let offset = &mut 0;
-    let snapshot_at_h_c = ok_or_return_processing_error!(read_snapshot(offset));
-    let snapshot_at_h_2c = ok_or_return_processing_error!(read_snapshot(offset));
-    let snapshot_at_h_3c = ok_or_return_processing_error!(read_snapshot(offset));
-    let diff_tip = ok_or_return_processing_error!(read_list_diff(offset));
+    let snapshot_at_h_c = read_snapshot(offset)?;
+    let snapshot_at_h_2c = read_snapshot(offset)?;
+    let snapshot_at_h_3c = read_snapshot(offset)?;
+    let diff_tip = read_list_diff(offset)?;
     if !is_from_snapshot {
-        ok_or_return_processing_error!(processor.provider.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash));
+        processor.provider.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash)?;
     }
-    let diff_h = ok_or_return_processing_error!(read_list_diff(offset));
-    let diff_h_c = ok_or_return_processing_error!(read_list_diff(offset));
-    let diff_h_2c = ok_or_return_processing_error!(read_list_diff(offset));
-    let diff_h_3c = ok_or_return_processing_error!(read_list_diff(offset));
+    let diff_h = read_list_diff(offset)?;
+    let diff_h_c = read_list_diff(offset)?;
+    let diff_h_2c = read_list_diff(offset)?;
+    let diff_h_3c = read_list_diff(offset)?;
     let extra_share = message[*offset] > 0;
     *offset += 1;
-    // let extra_share = message.read_with::<bool>(offset, ()).unwrap_or(false);
     let (snapshot_at_h_4c, diff_h_4c) = if extra_share {
-        let snapshot_at_h_4c = ok_or_return_processing_error!(read_snapshot(offset));
-        let diff_h_4c = ok_or_return_processing_error!(read_list_diff(offset));
+        let snapshot_at_h_4c = read_snapshot(offset)?;
+        let diff_h_4c = read_list_diff(offset)?;
         (Some(snapshot_at_h_4c), Some(diff_h_4c))
     } else {
         (None, None)
@@ -245,27 +205,26 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
         processor.provider.save_snapshot(diff_h_4c.as_ref().unwrap().block_hash, snapshot_at_h_4c.clone().unwrap());
     }
 
-    let last_quorum_per_index_count = ok_or_return_processing_error!(read_var_int(offset)).0 as usize;
+    let last_quorum_per_index_count = read_var_int(offset)?.0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> =
         Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
-        let quorum = ok_or_return_processing_error!(models::LLMQEntry::from_bytes(message, offset));
+        let quorum = models::LLMQEntry::from_bytes(message, offset).map_err(ProcessingError::from)?;
         last_quorum_per_index_vec.push(ferment_interfaces::boxed(quorum.encode()));
     }
-    let quorum_snapshot_list_count = ok_or_return_processing_error!(read_var_int(offset)).0 as usize;
+    let quorum_snapshot_list_count = read_var_int(offset)?.0 as usize;
     let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> =
         Vec::with_capacity(quorum_snapshot_list_count);
     let mut snapshots: Vec<models::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
     for _i in 0..quorum_snapshot_list_count {
-        let snapshot = ok_or_return_processing_error!(read_snapshot(offset));
-        snapshots.push(snapshot);
+        snapshots.push(read_snapshot(offset)?);
     }
-    let mn_list_diff_list_count = ok_or_return_processing_error!(read_var_int(offset)).0 as usize;
+    let mn_list_diff_list_count = read_var_int(offset)?.0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> =
         Vec::with_capacity(mn_list_diff_list_count);
     assert_eq!(quorum_snapshot_list_count, mn_list_diff_list_count, "'quorum_snapshot_list_count' must be equal 'mn_list_diff_list_count'");
     for i in 0..mn_list_diff_list_count {
-        let list_diff = ok_or_return_processing_error!(read_list_diff(offset));
+        let list_diff = read_list_diff(offset)?;
         let block_hash = list_diff.block_hash;
         mn_list_diff_list_vec.push(get_list_diff_result(list_diff, LLMQVerificationContext::None));
         let snapshot = snapshots.get(i).unwrap();

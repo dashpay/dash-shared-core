@@ -5,6 +5,7 @@ use crate::crypto::byte_util::{UInt256, UInt768};
 use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 
 #[derive(Clone, Default)]
+#[ferment_macro::opaque]
 pub struct MasternodeProcessorCache {
     pub llmq_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<MasternodeEntry>>>,
     pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<LLMQIndexedHash, Vec<MasternodeEntry>>>,

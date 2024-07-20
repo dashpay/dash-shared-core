@@ -33,6 +33,7 @@ pub enum ChainType {
     DevNet(DevnetType),
 }
 
+// #[ferment_macro::export]
 impl From<i16> for ChainType {
     fn from(orig: i16) -> Self {
         match orig {
@@ -141,6 +142,7 @@ impl From<&str> for DevnetType {
     }
 }
 
+#[ferment_macro::export]
 impl DevnetType {
     pub fn identifier(&self) -> String {
         match self {
@@ -164,6 +166,7 @@ impl DevnetType {
     }
 }
 
+#[ferment_macro::export]
 impl ChainType {
     pub fn is_mainnet(&self) -> bool {
         *self == ChainType::MainNet
@@ -213,10 +216,10 @@ impl ChainType {
         }
     }
 
-    pub fn dns_seeds(&self) -> Vec<&str> {
+    pub fn dns_seeds(&self) -> Vec<String> {
         match self {
-            ChainType::MainNet => vec!["dnsseed.dash.org"],
-            ChainType::TestNet => vec!["testnet-seed.dashdot.io"],
+            ChainType::MainNet => vec!["dnsseed.dash.org".to_string()],
+            ChainType::TestNet => vec!["testnet-seed.dashdot.io".to_string()],
             ChainType::DevNet(_) => vec![],
         }
     }
@@ -241,6 +244,7 @@ impl ChainType {
     }
 }
 
+#[ferment_macro::export]
 impl IHaveChainSettings for ChainType {
     fn genesis_hash(&self) -> UInt256 {
         match self {
@@ -307,6 +311,7 @@ impl IHaveChainSettings for ChainType {
     }
 }
 
+#[ferment_macro::export]
 impl IHaveChainSettings for DevnetType {
     fn genesis_hash(&self) -> UInt256 {
         UInt256::from_hex(match self {
@@ -363,6 +368,7 @@ impl IHaveChainSettings for DevnetType {
     }
 }
 // Params
+#[ferment_macro::export]
 impl ChainType {
     pub fn from_magic(magic: u32) -> Option<ChainType> {
         // Note: any new entries here must be added to `magic` below

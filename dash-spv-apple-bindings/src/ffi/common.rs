@@ -1,5 +1,4 @@
 use std::{mem, ptr};
-use ferment_interfaces::FFIConversion;
 use dash_spv_masternode_processor::util::sec_vec::SecVec;
 
 #[repr(C)]
