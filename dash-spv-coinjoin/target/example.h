@@ -58,6 +58,4 @@
 
 #define REFERENCE_DEFAULT_MIN_TX_FEE 1000
 
-#define MIN_BLOCKS_TO_WAIT 1
-
 #endif /* example_h */

@@ -13,7 +13,7 @@ use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
 use dash_spv_coinjoin::{ffi, messages};
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync, ValidMasternodeCount};
+use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -83,7 +83,9 @@ pub unsafe extern "C" fn register_client_manager(
     destroy_mn_list: DestroyMasternodeList,
     get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
     has_chain_lock: HasChainLock,
-    destroy_input_value: DestroyInputValue
+    destroy_input_value: DestroyInputValue,
+    update_success_block: UpdateSuccessBlock,
+    is_waiting_for_new_block: IsWaitingForNewBlock
 ) -> *mut CoinJoinClientManager {
     let coinjoin = CoinJoin::new(
         get_input_value_by_prevout_hash,
@@ -98,6 +100,8 @@ pub unsafe extern "C" fn register_client_manager(
         std::ptr::read(options_ptr), 
         get_masternode_list,
         destroy_mn_list,
+        update_success_block,
+        is_waiting_for_new_block,
         context
     );
     println!("[RUST] CoinJoin: register_client_manager");
@@ -111,7 +115,6 @@ pub unsafe extern "C" fn add_client_queue_manager(
     masternode_by_hash: MasternodeByHash,
     destroy_masternode: DestroyMasternode,
     valid_mns_count: ValidMasternodeCount,
-    is_synced: IsBlockchainSynced,
     context: *const c_void
 ) {
     let client_queue_manager = CoinJoinClientQueueManager::new(
@@ -121,7 +124,6 @@ pub unsafe extern "C" fn add_client_queue_manager(
         masternode_by_hash, 
         destroy_masternode, 
         valid_mns_count, 
-        is_synced, 
         context
     );
 
@@ -172,35 +174,10 @@ pub unsafe extern "C" fn finish_automatic_denominating(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn mixing_masternode_address(
-    manager: *mut CoinJoinClientManager,
-    client_session_id: *mut [u8; 32]
-) -> *mut ffi::socket_addres::SocketAddress {
-    if let Some(address) = (*manager).mixing_masternode_address(UInt256(*(client_session_id))) {
-        return boxed(ffi::socket_addres::SocketAddress {
-            ip_address: boxed(address.ip_address.0),
-            port: address.port
-        });
-    } else {
-        return std::ptr::null_mut();
-    }
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn destroy_transaction(
     tx: *mut types::Transaction
 ) {
-    println!("[RUST] CoinJoin 💀 destroy_transaction");
     let unboxed = unbox_any(tx);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn destroy_socket_address(
-    socket_address: *mut ffi::socket_addres::SocketAddress
-) {
-    println!("[RUST] CoinJoin 💀 destroy_socket_address");
-    let unboxed = unbox_any(socket_address);
-    let _ = unbox_any(unboxed.ip_address);
 }
 
 #[no_mangle]
@@ -249,7 +226,6 @@ pub unsafe extern "C" fn is_locked_coin(
 
 #[no_mangle]
 pub unsafe extern "C" fn coinjoin_get_smallest_denomination() -> u64 {
-    println!("[RUST] CoinJoin call coinjoin_get_smallest_denomination");
     return CoinJoin::get_smallest_denomination();
 }
 
@@ -370,20 +346,6 @@ pub unsafe extern "C" fn process_send_coinjoin_queue(
     let result = messages::SendCoinJoinQueue::consensus_decode(&mut cursor).unwrap();
 
     boxed(result)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn is_waiting_for_new_block(
-    client_manager: *mut CoinJoinClientManager
-) -> bool {
-    return (*client_manager).is_waiting_for_new_block();
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn is_mixing(
-    client_manager: *mut CoinJoinClientManager
-)-> bool {
-    return (*client_manager).is_mixing;
 }
 
 #[no_mangle]
