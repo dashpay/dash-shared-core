@@ -141,3 +141,11 @@ pub type AddPendingMasternode = unsafe extern "C" fn(
 pub type StartManagerAsync = unsafe extern "C" fn(
     context: *const c_void
 );
+
+pub type UpdateSuccessBlock = unsafe extern "C" fn(
+    context: *const c_void
+);
+
+pub type IsWaitingForNewBlock = unsafe extern "C" fn(
+    context: *const c_void
+) -> bool;

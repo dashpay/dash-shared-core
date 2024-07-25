@@ -15,7 +15,6 @@ pub struct CoinJoinClientQueueManager {
     masternode_by_hash: MasternodeByHash,
     destroy_masternode: DestroyMasternode,
     valid_mns_count: ValidMasternodeCount,
-    is_synced: IsBlockchainSynced,
     context: *const std::ffi::c_void
 }
 
@@ -27,7 +26,6 @@ impl CoinJoinClientQueueManager {
         masternode_by_hash: MasternodeByHash,
         destroy_masternode: DestroyMasternode,
         valid_mns_count: ValidMasternodeCount,
-        is_synced: IsBlockchainSynced,
         context: *const std::ffi::c_void
     ) -> Self {
         Self {
@@ -39,7 +37,6 @@ impl CoinJoinClientQueueManager {
             masternode_metadata_manager,
             coinjoin_options,
             valid_mns_count,
-            is_synced,
             context
         }
     }
@@ -157,9 +154,5 @@ impl CoinJoinClientQueueManager {
 
     fn valid_mns_count(&self) -> u64 {
         unsafe { return (self.valid_mns_count)(self.context); }
-    }
-
-    fn is_synced(&self) -> bool {
-        unsafe { return (self.is_synced)(self.context); }
     }
 }
