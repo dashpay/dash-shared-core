@@ -48,7 +48,7 @@ pub unsafe extern "C" fn register_wallet_ex(
     add_pending_masternode: AddPendingMasternode,
     start_manager_async: StartManagerAsync
 ) -> *mut WalletEx {
-    let wallet_ex =  WalletEx::new(
+    let wallet_ex: WalletEx =  WalletEx::new(
         context, 
         std::ptr::read(options_ptr), 
         get_wallet_transaction, 
@@ -111,7 +111,6 @@ pub unsafe extern "C" fn register_client_manager(
 #[no_mangle]
 pub unsafe extern "C" fn add_client_queue_manager(
     client_manager_ptr: *mut CoinJoinClientManager,
-    options_ptr: *mut CoinJoinClientOptions,
     masternode_by_hash: MasternodeByHash,
     destroy_masternode: DestroyMasternode,
     valid_mns_count: ValidMasternodeCount,
@@ -120,7 +119,6 @@ pub unsafe extern "C" fn add_client_queue_manager(
     let client_queue_manager = CoinJoinClientQueueManager::new(
         Rc::new(RefCell::new(std::ptr::read(client_manager_ptr))),
         MasternodeMetadataManager::new(), 
-        std::ptr::read(options_ptr), 
         masternode_by_hash, 
         destroy_masternode, 
         valid_mns_count, 

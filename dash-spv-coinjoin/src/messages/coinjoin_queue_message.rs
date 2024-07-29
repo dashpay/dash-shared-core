@@ -1,11 +1,13 @@
 use std::io::{Error, Read, Write};
+use std::time::{SystemTime, UNIX_EPOCH};
 use dash_spv_masternode_processor::consensus::encode::VarInt;
-use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, UInt256};
+use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable, UInt256};
 use dash_spv_masternode_processor::consensus::{encode, Encodable};
 use dash_spv_masternode_processor::crypto::UInt768;
 use dash_spv_masternode_processor::hashes::hex::ToHex;
 use dash_spv_masternode_processor::keys::{BLSKey, IKey};
 use dash_spv_masternode_processor::models::OperatorPublicKey;
+use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 use crate::constants::COINJOIN_QUEUE_TIMEOUT;
@@ -23,6 +25,21 @@ pub struct CoinJoinQueueMessage {
     pub signature: Option<UInt768>,
     // Memory only
     pub tried: bool
+}
+
+impl std::fmt::Display for CoinJoinQueueMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        write!(f, "CoinJoinQueue(denom={}[{}], t={}[exp={}], ready={}, proTxHash={})", 
+            CoinJoin::denomination_to_string(self.denomination),
+            self.denomination,
+            self.time,
+            self.is_time_out_of_bounds(current_time),
+            self.ready,
+            self.pro_tx_hash.reversed().0.to_hex().chars().take(16).collect::<String>()
+        )?;
+        Ok(())
+    }
 }
 
 impl CoinJoinQueueMessage {

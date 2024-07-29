@@ -25,7 +25,7 @@ impl PendingDsaRequest {
 
 impl std::fmt::Display for PendingDsaRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PendingDsaRequest {{ addr: {}, dsa: {:?}, n_time_created: {:?} }}",
+        write!(f, "PendingDsaRequest {{ addr: {}, dsa: {}, n_time_created: {:?} }}",
                self.addr, self.dsa, self.time_created)
     }
 }
