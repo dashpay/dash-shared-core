@@ -5,7 +5,8 @@ use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable, UInt
 use dash_spv_masternode_processor::consensus::{encode, Encodable};
 use dash_spv_masternode_processor::crypto::UInt768;
 use dash_spv_masternode_processor::hashes::hex::ToHex;
-use dash_spv_masternode_processor::keys::{BLSKey, IKey};
+use dash_spv_masternode_processor::hashes::{sha256d, Hash};
+use dash_spv_masternode_processor::keys::BLSKey;
 use dash_spv_masternode_processor::models::OperatorPublicKey;
 use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
@@ -50,16 +51,14 @@ impl CoinJoinQueueMessage {
 
     pub fn check_signature(&self, key: OperatorPublicKey) -> bool { // TODO: recheck test
         if let Some(ref signature) = self.signature {
-            println!("[RUST] dsq signature {:?}", signature.as_bytes().to_hex());
             let hash = self.get_signature_hash();
-            println!("[RUST] dsq: sig hash: {:?}", hash.as_bytes().to_hex());
             let verified = BLSKey::key_with_public_key(
                 key.data, 
                 key.is_legacy()
-            ).verify(hash.as_bytes(), signature.as_bytes());
+            ).verify_insecure(&hash, *signature);
 
             if !verified {
-                println!("[RUST] CoinJoinQueue-CheckSignature -- VerifyInsecure() failed");
+                println!("[RUST] CoinJoinQueue-verifySignature failed");
             }
 
             return verified;
@@ -68,13 +67,13 @@ impl CoinJoinQueueMessage {
         return false;
     }
 
-    pub fn get_signature_hash(&self) -> UInt256 {
+    pub fn get_signature_hash(&self) -> Vec<u8> {
         let mut writer = Vec::<u8>::new();
         self.denomination.consensus_encode(&mut writer).unwrap();
         self.pro_tx_hash.consensus_encode(&mut writer).unwrap();
         self.time.consensus_encode(&mut writer).unwrap();
         self.ready.consensus_encode(&mut writer).unwrap();
-        UInt256::sha256d(&writer)
+        sha256d::Hash::hash(&writer).into_inner().to_vec()
     }
 }
 
@@ -93,7 +92,11 @@ impl encode::Encodable for CoinJoinQueueMessage {
         offset += self.time.consensus_encode(&mut writer)?;
         offset += self.ready.consensus_encode(&mut writer)?;
         offset += match self.signature {
-            Some(ref signature) => signature.consensus_encode(&mut writer)?,
+            Some(ref signature) => {
+                let len_offset = VarInt(signature.0.len() as u64).consensus_encode(&mut writer)?;
+                let sig_offset = signature.consensus_encode(&mut writer)?;
+                len_offset + sig_offset
+            }
             None => 0
         };
 
@@ -110,7 +113,7 @@ impl encode::Decodable for CoinJoinQueueMessage {
         let ready: bool = bool::consensus_decode(&mut d)?;
         let _signature_len = VarInt::consensus_decode(&mut d)?;
         let signature: Option<UInt768> = UInt768::consensus_decode(&mut d).ok();
-        
-        Ok(CoinJoinQueueMessage { denomination, pro_tx_hash, time, ready, signature, tried: false })
+        let message = CoinJoinQueueMessage { denomination, pro_tx_hash, time, ready, signature, tried: false };
+        Ok(message)
     }
 }

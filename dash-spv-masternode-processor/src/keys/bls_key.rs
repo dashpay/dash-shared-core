@@ -382,6 +382,17 @@ impl BLSKey {
         Self::verify_message_with_key(self, digest.as_bytes(), signature)
     }
 
+    pub fn verify_insecure(&self, message: &[u8], signature: UInt768) -> bool {
+        return self.bls_public_key()
+            .map_or(false, |public_key| 
+                match g2_element_from_bytes(false, signature.as_bytes()) {
+                    Ok(signature) =>
+                        BasicSchemeMPL::new().verify(&public_key, message, &signature),
+                    _ => false
+                }
+            );
+    }
+
     pub fn verify_with_public_key(digest: UInt256, signature: UInt768, public_key: UInt384, use_legacy: bool) -> bool {
         Self::verify_message_with_key(&BLSKey::key_with_public_key(public_key, use_legacy), digest.as_bytes(), signature)
     }
