@@ -14,6 +14,7 @@ use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
+use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
 // #[ferment_macro::export]
@@ -123,7 +124,7 @@ impl CoinJoin {
             -1 => "out-of-bounds".to_string(),
             -2 => "non-denom".to_string(),
             -3 => "to-amount-error".to_string(),
-            n => format!("{}", n),
+            n => n.to_friendly_string()
         }
     }
 

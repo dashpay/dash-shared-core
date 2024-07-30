@@ -299,7 +299,7 @@ impl CoinJoinClientSession {
             let mut buffer = vec![];
             pending_request.dsa.consensus_encode(&mut buffer).unwrap();
             let sent_message = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr, false);
-            println!("[RUST] CoinJoin: sending {:?} to {}", pending_request.dsa, pending_request.addr);
+            println!("[RUST] CoinJoin: sending {} to {}", pending_request.dsa, pending_request.addr);
 
             if sent_message {
                 self.pending_dsa_request = None;

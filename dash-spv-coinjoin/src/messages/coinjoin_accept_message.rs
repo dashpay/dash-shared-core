@@ -1,6 +1,7 @@
 use std::io::{Read, Write, Error};
 use dash_spv_masternode_processor::consensus::encode;
 use dash_spv_masternode_processor::tx::transaction::{Transaction, TransactionType};
+use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dsa
@@ -11,6 +12,19 @@ pub struct CoinJoinAcceptMessage {
     pub denomination: u32,
     pub tx_collateral: Transaction,
 }
+
+impl std::fmt::Display for CoinJoinAcceptMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        
+        write!(f, "CoinJoinAccept(denom={}[{}], txCol={:?})",
+            CoinJoin::denomination_to_string(self.denomination),
+            self.denomination,
+            self.tx_collateral.tx_hash
+        )?;
+        Ok(())
+    }
+}
+
 
 impl CoinJoinAcceptMessage {
     pub fn new(denomination: u32, tx_collateral: Transaction) -> Self {

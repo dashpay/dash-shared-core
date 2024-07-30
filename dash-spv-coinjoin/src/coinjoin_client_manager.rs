@@ -1,9 +1,7 @@
 use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::from::FromFFI, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
 
-use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
-
-pub const MIN_BLOCKS_TO_WAIT: i32 = 1;
+use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub struct CoinJoinClientManager {
     wallet_ex: Rc<RefCell<WalletEx>>,
@@ -13,11 +11,9 @@ pub struct CoinJoinClientManager {
     masternodes_used: Vec<UInt256>,
     last_masternode_used: usize,
     last_time_report_too_recent: u64,
-    cached_last_success_block: i32,
-    cached_block_height: i32, // Keep track of current block height
     tick: i32,
     do_auto_next_run: i32,
-    pub is_mixing: bool,
+    is_mixing: bool,
     deq_sessions: VecDeque<CoinJoinClientSession>,
     continue_mixing_on_status: Vec<PoolStatus>,
     str_auto_denom_result: String,
@@ -25,6 +21,8 @@ pub struct CoinJoinClientManager {
     mixing_finished: bool,
     get_masternode_list: GetMasternodeList,
     destroy_mn_list: DestroyMasternodeList,
+    update_success_block: UpdateSuccessBlock,
+    is_waiting_for_new_block: IsWaitingForNewBlock,
     context: *const c_void
 }
 
@@ -35,6 +33,8 @@ impl CoinJoinClientManager {
         options: CoinJoinClientOptions,
         get_masternode_list: GetMasternodeList,
         destroy_mn_list: DestroyMasternodeList, 
+        update_success_block: UpdateSuccessBlock,
+        is_waiting_for_new_block: IsWaitingForNewBlock,
         context: *const c_void
     ) -> Self {
         Self {
@@ -45,10 +45,8 @@ impl CoinJoinClientManager {
             masternodes_used: vec![],
             last_masternode_used: 0,
             last_time_report_too_recent: 0,
-            cached_last_success_block: 0,
-            cached_block_height: 0,
             tick: 0,
-            do_auto_next_run: COINJOIN_AUTO_TIMEOUT_MIN, // TODO: this and tick should be static
+            do_auto_next_run: COINJOIN_AUTO_TIMEOUT_MIN,
             is_mixing: false,
             deq_sessions: VecDeque::new(),
             continue_mixing_on_status: vec![],
@@ -57,6 +55,8 @@ impl CoinJoinClientManager {
             mixing_finished: false,
             get_masternode_list,
             destroy_mn_list,
+            update_success_block,
+            is_waiting_for_new_block,
             context
         }
     }
@@ -218,10 +218,12 @@ impl CoinJoinClientManager {
                 self.deq_sessions.push_back(new_session);
             }
 
-            while let Some(mut session) = self.deq_sessions.pop_back() {
-                 //     if (!checkAutomaticBackup()) return false;
+            let mut sessions_to_process: Vec<_> = self.deq_sessions.drain(..).collect();
 
-                // we may not need this
+            for session in sessions_to_process.iter_mut() {
+                //     if (!checkAutomaticBackup()) return false;
+
+                // (DashJ) we may not need this
                 if !dry_run && self.is_waiting_for_new_block() {
                     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                             
@@ -230,14 +232,15 @@ impl CoinJoinClientManager {
                         println!("[RUST] CoinJoin do_automatic_denominating {}", self.str_auto_denom_result);
                         self.last_time_report_too_recent = current_time;
                     }
-                            
-                    self.deq_sessions.push_back(session);
-                    return false;
+                    
+                    result = false;
+                    break;
                 }
                 
                 result &= session.do_automatic_denominating(self, dry_run, balance_info.clone());
-                self.deq_sessions.push_back(session);
             }
+
+            self.deq_sessions.extend(sessions_to_process);
 
             return result;
         }
@@ -246,17 +249,20 @@ impl CoinJoinClientManager {
     }
     
     pub fn finish_automatic_denominating(&mut self, client_session_id: UInt256) -> bool {
-        while let Some(mut session) = self.deq_sessions.pop_back() {
+        let mut sessions: Vec<_> = self.deq_sessions.drain(..).collect();
+        let mut found = false;
+    
+        for session in &mut sessions {
             if session.id == client_session_id {
                 session.finish_automatic_denominating(self);
-                self.deq_sessions.push_back(session);
-                return true;
+                found = true;
+                break;
             }
-
-            self.deq_sessions.push_back(session);
         }
-
-        return false;
+    
+        self.deq_sessions.extend(sessions);
+    
+        return found;
     }
 
     pub fn add_used_masternode(&mut self, pro_tx_hash: UInt256) {
@@ -299,7 +305,9 @@ impl CoinJoinClientManager {
     }
 
     pub fn updated_success_block(&mut self) {
-        self.cached_last_success_block = self.cached_block_height;
+        unsafe {
+            (self.update_success_block)(self.context);   
+        }
     }
 
     pub fn get_mn_list(&self) -> MasternodeList {
@@ -333,15 +341,11 @@ impl CoinJoinClientManager {
     }
 
     pub fn is_waiting_for_new_block(&self) -> bool {
-        if !self.wallet_ex.borrow().is_synced() {
-            return true;
-        }
-
         if self.options.coinjoin_multi_session {
             return false;
         }
 
-        return self.cached_block_height - self.cached_last_success_block < MIN_BLOCKS_TO_WAIT;
+        return unsafe { (self.is_waiting_for_new_block)(self.context) };
     }
 
     pub fn try_submit_denominate(&mut self, mn_addr: SocketAddress) -> bool {
@@ -374,18 +378,6 @@ impl CoinJoinClientManager {
         }
 
         return false;
-    }
-
-    pub fn mixing_masternode_address(&self, client_session_id: UInt256) -> Option<SocketAddress> {
-        for session in self.deq_sessions.iter() {
-            if session.id == client_session_id {
-                if let Some(mixing_mn) = &session.mixing_masternode {
-                    return Some(mixing_mn.socket_address);
-                }
-            }
-        }
-
-        return None;
     }
 
     pub fn update_block_tip(&mut self, block: Block) {

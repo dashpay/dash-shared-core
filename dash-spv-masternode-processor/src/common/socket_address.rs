@@ -3,6 +3,7 @@ use byte::{BytesExt, TryRead};
 use crate::consensus::{Decodable, Encodable, encode};
 use crate::crypto::byte_util::UInt128;
 
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
@@ -13,7 +14,7 @@ pub struct SocketAddress {
 
 impl std::fmt::Display for SocketAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}:{}", self.ip_address, self.port)?;
+        write!(f, "{}:{}", self.ip_address.to_ip_addr(), self.port)?;
         Ok(())
     }
 }
