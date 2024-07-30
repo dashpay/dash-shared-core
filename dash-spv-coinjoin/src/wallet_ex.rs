@@ -36,12 +36,12 @@ pub struct WalletEx {
     options: CoinJoinClientOptions,
     pub locked_coins_set: HashSet<TxOutPoint>,
     anonymizable_tally_cached_non_denom: bool,
-    vec_anonymizable_tally_cached_non_denom: Vec<CompactTallyItem>, // TODO: is there a better way to cache?
+    vec_anonymizable_tally_cached_non_denom: Vec<CompactTallyItem>,
     anonymizable_tally_cached: bool,
     vec_anonymizable_tally_cached: Vec<CompactTallyItem>,
     map_outpoint_rounds_cache: HashMap<TxOutPoint, i32>,
     unused_keys: HashMap<UInt256, Vec<u8>>,
-    // TODO: we may not need keyUsage, it is used as a way to audit unusedKeys
+    // TODO (DashJ): we may not need keyUsage, it is used as a way to audit unusedKeys
     key_usage: HashMap<UInt256, bool>,
     coinjoin_salt: UInt256,
     get_wallet_transaction: GetWalletTransaction,
@@ -314,8 +314,6 @@ impl WalletEx {
                 self.anonymizable_tally_cached = true;
             }
         }
-        
-        // println!("[RUST] CoinJoin, vec_tally_ret items: {:?}", vec_tally_ret);
 
         return vec_tally_ret;
     }

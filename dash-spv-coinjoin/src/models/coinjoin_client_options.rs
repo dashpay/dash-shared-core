@@ -5,7 +5,7 @@ use dash_spv_masternode_processor::chain::common::ChainType;
 pub struct CoinJoinClientOptions {
     pub enable_coinjoin: bool,
     pub coinjoin_amount: u64,
-    pub coinjoin_sessions: i32, // TODO: Atomic?
+    pub coinjoin_sessions: i32,
     pub coinjoin_rounds: i32,
     pub coinjoin_random_rounds: i32,
     pub coinjoin_denoms_goal: i32,
