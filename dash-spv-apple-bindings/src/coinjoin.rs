@@ -10,7 +10,7 @@ use dash_spv_coinjoin::coinjoin_client_queue_manager::CoinJoinClientQueueManager
 
 use dash_spv_coinjoin::masternode_meta_data_manager::MasternodeMetadataManager;
 use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
-use dash_spv_coinjoin::{ffi, messages};
+use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
 use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
@@ -27,9 +27,16 @@ use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_wallet_ex(
+pub unsafe extern "C" fn register_client_manager(
     context: *const c_void,
     options_ptr: *mut CoinJoinClientOptions,
+    get_masternode_list: GetMasternodeList,
+    destroy_mn_list: DestroyMasternodeList,
+    get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
+    has_chain_lock: HasChainLock,
+    destroy_input_value: DestroyInputValue,
+    update_success_block: UpdateSuccessBlock,
+    is_waiting_for_new_block: IsWaitingForNewBlock,
     get_wallet_transaction: GetWalletTransaction,
     sign_transaction: SignTransaction,
     destroy_transaction: DestroyWalletTransaction,
@@ -47,17 +54,24 @@ pub unsafe extern "C" fn register_wallet_ex(
     send_message: SendMessage,
     add_pending_masternode: AddPendingMasternode,
     start_manager_async: StartManagerAsync
-) -> *mut WalletEx {
+) -> *mut CoinJoinClientManager {
+    let coinjoin = CoinJoin::new(
+        get_input_value_by_prevout_hash,
+        has_chain_lock,
+        destroy_input_value,
+        context
+    );
+
     let wallet_ex: WalletEx =  WalletEx::new(
-        context, 
-        std::ptr::read(options_ptr), 
+        context,
+        std::ptr::read(options_ptr),
         get_wallet_transaction, 
         sign_transaction,
         destroy_transaction, 
-        is_mine, 
-        available_coins, 
+        is_mine,
+        available_coins,
         destroy_gathered_outputs,
-        selected_coins, 
+        selected_coins,
         destroy_selected_coins,
         count_inputs_with_amount,
         fresh_coinjoin_key,
@@ -70,32 +84,8 @@ pub unsafe extern "C" fn register_wallet_ex(
         start_manager_async
     );
 
-    println!("[RUST] CoinJoin: register_wallet_ex");
-    return boxed(wallet_ex);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn register_client_manager(
-    context: *const c_void,
-    wallet_ex_ptr: *mut WalletEx,
-    options_ptr: *mut CoinJoinClientOptions,
-    get_masternode_list: GetMasternodeList,
-    destroy_mn_list: DestroyMasternodeList,
-    get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
-    has_chain_lock: HasChainLock,
-    destroy_input_value: DestroyInputValue,
-    update_success_block: UpdateSuccessBlock,
-    is_waiting_for_new_block: IsWaitingForNewBlock
-) -> *mut CoinJoinClientManager {
-    let coinjoin = CoinJoin::new(
-        get_input_value_by_prevout_hash,
-        has_chain_lock,
-        destroy_input_value,
-        context
-    );
-
     let client_manager = CoinJoinClientManager::new(
-        Rc::new(RefCell::new(std::ptr::read(wallet_ex_ptr))),
+        Rc::new(RefCell::new(wallet_ex)),
         Rc::new(RefCell::new(coinjoin)),
         std::ptr::read(options_ptr), 
         get_masternode_list,
@@ -117,16 +107,15 @@ pub unsafe extern "C" fn add_client_queue_manager(
     context: *const c_void
 ) {
     let client_queue_manager = CoinJoinClientQueueManager::new(
-        Rc::new(RefCell::new(std::ptr::read(client_manager_ptr))),
-        MasternodeMetadataManager::new(), 
-        masternode_by_hash, 
-        destroy_masternode, 
-        valid_mns_count, 
+        client_manager_ptr,
+        MasternodeMetadataManager::new(),
+        masternode_by_hash,
+        destroy_masternode,
+        valid_mns_count,
         context
     );
-
+        
     (*client_manager_ptr).set_client_queue_manager(Rc::new(RefCell::new(client_queue_manager)));
-
     println!("[RUST] CoinJoin: add_client_queue_manager");
 }
 
@@ -185,12 +174,6 @@ pub unsafe extern "C" fn unregister_client_manager(client_manager: *mut CoinJoin
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn unregister_wallet_ex(wallet_ex_ptr: *mut WalletEx) {
-    println!("[RUST] WalletEx 💀 unregister_wallet_ex: {:?}", wallet_ex_ptr);
-    let _wallet_ex_rc = Rc::from_raw(wallet_ex_ptr as *mut RefCell<WalletEx>);
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn is_denominated_amount(
     amount: u64,
 ) -> bool {
@@ -202,6 +185,15 @@ pub unsafe extern "C" fn is_collateral_amount(
     amount: u64,
 ) -> bool {
     return CoinJoin::is_collateral_amount(amount);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_fully_mixed_with_manager(
+    client_manager: *mut CoinJoinClientManager,
+    prevout_hash: *mut [u8; 32],
+    index: u32,
+) -> bool {
+    return (*client_manager).is_fully_mixed(TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
 #[no_mangle]

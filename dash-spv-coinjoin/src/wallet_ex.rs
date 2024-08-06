@@ -462,7 +462,7 @@ impl WalletEx {
         coin_control.coin_type = CoinType::OnlyReadyToMix;
     
         let mut coins = self.available_coins(true, coin_control);
-        println!("[RUST] CoinJoin: -- vCoins.size(): {}", coins.len());
+        println!("[RUST] CoinJoin dsi: -- vCoins.size(): {}", coins.len());
         coins.shuffle(&mut rand::thread_rng());
     
         for out in coins.iter() {
@@ -486,13 +486,13 @@ impl WalletEx {
             value_total += value;
             vec_tx_dsin_ret.push(CoinJoinTransactionInput::new(txin, script_pub_key, rounds));
             set_recent_tx_ids.insert(tx_hash);
-            println!("[RUST] CoinJoin: -- hash: {}, nValue: {}", tx_hash, value.to_friendly_string());
+            println!("[RUST] CoinJoin dsi: -- hash: {}, value: {} val_duffs", tx_hash, value.to_friendly_string());
         }
     
-        println!("[RUST] CoinJoin: -- setRecentTxIds.size(): {}", set_recent_tx_ids.len());
+        println!("[RUST] CoinJoin dsi: -- setRecentTxIds.size(): {}", set_recent_tx_ids.len());
         
         if set_recent_tx_ids.is_empty() {
-            println!("[RUST] CoinJoin: No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
+            println!("[RUST] CoinJoin dsi: No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
             
             for output in coins.iter() {
                 println!("  output: {:?}", output);
