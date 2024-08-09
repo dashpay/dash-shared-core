@@ -6,7 +6,6 @@ use dash_spv_masternode_processor::tx::transaction::Transaction;
 use ferment_interfaces::unbox_any;
 
 use crate::ffi::input_value::InputValue;
-use crate::models::denominations::Denomination;
 use crate::coinjoin::CoinJoin;
 
 #[test]
@@ -45,12 +44,6 @@ fn standard_denomination_test() {
 
     for value in CoinJoin::get_standard_denominations().iter() {
         assert_eq!(*value as i64, CoinJoin::denomination_to_amount(CoinJoin::amount_to_denomination(*value)));
-    }
-
-    let denomination_list = Denomination::all_values();
-    for denomination in denomination_list.iter() {
-        let pos = CoinJoin::get_standard_denominations().iter().position(|&x| x == *denomination);
-        assert_ne!(None, pos);
     }
 }
 

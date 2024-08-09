@@ -327,18 +327,6 @@ unsafe fn process_coinjoin_status_update(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn process_send_coinjoin_queue(
-    message: *const u8,
-    message_length: usize
-) -> *mut messages::SendCoinJoinQueue {
-    let message: &[u8] = slice::from_raw_parts(message, message_length);
-    let mut cursor = Cursor::new(message);
-    let result = messages::SendCoinJoinQueue::consensus_decode(&mut cursor).unwrap();
-
-    boxed(result)
-}
-
-#[no_mangle]
 pub unsafe extern "C" fn process_ds_queue(
     client_manager: *mut CoinJoinClientManager,
     peer_address: *const u8,

@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::TX_MIN_OUTPUT_AMOUNT;
+use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
 use dash_spv_masternode_processor::consensus::Encodable;
 use dash_spv_masternode_processor::crypto::UInt256;
 use dash_spv_masternode_processor::ffi::ByteArray;
@@ -82,8 +83,8 @@ impl<'a> TransactionBuilder {
                 input_hash: coin.tx_outpoint.hash,
                 index: coin.tx_outpoint.index,
                 script: None,
-                signature: None,
-                sequence: 0
+                signature: Some(Vec::new()),
+                sequence: TXIN_SEQUENCE
             };
             dummy_tx.inputs.push(input);
         }
