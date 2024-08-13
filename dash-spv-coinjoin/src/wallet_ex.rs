@@ -2,6 +2,8 @@ use std::collections::{HashSet, HashMap};
 use std::ffi::CString;
 use std::slice;
 use byte::{BytesExt, LE};
+use dash_spv_masternode_processor::chain::common::ChainType;
+use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
 use dash_spv_masternode_processor::common::SocketAddress;
 use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::ffi::ByteArray;
@@ -462,7 +464,7 @@ impl WalletEx {
         coin_control.coin_type = CoinType::OnlyReadyToMix;
     
         let mut coins = self.available_coins(true, coin_control);
-        println!("[RUST] CoinJoin: -- vCoins.size(): {}", coins.len());
+        println!("[RUST] CoinJoin dsi: -- vCoins.size(): {}", coins.len());
         coins.shuffle(&mut rand::thread_rng());
     
         for out in coins.iter() {
@@ -477,8 +479,8 @@ impl WalletEx {
                 input_hash: tx_hash,
                 index: out.tx_outpoint.index,
                 script: None,
-                signature: None,
-                sequence: 0
+                signature: Some(Vec::new()),
+                sequence: TXIN_SEQUENCE
             };
             let script_pub_key = out.output.script.clone();
             let rounds = self.get_real_outpoint_coinjoin_rounds(out.tx_outpoint.clone(), 0);
@@ -486,13 +488,14 @@ impl WalletEx {
             value_total += value;
             vec_tx_dsin_ret.push(CoinJoinTransactionInput::new(txin, script_pub_key, rounds));
             set_recent_tx_ids.insert(tx_hash);
-            println!("[RUST] CoinJoin: -- hash: {}, nValue: {}", tx_hash, value.to_friendly_string());
+
+            println!("[RUST] CoinJoin dsi: hash: {}, value: {} val_duffs: {}", tx_hash, value.to_friendly_string(), value);
         }
     
-        println!("[RUST] CoinJoin: -- setRecentTxIds.size(): {}", set_recent_tx_ids.len());
+        println!("[RUST] CoinJoin dsi: -- setRecentTxIds.size(): {}", set_recent_tx_ids.len());
         
         if set_recent_tx_ids.is_empty() {
-            println!("[RUST] CoinJoin: No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
+            println!("[RUST] CoinJoin dsi: No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
             
             for output in coins.iter() {
                 println!("  output: {:?}", output);

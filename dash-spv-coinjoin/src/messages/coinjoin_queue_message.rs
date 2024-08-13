@@ -1,7 +1,7 @@
 use std::io::{Error, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 use dash_spv_masternode_processor::consensus::encode::VarInt;
-use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable, UInt256};
+use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::consensus::{encode, Encodable};
 use dash_spv_masternode_processor::crypto::UInt768;
 use dash_spv_masternode_processor::hashes::hex::ToHex;
