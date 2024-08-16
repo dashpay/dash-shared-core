@@ -5,7 +5,7 @@ use dash_spv_masternode_processor::crypto::byte_util::{AsBytes, Reversable};
 use dash_spv_masternode_processor::crypto::{UInt256, UInt384, UInt768};
 use dash_spv_masternode_processor::models::OperatorPublicKey;
 use dash_spv_masternode_processor::tx::Transaction;
-use crate::messages;
+use crate::messages::{self, CoinJoinEntry};
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 
 #[test]
@@ -167,6 +167,29 @@ pub fn coinjoin_entry_round_test() {
     assert_eq!(from_bytes.mixing_outputs[1].amount, dsi.mixing_outputs[1].amount);
 
     assert_eq!(from_bytes.tx_collateral.tx_hash, dsi.tx_collateral.tx_hash);
+}
+
+#[test]
+pub fn coinjoin_entry_test() {
+    let dsi_message = Vec::from_hex("05a57b11f764c258688b0dd9557147aafac15165729b65a09180436f56a4c0709d0100000000ffffffff6eb1d7c1ba2dd0bab9c158e9aa9535614c518e700c7155ac95f5f8db70dd235a0000000000ffffffff2126f88ff1a1d77012083cf291ce395d37079ecff1c3ab30c3869d5493b387800000000000ffffffffc692fbe122b3934d1926b1f19b14137b24a9a7182937d35e99ad7da24aae4dab0200000000ffffffffac65973a3c7c45ad2ddb033ca2c224b7a151f847716d5449ba912b3868ff71c40000000000ffffffff0100000001dd86755f2cb8d67c52da2fc42c9a97a2b08e6de01f94037390d46fae68e8ed99000000006b483045022100954aa1d666906e78bcc42806874f153d31d5e1e4ae18dcadcbf8dbfc1123e3900220732c82db96098bbee7a69f284464d5233de0e2adf23401552bf2eba1623509fb0121036bfa0b828ff9b020750e765158495979bea2134b13386e6655e00ce1b9cbe980ffffffff0110270000000000001976a9146f6293e33e78ae0f2d74ba1922b86794b9efb08288ac0000000005a1860100000000001976a914b0a180dfd44ba7066f5f42f3eaf431f0cd668fe388aca1860100000000001976a914799bcbf0ff47c4e83fbf1db27a337cc89ed8407088aca1860100000000001976a914060ae9e82d52804b66911e8aa4e94d88665ec19f88aca1860100000000001976a914a48fd783b7a6aad534a91f941a9665c8ecf0964388aca1860100000000001976a91466dd8d620782a0d89e63f0ff2d7935c46e053a4288ac").unwrap();
+    let mut cursor = Cursor::new(&dsi_message);
+    let entry = CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
+
+    let tx_collateral_bytes = Vec::from_hex("0100000001dd86755f2cb8d67c52da2fc42c9a97a2b08e6de01f94037390d46fae68e8ed99000000006b483045022100954aa1d666906e78bcc42806874f153d31d5e1e4ae18dcadcbf8dbfc1123e3900220732c82db96098bbee7a69f284464d5233de0e2adf23401552bf2eba1623509fb0121036bfa0b828ff9b020750e765158495979bea2134b13386e6655e00ce1b9cbe980ffffffff0110270000000000001976a9146f6293e33e78ae0f2d74ba1922b86794b9efb08288ac00000000").unwrap();
+    cursor = Cursor::new(&tx_collateral_bytes);
+    let collateral_tx = Transaction::consensus_decode(&mut cursor).unwrap();
+    assert_eq!(collateral_tx, entry.tx_collateral);
+    assert_eq!(5, entry.mixing_inputs.len());
+    assert_eq!(5, entry.mixing_outputs.len());
+
+    let dsi_message = Vec::from_hex("019c3f66ef3952e2d7e8d6d1435493718006114ab77e669b5ced4f1d109380465e250000000000000001000000010f5884113d3f6ad149191519b89a263ec5df0a41425c611542f6a2f55359db53000000006b4830450221009b11da562429245a67fcc79d6608f25b4eb04fec4195e2e360d1a80815db6d840220545f898f0a0fdcd57bb4e61e6920a438996ec38f0af337b9220900de4b6644ef012103854b23a80ade3e0e601dbdc8edb4f41922b4c97575cdb5c82b8523fbd8448a72000000000130750000000000001976a9145a3c111140c3346dab672ceba7931a5532488bbe88ac0000000001e4969800000000001976a914a7024476050ae66be18ee3ca6a80ff1df6f2545688ac").unwrap();
+    let mut cursor = Cursor::new(&dsi_message);
+    let entry = CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
+
+    let hash = UInt256::from_hex("8ca06ef4f0b171c936eb8da3ad52f8a769cf5f9ab53cd910846180f8db183777").ok();
+    assert_eq!(hash, entry.tx_collateral.tx_hash);
+    assert_eq!(1, entry.mixing_inputs.len());
+    assert_eq!(1, entry.mixing_outputs.len());
 }
 
 #[test]
