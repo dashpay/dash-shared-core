@@ -2,6 +2,7 @@ use std::ffi::{c_char, c_void};
 use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types::{self, MasternodeEntry};
 use crate::ffi::selected_coins::SelectedCoins;
+use crate::messages::{PoolMessage, PoolState};
 use crate::wallet_ex::WalletEx;
 
 use super::coin_control::CoinControl;
@@ -35,6 +36,7 @@ pub type DestroyWalletTransaction = unsafe extern "C" fn(
 
 pub type SignTransaction = unsafe extern "C" fn(
     transaction: *mut types::Transaction,
+    anyone_can_pay: bool,
     context: *const c_void
 ) -> *mut types::Transaction;
 
@@ -149,3 +151,20 @@ pub type UpdateSuccessBlock = unsafe extern "C" fn(
 pub type IsWaitingForNewBlock = unsafe extern "C" fn(
     context: *const c_void
 ) -> bool;
+
+pub type SessionLifecycleListener = unsafe extern "C" fn(
+    is_complete: bool,
+    base_session_id: i32,
+    client_session_id: *mut [u8; 32],
+    denomination: u32,
+    state: PoolState,
+    message: PoolMessage,
+    ip_address: *mut [u8; 16],
+    joined: bool,
+    context: *const c_void
+);
+
+// pub type MixingCompleteListener = unsafe extern "C" fn(
+//     pool_statuses: Vec<PoolStatus>,
+//     context: *const c_void
+// };

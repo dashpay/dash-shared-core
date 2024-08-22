@@ -1,12 +1,21 @@
 use std::io::{Error, Read, Write};
-use dash_spv_masternode_processor::crypto::byte_util::UInt256;
+use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::consensus::encode;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 // #[ferment_macro::export]
 pub struct TxOutPoint {
     pub hash: UInt256,
     pub index: u32,
+}
+
+impl std::fmt::Debug for TxOutPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TxOutPoint")
+            .field("hash", &self.hash.reversed())
+            .field("index", &self.index)
+            .finish()
+    }
 }
 
 impl TxOutPoint {

@@ -200,7 +200,7 @@ impl<'a> TransactionBuilder {
             }
         }
 
-        if let Some(signed_tx) = wallet_ex.borrow().sign_transaction(&tx) {
+        if let Some(signed_tx) = wallet_ex.borrow().sign_transaction(&tx, false) {
             return signed_tx.to_data().len() as i32;
         }
 

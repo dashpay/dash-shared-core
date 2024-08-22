@@ -50,7 +50,7 @@ impl CoinJoinBaseSession {
         let mut result = ValidInOuts::new();
         
         if vin.len() != vout.len() {
-            println!("ERROR: inputs vs outputs size mismatch! {} vs {}", vin.len(), vout.len());
+            println!("[RUST] CoinJoin dsf: ERROR: inputs vs outputs size mismatch! {} vs {}", vin.len(), vout.len());
             result.message_id = PoolMessage::ErrSizeMismatch;
             result.consume_collateral = true;
             result.result = false;
@@ -63,7 +63,7 @@ impl CoinJoinBaseSession {
             let mut result = ValidInOuts::new();
 
             if denom != self.session_denom {
-                println!("ERROR: incompatible denom {} ({}) != sessionDenom {} ({})",
+                println!("[RUST] CoinJoin dsf: ERROR: incompatible denom {} ({}) != sessionDenom {} ({})",
                         denom, CoinJoin::denomination_to_string(denom), self.session_denom, CoinJoin::denomination_to_string(self.session_denom));
                 result.message_id = PoolMessage::ErrDenom;
                 result.consume_collateral = true;
@@ -75,7 +75,7 @@ impl CoinJoinBaseSession {
             let hex = tx_out.script.as_ref().unwrap_or(&vec![]).to_hex();
 
             if tx_out.script_pub_key_type() != ScriptType::PayToPubkeyHash {
-                println!("ERROR: invalid script! scriptPubKey={}", hex);
+                println!("[RUST] CoinJoin dsf: ERROR: invalid script! scriptPubKey={}", hex);
                 result.message_id = PoolMessage::ErrInvalidScript;
                 result.consume_collateral = true;
                 result.result = false;
@@ -84,7 +84,7 @@ impl CoinJoinBaseSession {
             }
 
             if !set_scrip_pub_keys.insert(hex.clone()) {
-                println!("ERROR: already have this script! scriptPubKey={}", hex);
+                println!("[RUST] CoinJoin dsf: ERROR: already have this script! scriptPubKey={}", hex);
                 result.message_id = PoolMessage::ErrAlreadyHave;
                 result.consume_collateral = true;
                 result.result = false;
@@ -99,9 +99,7 @@ impl CoinJoinBaseSession {
             return result;
         };
 
-        // Dash Core checks that the fee's are zero, but we cannot since we don't have access to all of the inputs
-        // TODO: remove fee check?
-        let mut fees: i64 = 0;
+        // Note: here, Dash Core checks that the fee's are zero, but we cannot since we don't have access to all of the inputs
 
         for tx_out in vout {
             let output_result = &check_tx_out(&tx_out);
@@ -110,33 +108,19 @@ impl CoinJoinBaseSession {
                 result.result = false;
                 return result;
             }
-
-            // nFees -= txout.nValue;
         }
 
         for tx_in in vin {
             println!("tx_in={:?}", tx_in);
 
             if tx_in.input_hash.0.is_empty() {
-                println!("coinjoin: ERROR: invalid input!");
+                println!("[RUST] CoinJoin dsf: ERROR: invalid input!");
                 result.message_id = PoolMessage::ErrInvalidInput;
                 result.consume_collateral = true;
                 result.result = false;
 
                 return result;
             }
-
-            // nFees += coin.out.nValue;
-        }
-
-        // The same size and denom for inputs and outputs ensures their total value is also the same,
-        // no need to double-check. If not, we are doing something wrong, bail out.
-        if fees != 0 {
-            println!("coinjoin: ERROR: non-zero fees! fees={}", fees);
-            result.message_id = PoolMessage::ErrFees;
-            result.result = false;
-
-            return result;
         }
 
         return result;

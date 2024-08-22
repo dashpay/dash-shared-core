@@ -9,9 +9,9 @@ pub struct ValidInOuts {
 impl ValidInOuts {
     pub fn new() -> Self {
         Self {
-            result: false,
+            result: true,
             message_id: PoolMessage::MsgNoErr,
-            consume_collateral: false,
+            consume_collateral: false
         }
     }
 }
