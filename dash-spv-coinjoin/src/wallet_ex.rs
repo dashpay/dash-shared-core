@@ -308,17 +308,14 @@ impl WalletEx {
         // This should only be used if nMaxOupointsPerAddress was NOT specified.
         if max_outpoints_per_address == -1 && anonymizable && skip_unconfirmed {
             if skip_denominated {
-                println!("[RUST] CoinJoin: assigning cache for non-denom inputs {}", vec_tally_ret.len());
                 self.vec_anonymizable_tally_cached_non_denom = vec_tally_ret.clone();
                 self.anonymizable_tally_cached_non_denom = true;
             } else {
-                println!("[RUST] CoinJoin: assigning cache for all inputs {}", vec_tally_ret.len());
                 self.vec_anonymizable_tally_cached = vec_tally_ret.clone();
                 self.anonymizable_tally_cached = true;
             }
         }
 
-        println!("[RUST] CoinJoin: returning vec_tally_ret: {}", vec_tally_ret.len());
         return vec_tally_ret;
     }
 
