@@ -54,7 +54,7 @@ impl<'a> ReserveDestination {
         if self.address.is_some() {
             self.wallet_ex.borrow_mut().remove_unused_key(&self.address);
         } else {
-            println!("[RUST] cannot keep key");
+            println!("[RUST] CoinJoin: cannot keep key");
         }
 
         self.address = None;
@@ -64,7 +64,7 @@ impl<'a> ReserveDestination {
         if self.address.is_some() {
             self.wallet_ex.borrow_mut().add_unused_key(&self.address);
         } else {
-            println!("[RUST] cannot return key");
+            println!("[RUST] CoinJoin: cannot return key");
         }
 
         self.address = None;

@@ -77,7 +77,7 @@ impl TransactionType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct TransactionInput {
     pub input_hash: UInt256,
     pub index: u32,
@@ -120,15 +120,11 @@ impl std::fmt::Debug for TransactionInput {
             .field("index", &self.index)
             .field(
                 "script",
-                &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex(),
+                &self.script.as_ref().map_or("None".to_string(), |s| s.to_hex()),
             )
             .field(
                 "signature",
-                &self
-                    .signature
-                    .as_ref()
-                    .unwrap_or(&Vec::<u8>::new())
-                    .to_hex(),
+                &self.signature.as_ref().map_or("None".to_string(), |s| s.to_hex()),
             )
             .field("sequence", &self.sequence)
             .finish()
@@ -156,7 +152,7 @@ impl<'a> TryRead<'a, Endian> for TransactionInput {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct TransactionOutput {
     pub amount: u64,
     pub script: Option<Vec<u8>>,
@@ -189,8 +185,8 @@ impl std::fmt::Debug for TransactionOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransactionOutput")
             .field("amount", &self.amount)
-            .field("script", &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
-            .field("address", &self.address.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
+            .field("script", &self.script.as_ref().map_or("None".to_string(), |s| s.to_hex()))
+            .field("address", &self.address.as_ref().map_or("None".to_string(), |s| s.to_hex()))
             .finish()
     }
 }
@@ -261,7 +257,7 @@ pub trait ITransaction {
     fn tx_type(&self) -> TransactionType;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Transaction {
     pub inputs: Vec<TransactionInput>,
     pub outputs: Vec<TransactionOutput>,

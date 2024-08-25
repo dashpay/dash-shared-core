@@ -1,6 +1,6 @@
 use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::from::FromFFI, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
-use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
+use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub struct CoinJoinClientManager {
     wallet_ex: Rc<RefCell<WalletEx>>,
@@ -22,6 +22,8 @@ pub struct CoinJoinClientManager {
     destroy_mn_list: DestroyMasternodeList,
     update_success_block: UpdateSuccessBlock,
     is_waiting_for_new_block: IsWaitingForNewBlock,
+    session_lifecycle_listener: SessionLifecycleListener,
+    // mixing_complete_listener: MixingCompleteListener,
     context: *const c_void
 }
 
@@ -34,6 +36,8 @@ impl CoinJoinClientManager {
         destroy_mn_list: DestroyMasternodeList, 
         update_success_block: UpdateSuccessBlock,
         is_waiting_for_new_block: IsWaitingForNewBlock,
+        session_lifecycle_listener: SessionLifecycleListener,
+        // mixing_complete_listener: MixingCompleteListener,
         context: *const c_void
     ) -> Self {
         Self {
@@ -56,6 +60,8 @@ impl CoinJoinClientManager {
             destroy_mn_list,
             update_success_block,
             is_waiting_for_new_block,
+            session_lifecycle_listener,
+            // mixing_complete_listener
             context
         }
     }
@@ -110,10 +116,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn do_maintenance(&mut self, balance_info: Balance) {
-        println!("[RUST] CoinJoin do_maintenance, sessions len: {}", self.deq_sessions.len());
-
         if !self.options.enable_coinjoin {
-            println!("[RUST] CoinJoin: not enabled");
             return;
         }
 
@@ -126,7 +129,6 @@ impl CoinJoinClientManager {
             queue_manager.borrow_mut().do_maintenance();
         }
 
-        println!("[RUST] CoinJoin: proceed with do_maintenance");
         self.tick += 1;
         self.check_timeout();
         self.process_pending_dsa_request();
@@ -139,7 +141,6 @@ impl CoinJoinClientManager {
 
         // are all sessions idle?
         let mut is_idle = !self.deq_sessions.is_empty(); // false if no sessions created yet
-        println!("[RUST] CoinJoin: is_idle? {}", is_idle);
         
         for session in &self.deq_sessions {
             if !session.has_nothing_to_do {
@@ -201,28 +202,22 @@ impl CoinJoinClientManager {
             let mut result = true;
 
             if self.deq_sessions.len() < self.options.coinjoin_sessions as usize {
-                let new_session = CoinJoinClientSession::new(self.coinjoin.clone(), self.options.clone(), self.wallet_ex.clone(), queue_manager.clone());
-                println!("[RUST] CoinJoin: creating new session, current amount {}: ", self.deq_sessions.len());
-
-                // TODO:
-                // for (ListenerRegistration<SessionCompleteListener> listener : sessionCompleteListeners) {
-                //     newSession.addSessionCompleteListener(listener.executor, listener.listener);
-                // }
-                // for (ListenerRegistration<SessionStartedListener> listener : sessionStartedListeners) {
-                //     newSession.addSessionStartedListener(listener.executor, listener.listener);
-                // }
-                // for (ListenerRegistration<CoinJoinTransactionListener> listener : transactionListeners) {
-                //     newSession.addTransationListener (listener.executor, listener.listener);
-                // }
-
+                let new_session = CoinJoinClientSession::new(
+                    self.coinjoin.clone(),
+                    self.options.clone(),
+                    self.wallet_ex.clone(),
+                    queue_manager.clone(),
+                    self.session_lifecycle_listener,
+                    self.context
+                );
+                
+                println!("[RUST] CoinJoin: creating new session, current session amount {}: ", self.deq_sessions.len());
                 self.deq_sessions.push_back(new_session);
             }
 
             let mut sessions_to_process: Vec<_> = self.deq_sessions.drain(..).collect();
 
             for session in sessions_to_process.iter_mut() {
-                //     if (!checkAutomaticBackup()) return false;
-
                 // (DashJ) we may not need this
                 if !dry_run && self.is_waiting_for_new_block() {
                     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
@@ -322,8 +317,6 @@ impl CoinJoinClientManager {
         for session in self.deq_sessions.iter_mut() {
             if session.process_pending_dsa_request() {
                 self.str_auto_denom_result = "Mixing in progress...".to_string();
-            } else {
-                println!("[RUST] CoinJoin dsa: did not process pending dsa request");
             }
         }
     }
@@ -406,7 +399,11 @@ impl CoinJoinClientManager {
         println!("[RUST] CoinJoin: trigger_mixing_finished");
         if self.stop_on_nothing_to_do {
             self.mixing_finished = true;
-            // TODO: self.queue_mixing_complete_listeners();
+            self.queue_mixing_complete_listeners();
         }
+    }
+
+    fn queue_mixing_complete_listeners(&self) {
+        // self.mixing_complete_listener()(self.deq_sessions.map(|x| x.status), self.context);
     }
 }
