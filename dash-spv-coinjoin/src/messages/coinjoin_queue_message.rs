@@ -46,7 +46,7 @@ impl std::fmt::Display for CoinJoinQueueMessage {
 impl CoinJoinQueueMessage {
     pub fn is_time_out_of_bounds(&self, current_time: u64) -> bool {
         return current_time.saturating_sub(self.time as u64) > COINJOIN_QUEUE_TIMEOUT || 
-            (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT
+            (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT;
     }
 
     pub fn check_signature(&self, key: OperatorPublicKey) -> bool { // TODO: recheck test

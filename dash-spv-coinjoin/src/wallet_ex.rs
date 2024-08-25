@@ -2,7 +2,6 @@ use std::collections::{HashSet, HashMap};
 use std::ffi::CString;
 use std::slice;
 use byte::{BytesExt, LE};
-use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
 use dash_spv_masternode_processor::common::SocketAddress;
 use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
@@ -374,8 +373,8 @@ impl WalletEx {
 
     pub fn get_unused_key(&mut self, internal: bool) -> TxDestination {
         if self.unused_keys.is_empty() {
-            println!("[RUST] WalletEx - obtaining fresh key");
-            println!("[RUST] WalletEx - keyUsage map has unused keys: {}", !self.key_usage.is_empty() && self.key_usage.values().all(|used| !used));
+            println!("[RUST] CoinJoin: WalletEx - obtaining fresh key");
+            println!("[RUST] CoinJoin: WalletEx - keyUsage map has unused keys: {}, unused key count: {}", !self.key_usage.is_empty() && self.key_usage.values().all(|used| !used), self.unused_keys.len());
             return Some(self.fresh_receive_key(internal));
         }
 
@@ -386,8 +385,8 @@ impl WalletEx {
             key = *pair.0;
             item = pair.1.clone();
 
-            println!("[RUST] WalletEx - reusing key: {:?}", address::with_script_sig(&item, &self.options.chain_type.script_map()));
-            println!("[RUST] WalletEx - keyUsage map says this key is used: {}", self.key_usage.get(&key).unwrap());
+            println!("[RUST] CoinJoin: WalletEx - reusing key: {:?}", address::with_script_sig(&item, &self.options.chain_type.script_map()));
+            println!("[RUST] CoinJoin: WalletEx - keyUsage map says this key is used: {}, unused key count: {}", self.key_usage.get(&key).unwrap(), self.unused_keys.len());
         } else {
             return None;
         }
@@ -404,7 +403,7 @@ impl WalletEx {
             let key_id = UInt256::sha256(key);
             self.unused_keys.insert(key_id, key.clone());
             self.key_usage.insert(key_id, false);
-            println!("[RUST] WalletEx - add unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
+            println!("[RUST] CoinJoin: WalletEx - add unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
         }
     }
 
@@ -413,7 +412,7 @@ impl WalletEx {
             let key_id = UInt256::sha256(key);
             self.unused_keys.remove(&key_id);
             self.key_usage.insert(key_id, true);
-            println!("[RUST] WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
+            println!("[RUST] CoinJoin: WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
         }
     }
 
@@ -435,9 +434,9 @@ impl WalletEx {
         return result;
     }
 
-    pub fn sign_transaction(&self, tx: &Transaction) -> Option<Transaction> {
+    pub fn sign_transaction(&self, tx: &Transaction, anyone_can_pay: bool) -> Option<Transaction> {
         unsafe {
-            let raw_tx = (self.sign_transaction)(boxed(tx.encode()), self.context);
+            let raw_tx = (self.sign_transaction)(boxed(tx.encode()), anyone_can_pay, self.context);
 
             if raw_tx.is_null() {
                 return None;
@@ -489,7 +488,7 @@ impl WalletEx {
             vec_tx_dsin_ret.push(CoinJoinTransactionInput::new(txin, script_pub_key, rounds));
             set_recent_tx_ids.insert(tx_hash);
 
-            println!("[RUST] CoinJoin dsi: hash: {}, value: {} val_duffs: {}", tx_hash, value.to_friendly_string(), value);
+            println!("[RUST] CoinJoin dsi: hash: {}, value: {} val_duffs: {}", tx_hash.reversed(), value.to_friendly_string(), value);
         }
     
         println!("[RUST] CoinJoin dsi: -- setRecentTxIds.size(): {}", set_recent_tx_ids.len());
@@ -498,7 +497,7 @@ impl WalletEx {
             println!("[RUST] CoinJoin dsi: No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
             
             for output in coins.iter() {
-                println!("  output: {:?}", output);
+                println!("[RUST] CoinJoin dsi:  output: {:?}", output);
             }
         }
     
@@ -607,7 +606,7 @@ impl WalletEx {
             result
         };
 
-        println!("[RUST] WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.chain_type.script_map()));
+        println!("[RUST] CoinJoin: WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.chain_type.script_map()));
         self.key_usage.insert(UInt256::sha256(&fresh_key), true);
 
         return fresh_key;

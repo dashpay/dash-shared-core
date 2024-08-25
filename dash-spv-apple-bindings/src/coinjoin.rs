@@ -13,7 +13,7 @@ use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
+use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, SelectCoinsGroupedByAddresses, SendMessage, SessionLifecycleListener, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
@@ -53,7 +53,9 @@ pub unsafe extern "C" fn register_client_manager(
     disconnect_masternode: DisconnectMasternode,
     send_message: SendMessage,
     add_pending_masternode: AddPendingMasternode,
-    start_manager_async: StartManagerAsync
+    start_manager_async: StartManagerAsync,
+    session_lifecycle_listener: SessionLifecycleListener,
+    // mixing_complete_listener: MixingCompleteListener
 ) -> *mut CoinJoinClientManager {
     let coinjoin = CoinJoin::new(
         get_input_value_by_prevout_hash,
@@ -92,6 +94,8 @@ pub unsafe extern "C" fn register_client_manager(
         destroy_mn_list,
         update_success_block,
         is_waiting_for_new_block,
+        session_lifecycle_listener,
+        // mixing_complete_listener,
         context
     );
     println!("[RUST] CoinJoin: register_client_manager");
