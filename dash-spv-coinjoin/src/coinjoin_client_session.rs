@@ -461,7 +461,7 @@ impl CoinJoinClientSession {
             for (denom, count) in &map_denom_count {
                 // Check if this specific denom could use another loop, check that there aren't nCoinJoinDenomsGoal of this
                 // denom and that our nValueLeft/nBalanceToDenominate is enough to create one of these denoms, if so, loop again.
-                if *count < DEFAULT_COINJOIN_DENOMS_GOAL && tx_builder.could_add_output(*denom) && balance_to_denominate > 0 {
+                if *count < DEFAULT_COINJOIN_DENOMS_GOAL && tx_builder.could_add_output(*denom) && balance_to_denominate >= CoinJoin::get_smallest_denomination() {
                     finished = false;
                     println!("[RUST] CoinJoinClientSession -- 1 - NOT finished - nDenomValue: {}, count: {}, nBalanceToDenominate: {}, {}",
                         denom.to_friendly_string(), count, balance_to_denominate.to_friendly_string(), tx_builder.to_string());
