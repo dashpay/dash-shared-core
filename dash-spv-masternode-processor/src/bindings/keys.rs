@@ -21,6 +21,7 @@ use crate::processing::keys_cache::KeysCache;
 use crate::types::opaque_key::{AsCStringPtr, AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
 use crate::util::address::address;
 use crate::util::sec_vec::SecVec;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Destroys
 /// # Safety
@@ -502,6 +503,7 @@ pub unsafe extern "C" fn key_bls_chaincode(key: *mut BLSKey) -> ByteArray {
 
 /// # Safety
 #[no_mangle]
+#[cfg(feature = "use_serde")]
 pub unsafe extern "C" fn key_bls_serialize(key: *mut BLSKey, legacy: bool) -> ByteArray {
     (&*key).bls_public_key()
         .map(|key| UInt384(*if legacy { key.serialize_legacy() } else { key.serialize() }))

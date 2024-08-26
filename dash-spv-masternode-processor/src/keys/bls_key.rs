@@ -8,6 +8,7 @@ use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::models::OperatorPublicKey;
 use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Debug, Default)]
 pub struct BLSKey {
@@ -171,6 +172,7 @@ impl BLSKey {
         }
     }
 
+    #[cfg(feature = "use_serde")]
     pub fn key_with_seed_data(seed: &[u8], use_legacy: bool) -> Self {
         let bls_private_key = PrivateKey::from_bip32_seed(seed);
         let bls_public_key = bls_private_key.g1_element().unwrap();
@@ -554,6 +556,7 @@ fn g1_element_from_bytes(use_legacy: bool, bytes: &[u8]) -> Result<G1Element, Bl
     }
 }
 
+#[cfg(feature = "use_serde")]
 fn g1_element_serialized(public_key: &G1Element, use_legacy: bool) -> [u8; 48] {
     *if use_legacy {
         public_key.serialize_legacy()
@@ -562,6 +565,7 @@ fn g1_element_serialized(public_key: &G1Element, use_legacy: bool) -> [u8; 48] {
     }
 }
 
+#[cfg(feature = "use_serde")]
 fn g2_element_serialized(signature: &G2Element, use_legacy: bool) -> [u8; 96] {
     *if use_legacy {
         signature.serialize_legacy()
