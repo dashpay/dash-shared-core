@@ -244,6 +244,14 @@ impl TransactionOutput {
             return true;
         }
     }
+
+    pub fn is_op_return(&self) -> bool {
+        if let Some(ref script) = self.script {
+            return script.script_elements().len() > 0 && script.script_elements()[0] == ScriptElement::Number(OP_RETURN.into_u8());
+        } else {
+            return false;
+        }
+    }
 }
 
 pub trait ITransaction {

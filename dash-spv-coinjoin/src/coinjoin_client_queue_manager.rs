@@ -95,7 +95,7 @@ impl CoinJoinClientQueueManager {
 
             // if the queue is ready, submit if we can
             if dsq.ready && self.try_submit_denominate(dmn.socket_address.clone()) {
-                println!("[RUST] CoinJoin dsi: DSQUEUE -- CoinJoin queue ({}) is ready on masternode {}", dsq, dmn.socket_address);
+                println!("[RUST] CoinJoin: DSQUEUE -- CoinJoin queue ({}) is ready on masternode {}", dsq, dmn.socket_address);
             } else {
                 if let Some(meta_info) = self.masternode_metadata_manager.get_meta_info(dmn.provider_registration_transaction_hash, true) {
                     let last_dsq = meta_info.last_dsq;

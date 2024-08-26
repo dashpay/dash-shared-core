@@ -127,6 +127,3 @@ extern "C" fn has_chain_lock(
 unsafe extern "C" fn destroy_input_value(input_value: *mut InputValue) {
     let _res = unbox_any(input_value);
 }
-
-// TODO: byte[] txPayload = Utils.HEX.decode("0100000001cb1768cae4d44860a6ae18fec6d81f14fa84de48f0027a83107889671c1f1d54000000006a47304402202edab2fb737f7672bd9898e00855a86ca3bdc60a676a16766edb505370e9e0d50220139fd47f674e2ccee32139cf7a82e441f6f2c7d79d7135ac900a3a836591ae9301210262ffa9b2c936262abd869ead9cfde301d29adbe3d4b18d8cd6a150d45e61d656ffffffff0130750000000000001976a914d1a0b93ec28bba201c03fb01a934727782c7b9e288ac00000000");
-//         Transaction txCollateral = new Transaction(PARAMS, txPayload);
