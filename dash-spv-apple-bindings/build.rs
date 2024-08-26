@@ -12,13 +12,16 @@ use ferment::{Builder, Crate};
 // # default: []
 // crates = ["your_crate_name"]
 pub const SELF_NAME: &str = "dash_spv_apple_bindings";
+
+// .with_crates(vec!["platform-value", "platform-version", "dpp"])
+
 fn main() {
 
     let c_header = "target/dash_shared_core.h";
     match Builder::new(Crate::current_with_name(SELF_NAME))
         .with_mod_name("fermented")
         // .with_crates(vec!["ferment-example", "platform-value", "dpp"])
-        .with_crates(vec!["dash-spv-masternode-processor"])
+        .with_crates(vec!["dash-spv-masternode-processor", "dash-spv-platform", "dash-sdk", "platform-value", "platform-version", "dpp", "drive-proof-verifier"])
         .generate() {
         Ok(()) => match Command::new("cbindgen")
             .args(["--config", "cbindgen.toml", "-o", c_header])

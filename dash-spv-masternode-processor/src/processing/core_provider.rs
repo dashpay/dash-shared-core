@@ -115,7 +115,7 @@ pub enum byte_Error_FFI {
     BadInput { err: *mut std::os::raw::c_char },
 }
 
-impl ferment_interfaces::FFIConversion<byte::Error> for byte_Error_FFI {
+impl ferment_interfaces::FFIConversionFrom<byte::Error> for byte_Error_FFI {
     unsafe fn ffi_from_const(ffi: *const byte_Error_FFI) -> byte::Error {
         let ffi_ref = &*ffi;
         match ffi_ref {
@@ -123,16 +123,20 @@ impl ferment_interfaces::FFIConversion<byte::Error> for byte_Error_FFI {
                 byte::Error::Incomplete,
             byte_Error_FFI::BadOffset(o_0) => byte::Error::BadOffset(*o_0),
             byte_Error_FFI::BadInput { err} =>
-                byte::Error::BadInput { err: ferment_interfaces::FFIConversion::ffi_from_const(*err) },
+                byte::Error::BadInput { err: ferment_interfaces::FFIConversionFrom::ffi_from_const(*err) },
         }
     }
+}
+impl ferment_interfaces::FFIConversionTo<byte::Error> for byte_Error_FFI {
     unsafe fn ffi_to_const(obj: byte::Error) -> *const byte_Error_FFI {
         ferment_interfaces::boxed(match obj {
             byte::Error::Incomplete => byte_Error_FFI::Incomplete,
             byte::Error::BadOffset(o_0) => byte_Error_FFI::BadOffset(o_0),
-            byte::Error::BadInput { err } => byte_Error_FFI::BadInput { err: ferment_interfaces::FFIConversion::ffi_to(err) },
+            byte::Error::BadInput { err } => byte_Error_FFI::BadInput { err: ferment_interfaces::FFIConversionTo::ffi_to(err) },
         })
     }
+}
+impl ferment_interfaces::FFIConversionDestroy<byte::Error> for byte_Error_FFI {
     unsafe fn destroy(ffi: *mut byte_Error_FFI) {
         ferment_interfaces::unbox_any(ffi);
     }
@@ -142,7 +146,7 @@ impl Drop for byte_Error_FFI {
         unsafe {
             match self {
                 byte_Error_FFI::BadInput { err } =>
-                    <std::os::raw::c_char as ferment_interfaces::FFIConversion<&str>>::destroy(*err),
+                    <std::os::raw::c_char as ferment_interfaces::FFIConversionDestroy<&str>>::destroy(*err),
                 _ => {},
             }
         }

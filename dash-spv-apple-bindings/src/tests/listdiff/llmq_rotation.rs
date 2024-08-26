@@ -524,7 +524,7 @@ fn test_processor_devnet_333_2() {
         context as *mut _ as *mut std::ffi::c_void,
         chain
     );
-    let processor = MasternodeProcessor::new(Arc::new(provider));
+    let processor = MasternodeProcessor::new(Box::new(provider));
     let result = process_mnlist_diff(&processor, &chain.load_message("mnlistdiff--1-25480.dat"), false, 70221, context.cache).unwrap();
     context.is_dip_0024 = true;
     let result = process_qr_info(&processor, &chain.load_message("qrinfo--1-24868.dat"), false, 70221, true, context.cache).unwrap();

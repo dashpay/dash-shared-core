@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use ferment_interfaces::FFIConversion;
+use ferment_interfaces::{FFIConversionFrom, FFIConversionTo};
 use crate::chain::common::llmq_type::LLMQType;
 use crate::crypto::byte_util::{UInt256, UInt768};
 use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
@@ -105,13 +105,9 @@ impl MasternodeProcessorCache {
 // it's transformed into MasternodeProcessorCache
 pub type MasternodeProcessorCacheFFI = MasternodeProcessorCache;
 
-impl FFIConversion<MasternodeProcessorCache> for MasternodeProcessorCacheFFI {
+impl FFIConversionFrom<MasternodeProcessorCache> for MasternodeProcessorCacheFFI {
     unsafe fn ffi_from_const(ffi: *const Self) -> MasternodeProcessorCache {
         panic!("It's not intended")
-    }
-
-    unsafe fn ffi_to_const(obj: MasternodeProcessorCache) -> *const Self {
-        ferment_interfaces::boxed(obj)
     }
 
     unsafe fn ffi_from(ffi: *mut Self) -> MasternodeProcessorCache {
@@ -119,6 +115,11 @@ impl FFIConversion<MasternodeProcessorCache> for MasternodeProcessorCacheFFI {
         // So we should not attempt to free or use the raw pointer in C again after this, as it would lead to undefined behavior
         // So we have to to re-box it and send it back to C again
         *ferment_interfaces::unbox_any(ffi)
+    }
+}
+impl FFIConversionTo<MasternodeProcessorCache> for MasternodeProcessorCacheFFI {
+    unsafe fn ffi_to_const(obj: MasternodeProcessorCache) -> *const Self {
+        ferment_interfaces::boxed(obj)
     }
 
     unsafe fn ffi_to(obj: MasternodeProcessorCache) -> *mut Self {

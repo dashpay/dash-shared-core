@@ -22,7 +22,7 @@ pub struct QRInfo {
 }
 
 
-pub type ReadContext<'a> = (&'a Box<dyn CoreProvider>, bool, u32, bool);
+pub type ReadContext<'a> = (&'a dyn CoreProvider, bool, u32, bool);
 
 impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
     fn try_read(bytes: &'a [u8], ctx: ReadContext<'a>) -> byte::Result<(Self, usize)> {

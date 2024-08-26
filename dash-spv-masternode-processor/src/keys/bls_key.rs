@@ -11,6 +11,7 @@ use crate::models::OperatorPublicKey;
 use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::opaque]
 pub struct BLSKey {
     pub seckey: UInt256,
     pub chaincode: UInt256,
@@ -387,14 +388,13 @@ impl BLSKey {
 
     pub fn verify_secure_aggregated(commitment_hash: UInt256, signature: UInt768, operator_keys: Vec<OperatorPublicKey>, use_legacy: bool) -> bool {
         let message = commitment_hash.as_bytes();
-        let public_keys = operator_keys.iter().filter_map(|key| {
-            let result: Result<G1Element, BlsError> = key.into();
-            result.ok()
-        }).collect::<Vec<_>>();
-        let public_keys = public_keys.iter().collect::<Vec<&G1Element>>();
+        let public_keys = operator_keys
+            .iter()
+            .filter_map(|key| g1_element_from_bytes(key.is_legacy(), &key.data.0).ok())
+            .collect::<Vec<_>>();
         match g2_element_from_bytes(use_legacy, signature.as_bytes()) {
-            Ok(signature) if use_legacy => LegacySchemeMPL::new().verify_secure(public_keys, message, &signature),
-            Ok(signature) => BasicSchemeMPL::new().verify_secure(public_keys, message, &signature),
+            Ok(signature) if use_legacy => LegacySchemeMPL::new().verify_secure(public_keys.iter(), message, &signature),
+            Ok(signature) => BasicSchemeMPL::new().verify_secure(public_keys.iter(), message, &signature),
             _ => false
         }
     }

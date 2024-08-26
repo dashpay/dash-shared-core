@@ -16,6 +16,7 @@ use crate::util::sec_vec::SecVec;
 const EXT_PUBKEY_SIZE: usize = 4 + mem::size_of::<UInt256>() + mem::size_of::<UInt256>();
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::opaque]
 pub struct ED25519Key {
     pub seckey: UInt256,
     pub pubkey: Vec<u8>,

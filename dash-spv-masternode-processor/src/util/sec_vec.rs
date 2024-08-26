@@ -2,8 +2,9 @@ use std::io;
 use zeroize::Zeroize;
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::opaque]
 pub struct SecVec {
-    inner: Vec<u8>,
+    pub inner: Vec<u8>,
 }
 
 impl SecVec {

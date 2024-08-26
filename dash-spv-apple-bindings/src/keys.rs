@@ -227,7 +227,7 @@ pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
 #[no_mangle]
 pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKey, chain_type: ChainType) -> *mut c_char {
     let script = chain_type.script_map();
-    ferment_interfaces::FFIConversion::ffi_to(match *key {
+    ferment_interfaces::FFIConversionTo::ffi_to(match *key {
         OpaqueKey::ECDSA(ptr) => (&*ptr).serialized_private_key_for_script(&script),
         OpaqueKey::BLSLegacy(ptr) |
         OpaqueKey::BLSBasic(ptr) => (&*ptr).serialized_private_key_for_script(&script),
@@ -560,7 +560,7 @@ pub unsafe extern "C" fn key_ecdsa_with_bip38_key(private_key: *const c_char, pa
     let private_key = CStr::from_ptr(private_key).to_str().unwrap();
     let passphrase = CStr::from_ptr(passphrase).to_str().unwrap();
     let script = chain_type.script_map();
-    ferment_interfaces::FFIConversion::ffi_to_opt(ECDSAKey::key_with_bip38_key(private_key, passphrase, &script)
+    ferment_interfaces::FFIConversionTo::ffi_to_opt(ECDSAKey::key_with_bip38_key(private_key, passphrase, &script)
         .map(|key| key.serialized_private_key_for_script(&script)).ok())
 }
 
@@ -622,7 +622,7 @@ pub unsafe extern "C" fn key_ecdsa_has_private_key(key: *mut ECDSAKey) -> bool {
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut ECDSAKey, chain_type: ChainType) -> *mut c_char {
-    ferment_interfaces::FFIConversion::ffi_to((&*key).serialized_private_key_for_script(&chain_type.script_map()))
+    ferment_interfaces::FFIConversionTo::ffi_to((&*key).serialized_private_key_for_script(&chain_type.script_map()))
 }
 
 // + (NSString *)serializedAuthPrivateKeyFromSeed:(NSData *)seed forChain:(DSChain *)chain
@@ -631,7 +631,7 @@ pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut EC
 pub unsafe extern "C" fn key_ecdsa_serialized_auth_private_key_for_chain(seed: *const u8, seed_len: usize, chain_type: ChainType) -> *mut c_char {
     let seed = slice::from_raw_parts(seed, seed_len);
     let script_map = chain_type.script_map();
-    ferment_interfaces::FFIConversion::ffi_to(ECDSAKey::serialized_auth_private_key_from_seed(seed, script_map))
+    ferment_interfaces::FFIConversionTo::ffi_to(ECDSAKey::serialized_auth_private_key_from_seed(seed, script_map))
 }
 
 /// # Safety
@@ -738,7 +738,7 @@ pub unsafe extern "C" fn key_serialized_extended_private_key_from_seed(
     chain_type: ChainType) -> *mut c_char {
     let secret_slice = slice::from_raw_parts(secret, secret_len);
     let index_path = decode_derivation_path(derivation_indexes, derivation_hardened, derivation_len);
-    ferment_interfaces::FFIConversion::ffi_to_opt(ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type).ok())
+    ferment_interfaces::FFIConversionTo::ffi_to_opt(ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type).ok())
 }
 
 /// # Safety
@@ -768,25 +768,25 @@ pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_type: Ch
 pub unsafe extern "C" fn key_address_with_public_key_data(data: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
     let map = chain_type.script_map();
     let data = slice::from_raw_parts(data, len);
-    ferment_interfaces::FFIConversion::ffi_to(address::with_public_key_data(data, &map))
+    ferment_interfaces::FFIConversionTo::ffi_to(address::with_public_key_data(data, &map))
 }
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn address_for_ecdsa_key(key: *mut ECDSAKey, chain_type: ChainType) -> *mut c_char {
     let script_map = chain_type.script_map();
-    ferment_interfaces::FFIConversion::ffi_to((&*key).address_with_public_key_data(&script_map))
+    ferment_interfaces::FFIConversionTo::ffi_to((&*key).address_with_public_key_data(&script_map))
 }
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn address_for_bls_key(key: *mut BLSKey, chain_type: ChainType) -> *mut c_char {
     let script_map = chain_type.script_map();
-    ferment_interfaces::FFIConversion::ffi_to((&*key).address_with_public_key_data(&script_map))
+    ferment_interfaces::FFIConversionTo::ffi_to((&*key).address_with_public_key_data(&script_map))
 }
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_type: ChainType) -> *mut c_char {
     let script_map = chain_type.script_map();
-    ferment_interfaces::FFIConversion::ffi_to((&*key).address_with_public_key_data(&script_map))
+    ferment_interfaces::FFIConversionTo::ffi_to((&*key).address_with_public_key_data(&script_map))
 }
 
 
@@ -799,7 +799,7 @@ pub unsafe extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_typ
 pub unsafe extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8, chain_type: ChainType) -> *mut c_char {
     let compact_sig = slice::from_raw_parts(data, len);
     let script_map = chain_type.script_map();
-    ferment_interfaces::FFIConversion::ffi_to_opt(UInt256::from_const(digest).map_err(ProcessingError::from)
+    ferment_interfaces::FFIConversionTo::ffi_to_opt(UInt256::from_const(digest).map_err(ProcessingError::from)
         .and_then(|message_digest| ECDSAKey::key_with_compact_sig(compact_sig, message_digest).map_err(ProcessingError::from))
         .map(|key| key.address_with_public_key_data(&script_map)).ok())
 }
@@ -824,7 +824,7 @@ pub extern "C" fn ecdsa_public_key_unique_id_from_derived_key_data(data: *const 
 #[no_mangle]
 pub unsafe extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
     let public_key_data = slice::from_raw_parts(data, len);
-    ferment_interfaces::FFIConversion::ffi_to_opt(ECDSAKey::key_with_public_key_data(public_key_data)
+    ferment_interfaces::FFIConversionTo::ffi_to_opt(ECDSAKey::key_with_public_key_data(public_key_data)
         .ok()
         .map(|key| key.address_with_public_key_data(&chain_type.script_map())))
 }
@@ -921,7 +921,7 @@ pub unsafe extern "C" fn key_check_payload_signature(key_ptr: *mut OpaqueKey, ke
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_secret_key_string(ptr: *mut OpaqueKey) -> *mut c_char {
-    ferment_interfaces::FFIConversion::ffi_to(match *ptr {
+    ferment_interfaces::FFIConversionTo::ffi_to(match *ptr {
         OpaqueKey::ECDSA(key) => (&*key).secret_key_string(),
         OpaqueKey::BLSLegacy(key) |
         OpaqueKey::BLSBasic(key) => (&*key).secret_key_string(),

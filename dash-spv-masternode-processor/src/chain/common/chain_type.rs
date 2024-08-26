@@ -23,9 +23,8 @@ pub trait IHaveChainSettings {
     fn name(&self) -> String;
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
-#[ferment_macro::export(IHaveChainSettings)]
+#[ferment_macro::export]
 pub enum ChainType {
     #[default]
     MainNet,
@@ -53,9 +52,8 @@ impl From<ChainType> for i16 {
         }
     }
 }
-#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
-#[ferment_macro::export(IHaveChainSettings)]
+#[ferment_macro::export]
 pub enum DevnetType {
     JackDaniels = 0,
     Devnet333 = 1,
@@ -163,84 +161,6 @@ impl DevnetType {
 
     pub fn version(&self) -> u16 {
         1
-    }
-}
-
-#[ferment_macro::export]
-impl ChainType {
-    pub fn is_mainnet(&self) -> bool {
-        *self == ChainType::MainNet
-    }
-
-    pub fn is_testnet(&self) -> bool {
-        *self == ChainType::TestNet
-    }
-
-    pub fn is_devnet_any(&self) -> bool {
-        !self.is_mainnet() && !self.is_testnet()
-    }
-
-    pub fn user_agent(&self) -> String {
-        format!(
-            "/dash-spv-core:{}{}/",
-            env!("CARGO_PKG_VERSION"),
-            match self {
-                ChainType::MainNet => format!(""),
-                ChainType::TestNet => format!("(testnet)"),
-                ChainType::DevNet(devnet_type) => format!("(devnet.{})", devnet_type.identifier()),
-            }
-        )
-    }
-
-    pub fn coin_type(&self) -> u32 {
-        if self.is_mainnet() {
-            5
-        } else {
-            1
-        }
-    }
-
-    pub fn devnet_identifier(&self) -> Option<String> {
-        if let ChainType::DevNet(devnet_type) = self {
-            Some(devnet_type.identifier())
-        } else {
-            None
-        }
-    }
-
-    pub fn devnet_version(&self) -> Option<i16> {
-        if let ChainType::DevNet(devnet_type) = self {
-            Some(devnet_type.version() as i16)
-        } else {
-            None
-        }
-    }
-
-    pub fn dns_seeds(&self) -> Vec<String> {
-        match self {
-            ChainType::MainNet => vec!["dnsseed.dash.org".to_string()],
-            ChainType::TestNet => vec!["testnet-seed.dashdot.io".to_string()],
-            ChainType::DevNet(_) => vec![],
-        }
-    }
-
-    pub fn script_map(&self) -> ScriptMap {
-        match self {
-            ChainType::MainNet => ScriptMap::MAINNET,
-            _ => ScriptMap::TESTNET,
-        }
-    }
-    pub fn bip32_script_map(&self) -> BIP32ScriptMap {
-        match self {
-            ChainType::MainNet => BIP32ScriptMap::MAINNET,
-            _ => BIP32ScriptMap::TESTNET,
-        }
-    }
-    pub fn dip14_script_map(&self) -> DIP14ScriptMap {
-        match self {
-            ChainType::MainNet => DIP14ScriptMap::MAINNET,
-            _ => DIP14ScriptMap::TESTNET,
-        }
     }
 }
 
@@ -370,6 +290,80 @@ impl IHaveChainSettings for DevnetType {
 // Params
 #[ferment_macro::export]
 impl ChainType {
+    pub fn is_mainnet(&self) -> bool {
+        *self == ChainType::MainNet
+    }
+
+    pub fn is_testnet(&self) -> bool {
+        *self == ChainType::TestNet
+    }
+
+    pub fn is_devnet_any(&self) -> bool {
+        !self.is_mainnet() && !self.is_testnet()
+    }
+
+    pub fn user_agent(&self) -> String {
+        format!(
+            "/dash-spv-core:{}{}/",
+            env!("CARGO_PKG_VERSION"),
+            match self {
+                ChainType::MainNet => format!(""),
+                ChainType::TestNet => format!("(testnet)"),
+                ChainType::DevNet(devnet_type) => format!("(devnet.{})", devnet_type.identifier()),
+            }
+        )
+    }
+
+    pub fn coin_type(&self) -> u32 {
+        if self.is_mainnet() {
+            5
+        } else {
+            1
+        }
+    }
+
+    pub fn devnet_identifier(&self) -> Option<String> {
+        if let ChainType::DevNet(devnet_type) = self {
+            Some(devnet_type.identifier())
+        } else {
+            None
+        }
+    }
+
+    pub fn devnet_version(&self) -> Option<i16> {
+        if let ChainType::DevNet(devnet_type) = self {
+            Some(devnet_type.version() as i16)
+        } else {
+            None
+        }
+    }
+
+    pub fn dns_seeds(&self) -> Vec<String> {
+        match self {
+            ChainType::MainNet => vec!["dnsseed.dash.org".to_string()],
+            ChainType::TestNet => vec!["testnet-seed.dashdot.io".to_string()],
+            ChainType::DevNet(_) => vec![],
+        }
+    }
+
+    pub fn script_map(&self) -> ScriptMap {
+        match self {
+            ChainType::MainNet => ScriptMap::MAINNET,
+            _ => ScriptMap::TESTNET,
+        }
+    }
+    pub fn bip32_script_map(&self) -> BIP32ScriptMap {
+        match self {
+            ChainType::MainNet => BIP32ScriptMap::MAINNET,
+            _ => BIP32ScriptMap::TESTNET,
+        }
+    }
+    pub fn dip14_script_map(&self) -> DIP14ScriptMap {
+        match self {
+            ChainType::MainNet => DIP14ScriptMap::MAINNET,
+            _ => DIP14ScriptMap::TESTNET,
+        }
+    }
     pub fn from_magic(magic: u32) -> Option<ChainType> {
         // Note: any new entries here must be added to `magic` below
         match magic {

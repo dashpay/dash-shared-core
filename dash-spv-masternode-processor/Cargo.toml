@@ -15,6 +15,7 @@ secp-lowmemory = ["secp256k1/lowmemory"]
 secp-recovery = ["secp256k1/recovery"]
 generate-dashj-tests = []
 test-helpers = []
+serde = []
 # At least one of std, no-std must be enabled.
 #
 # The no-std feature doesn't disable std - you need to turn off the std feature for that by disabling default.

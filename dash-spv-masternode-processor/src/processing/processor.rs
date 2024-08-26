@@ -39,12 +39,13 @@ pub struct MasternodeProcessor {
     // pub provider: Arc<dyn CoreProvider>,
     pub provider: Box<dyn CoreProvider>,
 }
-
+// #[ferment_macro::export]
 impl MasternodeProcessor {
     pub fn new(provider: Box<dyn CoreProvider>) -> Self {
         Self { provider }
     }
-
+}
+impl MasternodeProcessor {
     fn llmq_modifier_type_for(&self, llmq_type: LLMQType, work_block_hash: UInt256, work_block_height: u32, cached_cl_signatures: &BTreeMap<UInt256, UInt768>) -> LLMQModifierType {
         if self.provider.chain_type().core20_is_active_at(work_block_height) {
             if let Ok(work_block_hash) = self.provider.lookup_block_hash_by_height(work_block_height) {
@@ -469,7 +470,7 @@ impl MasternodeProcessor {
     pub fn qr_info_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, is_rotated_quorums_presented: bool, cache: &mut MasternodeProcessorCache) -> Result<processing::QRInfoResult, ProcessingError> {
         let list_diff_processor = |list_diff, verification_context|
             self.get_list_diff_result_with_base_lookup(list_diff, verification_context, cache);
-        let result = message.read_with::<QRInfo>(&mut 0, (&self.provider, is_from_snapshot, protocol_version, is_rotated_quorums_presented))
+        let result = message.read_with::<QRInfo>(&mut 0, (&*self.provider, is_from_snapshot, protocol_version, is_rotated_quorums_presented))
             .map_err(ProcessingError::from)
             .map(|qr_info| qr_info.into_result(list_diff_processor, is_rotated_quorums_presented));
 

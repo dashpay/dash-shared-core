@@ -1,6 +1,5 @@
 use hashes::hex::FromHex;
-use crate::chain::common::chain_type::DevnetType;
-use crate::chain::common::ChainType;
+use crate::chain::common::chain_type::{ChainType, DevnetType};
 use crate::crypto::byte_util::{Reversable, UInt256};
 
 pub(crate) const DUFFS: u64 = 100000000;
@@ -51,6 +50,7 @@ pub const BIP32_SEED_KEY: &str = "Bitcoin seed";
 pub const ED25519_SEED_KEY: &str = "ed25519 seed";
 
 #[derive(Clone, Debug, Default)]
+#[ferment_macro::export]
 pub struct ScriptMap {
     // DASH_PRIVKEY | DASH_PRIVKEY_TEST
     pub privkey: u8,
