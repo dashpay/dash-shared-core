@@ -49,7 +49,7 @@ impl CoinJoinQueueMessage {
             (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT;
     }
 
-    pub fn check_signature(&self, key: OperatorPublicKey) -> bool { // TODO: recheck test
+    pub fn check_signature(&self, key: OperatorPublicKey) -> bool {
         if let Some(ref signature) = self.signature {
             let hash = self.get_signature_hash();
             let verified = BLSKey::key_with_public_key(

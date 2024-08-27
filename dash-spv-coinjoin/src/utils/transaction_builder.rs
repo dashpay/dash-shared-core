@@ -167,8 +167,7 @@ impl<'a> TransactionBuilder {
             .filter(|x| x.script.is_some())
             .map(|out| Recipient {
                 script_pub_key: ByteArray::from(out.script.clone().unwrap()),
-                amount: out.amount,
-                subtract_fee_from_amount: false,
+                amount: out.amount
             })
             .collect();
 

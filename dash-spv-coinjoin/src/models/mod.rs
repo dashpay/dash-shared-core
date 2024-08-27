@@ -2,6 +2,7 @@ pub mod coinjoin_client_options;
 pub mod balance;
 pub mod tx_outpoint;
 pub mod coinjoin_transaction_input;
+pub mod coinjoin_tx_type;
 pub(crate) mod tx_destination;
 pub(crate) mod valid_in_outs;
 pub(crate) mod pending_dsa_request;

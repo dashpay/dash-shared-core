@@ -2,7 +2,7 @@ use std::ffi::{c_char, c_void};
 use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types::{self, MasternodeEntry};
 use crate::ffi::selected_coins::SelectedCoins;
-use crate::messages::{PoolMessage, PoolState};
+use crate::messages::{PoolMessage, PoolState, PoolStatus};
 use crate::wallet_ex::WalletEx;
 
 use super::coin_control::CoinControl;
@@ -164,7 +164,8 @@ pub type SessionLifecycleListener = unsafe extern "C" fn(
     context: *const c_void
 );
 
-// pub type MixingCompleteListener = unsafe extern "C" fn(
-//     pool_statuses: Vec<PoolStatus>,
-//     context: *const c_void
-// };
+pub type MixingCompleteListener = unsafe extern "C" fn(
+    pool_statuses: *const PoolStatus,
+    pool_statuses_len: usize,
+    context: *const c_void
+);

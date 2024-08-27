@@ -1,6 +1,6 @@
-use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::from::FromFFI, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
+use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
-use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
+use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, MixingCompleteListener, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub struct CoinJoinClientManager {
     wallet_ex: Rc<RefCell<WalletEx>>,
@@ -23,7 +23,7 @@ pub struct CoinJoinClientManager {
     update_success_block: UpdateSuccessBlock,
     is_waiting_for_new_block: IsWaitingForNewBlock,
     session_lifecycle_listener: SessionLifecycleListener,
-    // mixing_complete_listener: MixingCompleteListener,
+    mixing_complete_listener: MixingCompleteListener,
     context: *const c_void
 }
 
@@ -37,7 +37,7 @@ impl CoinJoinClientManager {
         update_success_block: UpdateSuccessBlock,
         is_waiting_for_new_block: IsWaitingForNewBlock,
         session_lifecycle_listener: SessionLifecycleListener,
-        // mixing_complete_listener: MixingCompleteListener,
+        mixing_complete_listener: MixingCompleteListener,
         context: *const c_void
     ) -> Self {
         Self {
@@ -61,7 +61,7 @@ impl CoinJoinClientManager {
             update_success_block,
             is_waiting_for_new_block,
             session_lifecycle_listener,
-            // mixing_complete_listener
+            mixing_complete_listener,
             context
         }
     }
@@ -71,8 +71,6 @@ impl CoinJoinClientManager {
     }
 
     pub fn process_message(&mut self, from: SocketAddress, message: CoinJoinMessage) {
-        println!("[RUST] CoinJoin: process_message");
-
         if !self.options.enable_coinjoin {
             return;
         }
@@ -340,7 +338,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn try_submit_denominate(&mut self, mn_addr: SocketAddress) -> bool {
-        println!("[RUST] CoinJoin dsi: try_submit_denominate, address: {}", mn_addr);
+        println!("[RUST] CoinJoin: try_submit_denominate, address: {}", mn_addr);
 
         for session in self.deq_sessions.iter_mut() {
             if let Some(mn_mixing) = &session.mixing_masternode {
@@ -348,10 +346,10 @@ impl CoinJoinClientManager {
                     session.submit_denominate();
                     return true;
                 } else {
-                    println!("[RUST] CoinJoin dsi: mixingMasternode {} != mnAddr {} or {:?} != {:?}", mn_mixing.socket_address, mn_addr, session.base_session.state, PoolState::Queue);
+                    println!("[RUST] CoinJoin: mixingMasternode {} != mnAddr {} or {:?} != {:?}", mn_mixing.socket_address, mn_addr, session.base_session.state, PoolState::Queue);
                 }
             } else {
-                println!("[RUST] CoinJoin dsi: mixingMasternode is None");
+                println!("[RUST] CoinJoin: mixingMasternode is None");
             }
         }
 
@@ -375,6 +373,16 @@ impl CoinJoinClientManager {
         self.coinjoin.borrow_mut().update_block_tip(block)
     }
 
+    pub fn is_mixing_fee_tx(&mut self, tx_id: UInt256) -> bool {
+        for session in &mut self.deq_sessions {
+            if session.is_mixing_fee_tx(tx_id) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     pub fn is_fully_mixed(&mut self, outpoint: TxOutPoint) -> bool {
         return self.wallet_ex.borrow_mut().is_fully_mixed(outpoint);
     }
@@ -396,7 +404,6 @@ impl CoinJoinClientManager {
     }
 
     fn trigger_mixing_finished(&mut self) {
-        println!("[RUST] CoinJoin: trigger_mixing_finished");
         if self.stop_on_nothing_to_do {
             self.mixing_finished = true;
             self.queue_mixing_complete_listeners();
@@ -404,6 +411,13 @@ impl CoinJoinClientManager {
     }
 
     fn queue_mixing_complete_listeners(&self) {
-        // self.mixing_complete_listener()(self.deq_sessions.map(|x| x.status), self.context);
+        let statuses: Vec<PoolStatus> = self.deq_sessions.iter().map(|x| x.base_session.status).collect();
+        let length = statuses.len();
+
+        unsafe {
+            let boxed_statuses = boxed_vec(statuses);
+            (self.mixing_complete_listener)(boxed_statuses, length, self.context);
+            unbox_vec_ptr(boxed_statuses, length);
+        }
     }
 }
