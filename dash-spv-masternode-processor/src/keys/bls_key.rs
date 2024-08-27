@@ -8,6 +8,8 @@ use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::models::OperatorPublicKey;
 use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
+#[cfg(feature = "use_serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Debug, Default)]
 pub struct BLSKey {
