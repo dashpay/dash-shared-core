@@ -7,9 +7,10 @@ mod provider;
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::Arc;
-use dash_sdk::{dpp, Sdk, SdkBuilder};
+use dash_sdk::{dpp, Error, Sdk, SdkBuilder};
 use dash_sdk::dpp::dashcore::secp256k1::rand;
 use dash_sdk::dpp::dashcore::secp256k1::rand::SeedableRng;
+use dash_sdk::platform::Fetch;
 
 use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use dash_sdk::sdk::AddressList;
@@ -105,6 +106,10 @@ impl PlatformSDK {
             sdk: ferment_interfaces::boxed(create_sdk(PlatformProvider::new(get_quorum_public_key, get_data_contract, context)))
         }
     }
+    pub async fn fetch_contract_by_id(&self, id: Identifier) -> Result<Option<DataContract>, Error> {
+        DataContract::fetch_by_identifier(self.sdk_ref(), id).await
+    }
+
 }
 
 fn create_sdk<C: ContextProvider + 'static>(provider: C) -> Sdk {
