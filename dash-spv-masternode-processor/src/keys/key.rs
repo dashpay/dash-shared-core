@@ -5,6 +5,7 @@ use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
 use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey};
 use crate::util::sec_vec::SecVec;
+#[cfg(feature = "use_serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[repr(C)]
