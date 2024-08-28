@@ -1,27 +1,34 @@
-mod identity;
-mod contract;
-pub mod document;
-mod document_request;
-mod provider;
+pub mod signer;
+pub mod provider;
 
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::Arc;
+use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::{dpp, Error, Sdk, SdkBuilder};
 use dash_sdk::dpp::dashcore::secp256k1::rand;
 use dash_sdk::dpp::dashcore::secp256k1::rand::SeedableRng;
-use dash_sdk::platform::Fetch;
+use dash_sdk::dpp::data_contract::accessors::v0::DataContractV0Getters;
+use dash_sdk::dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
+use dash_sdk::dpp::prelude::{BlockHeight, CoreBlockHeight};
+use dash_sdk::dpp::util::entropy_generator::DefaultEntropyGenerator;
+use dash_sdk::platform::{DocumentQuery, Fetch, FetchMany};
+use dash_sdk::platform::transition::put_document::PutDocument;
+use dash_sdk::platform::types::identity::PublicKeyHash;
+use dash_sdk::sdk::AddressList;
 
 use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
-use dash_sdk::sdk::AddressList;
 use dpp::data_contract::DataContract;
 use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0};
+use dpp::document::{Document, DocumentV0Getters};
+use drive::dpp::util::entropy_generator::EntropyGenerator;
+use drive::query::{OrderClause, WhereClause, WhereOperator};
 use http::Uri;
-use platform_version::version::LATEST_PLATFORM_VERSION;
-use platform_value::Identifier;
+use platform_version::version::{LATEST_PLATFORM_VERSION, PlatformVersion};
+use platform_value::{Identifier, Value};
 use tokio::runtime::Runtime;
-use crate::document::CallbackSigner;
+use crate::signer::CallbackSigner;
 use crate::provider::PlatformProvider;
 
 pub const ADDRESS_LIST: [&str; 28] = [
@@ -91,7 +98,6 @@ pub struct FFIContext {
 #[ferment_macro::export]
 impl PlatformSDK {
     pub fn new<
-        // CS: Fn(*const FFIContext, IdentityPublicKey, &[u8]) -> Result<BinaryData, ProtocolError> + 'static,
         QPK: Fn(*const FFIContext, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
         DC: Fn(*const FFIContext, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static>(
         get_quorum_public_key: QPK,
@@ -108,6 +114,114 @@ impl PlatformSDK {
     }
     pub async fn fetch_contract_by_id(&self, id: Identifier) -> Result<Option<DataContract>, Error> {
         DataContract::fetch_by_identifier(self.sdk_ref(), id).await
+    }
+    pub async fn fetch_identity_by_id(&self, id: Identifier) -> Result<Option<Identity>, Error> {
+        Identity::fetch_by_identifier(self.sdk_ref(), id).await
+    }
+    pub async fn fetch_identity_by_key_hash(&self, key_hash: PublicKeyHash) -> Result<Option<Identity>, Error> {
+        Identity::fetch(self.sdk_ref(), key_hash).await
+    }
+    pub async fn fetch_identity_balance(&self, id: Identifier) -> Result<Option<u64>, Error> {
+        u64::fetch_by_identifier(self.sdk_ref(), id).await
+    }
+    pub async fn put_document(
+        &self,
+        document: Document,
+        contract_id: Identifier,
+        document_type: &str,
+        identity_public_key: IdentityPublicKey,
+        block_height: BlockHeight,
+        core_block_height: CoreBlockHeight
+    ) -> Result<Document, Error> {
+        let sdk = self.sdk_ref();
+        match self.fetch_contract_by_id(contract_id).await? {
+            None => Err(Error::Config("no contract".to_string())),
+            Some(contract) => {
+                let document_type = contract.document_type_for_name(document_type)
+                    .map_err(ProtocolError::from)?;
+                let entropy = DefaultEntropyGenerator.generate().unwrap();
+                document_type
+                    .create_document_from_data(
+                        Value::from(document.properties()),
+                        document.owner_id(),
+                        block_height,
+                        core_block_height,
+                        entropy,
+                        PlatformVersion::latest())
+                    .map_err(Error::from)?
+                    .put_to_platform_and_wait_for_response(
+                        sdk,
+                        document_type.to_owned_document_type(),
+                        entropy,
+                        identity_public_key,
+                        Arc::new(contract),
+                        &self.callback_signer)
+                    .await
+            },
+        }
+    }
+
+    pub async fn dpns_domain_starts_with(&self, starts_with: &str, document_type: &str, contract_id: Identifier) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
+        match self.fetch_contract_by_id(contract_id).await? {
+            None => Err(Error::Config("Contract not exist".to_string())),
+            Some(contract) => {
+                let mut query = DocumentQuery::new(contract, document_type)?;
+                query.where_clauses.push(WhereClause {
+                    field: "normalizedLabel".to_string(),
+                    operator: WhereOperator::StartsWith,
+                    value: Value::Text(starts_with.to_string())
+                });
+                query.where_clauses.push(WhereClause {
+                    field: "normalizedParentDomainName".to_string(),
+                    operator: WhereOperator::Equal,
+                    value: Value::Text("dash".to_string())
+                });
+                query.order_by_clauses.push(OrderClause { field: "normalizedLabel".to_string(), ascending: true });
+                self.documents_with_query(query).await
+            }
+        }
+    }
+    pub async fn dpns_domain_by_id(&self, unique_id: Identifier, document_type: &str, contract_id: Identifier) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
+        match self.fetch_contract_by_id(contract_id).await? {
+            None => Err(Error::Config("Contract not exist".to_string())),
+            Some(contract) => {
+                let mut query = DocumentQuery::new(contract, document_type)?;
+                query.where_clauses.push(WhereClause {
+                    field: "records.identity".to_string(),
+                    operator: WhereOperator::Equal,
+                    value: Value::from(unique_id),
+                });
+                self.documents_with_query(query).await
+            }
+        }
+    }
+}
+
+impl PlatformSDK  {
+    pub async fn fetch_documents(
+        &self,
+        contract_id: Identifier,
+        document_type: &str,
+        where_clauses: Vec<WhereClause>,
+        order_clauses: Vec<OrderClause>,
+        limit: u32,
+        start: Option<Start>
+    ) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
+        match self.fetch_contract_by_id(contract_id).await? {
+            Some(contract) => {
+                let mut query = DocumentQuery::new(contract, document_type)?;
+                query.where_clauses.extend(where_clauses);
+                query.order_by_clauses.extend(order_clauses);
+                query.limit = limit;
+                query.start = start;
+                self.documents_with_query(query).await
+            },
+            None =>
+                Err(Error::Config("Contract not exist".to_string())),
+        }
+    }
+    pub async fn documents_with_query(&self, query: DocumentQuery) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
+        Document::fetch_many(self.sdk_ref(), query).await
     }
 
 }

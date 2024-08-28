@@ -79,17 +79,5 @@ impl DashSPVCore {
             context,
         }
     }
-    // pub fn new(
-    //     processor: *mut MasternodeProcessor,
-    //     cache: *mut MasternodeProcessorCache,
-    //     platform: *mut PlatformSDK,
-    //     context: *const std::os::raw::c_void) -> Self {
-    //     Self {
-    //         processor,
-    //         cache,
-    //         platform,
-    //         context,
-    //     }
-    // }
 }
 

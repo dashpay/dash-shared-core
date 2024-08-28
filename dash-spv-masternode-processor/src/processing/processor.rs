@@ -36,10 +36,8 @@ pub enum LLMQQuarterUsageType {
 #[derive(Debug)]
 #[ferment_macro::opaque]
 pub struct MasternodeProcessor {
-    // pub provider: Arc<dyn CoreProvider>,
     pub provider: Box<dyn CoreProvider>,
 }
-// #[ferment_macro::export]
 impl MasternodeProcessor {
     pub fn new(provider: Box<dyn CoreProvider>) -> Self {
         Self { provider }
