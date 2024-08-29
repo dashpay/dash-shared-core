@@ -3,7 +3,7 @@ pub mod provider;
 
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::{dpp, Error, Sdk, SdkBuilder};
 use dash_sdk::dpp::dashcore::secp256k1::rand;
@@ -26,12 +26,12 @@ use drive::dpp::util::entropy_generator::EntropyGenerator;
 use drive::query::{OrderClause, WhereClause, WhereOperator};
 use http::Uri;
 use platform_version::version::{LATEST_PLATFORM_VERSION, PlatformVersion};
-use platform_value::{Identifier, Value};
+use platform_value::{BinaryData, Identifier, Value};
 use tokio::runtime::Runtime;
 use crate::signer::CallbackSigner;
 use crate::provider::PlatformProvider;
 
-pub const ADDRESS_LIST: [&str; 28] = [
+pub const DEFAULT_ADDRESS_LIST: [&str; 28] = [
     "34.214.48.68",
     "35.166.18.166",
     // "35.165.50.126",
@@ -73,7 +73,7 @@ pub struct PlatformSDK {
     pub runtime: *mut Runtime,
     pub sdk: *mut Sdk,
     pub callback_signer: CallbackSigner,
-    pub foreign_identities: HashMap<Identifier, Identity>
+    pub foreign_identities: HashMap<Identifier, Identity>,
 }
 
 impl PlatformSDK {
@@ -82,34 +82,60 @@ impl PlatformSDK {
     }
 }
 
-// #[ferment_macro::opaque]
-// pub type GetQuorumPublicKey = dyn Fn(*const FFIContext, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync;
-// #[ferment_macro::opaque]
-// pub type GetDataContract = dyn Fn(*const FFIContext, &Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync;
-
 #[derive(Clone, Debug)]
 #[ferment_macro::opaque]
-pub struct FFIContext {
+pub struct FFIThreadSafeContext {
+    inner: Arc<Mutex<*const std::ffi::c_void>>, // Raw pointer wrapped in Arc<Mutex<>>
+}
+unsafe impl Send for FFIThreadSafeContext {}
+unsafe impl Sync for FFIThreadSafeContext {}
 
+#[ferment_macro::export]
+impl FFIThreadSafeContext {
+    pub fn new(context: *const std::ffi::c_void) -> Self {
+        FFIThreadSafeContext {
+            inner: Arc::new(Mutex::new(context)),
+        }
+    }
 }
 
+impl FFIThreadSafeContext {
+    pub fn get(&self) -> *const std::ffi::c_void {
+        let lock = self.inner.lock().unwrap();
+        *lock
+    }
 
+    pub fn set(&self, new_context: *const std::ffi::c_void) {
+        let mut lock = self.inner.lock().unwrap();
+        *lock = new_context;
+    }
+}
 
 #[ferment_macro::export]
 impl PlatformSDK {
     pub fn new<
-        QPK: Fn(*const FFIContext, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
-        DC: Fn(*const FFIContext, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static>(
+        QPK: Fn(*const std::os::raw::c_void, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
+        DC: Fn(*const std::os::raw::c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
+        CS: Fn(*const std::os::raw::c_void, IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
+    >(
         get_quorum_public_key: QPK,
         get_data_contract: DC,
-        callback_signer: CallbackSigner,
-        context: Arc<FFIContext>
+        callback_signer: CS,
+        address_list: Option<Vec<&'static str>>,
+        context: *const std::os::raw::c_void,
     ) -> Self {
+        // let context_arc = unsafe { Arc::from_raw(context as *const FFIThreadSafeContext) };
+        let context_arc = Arc::new(FFIThreadSafeContext::new(context));
         Self {
             foreign_identities: HashMap::new(),
             runtime: ferment_interfaces::boxed(Runtime::new().unwrap()),
-            callback_signer,
-            sdk: ferment_interfaces::boxed(create_sdk(PlatformProvider::new(get_quorum_public_key, get_data_contract, context)))
+            callback_signer: CallbackSigner::new(callback_signer, context_arc.clone()),
+            sdk: ferment_interfaces::boxed(
+                create_sdk(
+                    PlatformProvider::new(get_quorum_public_key, get_data_contract, context_arc),
+                    address_list.unwrap_or(Vec::from_iter(DEFAULT_ADDRESS_LIST))
+                        .iter()
+                        .filter_map(|s| Uri::from_str(s).ok())))
         }
     }
     pub async fn fetch_contract_by_id(&self, id: Identifier) -> Result<Option<DataContract>, Error> {
@@ -226,10 +252,10 @@ impl PlatformSDK  {
 
 }
 
-fn create_sdk<C: ContextProvider + 'static>(provider: C) -> Sdk {
-    let address_list = AddressList::from_iter(ADDRESS_LIST.iter().filter_map(|a| Uri::from_str(a).ok()));
-    let builder = SdkBuilder::new(address_list);
-    SdkBuilder::with_context_provider(builder, provider)
+fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Uri>>(provider: C, address_list: T) -> Sdk {
+    SdkBuilder::with_context_provider(
+        SdkBuilder::new(AddressList::from_iter(address_list)),
+        provider)
         .build()
         .unwrap()
 }

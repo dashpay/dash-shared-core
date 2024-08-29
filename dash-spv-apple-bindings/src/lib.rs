@@ -61,7 +61,7 @@ pub struct DashSPVCore {
     pub processor: *mut MasternodeProcessor,
     pub cache: *mut MasternodeProcessorCache,
     pub platform: *mut PlatformSDK,
-    context: *const std::ffi::c_void,
+    context: *const std::os::raw::c_void,
 }
 
 #[ferment_macro::export]
