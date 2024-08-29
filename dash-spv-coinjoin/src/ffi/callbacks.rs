@@ -6,6 +6,7 @@ use crate::messages::{PoolMessage, PoolState, PoolStatus};
 use crate::wallet_ex::WalletEx;
 
 use super::coin_control::CoinControl;
+use super::coinjoin_keys::CoinJoinKeys;
 use super::gathered_outputs::GatheredOutputs;
 use super::input_value::InputValue;
 use super::recepient::Recipient;
@@ -164,8 +165,18 @@ pub type SessionLifecycleListener = unsafe extern "C" fn(
     context: *const c_void
 );
 
-pub type MixingCompleteListener = unsafe extern "C" fn(
+pub type MixingLivecycleListener = unsafe extern "C" fn(
+    is_complete: bool,
     pool_statuses: *const PoolStatus,
     pool_statuses_len: usize,
     context: *const c_void
+);
+
+pub type GetCoinJoinKeys = unsafe extern "C" fn(
+    used: bool,
+    context: *const c_void
+) -> *mut CoinJoinKeys;
+
+pub type DestroyCoinJoinKeys = unsafe extern "C" fn(
+    coinjoin_keys: *mut CoinJoinKeys
 );

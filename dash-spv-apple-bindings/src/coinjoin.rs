@@ -8,12 +8,13 @@ use std::rc::Rc;
 use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use dash_spv_coinjoin::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
 
+use dash_spv_coinjoin::ffi::coinjoin_keys::CoinJoinKeys;
 use dash_spv_coinjoin::masternode_meta_data_manager::MasternodeMetadataManager;
 use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, MixingCompleteListener, SelectCoinsGroupedByAddresses, SendMessage, SessionLifecycleListener, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
+use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyCoinJoinKeys, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetCoinJoinKeys, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, MixingLivecycleListener, SelectCoinsGroupedByAddresses, SendMessage, SessionLifecycleListener, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
 use dash_spv_coinjoin::models::coinjoin_tx_type::CoinJoinTransactionType;
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
@@ -57,7 +58,9 @@ pub unsafe extern "C" fn register_client_manager(
     add_pending_masternode: AddPendingMasternode,
     start_manager_async: StartManagerAsync,
     session_lifecycle_listener: SessionLifecycleListener,
-    mixing_complete_listener: MixingCompleteListener
+    mixing_complete_listener: MixingLivecycleListener,
+    get_coinjoin_keys: GetCoinJoinKeys,
+    destroy_coinjoin_keys: DestroyCoinJoinKeys
 ) -> *mut CoinJoinClientManager {
     let coinjoin = CoinJoin::new(
         get_input_value_by_prevout_hash,
@@ -85,7 +88,9 @@ pub unsafe extern "C" fn register_client_manager(
         disconnect_masternode,
         send_message,
         add_pending_masternode,
-        start_manager_async
+        start_manager_async,
+        get_coinjoin_keys,
+        destroy_coinjoin_keys
     );
 
     let client_manager = CoinJoinClientManager::new(
@@ -363,4 +368,27 @@ pub unsafe extern "C" fn get_coinjoin_tx_type(
 ) -> CoinJoinTransactionType {
     let inputs: Vec<u64> = (0..input_values_len).map(|i| *(input_values.add(i))).collect();
     return CoinJoinTransactionType::from_tx(&(*tx).decode(), &inputs)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn process_used_scripts(
+    client_manager: *mut CoinJoinClientManager,
+    coinjoin_keys: *mut CoinJoinKeys
+) {
+    let mut scripts: Vec<Vec<u8>> = Vec::new();
+    
+    for i in 0..(*coinjoin_keys).item_count {
+        let byte_array = *(*coinjoin_keys).items.add(i);
+        let script = slice::from_raw_parts((*byte_array).ptr, (*byte_array).len);
+        scripts.push(script.to_vec());
+    }
+
+    (*client_manager).process_used_scripts(&scripts)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn refresh_unused_keys(
+    client_manager: *mut CoinJoinClientManager
+) {
+    (*client_manager).refresh_unused_keys();
 }

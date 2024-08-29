@@ -1,6 +1,6 @@
 use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
-use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, MixingCompleteListener, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
+use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, MixingLivecycleListener, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub struct CoinJoinClientManager {
     wallet_ex: Rc<RefCell<WalletEx>>,
@@ -23,7 +23,7 @@ pub struct CoinJoinClientManager {
     update_success_block: UpdateSuccessBlock,
     is_waiting_for_new_block: IsWaitingForNewBlock,
     session_lifecycle_listener: SessionLifecycleListener,
-    mixing_complete_listener: MixingCompleteListener,
+    mixing_lifecycle_listener: MixingLivecycleListener,
     context: *const c_void
 }
 
@@ -37,7 +37,7 @@ impl CoinJoinClientManager {
         update_success_block: UpdateSuccessBlock,
         is_waiting_for_new_block: IsWaitingForNewBlock,
         session_lifecycle_listener: SessionLifecycleListener,
-        mixing_complete_listener: MixingCompleteListener,
+        mixing_lifecycle_listener: MixingLivecycleListener,
         context: *const c_void
     ) -> Self {
         Self {
@@ -61,7 +61,7 @@ impl CoinJoinClientManager {
             update_success_block,
             is_waiting_for_new_block,
             session_lifecycle_listener,
-            mixing_complete_listener,
+            mixing_lifecycle_listener,
             context
         }
     }
@@ -95,7 +95,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn start_mixing(&mut self) -> bool {
-        // self.queue_mixing_started_listeners(); TODO
+        self.queue_mixing_lifecycle_listeners(false);
         
         if !self.is_mixing {
             self.is_mixing = true;
@@ -196,7 +196,7 @@ impl CoinJoinClientManager {
             println!("[RUST] CoinJoin: masternodesUsed: new size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
         }
 
-        if let Some(queue_manager) = &self.queue_queue_manager {  
+        if let Some(queue_manager) = &self.queue_queue_manager {
             let mut result = true;
 
             if self.deq_sessions.len() < self.options.coinjoin_sessions as usize {
@@ -237,7 +237,7 @@ impl CoinJoinClientManager {
 
             return result;
         }
-
+        
         return false;
     }
     
@@ -330,10 +330,6 @@ impl CoinJoinClientManager {
     }
 
     pub fn is_waiting_for_new_block(&self) -> bool {
-        if self.options.coinjoin_multi_session {
-            return false;
-        }
-
         return unsafe { (self.is_waiting_for_new_block)(self.context) };
     }
 
@@ -387,6 +383,14 @@ impl CoinJoinClientManager {
         return self.wallet_ex.borrow_mut().is_fully_mixed(outpoint);
     }
 
+    pub fn refresh_unused_keys(&mut self) {
+        self.wallet_ex.borrow_mut().refresh_unused_keys();
+    }
+
+    pub fn process_used_scripts(&mut self, scripts: &Vec<Vec<u8>>) {
+        self.wallet_ex.borrow_mut().process_used_scripts(scripts);
+    }
+
     fn get_valid_mns_count(&self, mn_list: &MasternodeList) -> usize {
         mn_list.masternodes.values().filter(|mn| mn.is_valid).count()
     }
@@ -406,17 +410,17 @@ impl CoinJoinClientManager {
     fn trigger_mixing_finished(&mut self) {
         if self.stop_on_nothing_to_do {
             self.mixing_finished = true;
-            self.queue_mixing_complete_listeners();
+            self.queue_mixing_lifecycle_listeners(true);
         }
     }
 
-    fn queue_mixing_complete_listeners(&self) {
+    fn queue_mixing_lifecycle_listeners(&self, is_complete: bool) {
         let statuses: Vec<PoolStatus> = self.deq_sessions.iter().map(|x| x.base_session.status).collect();
         let length = statuses.len();
 
         unsafe {
             let boxed_statuses = boxed_vec(statuses);
-            (self.mixing_complete_listener)(boxed_statuses, length, self.context);
+            (self.mixing_lifecycle_listener)(is_complete, boxed_statuses, length, self.context);
             unbox_vec_ptr(boxed_statuses, length);
         }
     }

@@ -21,7 +21,7 @@ use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
-use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync};
+use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyCoinJoinKeys, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetCoinJoinKeys, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync};
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
@@ -45,6 +45,7 @@ pub struct WalletEx {
     // TODO (DashJ): we may not need keyUsage, it is used as a way to audit unusedKeys
     key_usage: HashMap<UInt256, bool>,
     coinjoin_salt: UInt256,
+    loaded_keys: bool,
     get_wallet_transaction: GetWalletTransaction,
     sign_transaction: SignTransaction,
     destroy_transaction: DestroyWalletTransaction,
@@ -61,7 +62,9 @@ pub struct WalletEx {
     is_synced: IsBlockchainSynced,
     send_message: SendMessage,
     add_pending_masternode: AddPendingMasternode,
-    start_manager_async: StartManagerAsync
+    start_manager_async: StartManagerAsync,
+    get_coinjoin_keys: GetCoinJoinKeys,
+    destroy_coinjoin_keys: DestroyCoinJoinKeys
 }
 
 impl WalletEx {
@@ -84,7 +87,9 @@ impl WalletEx {
         disconnect_masternode: DisconnectMasternode,
         send_message: SendMessage,
         add_pending_masternode: AddPendingMasternode,
-        start_manager_async: StartManagerAsync
+        start_manager_async: StartManagerAsync,
+        get_coinjoin_keys: GetCoinJoinKeys,
+        destroy_coinjoin_keys: DestroyCoinJoinKeys
     ) -> Self {
         WalletEx {
             context,
@@ -96,6 +101,7 @@ impl WalletEx {
             vec_anonymizable_tally_cached: Vec::new(),
             map_outpoint_rounds_cache: HashMap::new(),
             coinjoin_salt: UInt256([0;32]), // TODO: InitCoinJoinSalt ?
+            loaded_keys: false,
             unused_keys: HashMap::with_capacity(1024),
             key_usage: HashMap::new(),
             get_wallet_transaction,
@@ -114,7 +120,9 @@ impl WalletEx {
             is_synced,
             send_message,
             add_pending_masternode,
-            start_manager_async
+            start_manager_async,
+            get_coinjoin_keys,
+            destroy_coinjoin_keys
         }
     }
 
@@ -416,6 +424,55 @@ impl WalletEx {
         }
     }
 
+    pub fn refresh_unused_keys(&mut self) {
+        self.unused_keys.clear();
+        let issued_keys = self.get_issued_receive_keys();
+        
+        for key in &issued_keys {
+            let key_id = UInt256::sha256(key);
+            self.unused_keys.insert(key_id, key.clone());
+            self.key_usage.insert(key_id, false);
+        }
+
+        let used_keys = self.get_used_receive_keys();
+
+        for used_key in &used_keys {
+            let key_id = UInt256::sha256(used_key);
+            self.unused_keys.remove(&key_id);
+            self.key_usage.insert(key_id, true);
+        }
+
+        for (_, key) in &self.unused_keys {
+            println!("[RUST] CoinJoin: WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.chain_type.script_map()));
+        }
+
+        for (key_id, used) in &self.key_usage {
+            if !used {
+                if let Some(key) = self.unused_keys.get(key_id) {
+                    println!("[RUST] CoinJoin: WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.chain_type.script_map()));
+                }
+            }
+        }
+
+        self.loaded_keys = true;
+        
+    }
+
+    pub fn process_used_scripts(&mut self, scripts: &Vec<Vec<u8>>) {
+        for script in scripts {
+            let key_id = UInt256::sha256(script);
+            
+            if self.loaded_keys {
+                self.key_usage.insert(key_id, true);
+                self.unused_keys.remove(&key_id);
+            }
+            
+            if let Some(key) = self.unused_keys.get(&key_id) {
+                println!("[RUST] CoinJoin: WalletEx - key used: {:?}", address::with_script_pub_key(key, &self.options.chain_type.script_map()));
+            }
+        }
+    }
+
     pub fn commit_transaction(&self, vec_send: &Vec<Recipient>, is_denominating: bool, client_session_id: UInt256) -> bool {
         let result: bool;
 
@@ -610,5 +667,41 @@ impl WalletEx {
         self.key_usage.insert(UInt256::sha256(&fresh_key), true);
 
         return fresh_key;
+    }
+
+    fn get_issued_receive_keys(&self) -> Vec<Vec<u8>> {
+        unsafe {
+            let data = (self.get_coinjoin_keys)(false, self.context);
+            let keys = &*data;
+            let mut result = Vec::with_capacity(keys.item_count);
+            
+            for i in 0..keys.item_count {
+                let item = *keys.items.add(i);
+                let bytes = slice::from_raw_parts((*item).ptr, (*item).len).to_vec();
+                result.push(bytes);
+            }
+
+            (self.destroy_coinjoin_keys)(data);
+            
+            result
+        }
+    }
+
+    fn get_used_receive_keys(&self) -> Vec<Vec<u8>> {
+        unsafe {
+            let data = (self.get_coinjoin_keys)(true, self.context);
+            let keys = &*data;
+            let mut result = Vec::with_capacity(keys.item_count);
+            
+            for i in 0..keys.item_count {
+                let item = *keys.items.add(i);
+                let bytes = slice::from_raw_parts((*item).ptr, (*item).len).to_vec();
+                result.push(bytes);
+            }
+
+            (self.destroy_coinjoin_keys)(data);
+            
+            result
+        }
     }
 }

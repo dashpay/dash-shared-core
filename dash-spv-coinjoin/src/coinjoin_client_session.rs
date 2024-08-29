@@ -17,6 +17,7 @@ use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::models::MasternodeEntry;
 use dash_spv_masternode_processor::secp256k1::rand::{self, Rng};
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput, TransactionOutput, TransactionType};
+use dash_spv_masternode_processor::util::address;
 use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
@@ -226,8 +227,9 @@ impl CoinJoinClientSession {
 
         // check if we have the collateral sized inputs
         if !self.mixing_wallet.borrow_mut().has_collateral_inputs(true) {
-            println!("[RUST] CoinJoin: exiting finish_automatic_denominating early");
-            return !self.mixing_wallet.borrow_mut().has_collateral_inputs(false) && self.make_collateral_amounts(client_manager);
+            let result = !self.mixing_wallet.borrow_mut().has_collateral_inputs(false) && self.make_collateral_amounts(client_manager);
+            println!("[RUST] CoinJoin: exiting finish_automatic_denominating early with result: {}", result);
+            return result;
         }
 
         if self.base_session.session_id != 0 {
@@ -284,6 +286,11 @@ impl CoinJoinClientSession {
         }
 
         println!("[RUST] CoinJoin: moved to queue joining/creating");
+
+        if self.options.denom_only {
+            println!("[RUST] CoinJoin: denom_only is true, skipping queue joining/creating");
+            return true;
+        }
 
         // Always attempt to join an existing queue
         if self.join_existing_queue(client_manager, balance_needs_anonymized) {
@@ -743,7 +750,7 @@ impl CoinJoinClientSession {
         } else if pool_status.is_warning() {
             println!("[RUST] CoinJoin warning: {}", self.str_auto_denom_result);
         } else {
-            println!("[RUST] CoinJoin: {}", self.str_auto_denom_result);
+            println!("[RUST] CoinJoin ok: {}", self.str_auto_denom_result);
         }
 
         self.base_session.status = pool_status;
