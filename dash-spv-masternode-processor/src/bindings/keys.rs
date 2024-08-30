@@ -21,6 +21,8 @@ use crate::processing::keys_cache::KeysCache;
 use crate::types::opaque_key::{AsCStringPtr, AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
 use crate::util::address::address;
 use crate::util::sec_vec::SecVec;
+#[cfg(feature = "use_serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Destroys
 /// # Safety

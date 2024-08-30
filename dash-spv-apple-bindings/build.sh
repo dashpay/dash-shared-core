@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 echo "Building Dash Shared Core..."
 pwd
 
@@ -24,7 +26,8 @@ compare_version() {
     fi
     return 1
 }
-REQUIRED_VERSION=1.66.0
+#REQUIRED_VERSION=1.66.0
+REQUIRED_VERSION=1.80.1
 CURRENT_VERSION=$(rustc -V | awk '{sub(/-.*/,"");print $2}')
 echo "rustc -V: current ${CURRENT_VERSION} vs. required ${REQUIRED_VERSION}"
 if compare_version "${REQUIRED_VERSION}" "${CURRENT_VERSION}"; then
@@ -34,11 +37,11 @@ fi
 
 cargo install cargo-lipo
 
-rm -r DashSharedCore/include
-rm -r DashSharedCore/lib/macos
-rm -r DashSharedCore/framework
-rm -r DashSharedCore/lib/ios
-rm -r DashSharedCore/lib/ios-simulator
+rm -rf DashSharedCore/include
+rm -rf DashSharedCore/lib/macos
+rm -rf DashSharedCore/framework
+rm -rf DashSharedCore/lib/ios
+rm -rf DashSharedCore/lib/ios-simulator
 
 rustup target add x86_64-apple-darwin
 rustup target add aarch64-apple-darwin
