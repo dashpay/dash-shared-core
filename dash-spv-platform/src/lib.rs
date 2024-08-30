@@ -1,9 +1,10 @@
 pub mod signer;
 pub mod provider;
+pub mod thread_safe_context;
 
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::{dpp, Error, Sdk, SdkBuilder};
 use dash_sdk::dpp::dashcore::secp256k1::rand;
@@ -30,8 +31,9 @@ use platform_value::{BinaryData, Identifier, Value};
 use tokio::runtime::Runtime;
 use crate::signer::CallbackSigner;
 use crate::provider::PlatformProvider;
+use crate::thread_safe_context::FFIThreadSafeContext;
 
-pub const DEFAULT_ADDRESS_LIST: [&str; 28] = [
+pub const DEFAULT_TESTNET_ADDRESS_LIST: [&str; 28] = [
     "34.214.48.68",
     "35.166.18.166",
     // "35.165.50.126",
@@ -66,6 +68,13 @@ pub const DEFAULT_ADDRESS_LIST: [&str; 28] = [
     "54.189.164.39",
     "54.213.204.85"
 ];
+fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Uri>>(provider: C, address_list: T) -> Sdk {
+    SdkBuilder::with_context_provider(
+        SdkBuilder::new(AddressList::from_iter(address_list)),
+        provider)
+        .build()
+        .unwrap()
+}
 
 #[derive(Clone)]
 #[ferment_macro::opaque]
@@ -82,49 +91,19 @@ impl PlatformSDK {
     }
 }
 
-#[derive(Clone, Debug)]
-#[ferment_macro::opaque]
-pub struct FFIThreadSafeContext {
-    inner: Arc<Mutex<*const std::ffi::c_void>>, // Raw pointer wrapped in Arc<Mutex<>>
-}
-unsafe impl Send for FFIThreadSafeContext {}
-unsafe impl Sync for FFIThreadSafeContext {}
-
-#[ferment_macro::export]
-impl FFIThreadSafeContext {
-    pub fn new(context: *const std::ffi::c_void) -> Self {
-        FFIThreadSafeContext {
-            inner: Arc::new(Mutex::new(context)),
-        }
-    }
-}
-
-impl FFIThreadSafeContext {
-    pub fn get(&self) -> *const std::ffi::c_void {
-        let lock = self.inner.lock().unwrap();
-        *lock
-    }
-
-    pub fn set(&self, new_context: *const std::ffi::c_void) {
-        let mut lock = self.inner.lock().unwrap();
-        *lock = new_context;
-    }
-}
-
 #[ferment_macro::export]
 impl PlatformSDK {
     pub fn new<
-        QPK: Fn(*const std::os::raw::c_void, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
+        QP: Fn(*const std::os::raw::c_void, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
         DC: Fn(*const std::os::raw::c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
         CS: Fn(*const std::os::raw::c_void, IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
     >(
-        get_quorum_public_key: QPK,
+        get_quorum_public_key: QP,
         get_data_contract: DC,
         callback_signer: CS,
         address_list: Option<Vec<&'static str>>,
         context: *const std::os::raw::c_void,
     ) -> Self {
-        // let context_arc = unsafe { Arc::from_raw(context as *const FFIThreadSafeContext) };
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
         Self {
             foreign_identities: HashMap::new(),
@@ -133,7 +112,7 @@ impl PlatformSDK {
             sdk: ferment_interfaces::boxed(
                 create_sdk(
                     PlatformProvider::new(get_quorum_public_key, get_data_contract, context_arc),
-                    address_list.unwrap_or(Vec::from_iter(DEFAULT_ADDRESS_LIST))
+                    address_list.unwrap_or(Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST))
                         .iter()
                         .filter_map(|s| Uri::from_str(s).ok())))
         }
@@ -189,35 +168,36 @@ impl PlatformSDK {
 
     pub async fn dpns_domain_starts_with(&self, starts_with: &str, document_type: &str, contract_id: Identifier) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
         match self.fetch_contract_by_id(contract_id).await? {
-            None => Err(Error::Config("Contract not exist".to_string())),
-            Some(contract) => {
-                let mut query = DocumentQuery::new(contract, document_type)?;
-                query.where_clauses.push(WhereClause {
-                    field: "normalizedLabel".to_string(),
-                    operator: WhereOperator::StartsWith,
-                    value: Value::Text(starts_with.to_string())
-                });
-                query.where_clauses.push(WhereClause {
-                    field: "normalizedParentDomainName".to_string(),
-                    operator: WhereOperator::Equal,
-                    value: Value::Text("dash".to_string())
-                });
-                query.order_by_clauses.push(OrderClause { field: "normalizedLabel".to_string(), ascending: true });
-                self.documents_with_query(query).await
-            }
+            None =>
+                Err(Error::Config("Contract not exist".to_string())),
+            Some(contract) =>
+                self.documents_with_query(DocumentQuery::new(contract, document_type)?
+                    .with_where(WhereClause {
+                        field: "normalizedLabel".to_string(),
+                        operator: WhereOperator::StartsWith,
+                        value: Value::Text(starts_with.to_string())
+                    })
+                    .with_where(WhereClause {
+                        field: "normalizedParentDomainName".to_string(),
+                        operator: WhereOperator::Equal,
+                        value: Value::Text("dash".to_string())
+                    })
+                    .with_order_by(OrderClause {
+                        field: "normalizedLabel".to_string(), ascending: true
+                    }))
+                    .await
         }
     }
     pub async fn dpns_domain_by_id(&self, unique_id: Identifier, document_type: &str, contract_id: Identifier) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
         match self.fetch_contract_by_id(contract_id).await? {
             None => Err(Error::Config("Contract not exist".to_string())),
             Some(contract) => {
-                let mut query = DocumentQuery::new(contract, document_type)?;
-                query.where_clauses.push(WhereClause {
-                    field: "records.identity".to_string(),
-                    operator: WhereOperator::Equal,
-                    value: Value::from(unique_id),
-                });
-                self.documents_with_query(query).await
+                self.documents_with_query(DocumentQuery::new(contract, document_type)?
+                    .with_where(WhereClause {
+                        field: "records.identity".to_string(),
+                        operator: WhereOperator::Equal,
+                        value: Value::from(unique_id),
+                    })).await
             }
         }
     }
@@ -250,14 +230,6 @@ impl PlatformSDK  {
         Document::fetch_many(self.sdk_ref(), query).await
     }
 
-}
-
-fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Uri>>(provider: C, address_list: T) -> Sdk {
-    SdkBuilder::with_context_provider(
-        SdkBuilder::new(AddressList::from_iter(address_list)),
-        provider)
-        .build()
-        .unwrap()
 }
 
 pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {

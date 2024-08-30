@@ -110,7 +110,8 @@ pub struct dashcore_Txid {
 impl ferment_interfaces::FFIConversionFrom<dashcore::Txid> for dashcore_Txid {
     unsafe fn ffi_from_const(ffi: *const Self) -> dashcore::Txid {
         let ffi_ref = &*ffi;
-        dashcore::Txid::from_slice(&*ffi_ref.raw).expect("TxId error")
+        dashcore::Txid::from_slice(&*ffi_ref.raw)
+            .expect("TxId error")
     }
 }
 impl ferment_interfaces::FFIConversionTo<dashcore::Txid> for dashcore_Txid {
