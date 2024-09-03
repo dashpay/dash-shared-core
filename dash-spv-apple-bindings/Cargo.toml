@@ -11,7 +11,7 @@ publish = true
 
 [dependencies.dash-spv-masternode-processor]
 path = "../dash-spv-masternode-processor"
-features = ["default", "generate-dashj-tests"]
+features = ["default", "generate-dashj-tests", "use_serde"]
 
 [dependencies.rs-merk-verify-c-binding]
 git = "https://github.com/dashpay/rs-merk-verify-c-binding"

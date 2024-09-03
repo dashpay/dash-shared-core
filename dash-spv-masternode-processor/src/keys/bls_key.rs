@@ -1,6 +1,7 @@
 use bls_signatures::bip32::{ChainCode, ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
-use hashes::{Hash, hex::FromHex, sha256, sha256d};
+use hashes::{Hash, hex::FromHex, sha256, sha256d, hex};
+use hashes::hex::ToHex;
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
@@ -176,8 +177,20 @@ impl BLSKey {
     pub fn key_with_seed_data(seed: &[u8], use_legacy: bool) -> Self {
         let bls_private_key = PrivateKey::from_bip32_seed(seed);
         let bls_public_key = bls_private_key.g1_element().unwrap();
-        let seckey = UInt256::from(&*bls_private_key.serialize());
+        let seckey = UInt256::from(bls_private_key);
+        let sec_key_s = format!("{}", seckey);
+
         let pubkey = UInt384(g1_element_serialized(&bls_public_key, use_legacy));
+        let pubkey_s = format!("{}", pubkey);
+
+
+        let pub_key_legacy = UInt384(g1_element_serialized(&bls_public_key, true));
+        let pub_key_legacy_s = format!("{}", pub_key_legacy);
+        let pub_key_basic = UInt384(g1_element_serialized(&bls_public_key, false));
+        let pub_key_basic_s = format!("{}", pub_key_basic);
+
+        println!("pri_key:{} pub_key_leg:{} pub_key_basic:{}\n", seckey, pub_key_legacy_s, pub_key_basic_s);
+
         Self { seckey, pubkey, use_legacy, ..Default::default() }
     }
 
@@ -556,7 +569,7 @@ fn g1_element_from_bytes(use_legacy: bool, bytes: &[u8]) -> Result<G1Element, Bl
     }
 }
 
-fn g1_element_serialized(public_key: &G1Element, use_legacy: bool) -> [u8; 48] {
+pub(crate) fn g1_element_serialized(public_key: &G1Element, use_legacy: bool) -> [u8; 48] {
     *if use_legacy {
         public_key.serialize_legacy()
     } else {
@@ -603,7 +616,7 @@ impl From<ChainCode> for UInt256 {
 
 impl From<PrivateKey> for UInt256 {
     fn from(value: PrivateKey) -> Self {
-        UInt256::from(value.serialize().as_slice())
+        UInt256::from(value.to_bytes().as_slice())
     }
 }
 
