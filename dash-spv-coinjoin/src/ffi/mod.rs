@@ -7,3 +7,4 @@ pub mod coin_control;
 pub mod gathered_outputs;
 pub mod input_value;
 pub mod socket_addres;
+pub mod coinjoin_keys;

@@ -1,7 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::wallet_ex::WalletEx;
-
 use super::tx_destination::TxDestination;
 
 /** A wrapper to reserve an address from a wallet
@@ -22,7 +21,7 @@ use super::tx_destination::TxDestination;
 #[derive(Clone)]
 pub struct ReserveDestination {
     wallet_ex: Rc<RefCell<WalletEx>>,
-    pub address: TxDestination,
+    pub key: TxDestination,
     pub internal: bool,
 }
 
@@ -30,43 +29,43 @@ impl<'a> ReserveDestination {
     pub fn new(wallet_ex: Rc<RefCell<WalletEx>>) -> Self {
         Self {
             wallet_ex,
-            address: None,
+            key: None,
             internal: false,
         }
     }
 
     pub fn get_reserved_destination(&mut self, internal: bool) -> TxDestination {
-        if self.address.is_none() {
+        if self.key.is_none() {
             let mut wallet = self.wallet_ex.borrow_mut();
             
             if let Some(key) = wallet.get_unused_key(internal) {
-                self.address = Some(key);
+                self.key = Some(key);
                 self.internal = true;
             } else {
                 return None;
             }
         }
 
-        return self.address.clone();
+        return self.key.clone();
     }
 
     pub fn keep_destination(&mut self) {
-        if self.address.is_some() {
-            self.wallet_ex.borrow_mut().remove_unused_key(&self.address);
+        if self.key.is_some() {
+            self.wallet_ex.borrow_mut().remove_unused_key(&self.key);
         } else {
             println!("[RUST] CoinJoin: cannot keep key");
         }
 
-        self.address = None;
+        self.key = None;
     }
 
     pub fn return_destination(&mut self) {
-        if self.address.is_some() {
-            self.wallet_ex.borrow_mut().add_unused_key(&self.address);
+        if self.key.is_some() {
+            self.wallet_ex.borrow_mut().add_unused_key(&self.key);
         } else {
             println!("[RUST] CoinJoin: cannot return key");
         }
 
-        self.address = None;
+        self.key = None;
     }
 }
