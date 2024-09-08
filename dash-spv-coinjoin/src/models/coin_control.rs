@@ -1,5 +1,7 @@
 use std::collections::HashSet;
-use crate::ffi::coin_control as ffi;
+use dash_spv_masternode_processor::ffi::boxer::{boxed, boxed_vec};
+
+use crate::ffi as ffi;
 
 use crate::constants::REFERENCE_DEFAULT_MIN_TX_FEE;
 use super::{tx_destination::TxDestination, tx_outpoint::TxOutPoint};
@@ -16,6 +18,8 @@ pub enum CoinType {
 }
 
 // CoinControl comes from Dash Core.  Not all functions fields and functions are supported within the Wallet class
+#[derive(Clone, Debug)]
+
 pub struct CoinControl {
     pub dest_change: TxDestination,
     pub allow_other_inputs: bool,
@@ -61,13 +65,24 @@ impl CoinControl {
         self.set_selected.remove(&out_point);
     }
     
-    pub fn encode(&self) -> ffi::CoinControl {
-        ffi::CoinControl {
+    pub fn encode(&self) -> ffi::coin_control::CoinControl {
+        ffi::coin_control::CoinControl {
             coin_type: self.coin_type,
             min_depth: self.min_depth,
             max_depth: self.max_depth,
             avoid_address_reuse: self.avoid_address_reuse,
-            allow_other_inputs: self.allow_other_inputs
+            allow_other_inputs: self.allow_other_inputs,
+            set_selected: if self.set_selected.is_empty() {
+                std::ptr::null_mut()
+            } else {
+                boxed_vec(
+                    self.set_selected
+                        .iter()
+                        .map(|outpoint| boxed(ffi::tx_outpoint::TxOutPoint::from(outpoint.clone())))
+                        .collect()
+                )
+            },
+            set_selected_size: self.set_selected.len(),
         }
     }
 }
