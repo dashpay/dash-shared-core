@@ -8,7 +8,9 @@ use std::rc::Rc;
 use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use dash_spv_coinjoin::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
 
+use dash_spv_coinjoin::ffi::coinjoin_denominations::CoinJoinDenominations;
 use dash_spv_coinjoin::ffi::coinjoin_keys::CoinJoinKeys;
+use dash_spv_coinjoin::ffi::coinjoin_session_statuses::CoinJoinSessionStatuses;
 use dash_spv_coinjoin::masternode_meta_data_manager::MasternodeMetadataManager;
 use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
 use dash_spv_coinjoin::messages;
@@ -69,9 +71,11 @@ pub unsafe extern "C" fn register_client_manager(
         context
     );
 
-    let wallet_ex: WalletEx =  WalletEx::new(
+    let options = Rc::new(RefCell::new(std::ptr::read(options_ptr)));
+
+    let wallet_ex: WalletEx = WalletEx::new(
         context,
-        std::ptr::read(options_ptr),
+        options.clone(),
         get_wallet_transaction, 
         sign_transaction,
         destroy_transaction, 
@@ -96,7 +100,7 @@ pub unsafe extern "C" fn register_client_manager(
     let client_manager = CoinJoinClientManager::new(
         Rc::new(RefCell::new(wallet_ex)),
         Rc::new(RefCell::new(coinjoin)),
-        std::ptr::read(options_ptr), 
+        options,
         get_masternode_list,
         destroy_mn_list,
         update_success_block,
@@ -392,3 +396,89 @@ pub unsafe extern "C" fn refresh_unused_keys(
 ) {
     (*client_manager).refresh_unused_keys();
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn get_anonymizable_balance(
+    client_manager: *mut CoinJoinClientManager,
+    skip_denominated: bool, 
+    skip_unconfirmed: bool
+) -> u64 {
+    return (*client_manager).get_anonymizable_balance(skip_denominated, skip_unconfirmed);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn change_coinjoin_options(
+    client_manager: *mut CoinJoinClientManager,
+    new_options_ptr: *mut CoinJoinClientOptions
+) {
+    (*client_manager).change_options(std::ptr::read(new_options_ptr));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn get_standard_denominations() -> *mut CoinJoinDenominations {
+    let denominations = CoinJoin::get_standard_denominations();
+    return boxed(CoinJoinDenominations {
+        denoms: denominations.as_ptr(),
+        length: denominations.len(),
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn destroy_coinjoin_denomination(
+    denomination: *mut CoinJoinDenominations
+) {
+    let _ = unbox_any(denomination);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn amount_to_denomination(
+    input_amount: u64
+) -> u32 {
+    return CoinJoin::amount_to_denomination(input_amount);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn get_real_outpoint_coinjoin_rounds(
+    client_manager: *mut CoinJoinClientManager,
+    prevout_hash: *mut [u8; 32],
+    index: u32,
+    rounds: i32
+) -> i32 {
+    let outpoint = TxOutPoint::new(UInt256(*(prevout_hash)), index);
+    return (*client_manager).get_real_outpoint_coinjoin_rounds(outpoint, rounds);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn get_collateral_amount() -> u64 {
+    return CoinJoin::get_collateral_amount();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn get_sessions_status(
+    client_manager: *mut CoinJoinClientManager
+) -> *mut CoinJoinSessionStatuses {
+    let statuses = (*client_manager).get_sessions_status();
+    let statuses_ptr = statuses.as_ptr();
+    let length = statuses.len();
+    
+   return boxed(CoinJoinSessionStatuses {
+        statuses: statuses_ptr,
+        length: length,
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn destroy_coinjoin_session_statuses(
+    statuses: *mut CoinJoinSessionStatuses
+) {
+    let _ = unbox_any(statuses);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn stop_and_reset_coinjoin(
+    client_manager: *mut CoinJoinClientManager
+) {
+    (*client_manager).reset_pool();
+    (*client_manager).stop_mixing();
+}
+

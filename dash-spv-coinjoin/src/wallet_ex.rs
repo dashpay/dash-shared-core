@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::collections::{HashSet, HashMap};
 use std::ffi::CString;
+use std::rc::Rc;
 use std::slice;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
@@ -34,7 +36,7 @@ use crate::utils::coin_format::CoinFormat;
 
 pub struct WalletEx {
     context: *const std::ffi::c_void,
-    options: CoinJoinClientOptions,
+    options: Rc<RefCell<CoinJoinClientOptions>>,
     pub locked_coins_set: HashSet<TxOutPoint>,
     anonymizable_tally_cached_non_denom: bool,
     vec_anonymizable_tally_cached_non_denom: Vec<CompactTallyItem>,
@@ -70,7 +72,7 @@ pub struct WalletEx {
 impl WalletEx {
     pub fn new(
         context: *const std::ffi::c_void,
-        options: CoinJoinClientOptions,
+        options: Rc<RefCell<CoinJoinClientOptions>>,
         get_wallet_transaction: GetWalletTransaction,
         sign_transaction: SignTransaction,
         destroy_transaction: DestroyWalletTransaction,
@@ -93,7 +95,7 @@ impl WalletEx {
     ) -> Self {
         WalletEx {
             context,
-            options: options.clone(),
+            options: options,
             locked_coins_set: HashSet::new(),
             anonymizable_tally_cached_non_denom: false,
             vec_anonymizable_tally_cached_non_denom: Vec::new(),
@@ -140,7 +142,7 @@ impl WalletEx {
         let rounds = self.get_real_outpoint_coinjoin_rounds(outpoint.clone(), 0);
         
         // Mix again if we don't have N rounds yet
-        if rounds < self.options.coinjoin_rounds {
+        if rounds < self.options.borrow().coinjoin_rounds {
             return false;
         }
 
@@ -148,7 +150,7 @@ impl WalletEx {
         // If we have already mixed N + MaxOffset rounds, don't mix again.
         // Otherwise, we should mix again 50% of the time, this results in an exponential decay
         // N rounds 50% N+1 25% N+2 12.5%... until we reach N + GetRandomRounds() rounds where we stop.
-        if rounds < self.options.coinjoin_rounds + self.options.coinjoin_random_rounds {
+        if rounds < self.options.borrow().coinjoin_rounds + self.options.borrow().coinjoin_random_rounds {
             let mut buffer = Vec::new();
             outpoint.consensus_encode(&mut buffer).unwrap();
             buffer.extend_from_slice(&self.coinjoin_salt.reversed().0);
@@ -163,7 +165,7 @@ impl WalletEx {
     }
 
     pub fn get_real_outpoint_coinjoin_rounds(&mut self, outpoint: TxOutPoint, rounds: i32) -> i32 {
-        let rounds_max = MAX_COINJOIN_ROUNDS + self.options.coinjoin_random_rounds;
+        let rounds_max = MAX_COINJOIN_ROUNDS + self.options.borrow().coinjoin_random_rounds;
 
         if rounds >= rounds_max {
             // there can only be rounds_max rounds max
@@ -335,7 +337,7 @@ impl WalletEx {
     }
 
     pub fn get_anonymizable_balance(&mut self, skip_denominated: bool, skip_unconfirmed: bool) -> u64 {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return 0;
         }
 
@@ -382,7 +384,7 @@ impl WalletEx {
     /**
      * Count the number of unspent outputs that have a certain value
      */
-    pub fn count_input_with_amount(&self, value: u64) -> u32 {
+    pub fn count_inputs_with_amount(&self, value: u64) -> u32 {
         return unsafe { (self.inputs_with_amount)(value, self.context) };
     }
 
@@ -400,7 +402,7 @@ impl WalletEx {
             key = *pair.0;
             item = pair.1.clone();
 
-            println!("[RUST] CoinJoin: WalletEx - reusing key: {:?}", address::with_script_sig(&item, &self.options.chain_type.script_map()));
+            println!("[RUST] CoinJoin: WalletEx - reusing key: {:?}", address::with_script_sig(&item, &self.options.borrow().chain_type.script_map()));
             println!("[RUST] CoinJoin: WalletEx - keyUsage map says this key is used: {}, unused key count: {}", self.key_usage.get(&key).unwrap(), self.unused_keys.len());
         } else {
             return None;
@@ -418,7 +420,7 @@ impl WalletEx {
             let key_id = UInt256::sha256(key);
             self.unused_keys.insert(key_id, key.clone());
             self.key_usage.insert(key_id, false);
-            println!("[RUST] CoinJoin: WalletEx - add unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
+            println!("[RUST] CoinJoin: WalletEx - add unused key: {:?}", address::with_script_sig(&key, &self.options.borrow().chain_type.script_map()));
         }
     }
 
@@ -427,7 +429,7 @@ impl WalletEx {
             let key_id = UInt256::sha256(key);
             self.unused_keys.remove(&key_id);
             self.key_usage.insert(key_id, true);
-            println!("[RUST] CoinJoin: WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
+            println!("[RUST] CoinJoin: WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.borrow().chain_type.script_map()));
         }
     }
 
@@ -450,13 +452,13 @@ impl WalletEx {
         }
 
         for (_, key) in &self.unused_keys {
-            println!("[RUST] CoinJoin: WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.chain_type.script_map()));
+            println!("[RUST] CoinJoin: WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
         }
 
         for (key_id, used) in &self.key_usage {
             if !used {
                 if let Some(key) = self.unused_keys.get(key_id) {
-                    println!("[RUST] CoinJoin: WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.chain_type.script_map()));
+                    println!("[RUST] CoinJoin: WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
                 }
             }
         }
@@ -475,7 +477,7 @@ impl WalletEx {
             }
             
             if let Some(key) = self.unused_keys.get(&key_id) {
-                println!("[RUST] CoinJoin: WalletEx - key used: {:?}", address::with_script_pub_key(key, &self.options.chain_type.script_map()));
+                println!("[RUST] CoinJoin: WalletEx - key used: {:?}", address::with_script_pub_key(key, &self.options.borrow().chain_type.script_map()));
             }
         }
     }
@@ -678,7 +680,7 @@ impl WalletEx {
             result
         };
 
-        println!("[RUST] CoinJoin: WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.chain_type.script_map()));
+        println!("[RUST] CoinJoin: WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.borrow().chain_type.script_map()));
         self.key_usage.insert(UInt256::sha256(&fresh_key), true);
 
         return fresh_key;
