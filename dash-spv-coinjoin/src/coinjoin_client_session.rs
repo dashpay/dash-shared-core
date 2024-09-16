@@ -17,7 +17,6 @@ use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::models::MasternodeEntry;
 use dash_spv_masternode_processor::secp256k1::rand::{self, Rng};
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput, TransactionOutput, TransactionType};
-use dash_spv_masternode_processor::util::address;
 use dash_spv_masternode_processor::util::script::ScriptType;
 
 use crate::coinjoin::CoinJoin;
@@ -47,7 +46,7 @@ pub struct CoinJoinClientSession {
     mixing_wallet: Rc<RefCell<WalletEx>>,
     queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>,
     pub base_session: CoinJoinBaseSession,
-    options: CoinJoinClientOptions,
+    options: Rc<RefCell<CoinJoinClientOptions>>,
     key_holder_storage: KeyHolderStorage,
     last_create_denominated_result: bool,
     outpoint_locked: Vec<TxOutPoint>,
@@ -68,7 +67,7 @@ pub struct CoinJoinClientSession {
 impl CoinJoinClientSession {
     pub fn new(
         coinjoin: Rc<RefCell<CoinJoin>>,
-        options: CoinJoinClientOptions,
+        options: Rc<RefCell<CoinJoinClientOptions>>,
         wallet_ex: Rc<RefCell<WalletEx>>,
         client_queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>,
         session_lifecycle_listener: SessionLifecycleListener,
@@ -100,7 +99,7 @@ impl CoinJoinClientSession {
     }
 
     pub fn do_automatic_denominating(&mut self, client_manager: &mut CoinJoinClientManager, dry_run: bool, balance_info: Balance) -> bool {
-        if self.base_session.state != PoolState::Idle || !self.options.enable_coinjoin {
+        if self.base_session.state != PoolState::Idle || !self.options.borrow().enable_coinjoin {
             return false;
         }
 
@@ -109,8 +108,12 @@ impl CoinJoinClientSession {
             return false;
         }
 
+
+        println!("[RUST] CoinJoin {:?}", self.options.borrow());
+        println!("{}", balance_info);
+
         let balance_anonymized = balance_info.anonymized;
-        let sub_res = self.options.coinjoin_amount.checked_sub(balance_anonymized);
+        let sub_res = self.options.borrow().coinjoin_amount.checked_sub(balance_anonymized);
         
         if sub_res.is_none() {
             println!("[RUST] CoinJoinClientSession::do_automatic_denominating -- Nothing to do\n");
@@ -149,11 +152,12 @@ impl CoinJoinClientSession {
         let balance_denominated_conf = balance_info.denominated_trusted;
         let balance_denominated_unconf = balance_info.denominated_untrusted_pending;
         let balance_denominated = balance_denominated_conf + balance_denominated_unconf;
-        let balance_to_denominate = self.options.coinjoin_amount.saturating_sub(balance_denominated);
+        let balance_to_denominate = self.options.borrow().coinjoin_amount.saturating_sub(balance_denominated);
         println!("[RUST] CoinJoin: balance_to_denominate: {}", balance_to_denominate);
 
         // Adjust balance_needs_anonymized to consume final denom
         if balance_denominated.saturating_sub(balance_anonymized) > balance_needs_anonymized as u64 {
+            println!("[RUST] CoinJoin: adjusting balance_needs_anonymized to consume final denom");
             let denoms = CoinJoin::get_standard_denominations();
             let mut additional_denom: u64 = 0;
             
@@ -167,8 +171,7 @@ impl CoinJoinClientSession {
             balance_needs_anonymized += additional_denom;
         }
 
-        println!("[RUST] CoinJoin: wallet stats:\n[RUST] CoinJoin: {}", balance_info);
-        println!("[RUST] CoinJoin: current stats:\n[RUST] CoinJoin: nValueMin: {}\n[RUST] CoinJoin: myTrusted: {}\n[RUST] CoinJoin: balanceAnonymizable: {}\n[RUST] CoinJoin: balanceAnonymized: {}\n[RUST] CoinJoin: balanceNeedsAnonymized: {}\n[RUST] CoinJoin: balanceAnonimizableNonDenom: {}\n[RUST] CoinJoin: balanceDenominatedConf: {}\n[RUST] CoinJoin: balanceDenominatedUnconf: {}\n[RUST] CoinJoin: balanceDenominated: {}\n[RUST] CoinJoin: balanceToDenominate: {}\n",
+        println!("[RUST] CoinJoin: current stats:\n[RUST] CoinJoin: value_min: {}\n[RUST] CoinJoin: myTrmy_trustedusted: {}\n[RUST] CoinJoin: balance_anonymizable: {}\n[RUST] CoinJoin: balance_anonymized: {}\n[RUST] CoinJoin: balance_needs_anonymized: {}\n[RUST] CoinJoin: balance_anonimizable_non_denom: {}\n[RUST] CoinJoin: balance_denominated_conf: {}\n[RUST] CoinJoin: balance_denominated_unconf: {}\n[RUST] CoinJoin: balance_denominated: {}\n[RUST] CoinJoin: balance_to_denominate: {}\n",
             value_min.to_friendly_string(),
             balance_info.my_trusted.to_friendly_string(),
             balance_anonymizable.to_friendly_string(),
@@ -287,7 +290,7 @@ impl CoinJoinClientSession {
 
         println!("[RUST] CoinJoin: moved to queue joining/creating");
 
-        if self.options.denom_only {
+        if self.options.borrow().denom_only {
             println!("[RUST] CoinJoin: denom_only is true, skipping queue joining/creating");
             return true;
         }
@@ -335,11 +338,9 @@ impl CoinJoinClientSession {
     }
 
     fn create_denominated(&mut self, client_manager: &mut CoinJoinClientManager, balance_to_denominate: u64, dry_run: bool) -> bool {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return false;
         }
-
-        println!("[RUST] CoinJoin: create_denominated, balance_to_denominate: {}", balance_to_denominate);
     
         // NOTE: We do not allow txes larger than 100 kB, so we have to limit number of inputs here.
         // We still want to consume a lot of inputs to avoid creating only smaller denoms though.
@@ -377,11 +378,9 @@ impl CoinJoinClientSession {
         create_mixing_collaterals: bool, 
         dry_run: bool
     ) -> bool {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return false;
         }
-
-        println!("[RUST] CoinJoin: create_denominated_with_item");
 
         // denominated input is always a single one, so we can check its amount directly and return early
         if tally_item.input_coins.len() == 1 && CoinJoin::is_denominated_amount(tally_item.amount) {
@@ -390,7 +389,7 @@ impl CoinJoinClientSession {
 
         let mut tx_builder = TransactionBuilder::new(
             self.mixing_wallet.clone(),
-            self.options.chain_type,
+            self.options.borrow().chain_type,
             tally_item.clone(),
             dry_run
         );
@@ -411,7 +410,7 @@ impl CoinJoinClientSession {
         let mut map_denom_count = HashMap::new();
 
         for denom_value in denoms {
-            map_denom_count.insert(*denom_value, self.mixing_wallet.borrow_mut().count_input_with_amount(*denom_value));
+            map_denom_count.insert(*denom_value, self.mixing_wallet.borrow_mut().count_inputs_with_amount(*denom_value));
         }
 
         // Will generate outputs for the createdenoms up to coinjoinmaxdenoms per denom
@@ -592,7 +591,7 @@ impl CoinJoinClientSession {
     }
 
     fn make_collateral_amounts(&mut self, client_manager: &mut CoinJoinClientManager) -> bool {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return false;
         }
 
@@ -636,7 +635,7 @@ impl CoinJoinClientSession {
     }
 
     fn make_collateral_amounts_with_item(&mut self, client_manager: &mut CoinJoinClientManager, tally_item: &CompactTallyItem, try_denominated: bool) -> bool {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return false;
         }
 
@@ -654,7 +653,7 @@ impl CoinJoinClientSession {
 
         let mut tx_builder = TransactionBuilder::new(
             self.mixing_wallet.clone(),
-            self.options.chain_type,
+            self.options.borrow().chain_type,
             tally_item.clone(),
             false
         );
@@ -816,7 +815,7 @@ impl CoinJoinClientSession {
     }
 
     fn unlock_coins(&mut self) {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return;
         }
 
@@ -931,7 +930,7 @@ impl CoinJoinClientSession {
     fn join_existing_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
         println!("[RUST] CoinJoin dsq: join_existing_queue");
 
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return false;
         }
 
@@ -1002,7 +1001,7 @@ impl CoinJoinClientSession {
     fn start_new_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
         println!("[RUST] CoinJoin dsa: start_new_queue");
 
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return false;
         }
         if balance_needs_anonymized <= 0 {
@@ -1102,8 +1101,9 @@ impl CoinJoinClientSession {
         }
 
         let mut vec_inputs_by_rounds = Vec::new();
-        let rounds = self.options.coinjoin_rounds;
-        let random_rounds = self.options.coinjoin_random_rounds;
+        let rounds = self.options.borrow().coinjoin_rounds;
+        let coinjoin_rounds = self.options.borrow().coinjoin_rounds;
+        let random_rounds = self.options.borrow().coinjoin_random_rounds;
 
         for i in 0..(rounds + random_rounds) {
             if self.prepare_denominate(i, i, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, true) {
@@ -1122,7 +1122,7 @@ impl CoinJoinClientSession {
         }
 
         // We failed? That's strange but let's just make final attempt and try to mix everything
-        if self.prepare_denominate(0, self.options.coinjoin_rounds - 1, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, false) {
+        if self.prepare_denominate(0, coinjoin_rounds - 1, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, false) {
             println!("[RUST] CoinJoin: Running CoinJoin denominate for all rounds, success");
             return self.send_denominate(vec_psin_out_pairs_tmp);
         }
@@ -1136,7 +1136,7 @@ impl CoinJoinClientSession {
 
     /// step 0: select denominated inputs and txouts
     fn select_denominate(&mut self, str_error_ret: &mut String, vec_tx_dsin_ret: &mut Vec<CoinJoinTransactionInput>) -> bool {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return false;
         }
 
@@ -1319,6 +1319,13 @@ impl CoinJoinClientSession {
         }
     }
 
+    pub fn reset_pool(&mut self) {
+        self.tx_my_collateral = None;
+        self.unlock_coins();
+        self.key_holder_storage.return_all();
+        self.set_null();
+    }
+
     fn process_status_update(&mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
         if self.mixing_masternode.is_none() {
             println!("[RUST] CoinJoin: mixingMasternode is None, ignoring status update");
@@ -1475,7 +1482,7 @@ impl CoinJoinClientSession {
     fn sign_final_transaction(&mut self, final_transaction_new: &Transaction, peer: &SocketAddress) {
         println!("[RUST] CoinJoin dsf: sign_final_transaction");
 
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return;
         }
 

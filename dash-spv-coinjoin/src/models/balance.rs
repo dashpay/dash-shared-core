@@ -32,7 +32,7 @@ impl Balance {
 
 impl fmt::Display for Balance {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Balance(\n myTrusted: {}\n myUntrustedPending: {}\n myImmature: {}\n watchOnlyTrusted: {}\n watchOnlyUntrustedPending: {}\n watchOnlyImmature: {}\n anonymized: {}\n denominatedTrusted: {}\n denominatedUntrustedPending: {}\n",
+        write!(f, "[RUST] CoinJoin: Balance(\n[RUST] CoinJoin: myTrusted: {}\n[RUST] CoinJoin: myUntrustedPending: {}\n[RUST] CoinJoin: myImmature: {}\n[RUST] CoinJoin: watchOnlyTrusted: {}\n[RUST] CoinJoin: watchOnlyUntrustedPending: {}\n[RUST] CoinJoin: watchOnlyImmature: {}\n[RUST] CoinJoin: anonymized: {}\n[RUST] CoinJoin: denominatedTrusted: {}\n[RUST] CoinJoin: denominatedUntrustedPending: {}\n",
             self.my_trusted,
             self.my_untrusted_pending,
             self.my_immature,

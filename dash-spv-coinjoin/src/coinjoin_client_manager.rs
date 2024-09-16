@@ -6,7 +6,7 @@ pub struct CoinJoinClientManager {
     wallet_ex: Rc<RefCell<WalletEx>>,
     coinjoin: Rc<RefCell<CoinJoin>>,
     pub queue_queue_manager: Option<Rc<RefCell<CoinJoinClientQueueManager>>>,
-    options: CoinJoinClientOptions,
+    options: Rc<RefCell<CoinJoinClientOptions>>,
     masternodes_used: Vec<UInt256>,
     last_masternode_used: usize,
     last_time_report_too_recent: u64,
@@ -31,7 +31,7 @@ impl CoinJoinClientManager {
     pub fn new(
         wallet_ex: Rc<RefCell<WalletEx>>,
         coinjoin: Rc<RefCell<CoinJoin>>,
-        options: CoinJoinClientOptions,
+        options: Rc<RefCell<CoinJoinClientOptions>>,
         get_masternode_list: GetMasternodeList,
         destroy_mn_list: DestroyMasternodeList, 
         update_success_block: UpdateSuccessBlock,
@@ -71,7 +71,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn process_message(&mut self, from: SocketAddress, message: CoinJoinMessage) {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return;
         }
 
@@ -114,7 +114,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn do_maintenance(&mut self, balance_info: Balance) {
-        if !self.options.enable_coinjoin {
+        if !self.options.borrow().enable_coinjoin {
             return;
         }
 
@@ -160,7 +160,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn do_automatic_denominating(&mut self, balance_info: Balance, dry_run: bool) -> bool {
-        if !self.options.enable_coinjoin || (!dry_run && !self.is_mixing) {
+        if !self.options.borrow().enable_coinjoin || (!dry_run && !self.is_mixing) {
             return false;
         }
 
@@ -199,7 +199,7 @@ impl CoinJoinClientManager {
         if let Some(queue_manager) = &self.queue_queue_manager {
             let mut result = true;
 
-            if self.deq_sessions.len() < self.options.coinjoin_sessions as usize {
+            if self.deq_sessions.len() < self.options.borrow().coinjoin_sessions as usize {
                 let new_session = CoinJoinClientSession::new(
                     self.coinjoin.clone(),
                     self.options.clone(),
@@ -391,12 +391,44 @@ impl CoinJoinClientManager {
         self.wallet_ex.borrow_mut().process_used_scripts(scripts);
     }
 
+    pub fn get_anonymizable_balance(&mut self, skip_denominated: bool, skip_unconfirmed: bool) -> u64 {
+        return self.wallet_ex.borrow_mut().get_anonymizable_balance(skip_denominated, skip_unconfirmed);
+    }
+
+    pub fn change_options(&mut self, new_options: CoinJoinClientOptions) {
+        println!("[RUST] CoinJoin: updating client options: {:?}", new_options);
+        let mut options = self.options.borrow_mut();
+        options.chain_type = new_options.chain_type;
+        options.enable_coinjoin = new_options.enable_coinjoin;
+        options.coinjoin_amount = new_options.coinjoin_amount;
+        options.coinjoin_sessions = new_options.coinjoin_sessions;
+        options.coinjoin_rounds = new_options.coinjoin_rounds;
+        options.coinjoin_random_rounds = new_options.coinjoin_random_rounds;
+        options.coinjoin_denoms_goal = new_options.coinjoin_denoms_goal;
+        options.coinjoin_denoms_hardcap = new_options.coinjoin_denoms_hardcap;
+        options.coinjoin_multi_session = new_options.coinjoin_multi_session;
+        options.denom_only = new_options.denom_only;
+    }
+
+    pub fn get_real_outpoint_coinjoin_rounds(&mut self, outpoint: TxOutPoint, rounds: i32) -> i32 {
+        return self.wallet_ex.borrow_mut().get_real_outpoint_coinjoin_rounds(outpoint, rounds);
+    }
+
+    pub fn reset_pool(&mut self) {
+        self.masternodes_used.clear();
+
+        for session in &mut self.deq_sessions {
+            session.reset_pool();
+        }
+        self.deq_sessions.clear();
+    }
+
     fn get_valid_mns_count(&self, mn_list: &MasternodeList) -> usize {
         mn_list.masternodes.values().filter(|mn| mn.is_valid).count()
     }
 
     fn check_timeout(&mut self) {
-        if !self.options.enable_coinjoin || !self.is_mixing {
+        if !self.options.borrow().enable_coinjoin || !self.is_mixing {
             return;
         }
 
