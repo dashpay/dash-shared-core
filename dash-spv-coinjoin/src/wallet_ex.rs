@@ -4,7 +4,7 @@ use std::slice;
 use byte::{BytesExt, LE};
 use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
 use dash_spv_masternode_processor::common::SocketAddress;
-use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
+use dash_spv_masternode_processor::ffi::unboxer::{unbox_any, unbox_vec};
 use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types::opaque_key::AsCStringPtr;
 use rand::seq::SliceRandom;
@@ -263,7 +263,8 @@ impl WalletEx {
         let mut vec_gathered_outputs: Vec<InputCoin> = Vec::new();
         
         unsafe {
-            let gathered_outputs = (self.available_coins)(only_safe, coin_control.encode(), self, self.context);
+            let encoded_coin_control = boxed(coin_control.encode());
+            let gathered_outputs = (self.available_coins)(only_safe, encoded_coin_control, self, self.context);
             (0..(*gathered_outputs).item_count)
                 .into_iter()
                 .map(|i| (**(*gathered_outputs).items.add(i)).decode())
@@ -272,9 +273,15 @@ impl WalletEx {
                 );
 
             (self.destroy_gathered_outputs)(gathered_outputs);
+            let unboxed_coin_control = unbox_any(encoded_coin_control);
+
+            if !unboxed_coin_control.set_selected.is_null() && unboxed_coin_control.set_selected_size > 0 {
+                let unboxed = unbox_vec_ptr(unboxed_coin_control.set_selected, unboxed_coin_control.set_selected_size);
+                unbox_vec(unboxed);
+            }
         }
 
-        return vec_gathered_outputs;
+        vec_gathered_outputs
     }
 
     pub fn select_coins_grouped_by_addresses(
@@ -473,19 +480,27 @@ impl WalletEx {
         }
     }
 
-    pub fn commit_transaction(&self, vec_send: &Vec<Recipient>, is_denominating: bool, client_session_id: UInt256) -> bool {
+    pub fn commit_transaction(&self, vec_send: &Vec<Recipient>, coin_control: CoinControl, is_denominating: bool, client_session_id: UInt256) -> bool {
         let result: bool;
 
         unsafe {
+            let encoded_coin_control = boxed(coin_control.encode());
             let boxed_vec = boxed_vec(
                 vec_send
                     .iter()
                     .map(|input| boxed((*input).clone()))
                     .collect()
             );
-            result = (self.commit_transaction)(boxed_vec, vec_send.len(), is_denominating, boxed(client_session_id.0), self.context);
+            
+            result = (self.commit_transaction)(boxed_vec, vec_send.len(), encoded_coin_control, is_denominating, boxed(client_session_id.0), self.context);
             let vec = unbox_vec_ptr(boxed_vec, vec_send.len());
             unbox_any_vec(vec);
+            let unboxed_coin_control = unbox_any(encoded_coin_control);
+
+            if !unboxed_coin_control.set_selected.is_null() && unboxed_coin_control.set_selected_size > 0 {
+                let unboxed = unbox_vec_ptr(unboxed_coin_control.set_selected, unboxed_coin_control.set_selected_size);
+                unbox_vec(unboxed);
+            }
         }
 
         return result;

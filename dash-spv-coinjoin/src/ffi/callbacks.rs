@@ -49,7 +49,7 @@ pub type IsMineInput = unsafe extern "C" fn(
 
 pub type AvailableCoins = unsafe extern "C" fn(
     only_safe: bool,
-    coin_control: CoinControl,
+    coin_control: *mut CoinControl,
     wallet_ex: &mut WalletEx,
     context: *const c_void,
 ) -> *mut GatheredOutputs;
@@ -84,6 +84,7 @@ pub type FreshCoinJoinAddress = unsafe extern "C" fn(
 pub type CommitTransaction = unsafe extern "C" fn(
     items: *mut *mut Recipient,
     item_count: usize,
+    coin_control: *mut CoinControl,
     is_denominating: bool,
     client_session_id: *mut [u8; 32],
     context: *const c_void
