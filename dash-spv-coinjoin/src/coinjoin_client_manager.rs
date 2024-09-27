@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{Syst
 use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, MixingLivecycleListener, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub struct CoinJoinClientManager {
-    wallet_ex: Rc<RefCell<WalletEx>>,
+    pub wallet_ex: Rc<RefCell<WalletEx>>,
     coinjoin: Rc<RefCell<CoinJoin>>,
     pub queue_queue_manager: Option<Rc<RefCell<CoinJoinClientQueueManager>>>,
     options: Rc<RefCell<CoinJoinClientOptions>>,
@@ -12,7 +12,7 @@ pub struct CoinJoinClientManager {
     last_time_report_too_recent: u64,
     tick: i32,
     do_auto_next_run: i32,
-    is_mixing: bool,
+    pub is_mixing: bool,
     deq_sessions: VecDeque<CoinJoinClientSession>,
     continue_mixing_on_status: Vec<PoolStatus>,
     str_auto_denom_result: String,
@@ -95,7 +95,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn start_mixing(&mut self) -> bool {
-        self.queue_mixing_lifecycle_listeners(false);
+        self.queue_mixing_lifecycle_listeners(false, false);
         
         if !self.is_mixing {
             self.is_mixing = true;
@@ -111,6 +111,7 @@ impl CoinJoinClientManager {
 
     pub fn stop_mixing(&mut self) {
         self.is_mixing = false;
+        self.queue_mixing_lifecycle_listeners(self.mixing_finished, true);
     }
 
     pub fn do_maintenance(&mut self, balance_info: Balance) {
@@ -209,7 +210,7 @@ impl CoinJoinClientManager {
                     self.context
                 );
                 
-                println!("[RUST] CoinJoin: creating new session, current session amount {}: ", self.deq_sessions.len());
+                println!("[RUST] CoinJoin: creating new session, current session amount: {} ", self.deq_sessions.len());
                 self.deq_sessions.push_back(new_session);
             }
 
@@ -379,20 +380,12 @@ impl CoinJoinClientManager {
         return false;
     }
 
-    pub fn is_fully_mixed(&mut self, outpoint: TxOutPoint) -> bool {
-        return self.wallet_ex.borrow_mut().is_fully_mixed(outpoint);
-    }
-
     pub fn refresh_unused_keys(&mut self) {
         self.wallet_ex.borrow_mut().refresh_unused_keys();
     }
 
     pub fn process_used_scripts(&mut self, scripts: &Vec<Vec<u8>>) {
         self.wallet_ex.borrow_mut().process_used_scripts(scripts);
-    }
-
-    pub fn get_anonymizable_balance(&mut self, skip_denominated: bool, skip_unconfirmed: bool) -> u64 {
-        return self.wallet_ex.borrow_mut().get_anonymizable_balance(skip_denominated, skip_unconfirmed);
     }
 
     pub fn change_options(&mut self, new_options: CoinJoinClientOptions) {
@@ -442,17 +435,17 @@ impl CoinJoinClientManager {
     fn trigger_mixing_finished(&mut self) {
         if self.stop_on_nothing_to_do {
             self.mixing_finished = true;
-            self.queue_mixing_lifecycle_listeners(true);
+            self.queue_mixing_lifecycle_listeners(true, false);
         }
     }
 
-    fn queue_mixing_lifecycle_listeners(&self, is_complete: bool) {
+    fn queue_mixing_lifecycle_listeners(&self, is_complete: bool, is_interrupted: bool) {
         let statuses: Vec<PoolStatus> = self.deq_sessions.iter().map(|x| x.base_session.status).collect();
         let length = statuses.len();
 
         unsafe {
             let boxed_statuses = boxed_vec(statuses);
-            (self.mixing_lifecycle_listener)(is_complete, boxed_statuses, length, self.context);
+            (self.mixing_lifecycle_listener)(is_complete, is_interrupted, boxed_statuses, length, self.context);
             unbox_vec_ptr(boxed_statuses, length);
         }
     }

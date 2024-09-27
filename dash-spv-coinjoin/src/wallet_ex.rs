@@ -183,7 +183,6 @@ impl WalletEx {
         if wtx.is_none() {
             // no such tx in this wallet
             rounds_ref = -1;
-            println!("[RUST] CoinJoin: FAILED    {:?} {} (no such tx)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -193,7 +192,6 @@ impl WalletEx {
         if outpoint.index >= transaction.outputs.len() as u32 {
             // should never actually hit this
             rounds_ref = -4;
-            println!("[RUST] CoinJoin: FAILED    {:?} {} (bad index)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -202,7 +200,6 @@ impl WalletEx {
 
         if CoinJoin::is_collateral_amount(tx_out.amount) {
             rounds_ref = -3;
-            println!("[RUST] CoinJoin: UPDATED    {:?} {} (collateral)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -210,7 +207,6 @@ impl WalletEx {
         // make sure the final output is non-denominate
         if !CoinJoin::is_denominated_amount(tx_out.amount) {
             rounds_ref = -2;
-            println!("[RUST] CoinJoin: UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -219,7 +215,6 @@ impl WalletEx {
             if !CoinJoin::is_denominated_amount(out.amount) {
                 // this one is denominated but there is another non-denominated output found in the same tx
                 rounds_ref = 0;
-                println!("[RUST] CoinJoin: UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
                 self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
                 return rounds_ref;
             }
@@ -248,7 +243,6 @@ impl WalletEx {
             0
         };
 
-        println!("[RUST] CoinJoin: UPDATED    {:?} {} (coinjoin)", outpoint, rounds_ref);
         self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
         rounds_ref
     }
@@ -297,12 +291,12 @@ impl WalletEx {
         // This should only be used if maxOupointsPerAddress was NOT specified.
         if max_outpoints_per_address == -1 && anonymizable && skip_unconfirmed {
             if skip_denominated && self.anonymizable_tally_cached_non_denom {
-                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - using cache for non-denom inputs {}", self.vec_anonymizable_tally_cached_non_denom.len());
+                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - using cache for non-denom inputs, len: {}", self.vec_anonymizable_tally_cached_non_denom.len());
                 return self.vec_anonymizable_tally_cached_non_denom.clone();
             }
 
             if !skip_denominated && self.anonymizable_tally_cached {
-                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - using cache for all inputs {}", self.vec_anonymizable_tally_cached.len());
+                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - using cache for all inputs, len: {}", self.vec_anonymizable_tally_cached.len());
                 return self.vec_anonymizable_tally_cached.clone();
             }
         }
@@ -323,11 +317,13 @@ impl WalletEx {
 
         // Cache already confirmed mixable entries for later use.
         // This should only be used if nMaxOupointsPerAddress was NOT specified.
-        if max_outpoints_per_address == -1 && anonymizable && skip_unconfirmed {
+        if max_outpoints_per_address == -1 && anonymizable && skip_unconfirmed && !vec_tally_ret.is_empty() {
             if skip_denominated {
+                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - set cache for non-denom inputs, len: {}", vec_tally_ret.len());
                 self.vec_anonymizable_tally_cached_non_denom = vec_tally_ret.clone();
                 self.anonymizable_tally_cached_non_denom = true;
             } else {
+                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - set cache for all inputs, len: {}", vec_tally_ret.len());
                 self.vec_anonymizable_tally_cached = vec_tally_ret.clone();
                 self.anonymizable_tally_cached = true;
             }
@@ -570,9 +566,9 @@ impl WalletEx {
         if set_recent_tx_ids.is_empty() {
             println!("[RUST] CoinJoin: No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
             
-            for output in coins.iter() {
-                println!("[RUST] CoinJoin: output: {:?}", output);
-            }
+            // for output in coins.iter() { // TODO: debug/release logs
+            //     println!("[RUST] CoinJoin: output: {:?}", output);
+            // }
         }
     
         return value_total > 0;

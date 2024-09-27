@@ -208,7 +208,7 @@ pub unsafe extern "C" fn is_fully_mixed_with_manager(
     prevout_hash: *mut [u8; 32],
     index: u32,
 ) -> bool {
-    return (*client_manager).is_fully_mixed(TxOutPoint::new(UInt256(*(prevout_hash)), index));
+    return (*client_manager).wallet_ex.borrow_mut().is_fully_mixed(TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
 #[no_mangle]
@@ -227,6 +227,15 @@ pub unsafe extern "C" fn is_locked_coin(
     index: u32,
 ) -> bool {
     return (*wallet_ex).locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn is_locked_coin_with_manager(
+    client_manager: *mut CoinJoinClientManager,
+    prevout_hash: *mut [u8; 32],
+    index: u32,
+) -> bool {
+    return (*client_manager).wallet_ex.borrow().locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
 }
 
 #[no_mangle]
@@ -403,7 +412,7 @@ pub unsafe extern "C" fn get_anonymizable_balance(
     skip_denominated: bool, 
     skip_unconfirmed: bool
 ) -> u64 {
-    return (*client_manager).get_anonymizable_balance(skip_denominated, skip_unconfirmed);
+    return (*client_manager).wallet_ex.borrow_mut().get_anonymizable_balance(skip_denominated, skip_unconfirmed);
 }
 
 #[no_mangle]
@@ -478,7 +487,9 @@ pub unsafe extern "C" fn destroy_coinjoin_session_statuses(
 pub unsafe extern "C" fn stop_and_reset_coinjoin(
     client_manager: *mut CoinJoinClientManager
 ) {
-    (*client_manager).reset_pool();
-    (*client_manager).stop_mixing();
+    if (*client_manager).is_mixing {
+        (*client_manager).reset_pool();
+        (*client_manager).stop_mixing();
+    }
 }
 

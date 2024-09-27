@@ -109,7 +109,7 @@ impl CoinJoinClientSession {
         }
 
 
-        println!("[RUST] CoinJoin {:?}", self.options.borrow());
+        println!("\n[RUST] CoinJoin {:?}", self.options.borrow());
         println!("{}", balance_info);
 
         let balance_anonymized = balance_info.anonymized;
@@ -145,6 +145,7 @@ impl CoinJoinClientSession {
                 self.queue_session_lifecycle_listeners(true, self.base_session.state, PoolMessage::ErrSession);
             }
             
+            println!("[RUST] CoinJoin: skipping, balance_anonymizable: {}, balance_left_to_mix: {}, value_min: {}", balance_anonymizable, balance_left_to_mix, value_min);
             return false;
         }
 
@@ -171,7 +172,7 @@ impl CoinJoinClientSession {
             balance_needs_anonymized += additional_denom;
         }
 
-        println!("[RUST] CoinJoin: current stats:\n[RUST] CoinJoin: value_min: {}\n[RUST] CoinJoin: myTrmy_trustedusted: {}\n[RUST] CoinJoin: balance_anonymizable: {}\n[RUST] CoinJoin: balance_anonymized: {}\n[RUST] CoinJoin: balance_needs_anonymized: {}\n[RUST] CoinJoin: balance_anonimizable_non_denom: {}\n[RUST] CoinJoin: balance_denominated_conf: {}\n[RUST] CoinJoin: balance_denominated_unconf: {}\n[RUST] CoinJoin: balance_denominated: {}\n[RUST] CoinJoin: balance_to_denominate: {}\n",
+        println!("[RUST] CoinJoin: current stats:\n[RUST] CoinJoin: value_min: {}\n[RUST] CoinJoin: my_trusted: {}\n[RUST] CoinJoin: balance_anonymizable: {}\n[RUST] CoinJoin: balance_anonymized: {}\n[RUST] CoinJoin: balance_needs_anonymized: {}\n[RUST] CoinJoin: balance_anonimizable_non_denom: {}\n[RUST] CoinJoin: balance_denominated_conf: {}\n[RUST] CoinJoin: balance_denominated_unconf: {}\n[RUST] CoinJoin: balance_denominated: {}\n[RUST] CoinJoin: balance_to_denominate: {}\n",
             value_min.to_friendly_string(),
             balance_info.my_trusted.to_friendly_string(),
             balance_anonymizable.to_friendly_string(),
@@ -312,8 +313,6 @@ impl CoinJoinClientSession {
 
     pub fn process_pending_dsa_request(&mut self) -> bool {
         if let Some(pending_request) = &self.pending_dsa_request {
-            println!("[RUST] CoinJoin dsa: valid collateral before sending: {}",
-                self.coinjoin.borrow().is_collateral_valid(&pending_request.dsa.tx_collateral, true));
             let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             self.base_session.time_last_successful_step = current_time;
             let mut buffer = vec![];
@@ -322,7 +321,6 @@ impl CoinJoinClientSession {
             println!("[RUST] CoinJoin dsa: sending {} to {}", pending_request.dsa, pending_request.addr);
 
             if message_sent {
-                println!("[RUST] CoinJoin dsa: sent");
                 self.pending_dsa_request = None;
             } else if pending_request.is_expired() {
                 println!("[RUST] CoinJoin dsa: failed to connect to {}; reason: cannot find peer", pending_request.addr);
@@ -839,15 +837,12 @@ impl CoinJoinClientSession {
             }
         }
 
-        println!("[RUST] CoinJoin peers: mixing_masternode to None");
         self.mixing_masternode = None;
         self.pending_dsa_request = None;
         self.base_session.set_null();
     }
 
     fn create_collateral_transaction(&mut self, str_reason: &mut String) -> bool {
-        println!("[RUST] CoinJoinClientSession::create_collateral_transaction");
-        
         let mut coin_control = CoinControl::new();
         coin_control.coin_type = CoinType::OnlyCoinJoinCollateral;
         let coins = self.mixing_wallet.borrow_mut().available_coins(true, coin_control);
@@ -928,8 +923,6 @@ impl CoinJoinClientSession {
     }
 
     fn join_existing_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
-        println!("[RUST] CoinJoin dsq: join_existing_queue");
-
         if !self.options.borrow().enable_coinjoin {
             return false;
         }
@@ -938,7 +931,6 @@ impl CoinJoinClientSession {
         let queue_manager_rc = self.queue_manager.clone();
         let mut queue_manager = queue_manager_rc.borrow_mut();
         let mut dsq_option = queue_manager.get_queue_item_and_try();
-        println!("[RUST] CoinJoin dsq try item: {:?}", dsq_option);
 
         while let Some(dsq) = dsq_option.clone() {
             let dmn = mn_list.masternode_for(dsq.pro_tx_hash.reversed());
@@ -999,8 +991,6 @@ impl CoinJoinClientSession {
     }
 
     fn start_new_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
-        println!("[RUST] CoinJoin dsa: start_new_queue");
-
         if !self.options.borrow().enable_coinjoin {
             return false;
         }
@@ -1328,7 +1318,6 @@ impl CoinJoinClientSession {
 
     fn process_status_update(&mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
         if self.mixing_masternode.is_none() {
-            println!("[RUST] CoinJoin: mixingMasternode is None, ignoring status update");
             return;
         }
 
@@ -1456,8 +1445,6 @@ impl CoinJoinClientSession {
     }
 
     fn process_final_transaction(&mut self, peer: &SocketAddress, final_tx: &CoinJoinFinalTransaction) {
-        println!("[RUST] CoinJoin dsf: process_final_transaction");
-
         if self.mixing_masternode.is_none() {
             return;
         }
