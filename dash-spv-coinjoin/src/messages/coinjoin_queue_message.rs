@@ -1,5 +1,6 @@
 use std::io::{Error, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::warn;
 use dash_spv_masternode_processor::consensus::encode::VarInt;
 use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::consensus::{encode, Encodable};
@@ -58,7 +59,7 @@ impl CoinJoinQueueMessage {
             ).verify_insecure(&hash, *signature);
 
             if !verified {
-                println!("[RUST] CoinJoinQueue-verifySignature failed");
+                warn!(target: "CoinJoinQueue", "verifySignature failed");
             }
 
             return verified;

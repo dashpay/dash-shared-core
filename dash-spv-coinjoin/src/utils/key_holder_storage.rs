@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-
+use tracing::info;
 use crate::{utils::key_holder::KeyHolder, wallet_ex::WalletEx};
 
 pub(crate) struct KeyHolderStorage {
@@ -30,7 +30,7 @@ impl KeyHolderStorage {
                 key_holder.keep_key();
             }
 
-            println!("[RUST] CoinJoin: keepAll: {} keys kept", tmp.len());
+            info!(target: "CoinJoin", "keepAll: {} keys kept", tmp.len());
         }
     }
 

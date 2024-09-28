@@ -58,4 +58,8 @@
 
 #define REFERENCE_DEFAULT_MIN_TX_FEE 1000
 
+extern void *os_log_create(const char *subsystem, const char *category);
+
+extern void os_log_info(void *log, const char *message);
+
 #endif /* example_h */

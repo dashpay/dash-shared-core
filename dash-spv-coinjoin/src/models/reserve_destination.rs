@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-
+use tracing::info;
 use crate::wallet_ex::WalletEx;
 use super::tx_destination::TxDestination;
 
@@ -52,6 +52,8 @@ impl<'a> ReserveDestination {
     pub fn keep_destination(&mut self) {
         if self.key.is_some() {
             self.wallet_ex.borrow_mut().remove_unused_key(&self.key);
+        } else {
+            info!(target: "CoinJoin", "cannot keep key");
         }
 
         self.key = None;
@@ -60,6 +62,8 @@ impl<'a> ReserveDestination {
     pub fn return_destination(&mut self) {
         if self.key.is_some() {
             self.wallet_ex.borrow_mut().add_unused_key(&self.key);
+        } else {
+            info!(target: "CoinJoin", "cannot return key");
         }
 
         self.key = None;

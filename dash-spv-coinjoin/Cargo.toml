@@ -18,6 +18,8 @@ dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
 ferment-interfaces = { path = "../../ferment/ferment-interfaces" }
 ferment-macro = { path = "../../ferment/ferment-macro" }
 byte = "0.2"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [build-dependencies]
 cbindgen = "0.24.3"
