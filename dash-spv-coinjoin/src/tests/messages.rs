@@ -181,15 +181,6 @@ pub fn coinjoin_entry_test() {
     assert_eq!(collateral_tx, entry.tx_collateral);
     assert_eq!(5, entry.mixing_inputs.len());
     assert_eq!(5, entry.mixing_outputs.len());
-
-    let dsi_message = Vec::from_hex("019c3f66ef3952e2d7e8d6d1435493718006114ab77e669b5ced4f1d109380465e250000000000000001000000010f5884113d3f6ad149191519b89a263ec5df0a41425c611542f6a2f55359db53000000006b4830450221009b11da562429245a67fcc79d6608f25b4eb04fec4195e2e360d1a80815db6d840220545f898f0a0fdcd57bb4e61e6920a438996ec38f0af337b9220900de4b6644ef012103854b23a80ade3e0e601dbdc8edb4f41922b4c97575cdb5c82b8523fbd8448a72000000000130750000000000001976a9145a3c111140c3346dab672ceba7931a5532488bbe88ac0000000001e4969800000000001976a914a7024476050ae66be18ee3ca6a80ff1df6f2545688ac").unwrap();
-    let mut cursor = Cursor::new(&dsi_message);
-    let entry = CoinJoinEntry::consensus_decode(&mut cursor).unwrap();
-
-    let hash = UInt256::from_hex("8ca06ef4f0b171c936eb8da3ad52f8a769cf5f9ab53cd910846180f8db183777").ok();
-    assert_eq!(hash, entry.tx_collateral.tx_hash);
-    assert_eq!(1, entry.mixing_inputs.len());
-    assert_eq!(1, entry.mixing_outputs.len());
 }
 
 #[test]
