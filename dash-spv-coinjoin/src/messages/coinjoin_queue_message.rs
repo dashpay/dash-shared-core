@@ -1,6 +1,5 @@
 use std::io::{Error, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::warn;
 use dash_spv_masternode_processor::consensus::encode::VarInt;
 use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::consensus::{encode, Encodable};
@@ -9,10 +8,12 @@ use dash_spv_masternode_processor::hashes::hex::ToHex;
 use dash_spv_masternode_processor::hashes::{sha256d, Hash};
 use dash_spv_masternode_processor::keys::BLSKey;
 use dash_spv_masternode_processor::models::OperatorPublicKey;
+use tracing::warn;
 use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 use crate::constants::COINJOIN_QUEUE_TIMEOUT;
+use crate::log_warn;
 
 // dsq
 // A currently in progress mixing merge and denomination information
@@ -59,7 +60,7 @@ impl CoinJoinQueueMessage {
             ).verify_insecure(&hash, *signature);
 
             if !verified {
-                warn!(target: "CoinJoinQueue", "verifySignature failed");
+                log_warn!(target: "CoinJoinQueue", "verifySignature failed");
             }
 
             return verified;

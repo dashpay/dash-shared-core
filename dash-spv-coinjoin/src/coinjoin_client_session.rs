@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::{error, info, warn};
+use tracing::{info, warn, error};
 use dash_spv_masternode_processor::blockdata::opcodes::all::OP_RETURN;
 use dash_spv_masternode_processor::chain::params::DUFFS;
 use dash_spv_masternode_processor::chain::tx::protocol::{TXIN_SEQUENCE, TX_UNCONFIRMED};
@@ -36,6 +36,7 @@ use crate::coinjoin_base_session::CoinJoinBaseSession;
 use crate::utils::coin_format::CoinFormat;
 use crate::utils::key_holder_storage::KeyHolderStorage;
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
+use crate::{log_error, log_info, log_warn};
 use crate::utils::transaction_builder::TransactionBuilder;
 use crate::wallet_ex::WalletEx;
 use crate::messages::coinjoin_message::{CoinJoinMessageType, CoinJoinMessage};
@@ -109,14 +110,14 @@ impl CoinJoinClientSession {
         }
 
 
-        info!(target: "CoinJoin", "{:?}", self.options.borrow());
-        info!(target: "CoinJoin", "balance: {}", balance_info);
+        log_info!(target: "CoinJoin", "{:?}", self.options.borrow());
+        log_info!(target: "CoinJoin", "balance: {}", balance_info);
 
         let balance_anonymized = balance_info.anonymized;
         let sub_res = self.options.borrow().coinjoin_amount.checked_sub(balance_anonymized);
         
         if sub_res.is_none() {
-            info!(target: "CoinJoin", "CoinJoinClientSession::do_automatic_denominating -- Nothing to do");
+            log_info!(target: "CoinJoin", "CoinJoinClientSession::do_automatic_denominating -- Nothing to do");
             // nothing to do, just keep it in idle mode
             self.set_status(PoolStatus::Finished);
             return false;
@@ -127,7 +128,7 @@ impl CoinJoinClientSession {
 
         // if there are no confirmed DS collateral inputs yet
         if !self.mixing_wallet.borrow_mut().has_collateral_inputs(true) {
-            info!(target: "CoinJoin", "no collateral inputs");
+            log_info!(target: "CoinJoin", "no collateral inputs");
             // should have some additional amount for them
             value_min = value_min + CoinJoin::get_max_collateral_amount();
         }
@@ -141,7 +142,7 @@ impl CoinJoinClientSession {
             
             if balance_left_to_mix < value_min {
                 self.set_status(PoolStatus::ErrNotEnoughFunds);
-                info!(target: "CoinJoin", "NotEnoughFunds");
+                log_info!(target: "CoinJoin", "NotEnoughFunds");
                 self.queue_session_lifecycle_listeners(true, self.base_session.state, PoolMessage::ErrSession);
             }
             
@@ -154,11 +155,11 @@ impl CoinJoinClientSession {
         let balance_denominated_unconf = balance_info.denominated_untrusted_pending;
         let balance_denominated = balance_denominated_conf + balance_denominated_unconf;
         let balance_to_denominate = self.options.borrow().coinjoin_amount.saturating_sub(balance_denominated);
-        info!(target: "CoinJoin", "balance_to_denominate: {}", balance_to_denominate);
+        log_info!(target: "CoinJoin", "balance_to_denominate: {}", balance_to_denominate);
 
         // Adjust balance_needs_anonymized to consume final denom
         if balance_denominated.saturating_sub(balance_anonymized) > balance_needs_anonymized as u64 {
-            info!(target: "CoinJoin", "adjusting balance_needs_anonymized to consume final denom");
+            log_info!(target: "CoinJoin", "adjusting balance_needs_anonymized to consume final denom");
             let denoms = CoinJoin::get_standard_denominations();
             let mut additional_denom: u64 = 0;
             
@@ -172,7 +173,7 @@ impl CoinJoinClientSession {
             balance_needs_anonymized += additional_denom;
         }
 
-        info!(target: "CoinJoin", "current stats: value_min:{}, myTrmy_trustedusted:{}, balance_anonymizable:{}, balance_anonymized:{}, balance_needs_anonymized:{}, balance_anonimizable_non_denom:{}, balance_denominated_conf:{}, balance_denominated_unconf:{}, balance_denominated:{}, balance_to_denominate:{}",
+        log_info!(target: "CoinJoin", "current stats: value_min:{}, myTrmy_trustedusted:{}, balance_anonymizable:{}, balance_anonymized:{}, balance_needs_anonymized:{}, balance_anonimizable_non_denom:{}, balance_denominated_conf:{}, balance_denominated_unconf:{}, balance_denominated:{}, balance_to_denominate:{}",
             value_min.to_friendly_string(),
             balance_info.my_trusted.to_friendly_string(),
             balance_anonymizable.to_friendly_string(),
@@ -206,11 +207,11 @@ impl CoinJoinClientSession {
         self.balance_needs_anonymized = balance_needs_anonymized;
 
         if self.last_create_denominated_result {
-            info!(target: "CoinJoin", "auto_denom: wait for finish callback");
+            log_info!(target: "CoinJoin", "auto_denom: wait for finish callback");
             // If transaction was commited, return and wait for obj-c to call finish_automatic_denominating
             return true;
         } else {
-            info!(target: "CoinJoin", "auto_denom: proceed immediately");
+            log_info!(target: "CoinJoin", "auto_denom: proceed immediately");
             // If no transactions were commited, call finish_automatic_denominating directly
             self.last_create_denominated_result = true;
             self.finish_automatic_denominating(client_manager);
@@ -220,7 +221,7 @@ impl CoinJoinClientSession {
     }
 
     pub fn finish_automatic_denominating(&mut self, client_manager: &mut CoinJoinClientManager) -> bool {
-        info!(target: "CoinJoin", "finish_automatic_denominating: {}", self.balance_needs_anonymized.to_friendly_string());
+        log_info!(target: "CoinJoin", "finish_automatic_denominating: {}", self.balance_needs_anonymized.to_friendly_string());
 
         if self.balance_needs_anonymized == 0 {
             return false;
@@ -232,13 +233,13 @@ impl CoinJoinClientSession {
         // check if we have the collateral sized inputs
         if !self.mixing_wallet.borrow_mut().has_collateral_inputs(true) {
             let result = !self.mixing_wallet.borrow_mut().has_collateral_inputs(false) && self.make_collateral_amounts(client_manager);
-            info!(target: "CoinJoin", "exiting finish_automatic_denominating early with result: {}", result);
+            log_info!(target: "CoinJoin", "exiting finish_automatic_denominating early with result: {}", result);
             return result;
         }
 
         if self.base_session.session_id != 0 {
             self.set_status(PoolStatus::Mixing);
-            info!(target: "CoinJoin", "base_session.session_id != 0");
+            log_info!(target: "CoinJoin", "base_session.session_id != 0");
             return false;
         }
         
@@ -261,13 +262,13 @@ impl CoinJoinClientSession {
         match self.tx_my_collateral.clone() {
             None => {
                 if !self.create_collateral_transaction(&mut reason) {
-                    error!(target: "CoinJoin", "create collateral error: {}", reason);
+                    log_error!(target: "CoinJoin", "create collateral error: {}", reason);
                     return false;
                 }
             },
             Some(collateral) => {
                 if !self.is_my_collateral_valid || !self.coinjoin.borrow().is_collateral_valid(&collateral, true) {
-                    info!(target: "CoinJoin", "invalid collateral, recreating... [id: {}] ", self.id);
+                    log_info!(target: "CoinJoin", "invalid collateral, recreating... [id: {}] ", self.id);
                     let output = &collateral.outputs[0];
                     
                     if output.script_pub_key_type() == ScriptType::PayToPubkeyHash {
@@ -275,7 +276,7 @@ impl CoinJoinClientSession {
                     }
 
                     if !self.create_collateral_transaction(&mut reason) {
-                        error!(target: "CoinJoin", "create collateral error: {}", reason);
+                        log_error!(target: "CoinJoin", "create collateral error: {}", reason);
                         return false;
                     }
                 }
@@ -289,10 +290,10 @@ impl CoinJoinClientSession {
             }
         }
 
-        info!(target: "CoinJoin", "moved to queue joining/creating");
+        log_info!(target: "CoinJoin", "moved to queue joining/creating");
 
         if self.options.borrow().denom_only {
-            info!(target: "CoinJoin", "denom_only is true, skipping queue joining/creating");
+            log_info!(target: "CoinJoin", "denom_only is true, skipping queue joining/creating");
             return true;
         }
 
@@ -313,19 +314,20 @@ impl CoinJoinClientSession {
 
     pub fn process_pending_dsa_request(&mut self) -> bool {
         if let Some(pending_request) = &self.pending_dsa_request {
-            info!(target: "CoinJoin dsa", "valid collateral before sending: {}",
+            log_info!(target: "CoinJoin dsa", "valid collateral before sending: {}",
                 self.coinjoin.borrow().is_collateral_valid(&pending_request.dsa.tx_collateral, true));
             let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             self.base_session.time_last_successful_step = current_time;
             let mut buffer = vec![];
             pending_request.dsa.consensus_encode(&mut buffer).unwrap();
             let message_sent = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr, false);
-            info!(target: "CoinJoin dsa", "sending {} to {}", pending_request.dsa, pending_request.addr);
+            log_info!(target: "CoinJoin dsa", "sending {} to {}", pending_request.dsa, pending_request.addr);
 
             if message_sent {
+                log_warn!(target: "CoinJoin dsa", "sent");
                 self.pending_dsa_request = None;
             } else if pending_request.is_expired() {
-                warn!(target: "CoinJoin dsa", "failed to connect to {}; reason: cannot find peer", pending_request.addr);
+                log_warn!(target: "CoinJoin dsa", "failed to connect to {}; reason: cannot find peer", pending_request.addr);
                 self.set_status(PoolStatus::ConnectionTimeout);
                 self.queue_session_lifecycle_listeners(true, self.base_session.state, PoolMessage::ErrConnectionTimeout);
                 self.set_null();
@@ -349,14 +351,14 @@ impl CoinJoinClientSession {
         let mut vec_tally: Vec<CompactTallyItem> = self.mixing_wallet.borrow_mut().select_coins_grouped_by_addresses(true, true, true, 400);
     
         if vec_tally.is_empty() {
-            info!(target: "CoinJoin", "CoinJoinClientSession::CreateDenominated -- SelectCoinsGroupedByAddresses can't find any inputs!");
+            log_info!(target: "CoinJoin", "CoinJoinClientSession::CreateDenominated -- SelectCoinsGroupedByAddresses can't find any inputs!");
             return false;
         }
     
         // Start from the largest balances first to speed things up by creating txes with larger/largest denoms included
         vec_tally.sort_by(|a, b| b.amount.cmp(&a.amount));
         let create_mixing_collaterals = !self.mixing_wallet.borrow_mut().has_collateral_inputs(true);
-        info!(target: "CoinJoin", "has_collateral_inputs: {}", !create_mixing_collaterals);
+        log_info!(target: "CoinJoin", "has_collateral_inputs: {}", !create_mixing_collaterals);
 
         for item in vec_tally {
             if !self.create_denominated_with_item(client_manager, &item, balance_to_denominate, create_mixing_collaterals, dry_run) {
@@ -366,7 +368,7 @@ impl CoinJoinClientSession {
             return true;
         }
     
-        info!(target: "CoinJoin", "CoinJoinClientSession: createDenominated({}) -- failed! ", balance_to_denominate.to_friendly_string());
+        log_info!(target: "CoinJoin", "CoinJoinClientSession: createDenominated({}) -- failed! ", balance_to_denominate.to_friendly_string());
         false
     }
 
@@ -394,12 +396,12 @@ impl CoinJoinClientSession {
             dry_run
         );
 
-        info!(target: "CoinJoin", "create_denominated_with_item. Start tx_builder: {}", tx_builder);
+        log_info!(target: "CoinJoin", "create_denominated_with_item. Start tx_builder: {}", tx_builder);
 
         // ****** Add an output for mixing collaterals ************ /
 
         if create_mixing_collaterals && !tx_builder.add_output(CoinJoin::get_max_collateral_amount()) {
-            warn!(target: "CoinJoin", "CoinJoinClientSession::CreateDenominatedWithItem -- Failed to add collateral output");
+            log_warn!(target: "CoinJoin", "CoinJoinClientSession::CreateDenominatedWithItem -- Failed to add collateral output");
             return false;
         }
 
@@ -433,7 +435,7 @@ impl CoinJoinClientSession {
                     if tx_builder.could_add_output(*denom_value) {
                         if add_final && balance_to_denom > 0 && balance_to_denom < *denom_value {
                             add_final = false; // add final denom only once, only the smallest possible one
-                            info!(target: "CoinJoin", "CoinJoinClientSession -- 1 - FINAL - nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
+                            log_info!(target: "CoinJoin", "CoinJoinClientSession -- 1 - FINAL - nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
                                 denom_value.to_friendly_string(), balance_to_denom.to_friendly_string(), outputs, tx_builder.to_string());
                             return true;
                         } else if balance_to_denom >= *denom_value {
@@ -451,16 +453,16 @@ impl CoinJoinClientSession {
                         outputs += 1;
                         *map_denom_count.entry(*denom_value).or_insert(0) += 1;
                         balance_to_denominate = balance_to_denominate.saturating_sub(*denom_value);
-                        info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
+                        log_info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
                             denom_value.to_friendly_string(), balance_to_denominate.to_friendly_string(), outputs, tx_builder.to_string());
                     } else {
-                        error!(target: "CoinJoin", "CoinJoinClientSession -- 2 - Error: AddOutput failed for nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
+                        log_error!(target: "CoinJoin", "CoinJoinClientSession -- 2 - Error: AddOutput failed for nDenomValue: {}, nBalanceToDenominate: {}, nOutputs: {}, {}",
                             denom_value.to_friendly_string(), balance_to_denominate.to_friendly_string(), outputs, tx_builder.to_string());
                         return false;
                     }
                 }
 
-                info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - tx_builder.amount_left: {}, balance_to_denominate: {}", tx_builder.amount_left(), balance_to_denominate);
+                log_info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - tx_builder.amount_left: {}, balance_to_denominate: {}", tx_builder.amount_left(), balance_to_denominate);
                 if tx_builder.amount_left() == 0 || balance_to_denominate == 0 {
                     break;
                 }
@@ -473,11 +475,11 @@ impl CoinJoinClientSession {
                 // denom and that our nValueLeft/nBalanceToDenominate is enough to create one of these denoms, if so, loop again.
                 if *count < DEFAULT_COINJOIN_DENOMS_GOAL && tx_builder.could_add_output(*denom) && balance_to_denominate >= CoinJoin::get_smallest_denomination() {
                     finished = false;
-                    info!(target: "CoinJoin", "CoinJoinClientSession -- 1 - NOT finished - nDenomValue: {}, count: {}, nBalanceToDenominate: {}, {}",
+                    log_info!(target: "CoinJoin", "CoinJoinClientSession -- 1 - NOT finished - nDenomValue: {}, count: {}, nBalanceToDenominate: {}, {}",
                         denom.to_friendly_string(), count, balance_to_denominate.to_friendly_string(), tx_builder.to_string());
                     break;
                 }
-                info!(target: "CoinJoin", "CoinJoinClientSession -- 1 - FINISHED - nDenomValue: {}, count: {}, nBalanceToDenominate: {}, {}",
+                log_info!(target: "CoinJoin", "CoinJoinClientSession -- 1 - FINISHED - nDenomValue: {}, count: {}, nBalanceToDenominate: {}, {}",
                     denom.to_friendly_string(), count, balance_to_denominate.to_friendly_string(), tx_builder.to_string());
             }
 
@@ -490,7 +492,7 @@ impl CoinJoinClientSession {
         // if (txBuilder.CouldAddOutput(CCoinJoin::GetSmallestDenomination()) && nBalanceToDenominate >= CCoinJoin::GetSmallestDenomination() && txBuilder.CountOutputs() < COINJOIN_DENOM_OUTPUTS_THRESHOLD) {
         if tx_builder.could_add_output(CoinJoin::get_smallest_denomination()) && balance_to_denominate >= CoinJoin::get_smallest_denomination() && (tx_builder.outputs.len() as i32) < COINJOIN_DENOM_OUTPUTS_THRESHOLD {
             let largest_denom_value = denoms[0];
-            info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - Process remainder: {}\n", tx_builder.to_string());
+            log_info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - Process remainder: {}\n", tx_builder.to_string());
 
             let count_possible_outputs = |amount: u64, tx_builder: &TransactionBuilder| -> u64 {
                 let mut vec_outputs: Vec<u64> = Vec::new();
@@ -527,7 +529,7 @@ impl CoinJoinClientSession {
                 let denoms_to_create_bal = (balance_to_denominate / *denom_value as u64) + 1;
                 // Use the smaller value
                 let denoms_to_create = denoms_to_create_value.min(denoms_to_create_bal);
-                info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - nBalanceToDenominate: {}, nDenomValue: {}, denomsToCreateValue: {}, denomsToCreateBal: {}\n",
+                log_info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - nBalanceToDenominate: {}, nDenomValue: {}, denomsToCreateValue: {}, denomsToCreateBal: {}\n",
                     balance_to_denominate.to_friendly_string(), denom_value.to_friendly_string(), denoms_to_create_value.to_friendly_string(), denoms_to_create_bal.to_friendly_string());
 
                 let mut it = map_denom_count[denom_value];
@@ -545,11 +547,11 @@ impl CoinJoinClientSession {
                         map_denom_count.insert(*denom_value, it);
                         balance_to_denominate = balance_to_denominate.saturating_sub(*denom_value);
                     } else {
-                        error!(target: "CoinJoin", "CoinJoinClientSession -- 2 - Error: AddOutput failed at {}/{}, {}\n", i + 1, denoms_to_create, tx_builder.to_string());
+                        log_error!(target: "CoinJoin", "CoinJoinClientSession -- 2 - Error: AddOutput failed at {}/{}, {}\n", i + 1, denoms_to_create, tx_builder.to_string());
                         break;
                     }
 
-                    info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - denomValue: {}, balanceToDenominate: {}, nOutputs: {}, {}\n",
+                    log_info!(target: "CoinJoin", "CoinJoinClientSession -- 2 - denomValue: {}, balanceToDenominate: {}, nOutputs: {}, {}\n",
                         denom_value.to_friendly_string(), balance_to_denominate.to_friendly_string(), outputs, tx_builder.to_string());
                     
                     if (tx_builder.outputs.len() as i32) >= COINJOIN_DENOM_OUTPUTS_THRESHOLD {
@@ -563,10 +565,10 @@ impl CoinJoinClientSession {
             }
         }
 
-        info!(target: "CoinJoin", "CoinJoinClientSession -- 3 - nBalanceToDenominate: {}, {}\n", balance_to_denominate.to_friendly_string(), tx_builder.to_string());
+        log_info!(target: "CoinJoin", "CoinJoinClientSession -- 3 - nBalanceToDenominate: {}, {}\n", balance_to_denominate.to_friendly_string(), tx_builder.to_string());
 
         for (denom, count) in &map_denom_count {
-            info!(target: "CoinJoin", "CoinJoinClientSession -- 3 - DONE - nDenomValue: {}, count: {}\n", denom.to_friendly_string(), count);
+            log_info!(target: "CoinJoin", "CoinJoinClientSession -- 3 - DONE - nDenomValue: {}, count: {}\n", denom.to_friendly_string(), count);
         }
 
         // No reasons to create mixing collaterals if we can't create denoms to mix
@@ -578,13 +580,13 @@ impl CoinJoinClientSession {
             let mut str_result = String::new();
             
             if !tx_builder.commit(&mut str_result, true, self.id) {
-                error!(target: "CoinJoin", "CoinJoinClientSession -- 4 - Commit failed: {}\n", str_result);
+                log_error!(target: "CoinJoin", "CoinJoinClientSession -- 4 - Commit failed: {}\n", str_result);
                 return false;
             }
 
             // use the same nCachedLastSuccessBlock as for DS mixing to prevent race
             client_manager.updated_success_block();
-            info!(target: "CoinJoin", "CoinJoinClientSession -- 4: commited CreateDenomination tx, str_result: {}\n", str_result);
+            log_info!(target: "CoinJoin", "CoinJoinClientSession -- 4: commited CreateDenomination tx, str_result: {}\n", str_result);
         }
 
         return true;
@@ -595,7 +597,7 @@ impl CoinJoinClientSession {
             return false;
         }
 
-        info!(target: "CoinJoin", "make_collateral_amounts");
+        log_info!(target: "CoinJoin", "make_collateral_amounts");
 
         // NOTE: We do not allow txes larger than 100 kB, so we have to limit number of inputs here.
         // We still want to consume a lot of inputs to avoid creating only smaller denoms though.
@@ -604,7 +606,7 @@ impl CoinJoinClientSession {
         let mut vec_tally = self.mixing_wallet.borrow_mut().select_coins_grouped_by_addresses(false, false, true, 400);
 
         if vec_tally.is_empty() {
-            warn!(target: "CoinJoin", "CoinJoinClientSession::MakeCollateralAmounts -- SelectCoinsGroupedByAddresses can't find any inputs!\n");
+            log_warn!(target: "CoinJoin", "CoinJoinClientSession::MakeCollateralAmounts -- SelectCoinsGroupedByAddresses can't find any inputs!\n");
             return false;
         }
 
@@ -630,7 +632,7 @@ impl CoinJoinClientSession {
         }
 
         // If we got here then something is terribly broken actually
-        error!(target: "CoinJoin", "CoinJoinClientSession::MakeCollateralAmounts -- ERROR: Can't make collaterals!");
+        log_error!(target: "CoinJoin", "CoinJoinClientSession::MakeCollateralAmounts -- ERROR: Can't make collaterals!");
         return false;
     }
 
@@ -639,7 +641,7 @@ impl CoinJoinClientSession {
             return false;
         }
 
-        info!(target: "CoinJoin", "make_collateral_amounts_with_item: {:?}", tally_item);
+        log_info!(target: "CoinJoin", "make_collateral_amounts_with_item: {:?}", tally_item);
 
         // Denominated input is always a single one, so we can check its amount directly and return early
         if !try_denominated && tally_item.input_coins.len() == 1 && CoinJoin::is_denominated_amount(tally_item.amount) {
@@ -657,7 +659,7 @@ impl CoinJoinClientSession {
             tally_item.clone(),
             false
         );
-        info!(target: "CoinJoin", "make_collateral_amounts_with_item. Start tx_builder {}", tx_builder);
+        log_info!(target: "CoinJoin", "make_collateral_amounts_with_item. Start tx_builder {}", tx_builder);
         
         // Skip way too tiny amounts. Smallest we want is minimum collateral amount in a one output tx
         if !tx_builder.could_add_output(CoinJoin::get_collateral_amount()) {
@@ -724,18 +726,18 @@ impl CoinJoinClientSession {
             }
         }
 
-        info!(target: "CoinJoin", "Done with case {}: {}", case, tx_builder);
+        log_info!(target: "CoinJoin", "Done with case {}: {}", case, tx_builder);
         assert!(TransactionBuilder::is_dust(tx_builder.amount_left()));
 
         let mut str_result = String::new();
 
         if !tx_builder.commit(&mut str_result, false, self.id) {
-            error!(target: "CoinJoin", "Commit failed: {}", str_result);
+            log_error!(target: "CoinJoin", "Commit failed: {}", str_result);
             return false;
         }
 
         client_manager.updated_success_block();
-        info!(target: "CoinJoin", "commited MakeCollateralInputs tx, str_result: {}", str_result);
+        log_info!(target: "CoinJoin", "commited MakeCollateralInputs tx, str_result: {}", str_result);
 
         return true;
     }
@@ -745,20 +747,20 @@ impl CoinJoinClientSession {
         self.str_auto_denom_result = CoinJoin::get_status_message(pool_status).to_string();
 
         if pool_status.is_error() {
-            error!(target: "CoinJoin", " error: {}", self.str_auto_denom_result);
+            log_error!(target: "CoinJoin", " error: {}", self.str_auto_denom_result);
         } else if pool_status.is_warning() {
-            warn!(target: "CoinJoin", "warning: {}", self.str_auto_denom_result);
+            log_warn!(target: "CoinJoin", "warning: {}", self.str_auto_denom_result);
         } else {
-            info!(target: "CoinJoin", "ok: {}", self.str_auto_denom_result);
+            log_info!(target: "CoinJoin", "ok: {}", self.str_auto_denom_result);
         }
 
         self.base_session.status = pool_status;
     
         if pool_status.should_stop() {
-            info!(target: "CoinJoin", "Session has nothing to do: {:?}", pool_status);
+            log_info!(target: "CoinJoin", "Session has nothing to do: {:?}", pool_status);
             
             if pool_status.is_error() {
-                error!(target: "CoinJoin", "Session has an error: {:?}", pool_status);
+                log_error!(target: "CoinJoin", "Session has an error: {:?}", pool_status);
             }
             
             self.has_nothing_to_do = true;
@@ -772,7 +774,7 @@ impl CoinJoinClientSession {
                 let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                 if self.base_session.time_last_successful_step + 10 >= current_time {
                     // reset after being in POOL_STATE_ERROR for 10 or more seconds
-                    warn!(target: "CoinJoin", "resetting session {}", self.id);
+                    log_warn!(target: "CoinJoin", "resetting session {}", self.id);
                     self.set_null();
                 }
                 return false;
@@ -793,10 +795,10 @@ impl CoinJoinClientSession {
             return false;
         }
 
-        info!(target: "CoinJoin", "connect: {} {} timed out ({})",
+        log_info!(target: "CoinJoin", "connect: {} {} timed out ({})",
                  if self.base_session.state == PoolState::Signing { "Signing at session" } else { "Session" },
                  self.id, timeout);
-        warn!(target: "CoinJoin", "connect timeout, last successful step: {}, current time: {}", self.base_session.time_last_successful_step, current_time);
+        log_warn!(target: "CoinJoin", "connect timeout, last successful step: {}, current time: {}", self.base_session.time_last_successful_step, current_time);
 
         self.queue_session_lifecycle_listeners(true, self.base_session.state, PoolMessage::ErrTimeout);
         self.base_session.state = PoolState::Error;
@@ -832,21 +834,21 @@ impl CoinJoinClientSession {
         if let Some(dmn) = self.mixing_masternode.clone() {
             if self.mixing_wallet.borrow().is_masternode_or_disconnect_requested(dmn.socket_address) {
                 if !self.mixing_wallet.borrow().disconnect_masternode(dmn.socket_address) {
-                    info!(target: "CoinJoin", "not closing existing masternode: {}", dmn.socket_address);
+                    log_info!(target: "CoinJoin", "not closing existing masternode: {}", dmn.socket_address);
                 }
             } else {
-                info!(target: "CoinJoin", "not closing masternode since it is not found: {}", dmn.socket_address);
+                log_info!(target: "CoinJoin", "not closing masternode since it is not found: {}", dmn.socket_address);
             }
         }
 
-        info!(target: "CoinJoin", " peers: mixing_masternode to None");
+        log_info!(target: "CoinJoin", " peers: mixing_masternode to None");
         self.mixing_masternode = None;
         self.pending_dsa_request = None;
         self.base_session.set_null();
     }
 
     fn create_collateral_transaction(&mut self, str_reason: &mut String) -> bool {
-        info!(target: "CoinJoin", "CoinJoinClientSession::create_collateral_transaction");
+        log_info!(target: "CoinJoin", "CoinJoinClientSession::create_collateral_transaction");
         
         let mut coin_control = CoinControl::new();
         coin_control.coin_type = CoinType::OnlyCoinJoinCollateral;
@@ -866,7 +868,7 @@ impl CoinJoinClientSession {
             signature: Some(Vec::new()),
             sequence: TXIN_SEQUENCE
         }];
-        info!(target: "CoinJoin", "checking inputs: {:?}", inputs);
+        log_info!(target: "CoinJoin", "checking inputs: {:?}", inputs);
         let mut tx_collateral = Transaction {
             inputs: inputs,
             outputs: Vec::new(),
@@ -907,7 +909,7 @@ impl CoinJoinClientSession {
             );
         }
 
-        info!(target: "CoinJoin", "sign collateral: {:?}", tx_collateral);
+        log_info!(target: "CoinJoin", "sign collateral: {:?}", tx_collateral);
         if let Some(signed_tx) = self.mixing_wallet.borrow().sign_transaction(&tx_collateral, false) {
             if let Some(tx_id) = signed_tx.tx_hash {
                 self.tx_my_collateral = Some(signed_tx);
@@ -921,14 +923,14 @@ impl CoinJoinClientSession {
             return true;
         }
 
-        warn!(target: "CoinJoin", "Unable to sign collateral transaction!");
+        log_warn!(target: "CoinJoin", "Unable to sign collateral transaction!");
         str_reason.push_str("Unable to sign collateral transaction!");
 
         return false;
     }
 
     fn join_existing_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
-        info!(target: "CoinJoin dsq", "join_existing_queue");
+        log_info!(target: "CoinJoin dsq", "join_existing_queue");
 
         if !self.options.borrow().enable_coinjoin {
             return false;
@@ -938,25 +940,25 @@ impl CoinJoinClientSession {
         let queue_manager_rc = self.queue_manager.clone();
         let mut queue_manager = queue_manager_rc.borrow_mut();
         let mut dsq_option = queue_manager.get_queue_item_and_try();
-        info!(target: "CoinJoin dsq", "try item: {:?}", dsq_option);
+        log_info!(target: "CoinJoin dsq", "try item: {:?}", dsq_option);
 
         while let Some(dsq) = dsq_option.clone() {
             let dmn = mn_list.masternode_for(dsq.pro_tx_hash.reversed());
 
             match (dmn, self.tx_my_collateral.clone()) {
                 (None, _) => {
-                    info!(target: "CoinJoin dsq", "masternode is not in masternode list, masternode={}", dsq.pro_tx_hash);
+                    log_info!(target: "CoinJoin dsq", "masternode is not in masternode list, masternode={}", dsq.pro_tx_hash);
                     dsq_option = queue_manager.get_queue_item_and_try();
                     continue;
                 },
                 (Some(dmn), Some(tx)) => {
                     println!("[RUST] CoinJoin dsq: trying existing queue: {:?}", dsq);
-                    warn!(target: "CoinJoin dsf", "");
+                    log_warn!(target: "CoinJoin dsf", "");
 
                     let mut vec_tx_dsin_tmp = Vec::new();
 
                     if !self.mixing_wallet.borrow_mut().select_tx_dsins_by_denomination(dsq.denomination, balance_needs_anonymized, &mut vec_tx_dsin_tmp) {
-                        info!(target: "CoinJoin dsq", "couldn't match denomination {} ({})", dsq.denomination, CoinJoin::denomination_to_string(dsq.denomination));
+                        log_info!(target: "CoinJoin dsq", "couldn't match denomination {} ({})", dsq.denomination, CoinJoin::denomination_to_string(dsq.denomination));
                         dsq_option = queue_manager.get_queue_item_and_try();
                         continue;
                     }
@@ -964,14 +966,14 @@ impl CoinJoinClientSession {
                     client_manager.add_used_masternode(dsq.pro_tx_hash);
 
                     if self.mixing_wallet.borrow().is_masternode_or_disconnect_requested(dmn.socket_address) {
-                        info!(target: "CoinJoin dsq", "skipping masternode connection, addr={}", dmn.socket_address);
+                        log_info!(target: "CoinJoin dsq", "skipping masternode connection, addr={}", dmn.socket_address);
                         dsq_option = queue_manager.get_queue_item_and_try();
                         continue;
                     }
 
                     self.base_session.session_denom = dsq.denomination;
                     self.mixing_masternode = Some(dmn.clone());
-                    info!(target: "CoinJoin dsq", "set pending dsa for {}", dmn.socket_address);
+                    log_info!(target: "CoinJoin dsq", "set pending dsa for {}", dmn.socket_address);
                     self.pending_dsa_request = Some(PendingDsaRequest::new(
                         dmn.socket_address,
                         CoinJoinAcceptMessage::new(
@@ -983,14 +985,14 @@ impl CoinJoinClientSession {
                     self.base_session.state = PoolState::Queue;
                     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                     self.base_session.time_last_successful_step = current_time;
-                    info!(target: "CoinJoin dsq", "join existing queue -> pending connection, sessionDenom: {} ({}), addr={}",
+                    log_info!(target: "CoinJoin dsq", "join existing queue -> pending connection, sessionDenom: {} ({}), addr={}",
                              self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
                     self.set_status(PoolStatus::Connecting);
                     self.joined = true;
                     return true;
                 }
                 (Some(_), None) => {
-                    warn!(target: "CoinJoin dsq", "tx_collateral is missing");
+                    log_warn!(target: "CoinJoin dsq", "tx_collateral is missing");
                 }
             }
         }
@@ -1000,7 +1002,7 @@ impl CoinJoinClientSession {
     }
 
     fn start_new_queue(&mut self, client_manager: &mut CoinJoinClientManager, balance_needs_anonymized: u64) -> bool {
-        info!(target: "CoinJoin dsa", "start_new_queue");
+        log_info!(target: "CoinJoin dsa", "start_new_queue");
 
         if !self.options.borrow().enable_coinjoin {
             return false;
@@ -1038,20 +1040,20 @@ impl CoinJoinClientSession {
                         let dsq_threshold = metadata_manager.get_dsq_threshold(dmn.provider_registration_transaction_hash, mn_count as u64);
                         
                         if last_dsq != 0 && dsq_threshold > metadata_manager.dsq_count {
-                            warn!(target: "CoinJoin", "warning: Too early to mix on this masternode! masternode={} addr={} nLastDsq={} nDsqThreshold={} nDsqCount={}",
+                            log_warn!(target: "CoinJoin", "warning: Too early to mix on this masternode! masternode={} addr={} nLastDsq={} nDsqThreshold={} nDsqCount={}",
                                     dmn.provider_registration_transaction_hash, dmn.socket_address, last_dsq, dsq_threshold, metadata_manager.dsq_count);
                             tries += 1;
                             continue;
                         }
 
                         if self.mixing_wallet.borrow_mut().is_masternode_or_disconnect_requested(dmn.socket_address) {
-                            warn!(target: "CoinJoin", "warning: skipping masternode connection, addr={}", dmn.socket_address);
+                            log_warn!(target: "CoinJoin", "warning: skipping masternode connection, addr={}", dmn.socket_address);
                             tries += 1;
                             continue;
                         }
                     }
 
-                    info!(target: "CoinJoin", "attempt {} connection to masternode {}, protx: {}", tries + 1, dmn.socket_address, dmn.provider_registration_transaction_hash);
+                    log_info!(target: "CoinJoin", "attempt {} connection to masternode {}, protx: {}", tries + 1, dmn.socket_address, dmn.provider_registration_transaction_hash);
 
                     while self.base_session.session_denom == 0 {
                         for amount in &set_amounts {
@@ -1065,7 +1067,7 @@ impl CoinJoinClientSession {
 
                     self.mixing_masternode = Some(dmn.clone());
                     self.mixing_wallet.borrow_mut().add_pending_masternode(dmn.provider_registration_transaction_hash, self.id);
-                    info!(target: "CoinJoin dsa", "set pending dsa for {}", dmn.socket_address);
+                    log_info!(target: "CoinJoin dsa", "set pending dsa for {}", dmn.socket_address);
                     self.pending_dsa_request = Some(PendingDsaRequest::new(
                         dmn.socket_address,
                         CoinJoinAcceptMessage::new(
@@ -1076,7 +1078,7 @@ impl CoinJoinClientSession {
                     self.base_session.state = PoolState::Queue;
                     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                     self.base_session.time_last_successful_step = current_time;
-                    info!(target: "CoinJoin", "start new queue -> pending connection, sessionDenom: {} ({}), addr={}",
+                    log_info!(target: "CoinJoin", "start new queue -> pending connection, sessionDenom: {} ({}), addr={}",
                             self.base_session.session_denom, CoinJoin::denomination_to_string(self.base_session.session_denom), dmn.socket_address);
                     self.mixing_wallet.borrow_mut().start_manager_async();
                     self.set_status(PoolStatus::Connecting);
@@ -1097,7 +1099,7 @@ impl CoinJoinClientSession {
         let mut vec_psin_out_pairs_tmp = Vec::new();
 
         if !self.select_denominate(&mut str_error, &mut vec_tx_dsin) {
-            error!(target: "CoinJoin", "SelectDenominate failed, error: {}", str_error);
+            log_error!(target: "CoinJoin", "SelectDenominate failed, error: {}", str_error);
             return false;
         }
 
@@ -1108,7 +1110,7 @@ impl CoinJoinClientSession {
 
         for i in 0..(rounds + random_rounds) {
             if self.prepare_denominate(i, i, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, true) {
-                info!(target: "CoinJoin", "Running CoinJoin denominate for {} rounds, success", i);
+                log_info!(target: "CoinJoin", "Running CoinJoin denominate for {} rounds, success", i);
                 vec_inputs_by_rounds.push((i, vec_psin_out_pairs_tmp.len()));
             }
         }
@@ -1118,18 +1120,18 @@ impl CoinJoinClientSession {
         let rounds = vec_inputs_by_rounds[0].0;
 
         if self.prepare_denominate(rounds, rounds, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, false) {
-            info!(target: "CoinJoin", "Running CoinJoin denominate for {} rounds, success", rounds);
+            log_info!(target: "CoinJoin", "Running CoinJoin denominate for {} rounds, success", rounds);
             return self.send_denominate(vec_psin_out_pairs_tmp);
         }
 
         // We failed? That's strange but let's just make final attempt and try to mix everything
         if self.prepare_denominate(0, coinjoin_rounds - 1, &mut str_error, &vec_tx_dsin, &mut vec_psin_out_pairs_tmp, false) {
-            info!(target: "CoinJoin", "Running CoinJoin denominate for all rounds, success");
+            log_info!(target: "CoinJoin", "Running CoinJoin denominate for all rounds, success");
             return self.send_denominate(vec_psin_out_pairs_tmp);
         }
 
         // Should never actually get here but just in case
-        info!(target: "CoinJoin", "Running CoinJoin denominate for all rounds, error: {}", str_error);
+        log_info!(target: "CoinJoin", "Running CoinJoin denominate for all rounds, error: {}", str_error);
         self.str_auto_denom_result = str_error;
         
         return false;
@@ -1237,13 +1239,13 @@ impl CoinJoinClientSession {
     /// step 2: send denominated inputs and outputs prepared in step 1
     fn send_denominate(&mut self, vec_psin_out_pairs: Vec<(CoinJoinTransactionInput, TransactionOutput)>) -> bool {
         if self.tx_my_collateral.is_none() || self.tx_my_collateral.as_ref().unwrap().inputs.is_empty() {
-            warn!(target: "CoinJoin", "CoinJoin collateral not set");
+            log_warn!(target: "CoinJoin", "CoinJoin collateral not set");
             return false;
         }
 
         // we should already be connected to a Masternode
         if self.base_session.session_id == 0 {
-            warn!(target: "CoinJoin", " No Masternode has been selected yet.");
+            log_warn!(target: "CoinJoin", " No Masternode has been selected yet.");
             self.unlock_coins();
             self.key_holder_storage.return_all();
             self.set_null();
@@ -1254,7 +1256,7 @@ impl CoinJoinClientSession {
         self.base_session.state = PoolState::AcceptingEntries;
         self.str_auto_denom_result = String::new();
 
-        info!(target: "CoinJoin", "Added transaction to pool.");
+        log_info!(target: "CoinJoin", "Added transaction to pool.");
 
         let mut tx = Transaction {  // for debug purposes only
             inputs: vec![],
@@ -1276,7 +1278,7 @@ impl CoinJoinClientSession {
             tx.outputs.push(pair.1);
         }
 
-        info!(target: "CoinJoin", "Submitting partial tx {:?} to session {}", tx, self.base_session.session_id);
+        log_info!(target: "CoinJoin", "Submitting partial tx {:?} to session {}", tx, self.base_session.session_id);
 
         // Store our entry for later use
         let entry = CoinJoinEntry {
@@ -1298,7 +1300,7 @@ impl CoinJoinClientSession {
             entry.consensus_encode(&mut buffer).unwrap();
 
             if !self.mixing_wallet.borrow_mut().send_message(buffer, entry.get_message_type(), &mn.socket_address, true) {
-                info!(target: "CoinJoin", "failed to send dsi to {}", mn.socket_address);
+                log_info!(target: "CoinJoin", "failed to send dsi to {}", mn.socket_address);
             }
         }
     }
@@ -1329,7 +1331,7 @@ impl CoinJoinClientSession {
 
     fn process_status_update(&mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
         if self.mixing_masternode.is_none() {
-            info!(target: "CoinJoin", "mixingMasternode is None, ignoring status update");
+            log_info!(target: "CoinJoin", "mixingMasternode is None, ignoring status update");
             return;
         }
 
@@ -1342,7 +1344,7 @@ impl CoinJoinClientSession {
 
     /// Process Masternode updates about the progress of mixing
     fn process_pool_state_update(&mut self, peer: &SocketAddress, status_update: &CoinJoinStatusUpdate) {
-        info!(target: "CoinJoin", "status update received: {:?} from {}", status_update, peer);
+        log_info!(target: "CoinJoin", "status update received: {:?} from {}", status_update, peer);
 
         // do not update state when mixing client state is one of these
         if self.base_session.state == PoolState::Idle || self.base_session.state == PoolState::Error {
@@ -1362,7 +1364,7 @@ impl CoinJoinClientSession {
 
         match status_update.status_update {
             PoolStatusUpdate::Rejected => {
-                info!(target: "CoinJoin", "session: rejected by Masternode {}: {}", peer, str_message_tmp);
+                log_info!(target: "CoinJoin", "session: rejected by Masternode {}: {}", peer, str_message_tmp);
                 self.base_session.state = PoolState::Error;
                 self.unlock_coins();
                 self.key_holder_storage.return_all();
@@ -1370,16 +1372,16 @@ impl CoinJoinClientSession {
                 match status_update.message_id {
                     PoolMessage::ErrInvalidCollateral => {
                         if let Some(collateral) = &self.tx_my_collateral {
-                            warn!(target: "CoinJoin", "collateral invalid: {}", self.coinjoin.borrow().is_collateral_valid(collateral, true));
+                            log_warn!(target: "CoinJoin", "collateral invalid: {}", self.coinjoin.borrow().is_collateral_valid(collateral, true));
                         } else {
-                            warn!(target: "CoinJoin", "collateral invalid, tx_my_collateral is None");
+                            log_warn!(target: "CoinJoin", "collateral invalid, tx_my_collateral is None");
                         }
 
                         self.is_my_collateral_valid = false;
                         self.set_null(); // for now lets disconnect.  TODO(DashJ): Why is the collateral invalid?
                     },
                     _ => {
-                        warn!(target: "CoinJoin", "rejected for other reasons");
+                        log_warn!(target: "CoinJoin", "rejected for other reasons");
                     }
                 }
                 let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
@@ -1401,9 +1403,9 @@ impl CoinJoinClientSession {
                         self.queue_session_lifecycle_listeners(false, self.base_session.state, PoolMessage::MsgSuccess);
                     }
 
-                    info!(target: "CoinJoin", "session: accepted by Masternode: {}", str_message_tmp);
+                    log_info!(target: "CoinJoin", "session: accepted by Masternode: {}", str_message_tmp);
                 } else {
-                    info!(target: "CoinJoin", "collateral accepted but tx_my_collateral is None");
+                    log_info!(target: "CoinJoin", "collateral accepted but tx_my_collateral is None");
                 }
             }
         }
@@ -1419,17 +1421,17 @@ impl CoinJoinClientSession {
         }
 
         if complete_message.msg_message_id < PoolMessage::msg_pool_min() || complete_message.msg_message_id > PoolMessage::msg_pool_max() {
-            warn!(target: "CoinJoin dscomplete", "msgID is out of bounds: {:?}", complete_message.msg_message_id);
+            log_warn!(target: "CoinJoin dscomplete", "msgID is out of bounds: {:?}", complete_message.msg_message_id);
             return false;
         }
 
         if self.base_session.session_id != complete_message.msg_session_id {
-            warn!(target: "CoinJoin dscomplete", "message doesn't match current CoinJoin session: SID: {}  msgID: {}  ({})",
+            log_warn!(target: "CoinJoin dscomplete", "message doesn't match current CoinJoin session: SID: {}  msgID: {}  ({})",
                     self.base_session.session_id, complete_message.msg_session_id, CoinJoin::get_message_by_id(complete_message.msg_message_id));
             return false;
         }
 
-        info!(target: "CoinJoin dscomplete", "msgSID {}  msg {:?} ({})", complete_message.msg_session_id,
+        log_info!(target: "CoinJoin dscomplete", "msgSID {}  msg {:?} ({})", complete_message.msg_session_id,
                  complete_message.msg_message_id, CoinJoin::get_message_by_id(complete_message.msg_message_id));
 
         return self.completed_transaction(complete_message.msg_message_id);
@@ -1439,12 +1441,12 @@ impl CoinJoinClientSession {
         let mut update_success_block = false;
 
         if message_id == PoolMessage::MsgSuccess {
-            info!(target: "CoinJoin dsc", "completedTransaction -- success");
+            log_info!(target: "CoinJoin dsc", "completedTransaction -- success");
             self.queue_session_lifecycle_listeners(true, self.base_session.state, PoolMessage::MsgSuccess);
             self.key_holder_storage.keep_all();
             update_success_block = true;
         } else {
-            error!(target: "CoinJoin dsc", "completedTransaction -- error");
+            log_error!(target: "CoinJoin dsc", "completedTransaction -- error");
             self.key_holder_storage.return_all();
         }
 
@@ -1458,7 +1460,7 @@ impl CoinJoinClientSession {
 
     fn process_final_transaction(&mut self, peer: &SocketAddress, final_tx: &CoinJoinFinalTransaction) {
         println!("[RUST] CoinJoin dsf: process_final_transaction");
-        info!(target: "CoinJoin dsf", "process_final_transaction");
+        log_info!(target: "CoinJoin dsf", "process_final_transaction");
 
         if self.mixing_masternode.is_none() {
             return;
@@ -1469,12 +1471,12 @@ impl CoinJoinClientSession {
         }
 
         if self.base_session.session_id != final_tx.msg_session_id {
-            warn!(target: "CoinJoin dsf", "DSFINALTX: message doesn't match current CoinJoin session: sessionID: {}  msgSessionID: {}",
+            log_warn!(target: "CoinJoin dsf", "DSFINALTX: message doesn't match current CoinJoin session: sessionID: {}  msgSessionID: {}",
                     self.base_session.session_id, final_tx.msg_session_id);
             return;
         }
 
-        info!(target: "CoinJoin dsf", "DSFINALTX: txNew {:?}", final_tx.tx); /* Continued */;
+        log_info!(target: "CoinJoin dsf", "DSFINALTX: txNew {:?}", final_tx.tx); /* Continued */;
 
         // check to see if input is spent already? (and probably not confirmed)
         self.sign_final_transaction(&final_tx.tx, peer);
@@ -1483,7 +1485,7 @@ impl CoinJoinClientSession {
     /// As a client, check and sign the final transaction
     fn sign_final_transaction(&mut self, final_transaction_new: &Transaction, peer: &SocketAddress) {
         println!("[RUST] CoinJoin dsf: sign_final_transaction");
-        info!(target: "CoinJoin dsf", "sign_final_transaction");
+        log_info!(target: "CoinJoin dsf", "sign_final_transaction");
 
         if !self.options.borrow().enable_coinjoin {
             return;
@@ -1502,7 +1504,7 @@ impl CoinJoinClientSession {
         final_mutable_transaction.outputs.sort_by(Self::compare_output_bip69);
 
         if UInt256::sha256d(final_mutable_transaction.to_data()) != UInt256::sha256d(final_transaction_new.to_data()) {
-            error!(target: "CoinJoin dsf", "ERROR! Masternode {} is not BIP69 compliant!", self.mixing_masternode.as_ref().unwrap().provider_registration_transaction_hash);
+            log_error!(target: "CoinJoin dsf", "log_error! Masternode {} is not BIP69 compliant!", self.mixing_masternode.as_ref().unwrap().provider_registration_transaction_hash);
             self.unlock_coins();
             self.key_holder_storage.return_all();
             self.set_null();
@@ -1513,7 +1515,7 @@ impl CoinJoinClientSession {
         let is_valid_ins_outs = self.base_session.is_valid_in_outs(&final_mutable_transaction.inputs, &final_mutable_transaction.outputs);
 
         if !is_valid_ins_outs.result {
-            error!(target: "CoinJoin dsf", "ERROR! IsValidInOuts() failed: {}", CoinJoin::get_message_by_id(is_valid_ins_outs.message_id));
+            log_error!(target: "CoinJoin dsf", "log_error! IsValidInOuts() failed: {}", CoinJoin::get_message_by_id(is_valid_ins_outs.message_id));
             self.unlock_coins();
             self.key_holder_storage.return_all();
             self.set_null();
@@ -1533,7 +1535,7 @@ impl CoinJoinClientSession {
                 if !found {
                     // Something went wrong and we'll refuse to sign. It's possible we'll be charged collateral. But that's
                     // better than signing if the transaction doesn't look like what we wanted.
-                    warn!(target: "CoinJoin dss", "an output is missing, refusing to sign! txout={:?}", txout);
+                    log_warn!(target: "CoinJoin dss", "an output is missing, refusing to sign! txout={:?}", txout);
                     self.unlock_coins();
                     self.key_holder_storage.return_all();
                     self.set_null();
@@ -1554,13 +1556,13 @@ impl CoinJoinClientSession {
 
                 if let Some(index) = my_input_index {
                     let input = final_mutable_transaction.inputs[index].clone();
-                    info!(target: "CoinJoin dss", "found my input at {}, hash: {}, index: {}", index, input.input_hash.short_hex(), input.index);
+                    log_info!(target: "CoinJoin dss", "found my input at {}, hash: {}, index: {}", index, input.input_hash.short_hex(), input.index);
                     // add a pair with an empty value
                     coins.push(input);
                 } else {
                     // Can't find one of my own inputs, refuse to sign. It's possible we'll be charged collateral. But that's
                     // better than signing if the transaction doesn't look like what we wanted.
-                    warn!(target: "CoinJoin dss", "missing input! txdsin={:?}", txin);
+                    log_warn!(target: "CoinJoin dss", "missing input! txdsin={:?}", txin);
                     self.unlock_coins();
                     self.key_holder_storage.return_all();
                     self.set_null();
@@ -1581,7 +1583,7 @@ impl CoinJoinClientSession {
             }
 
             if signed_inputs.is_empty() {
-                warn!(target: "CoinJoin dss", "can't sign anything!");
+                log_warn!(target: "CoinJoin dss", "can't sign anything!");
                 self.unlock_coins();
                 self.key_holder_storage.return_all();
                 self.set_null();
@@ -1590,14 +1592,14 @@ impl CoinJoinClientSession {
 
             // push all of our signatures to the Masternode
             let message = CoinJoinSignedInputs { inputs: signed_inputs };
-            info!(target: "CoinJoin dss", "pushing signed inputs to the masternode, CoinJoinSignedInputs={:?}", message);
+            log_info!(target: "CoinJoin dss", "pushing signed inputs to the masternode, CoinJoinSignedInputs={:?}", message);
             let mut buffer = vec![];
             message.consensus_encode(&mut buffer).unwrap();
             self.mixing_wallet.borrow_mut().send_message(buffer, message.get_message_type(), peer, true);
             self.base_session.state = PoolState::Signing;
             self.base_session.time_last_successful_step = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         } else {
-            warn!(target: "CoinJoin dss", "sign_transaction returned false for the tx");
+            log_warn!(target: "CoinJoin dss", "sign_transaction returned false for the tx");
         }
     }
 

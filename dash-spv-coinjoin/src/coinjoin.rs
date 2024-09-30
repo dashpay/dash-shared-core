@@ -14,6 +14,7 @@ use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
+use crate::{log_info, log_warn};
 use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
@@ -131,12 +132,12 @@ impl CoinJoin {
     // check to make sure the collateral provided by the client is valid
     pub fn is_collateral_valid(&self, tx_collateral: &Transaction, check_inputs: bool) -> bool {
         if tx_collateral.outputs.is_empty() {
-            warn!(target: "CoinJoin", "Collateral invalid due to no outputs: {}", tx_collateral.tx_hash.unwrap_or_default());
+            log_warn!(target: "CoinJoin", "Collateral invalid due to no outputs: {}", tx_collateral.tx_hash.unwrap_or_default());
             return false;
         }
 
         if tx_collateral.lock_time != 0 {
-            warn!(target: "CoinJoin", "Collateral invalid due to lock time != 0: {}", tx_collateral.tx_hash.unwrap_or_default());
+            log_warn!(target: "CoinJoin", "Collateral invalid due to lock time != 0: {}", tx_collateral.tx_hash.unwrap_or_default());
             return false;
         }
     
@@ -147,7 +148,7 @@ impl CoinJoin {
             n_value_out = n_value_out + txout.amount as i64;
     
             if txout.script_pub_key_type() != ScriptType::PayToPubkeyHash && !txout.is_script_unspendable() {
-                warn!(target: "CoinJoin", "Invalid Script, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
+                log_warn!(target: "CoinJoin", "Invalid Script, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }
@@ -158,21 +159,21 @@ impl CoinJoin {
                 
                 if let Some(input_value) = result {
                     if !input_value.is_valid {
-                        warn!(target: "CoinJoin", "spent or non-locked mempool input! txin={:?}", txin);
+                        log_warn!(target: "CoinJoin", "spent or non-locked mempool input! txin={:?}", txin);
                         return false;
                     }
 
                     n_value_in = n_value_in + input_value.value as i64;
                 } else {
-                    warn!(target: "CoinJoin", "Unknown inputs in collateral transaction, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
+                    log_warn!(target: "CoinJoin", "Unknown inputs in collateral transaction, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
                     return false;
                 }
             }
 
-            info!(target: "CoinJoin", "n_value_out={}, n_value_in={}", n_value_out, n_value_in);
+            log_info!(target: "CoinJoin", "n_value_out={}, n_value_in={}", n_value_out, n_value_in);
 
             if n_value_in - n_value_out < CoinJoin::get_collateral_amount() as i64 {
-                warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
+                log_warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }

@@ -14,6 +14,7 @@ use dash_spv_masternode_processor::util::data_append::DataAppend;
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::constants::REFERENCE_DEFAULT_MIN_TX_FEE;
 use crate::ffi::recepient::Recipient;
+use crate::log_info;
 use crate::utils::coin_format::CoinFormat;
 use crate::wallet_ex::WalletEx;
 use crate::models::coin_control::CoinControl;
@@ -175,15 +176,15 @@ impl<'a> TransactionBuilder {
             })
             .collect();
 
-        info!(target: "CoinJoin", "tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
+        log_info!(target: "CoinJoin", "tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
 
         if !self.wallet_ex.borrow().commit_transaction(&vec_send, self.coin_control.clone(), is_denominating, client_session_id) {
-            info!(target: "CoinJoin", "tx_builder.commit: Failed to commit transaction");
+            log_info!(target: "CoinJoin", "tx_builder.commit: Failed to commit transaction");
             str_result.push_str("Failed to commit transaction");
             return false;
         }
 
-        info!(target: "CoinJoin", "tx_builder.commit: Transaction committed");
+        log_info!(target: "CoinJoin", "tx_builder.commit: Transaction committed");
         str_result.push_str("Transaction committed");
         self.keep_keys = true;
         return true;
@@ -207,7 +208,7 @@ impl<'a> TransactionBuilder {
             return signed_tx.to_data().len() as i32;
         }
 
-        info!(target: "CoinJoin", "TxBuilder: Could not sign transaction");
+        log_info!(target: "CoinJoin", "TxBuilder: Could not sign transaction");
         return -1;
     }
 

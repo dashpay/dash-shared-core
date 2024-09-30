@@ -1,72 +1,169 @@
-use tracing::{subscriber::set_global_default, Subscriber};
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, Registry};
+#[cfg(target_os = "ios")]
+use tracing::{error, warn, info};
 
 #[cfg(target_os = "ios")]
-use std::ffi::CString;
-#[cfg(target_os = "ios")]
-use std::os::raw::c_char;
+use std::path::PathBuf;
 
 #[cfg(target_os = "ios")]
-mod ios_log {
-    use super::*;
+use dirs::document_dir;
 
-    #[link(name = "os")]
-    extern "C" {
-        fn os_log_create(subsystem: *const c_char, category: *const c_char) -> *mut std::ffi::c_void;
-        fn os_log_info(log: *mut std::ffi::c_void, message: *const c_char);
-    }
+#[cfg(target_os = "ios")]
+use std::fs::{File, OpenOptions};
 
-    pub struct IOSLogger {
-        log: *mut std::ffi::c_void,
-    }
+#[cfg(target_os = "ios")]
+use std::io::{Write, Result};  // Importing std::io::Result only for iOS
 
-    impl IOSLogger {
-        pub fn new(subsystem: &str, category: &str) -> Self {
-            let subsystem_c = CString::new(subsystem).unwrap();
-            let category_c = CString::new(category).unwrap();
-            unsafe {
-                let log = os_log_create(subsystem_c.as_ptr(), category_c.as_ptr());
-                Self { log }
-            }
+#[cfg(target_os = "ios")]
+use std::sync::Mutex;
+
+#[cfg(target_os = "ios")]
+use tracing_subscriber::fmt::writer::BoxMakeWriter;
+
+#[cfg(target_os = "ios")]
+use tracing_subscriber::fmt::{MakeWriter, SubscriberBuilder};
+
+// Function to initialize logging
+// Custom MakeWriter struct that holds a Mutex around a File
+#[cfg(target_os = "ios")]
+struct MutexMakeWriter {
+    file: Mutex<File>,
+}
+
+#[cfg(target_os = "ios")]
+impl MutexMakeWriter {
+    fn new(file: File) -> Self {
+        Self {
+            file: Mutex::new(file),
         }
-
-        pub fn log_info(&self, message: &str) {
-            let message_c = CString::new(message).unwrap();
-            unsafe {
-                os_log_info(self.log, message_c.as_ptr());
-            }
-        }
-    }
-
-    pub fn log_message(subsystem: &str, category: &str, message: &str) {
-        let logger = IOSLogger::new(subsystem, category);
-        logger.log_info(message);
     }
 }
 
-#[cfg(not(target_os = "ios"))]
-mod dev_log {
-    pub fn log_message(subsystem: &str, category: &str, message: &str) {
-        println!("[{}][{}] {}", subsystem, category, message); // Fallback to println! for non-iOS environments
+// Implement MakeWriter for MutexMakeWriter to be used in tracing_subscriber
+#[cfg(target_os = "ios")]
+impl<'a> MakeWriter<'a> for MutexMakeWriter {
+    type Writer = MutexWriter<'a>;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        MutexWriter {
+            guard: self.file.lock().unwrap(),
+        }
     }
 }
 
-// Re-export log_message function depending on the platform
+// MutexWriter struct to handle writing to the file
 #[cfg(target_os = "ios")]
-pub use ios_log::log_message;
+struct MutexWriter<'a> {
+    guard: std::sync::MutexGuard<'a, File>,
+}
+
+// Implement the Write trait for MutexWriter
+#[cfg(target_os = "ios")]
+impl<'a> Write for MutexWriter<'a> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        self.guard.write(buf)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        self.guard.flush()
+    }
+}
+
+#[cfg(target_os = "ios")]
+fn init_logging() {
+    // Get the path to the app's documents directory for logging
+    let log_file_path: PathBuf = document_dir()
+        .expect("Unable to find documents directory")
+        .join("logfile.log"); //TODO: Use correct filename
+
+    let file = OpenOptions::new()
+        .write(true)      // Open for writing
+        .create(true)     // Create the file if it doesn't exist
+        .append(true)     // Append to the file if it exists
+        .open(&log_file_path)
+        .expect("Unable to open or create log file");
+
+    // Create the MutexMakeWriter
+    let make_writer = MutexMakeWriter::new(file);
+
+    // Initialize the subscriber with file-based logging
+    let subscriber = SubscriberBuilder::default()
+        .with_writer(make_writer)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Unable to set global subscriber");
+}
+#[cfg(not(target_os = "ios"))]
+fn init_logging() {
+    // No-op for non-iOS platforms
+    println!("Logging is set to println! on this platform.");
+}
+
+// Conditional macro for logging errors with optional log prefix
+#[cfg(target_os = "ios")]
+#[macro_export]  // Ensures the macro is available across the crate
+macro_rules! log_error {
+    (target: $target:expr, $($arg:tt)*) => {
+        error!(target: $target, $($arg)*)
+    };
+    ($($arg:tt)*) => {
+        error!(target: "default_log_prefix", $($arg)*)
+    };
+}
 
 #[cfg(not(target_os = "ios"))]
-pub use dev_log::log_message;
+#[macro_export]  // Ensures the macro is available across the crate
+macro_rules! log_error {
+    (target: $target:expr, $($arg:tt)*) => {
+        println!("[{}] ERROR: {}", $target, format!($($arg)*))
+    };
+    ($($arg:tt)*) => {
+        println!("[default_log_prefix] ERROR: {}", format!($($arg)*))
+    };
+}
 
-// Setup tracing-based logging for iOS or other platforms
-pub fn setup_logs() {
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+// Conditional macro for logging warnings with optional log prefix
+#[cfg(target_os = "ios")]
+#[macro_export]  // Ensures the macro is available across the crate
+macro_rules! log_warn {
+    (target: $target:expr, $($arg:tt)*) => {
+        warn!(target: $target, $($arg)*)
+    };
+    ($($arg:tt)*) => {
+        warn!(target: "default_log_prefix", $($arg)*)
+    };
+}
 
-    let subscriber = Registry::default()
-        .with(env_filter)
-        .with(fmt::layer().with_target(false).with_writer(std::io::stderr));
+#[cfg(not(target_os = "ios"))]
+#[macro_export]  // Ensures the macro is available across the crate
+macro_rules! log_warn {
+    (target: $target:expr, $($arg:tt)*) => {
+        println!("[{}] WARN: {}", $target, format!($($arg)*))
+    };
+    ($($arg:tt)*) => {
+        println!("[default_log_prefix] WARN: {}", format!($($arg)*))
+    };
+}
 
-    if set_global_default(subscriber).is_err() {
-        log_message("platform", "logging", "Failed to set global default subscriber");
-    }
+// Conditional macro for logging info with optional log prefix
+#[cfg(target_os = "ios")]
+#[macro_export]  // Ensures the macro is available across the crate
+macro_rules! log_info {
+    (target: $target:expr, $($arg:tt)*) => {
+        info!(target: $target, $($arg)*)
+    };
+    ($($arg:tt)*) => {
+        info!(target: "default_log_prefix", $($arg)*)
+    };
+}
+
+#[cfg(not(target_os = "ios"))]
+#[macro_export]  // Ensures the macro is available across the crate
+macro_rules! log_info {
+    (target: $target:expr, $($arg:tt)*) => {
+        println!("[{}] INFO: {}", $target, format!($($arg)*))
+    };
+    ($($arg:tt)*) => {
+        println!("[default_log_prefix] INFO: {}", format!($($arg)*))
+    };
 }

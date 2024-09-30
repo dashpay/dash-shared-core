@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 use tracing::info;
-use crate::{utils::key_holder::KeyHolder, wallet_ex::WalletEx};
+use crate::{log_info, utils::key_holder::KeyHolder, wallet_ex::WalletEx};
 
 pub(crate) struct KeyHolderStorage {
     storage: Vec<KeyHolder>,
@@ -30,7 +30,7 @@ impl KeyHolderStorage {
                 key_holder.keep_key();
             }
 
-            info!(target: "CoinJoin", "keepAll: {} keys kept", tmp.len());
+            log_info!(target: "CoinJoin", "keepAll: {} keys kept", tmp.len());
         }
     }
 

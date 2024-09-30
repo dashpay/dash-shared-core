@@ -3,7 +3,7 @@ use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi:
 use ferment_interfaces::boxed;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
-use crate::{coinjoin_client_manager::CoinJoinClientManager, constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage};
+use crate::{coinjoin_client_manager::CoinJoinClientManager, constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, log_info, log_warn, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage};
 
 pub struct CoinJoinClientQueueManager {
     client_manager_ptr: *mut CoinJoinClientManager,
@@ -72,57 +72,57 @@ impl CoinJoinClientQueueManager {
                 if !self.spamming_masternodes.contains_key(&dsq.pro_tx_hash) {
                     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                     self.spamming_masternodes.insert(dsq.pro_tx_hash, current_time);
-                    info!(target: "CoinJoin dsqueue", "Peer {:?} is sending WAY too many dsq messages for a masternode {:?}", from_peer.ip_address, dsq.pro_tx_hash);
+                    log_info!(target: "CoinJoin dsqueue", "Peer {:?} is sending WAY too many dsq messages for a masternode {:?}", from_peer.ip_address, dsq.pro_tx_hash);
                 }
                 return;
             }
         }
 
-        info!(target: "CoinJoin dsqueue", "new {}", dsq);
+        log_info!(target: "CoinJoin dsqueue", "new {}", dsq);
         let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
 
         if dsq.is_time_out_of_bounds(current_time) {
-            info!(target: "CoinJoin dsqueue", "time_out_of_bounds, time: {}, current_time: {}", dsq.time, current_time);
+            log_info!(target: "CoinJoin dsqueue", "time_out_of_bounds, time: {}, current_time: {}", dsq.time, current_time);
             return;
         }
 
         if let Some(dmn) = self.get_mn(dsq.pro_tx_hash) {
             if !dsq.check_signature(dmn.operator_public_key) {
                 // add 10 points to ban score
-                warn!(target: "CoinJoin dsqueue", "signature check failed");
+                log_warn!(target: "CoinJoin dsqueue", "signature check failed");
                 return;
             }
 
             // if the queue is ready, submit if we can
             if dsq.ready && self.try_submit_denominate(dmn.socket_address.clone()) {
-                info!(target: "CoinJoin dsqueue", "CoinJoin queue ({}) is ready on masternode {}", dsq, dmn.socket_address);
+                log_info!(target: "CoinJoin dsqueue", "CoinJoin queue ({}) is ready on masternode {}", dsq, dmn.socket_address);
             } else {
                 if let Some(meta_info) = self.masternode_metadata_manager.get_meta_info(dmn.provider_registration_transaction_hash, true) {
                     let last_dsq = meta_info.last_dsq;
                     let dsq_threshold = self.masternode_metadata_manager.get_dsq_threshold(dmn.provider_registration_transaction_hash, self.valid_mns_count());
-                    info!(target: "CoinJoin dsqueue", "lastDsq: {}  dsqThreshold: {}  dsqCount: {}", last_dsq, dsq_threshold, self.masternode_metadata_manager.dsq_count);
+                    log_info!(target: "CoinJoin dsqueue", "lastDsq: {}  dsqThreshold: {}  dsqCount: {}", last_dsq, dsq_threshold, self.masternode_metadata_manager.dsq_count);
                     // don't allow a few nodes to dominate the queuing process
                     if last_dsq != 0 && dsq_threshold > self.masternode_metadata_manager.dsq_count {
                         if !self.spamming_masternodes.contains_key(&dsq.pro_tx_hash) {
                             let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                             self.spamming_masternodes.insert(dsq.pro_tx_hash, current_time);
-                            info!(target: "CoinJoin dsqueue", "Masternode {} is sending too many dsq messages", dmn.provider_registration_transaction_hash);
+                            log_info!(target: "CoinJoin dsqueue", "Masternode {} is sending too many dsq messages", dmn.provider_registration_transaction_hash);
                         }
                         return;
                     }
                 } else {
-                    info!(target: "CoinJoin dsqueue", "meta_info is None");
+                    log_info!(target: "CoinJoin dsqueue", "meta_info is None");
                     return;
                 }
 
                 self.masternode_metadata_manager.allow_mixing(dmn.provider_registration_transaction_hash);
-                info!(target: "CoinJoin dsqueue", "new CoinJoin queue ({}) from masternode {}", dsq, dmn.socket_address);
+                log_info!(target: "CoinJoin dsqueue", "new CoinJoin queue ({}) from masternode {}", dsq, dmn.socket_address);
 
                 self.mark_already_joined_queue_as_tried(&mut dsq);
                 self.coinjoin_queue.push(dsq);
             }
         } else {
-            info!(target: "CoinJoin dsqueue", "masternode entry is None");
+            log_info!(target: "CoinJoin dsqueue", "masternode entry is None");
         }
     }
 
