@@ -15,7 +15,7 @@ use std::io::{Write, Result};  // Importing std::io::Result only for iOS
 
 #[cfg(target_os = "ios")]
 use std::sync::Mutex;
-
+use dirs::download_dir;
 #[cfg(target_os = "ios")]
 use tracing_subscriber::fmt::writer::BoxMakeWriter;
 
@@ -69,11 +69,21 @@ impl<'a> Write for MutexWriter<'a> {
 }
 
 #[cfg(target_os = "ios")]
-fn init_logging() {
-    // Get the path to the app's documents directory for logging
-    let log_file_path: PathBuf = document_dir()
-        .expect("Unable to find documents directory")
-        .join("logfile.log"); //TODO: Use correct filename
+pub fn init_logging() {
+    // Get the path to the cache directory.
+    let cache_path = match dirs_next::cache_dir() {
+        Some(path) => path,
+        None => panic!("Failed to find the cache directory"),
+    };
+
+    // Create the log directory if it doesn't exist.
+    let log_dir = cache_path.join("Logs");
+    if !log_dir.exists() {
+        std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
+    }
+
+    // Create the log file inside the cache directory.
+    let log_file_path = log_dir.join("coinjoin_processor.log");
 
     let file = OpenOptions::new()
         .write(true)      // Open for writing
@@ -94,7 +104,7 @@ fn init_logging() {
         .expect("Unable to set global subscriber");
 }
 #[cfg(not(target_os = "ios"))]
-fn init_logging() {
+pub fn init_logging() {
     // No-op for non-iOS platforms
     println!("Logging is set to println! on this platform.");
 }

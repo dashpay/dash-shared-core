@@ -15,6 +15,7 @@ use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
 use crate::{log_info, log_warn};
+use crate::logging::init_logging;
 use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
@@ -44,6 +45,7 @@ impl CoinJoin {
         destroy_input_value: DestroyInputValue,
         context: *const std::ffi::c_void
     ) -> Self {
+        init_logging();
         Self {
             opaque_context: context,
             get_input_value_by_prevout_hash,

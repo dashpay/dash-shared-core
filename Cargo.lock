@@ -496,6 +496,7 @@ dependencies = [
  "cbindgen 0.24.5",
  "dash-spv-masternode-processor",
  "dirs",
+ "dirs-next",
  "ferment",
  "ferment-interfaces",
  "ferment-macro",

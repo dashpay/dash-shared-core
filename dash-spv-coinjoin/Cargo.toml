@@ -20,7 +20,8 @@ ferment-macro = { path = "../../ferment/ferment-macro" }
 byte = "0.2"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-dirs = "4.0"  # Optional, for dynamic log file paths
+dirs = "4.0"
+dirs-next = "2.0.0"  # Optional, for dynamic log file paths
 
 [build-dependencies]
 cbindgen = "0.24.3"
