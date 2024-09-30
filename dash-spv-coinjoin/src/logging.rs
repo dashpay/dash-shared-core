@@ -115,9 +115,11 @@ pub fn init_logging() {
 macro_rules! log_error {
     (target: $target:expr, $($arg:tt)*) => {
         error!(target: $target, $($arg)*)
+        println!("[{}] ERROR: {}", $target, format!($($arg)*))
     };
     ($($arg:tt)*) => {
         error!(target: "default_log_prefix", $($arg)*)
+        println!("[default_log_prefix] ERROR: {}", format!($($arg)*))
     };
 }
 
@@ -138,9 +140,11 @@ macro_rules! log_error {
 macro_rules! log_warn {
     (target: $target:expr, $($arg:tt)*) => {
         warn!(target: $target, $($arg)*)
+        println!("[{}] WARN: {}", $target, format!($($arg)*))
     };
     ($($arg:tt)*) => {
         warn!(target: "default_log_prefix", $($arg)*)
+        println!("[default_log_prefix] WARN: {}", format!($($arg)*))
     };
 }
 
@@ -161,9 +165,11 @@ macro_rules! log_warn {
 macro_rules! log_info {
     (target: $target:expr, $($arg:tt)*) => {
         info!(target: $target, $($arg)*)
+        println!("[{}] INFO: {}", $target, format!($($arg)*))
     };
     ($($arg:tt)*) => {
         info!(target: "default_log_prefix", $($arg)*)
+        println!("[default_log_prefix] INFO: {}", format!($($arg)*))
     };
 }
 
