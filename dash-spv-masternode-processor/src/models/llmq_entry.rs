@@ -5,6 +5,8 @@ use std::convert::Into;
 use serde::ser::SerializeStruct;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
+use logging::*;
+use tracing::*;
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::common::LLMQVersion;
 use crate::consensus::{encode::VarInt, Encodable, WriteExt};
@@ -313,7 +315,7 @@ impl LLMQEntry {
 
     fn validate_bitset(bitset: Vec<u8>, count: VarInt) -> bool {
         if bitset.len() != (count.0 as usize + 7) / 8 {
-            warn!(
+            log_warn!(target: "masternode-processor",
                 "Error: The byte size of the bitvectors ({}) must match “(quorumSize + 7) / 8 ({})",
                 bitset.len(),
                 (count.0 + 7) / 8
@@ -330,7 +332,7 @@ impl LLMQEntry {
                 None => 0,
             };
             if last_byte & mask != 0 {
-                warn!("Error: No out-of-range bits should be set in byte representation of the bitvector");
+                log_warn!(target: "masternode-processor", "Error: No out-of-range bits should be set in byte representation of the bitvector");
                 return false;
             }
         }
@@ -343,26 +345,26 @@ impl LLMQEntry {
         let is_valid_signers =
             Self::validate_bitset(self.signers_bitset.clone(), self.signers_count);
         if !is_valid_signers {
-            warn!("Error: signers_bitset is invalid ({:?} {})", self.signers_bitset, self.signers_count);
+            log_warn!(target: "masternode-processor", "Error: signers_bitset is invalid ({:?} {})", self.signers_bitset, self.signers_count);
             return LLMQPayloadValidationStatus::InvalidSigners(self.signers_bitset.to_hex());
         }
         let is_valid_members =
             Self::validate_bitset(self.valid_members_bitset.clone(), self.valid_members_count);
         if !is_valid_members {
-            warn!("Error: valid_members_bitset is invalid ({:?} {})", self.valid_members_bitset, self.valid_members_count);
+            log_warn!(target: "masternode-processor", "Error: valid_members_bitset is invalid ({:?} {})", self.valid_members_bitset, self.valid_members_count);
             return LLMQPayloadValidationStatus::InvalidMembers(self.valid_members_bitset.to_hex());
         }
         let quorum_threshold = self.llmq_type.threshold() as u64;
         // The number of set bits in the signers and validMembers bitvectors must be at least >= quorumThreshold
         let signers_bitset_true_bits_count = self.signers_bitset.as_slice().true_bits_count();
         if signers_bitset_true_bits_count < quorum_threshold {
-            warn!("Error: The number of set bits in the signers {} must be >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
+            log_warn!(target: "masternode-processor", "Error: The number of set bits in the signers {} must be >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
             return LLMQPayloadValidationStatus::SignersBelowThreshold { actual: signers_bitset_true_bits_count, threshold: quorum_threshold };
         }
         let valid_members_bitset_true_bits_count =
             self.valid_members_bitset.as_slice().true_bits_count();
         if valid_members_bitset_true_bits_count < quorum_threshold {
-            warn!("Error: The number of set bits in the valid members bitvector {} must be >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
+            log_warn!(target: "masternode-processor", "Error: The number of set bits in the valid members bitvector {} must be >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
             return LLMQPayloadValidationStatus::SignersBelowThreshold { actual: valid_members_bitset_true_bits_count, threshold: quorum_threshold };
         }
         LLMQPayloadValidationStatus::Ok
@@ -397,17 +399,17 @@ impl LLMQEntry {
             operator_keys,
             use_legacy);
         if !all_commitment_aggregated_signature_validated {
-            println!("••• INVALID AGGREGATED SIGNATURE {}: {:?} ({})", block_height, self.llmq_type, self.all_commitment_aggregated_signature);
+            log_warn!(target: "masternode-processor", "••• INVALID AGGREGATED SIGNATURE {}: {:?} ({})", block_height, self.llmq_type, self.all_commitment_aggregated_signature);
             return LLMQValidationStatus::InvalidAggregatedSignature;
         }
         // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
         // This is an aggregated BLS signature verification.
         let quorum_signature_validated = BLSKey::verify_quorum_signature(commitment_hash.as_bytes(), self.threshold_signature.as_bytes(), self.public_key.as_bytes(), use_legacy);
         if !quorum_signature_validated {
-            println!("••• INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, self.llmq_type, self.threshold_signature);
+            log_warn!(target: "masternode-processor", "••• INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, self.llmq_type, self.threshold_signature);
             return LLMQValidationStatus::InvalidQuorumSignature;
         }
-        println!("••• quorum {:?} validated at {}", self.llmq_type, block_height);
+        log_info!(target: "masternode-processor", "••• quorum {:?} validated at {}", self.llmq_type, block_height);
         LLMQValidationStatus::Verified
     }
 }

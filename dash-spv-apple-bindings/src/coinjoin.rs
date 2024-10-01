@@ -1,35 +1,37 @@
 use core::slice;
 use std::cell::RefCell;
-use std::io::Cursor;
 use std::ffi::{c_void, CStr};
+use std::io::Cursor;
 use std::os::raw::c_char;
 use std::rc::Rc;
 
 use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use dash_spv_coinjoin::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
 
+use dash_spv_coinjoin::coinjoin::CoinJoin;
+use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyCoinJoinKeys, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetCoinJoinKeys, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, MixingLivecycleListener, SelectCoinsGroupedByAddresses, SendMessage, SessionLifecycleListener, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
 use dash_spv_coinjoin::ffi::coinjoin_denominations::CoinJoinDenominations;
 use dash_spv_coinjoin::ffi::coinjoin_keys::CoinJoinKeys;
 use dash_spv_coinjoin::ffi::coinjoin_session_statuses::CoinJoinSessionStatuses;
 use dash_spv_coinjoin::masternode_meta_data_manager::MasternodeMetadataManager;
-use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
 use dash_spv_coinjoin::messages;
 use dash_spv_coinjoin::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
-use dash_spv_coinjoin::coinjoin::CoinJoin;
-use dash_spv_coinjoin::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyCoinJoinKeys, DestroyGatheredOutputs, DestroyInputValue, DestroyMasternode, DestroyMasternodeList, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetCoinJoinKeys, GetInputValueByPrevoutHash, GetMasternodeList, GetWalletTransaction, HasChainLock, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, IsWaitingForNewBlock, MasternodeByHash, MixingLivecycleListener, SelectCoinsGroupedByAddresses, SendMessage, SessionLifecycleListener, SignTransaction, StartManagerAsync, UpdateSuccessBlock, ValidMasternodeCount};
+use dash_spv_coinjoin::messages::coinjoin_message::CoinJoinMessage;
 use dash_spv_coinjoin::models::coinjoin_tx_type::CoinJoinTransactionType;
 use dash_spv_coinjoin::models::tx_outpoint::TxOutPoint;
 use dash_spv_coinjoin::models::{Balance, CoinJoinClientOptions};
 use dash_spv_coinjoin::wallet_ex::WalletEx;
 use dash_spv_masternode_processor::common::{self, SocketAddress};
 use dash_spv_masternode_processor::consensus::Decodable;
-use dash_spv_masternode_processor::crypto::{UInt128, UInt256};
 use dash_spv_masternode_processor::crypto::byte_util::ConstDecodable;
+use dash_spv_masternode_processor::crypto::{UInt128, UInt256};
 use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::from::FromFFI;
 use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::ffi::ByteArray;
 use dash_spv_masternode_processor::types;
+use logging::*;
+use tracing::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_client_manager(
@@ -64,6 +66,7 @@ pub unsafe extern "C" fn register_client_manager(
     get_coinjoin_keys: GetCoinJoinKeys,
     destroy_coinjoin_keys: DestroyCoinJoinKeys
 ) -> *mut CoinJoinClientManager {
+
     let coinjoin = CoinJoin::new(
         get_input_value_by_prevout_hash,
         has_chain_lock,
@@ -109,7 +112,7 @@ pub unsafe extern "C" fn register_client_manager(
         mixing_complete_listener,
         context
     );
-    println!("[RUST] CoinJoin: register_client_manager");
+    log_info!(target: "CoinJoin", "register_client_manager");
     boxed(client_manager)
 }
 
@@ -131,7 +134,7 @@ pub unsafe extern "C" fn add_client_queue_manager(
     );
         
     (*client_manager_ptr).set_client_queue_manager(Rc::new(RefCell::new(client_queue_manager)));
-    println!("[RUST] CoinJoin: add_client_queue_manager");
+    log_info!(target: "CoinJoin", "add_client_queue_manager");
 }
 
 #[no_mangle]

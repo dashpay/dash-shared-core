@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 use tracing::info;
-use crate::{log_info, utils::key_holder::KeyHolder, wallet_ex::WalletEx};
+use logging::*;
+use crate::{utils::key_holder::KeyHolder, wallet_ex::WalletEx};
 
 pub(crate) struct KeyHolderStorage {
     storage: Vec<KeyHolder>,

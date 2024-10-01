@@ -7,6 +7,7 @@ use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 use ferment_interfaces::boxed;
+use logging::*;
 use tracing::{info, warn};
 use crate::ffi::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
 use crate::ffi::input_value::InputValue;
@@ -14,8 +15,6 @@ use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
-use crate::{log_info, log_warn};
-use crate::logging::init_logging;
 use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]

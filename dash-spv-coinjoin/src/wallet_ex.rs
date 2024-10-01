@@ -20,6 +20,7 @@ use dash_spv_masternode_processor::secp256k1::rand;
 use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
 use dash_spv_masternode_processor::util::address::address;
 use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
+use logging::*;
 use tracing::{info, error};
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
@@ -27,7 +28,6 @@ use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransact
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
 use crate::ffi::recepient::Recipient;
-use crate::{log_error, log_info};
 use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::tx_destination::TxDestination;

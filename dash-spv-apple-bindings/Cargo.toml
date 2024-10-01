@@ -8,6 +8,8 @@ build = "build.rs"
 publish = true
 
 [dependencies]
+logging = { path = "../logging" }
+tracing = "0.1.40"
 
 [dependencies.dash-spv-masternode-processor]
 path = "../dash-spv-masternode-processor"

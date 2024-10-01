@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 use tracing::info;
-use crate::log_info;
+use logging::*;
 use crate::wallet_ex::WalletEx;
 use super::tx_destination::TxDestination;
 

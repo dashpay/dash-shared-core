@@ -17,11 +17,9 @@ dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
 #ferment-macro = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-macro" }
 ferment-interfaces = { path = "../../ferment/ferment-interfaces" }
 ferment-macro = { path = "../../ferment/ferment-macro" }
+logging = { path = "../logging" }
 byte = "0.2"
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-dirs = "4.0"
-dirs-next = "2.0.0"  # Optional, for dynamic log file paths
 
 [build-dependencies]
 cbindgen = "0.24.3"

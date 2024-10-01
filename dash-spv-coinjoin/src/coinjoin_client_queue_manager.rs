@@ -3,7 +3,8 @@ use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi:
 use ferment_interfaces::boxed;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
-use crate::{coinjoin_client_manager::CoinJoinClientManager, constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, log_info, log_warn, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage};
+use logging::*;
+use crate::{coinjoin_client_manager::CoinJoinClientManager, constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage};
 
 pub struct CoinJoinClientQueueManager {
     client_manager_ptr: *mut CoinJoinClientManager,

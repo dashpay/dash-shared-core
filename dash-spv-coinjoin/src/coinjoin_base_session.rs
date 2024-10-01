@@ -5,11 +5,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use dash_spv_masternode_processor::hashes::hex::ToHex;
 use dash_spv_masternode_processor::tx::transaction::{Transaction, TransactionOutput, TransactionInput};
 use dash_spv_masternode_processor::util::script::ScriptType;
+use logging::*;
 use tracing::{error, warn, info};
 use crate::coinjoin::CoinJoin;
 use crate::messages::{coinjoin_entry::CoinJoinEntry, pool_state::PoolState, pool_status::PoolStatus, pool_message::PoolMessage};
 use crate::models::valid_in_outs::ValidInOuts;
-use crate::{log_error, log_info};
 
 #[repr(C)]
 #[derive(Debug)]

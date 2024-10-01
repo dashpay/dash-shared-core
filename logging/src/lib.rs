@@ -83,7 +83,7 @@ pub fn init_logging() {
     }
 
     // Create the log file inside the cache directory.
-    let log_file_path = log_dir.join("coinjoin_processor.log");
+    let log_file_path = log_dir.join("processor.log");
 
     let file = OpenOptions::new()
         .write(true)      // Open for writing
