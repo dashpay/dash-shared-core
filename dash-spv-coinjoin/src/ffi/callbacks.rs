@@ -168,6 +168,7 @@ pub type SessionLifecycleListener = unsafe extern "C" fn(
 
 pub type MixingLivecycleListener = unsafe extern "C" fn(
     is_complete: bool,
+    is_interrupted: bool,
     pool_statuses: *const PoolStatus,
     pool_statuses_len: usize,
     context: *const c_void

@@ -140,7 +140,11 @@ impl<'a> TransactionBuilder {
 
     /// Get the amount currently left to add more outputs. Does respect fees.
     pub fn amount_left(&self) -> u64 {
-        return self.get_amount_initial() - self.get_amount_used() - self.get_fee(self.get_bytes_total() as u64);
+        let initial = self.get_amount_initial();
+        let used = self.get_amount_used();
+        let fee = self.get_fee(self.get_bytes_total() as u64);
+
+        return initial.saturating_sub(used).saturating_sub(fee);
     }
 
     /// Check if an amounts should be considered as dust
