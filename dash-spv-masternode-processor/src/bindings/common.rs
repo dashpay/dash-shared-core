@@ -14,7 +14,7 @@ use crate::types;
 /// Initializes logger (it could be initialize only once)
 #[no_mangle]
 pub unsafe extern "C" fn register_rust_logger() {
-
+    logging::init_logging();
 }
 
 /// Register all the callbacks for use across FFI

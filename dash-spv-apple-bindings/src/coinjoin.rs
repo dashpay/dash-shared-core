@@ -66,8 +66,6 @@ pub unsafe extern "C" fn register_client_manager(
     get_coinjoin_keys: GetCoinJoinKeys,
     destroy_coinjoin_keys: DestroyCoinJoinKeys
 ) -> *mut CoinJoinClientManager {
-    logging::init_logging();
-    
     let coinjoin = CoinJoin::new(
         get_input_value_by_prevout_hash,
         has_chain_lock,
