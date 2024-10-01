@@ -111,18 +111,18 @@ pub fn init_logging() {
 
 // Conditional macro for logging errors with optional log prefix
 #[cfg(target_os = "ios")]
-#[macro_export]  // Ensures the macro is available across the crate
+#[macro_export]
 macro_rules! log_error {
     (target: $target:expr, $($arg:tt)*) => {
         {
-            error!(target: $target, $($arg)*);
-            println!("[{}] ERROR: {}", $target, format!($($arg)*));
+            error!(target: $target, $($arg)*); // Logs to file via tracing
+            println!("ERROR [{}]: {}", $target, format!($($arg)*)); // Console output
         }
     };
     ($($arg:tt)*) => {
         {
-            error!(target: "default_log_prefix", $($arg)*);
-            println!("[default_log_prefix] ERROR: {}", format!($($arg)*));
+            error!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            println!("ERROR [default_log_prefix]: {}", format!($($arg)*)); // Console output
         }
     };
 }
@@ -140,18 +140,18 @@ macro_rules! log_error {
 
 // Conditional macro for logging warnings with optional log prefix
 #[cfg(target_os = "ios")]
-#[macro_export]  // Ensures the macro is available across the crate
+#[macro_export]
 macro_rules! log_warn {
     (target: $target:expr, $($arg:tt)*) => {
         {
-            warn!(target: $target, $($arg)*);
-            println!("[{}] WARN: {}", $target, format!($($arg)*));
+            warn!(target: $target, $($arg)*); // Logs to file via tracing
+            println!("WARN [{}]: {}", $target, format!($($arg)*)); // Console output
         }
     };
     ($($arg:tt)*) => {
         {
-            warn!(target: "default_log_prefix", $($arg)*);
-            println!("[default_log_prefix] WARN: {}", format!($($arg)*));
+            warn!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            println!("WARN [default_log_prefix]: {}", format!($($arg)*)); // Console output
         }
     };
 }
@@ -169,18 +169,18 @@ macro_rules! log_warn {
 
 // Conditional macro for logging info with optional log prefix
 #[cfg(target_os = "ios")]
-#[macro_export]  // Ensures the macro is available across the crate
+#[macro_export]
 macro_rules! log_info {
     (target: $target:expr, $($arg:tt)*) => {
         {
-            info!(target: $target, $($arg)*);
-            println!("[{}] INFO: {}", $target, format!($($arg)*));
+            info!(target: $target, $($arg)*); // Logs to file via tracing
+            println!("INFO [{}]: {}", $target, format!($($arg)*)); // Console output
         }
     };
     ($($arg:tt)*) => {
         {
-            info!(target: "default_log_prefix", $($arg)*);
-            println!("[default_log_prefix] INFO: {}", format!($($arg)*));
+            info!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            println!("INFO [default_log_prefix]: {}", format!($($arg)*)); // Console output
         }
     };
 }
