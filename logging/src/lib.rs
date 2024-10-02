@@ -2,6 +2,9 @@
 use tracing::{error, warn, info};
 
 #[cfg(target_os = "ios")]
+use std::sync::Once;
+
+#[cfg(target_os = "ios")]
 use std::path::PathBuf;
 
 #[cfg(target_os = "ios")]
@@ -21,6 +24,9 @@ use tracing_subscriber::fmt::writer::BoxMakeWriter;
 
 #[cfg(target_os = "ios")]
 use tracing_subscriber::fmt::{MakeWriter, SubscriberBuilder};
+
+#[cfg(target_os = "ios")]
+static INIT: Once = Once::new();
 
 // Function to initialize logging
 // Custom MakeWriter struct that holds a Mutex around a File
@@ -70,38 +76,40 @@ impl<'a> Write for MutexWriter<'a> {
 
 #[cfg(target_os = "ios")]
 pub fn init_logging() {
-    // Get the path to the cache directory.
-    let cache_path = match dirs_next::cache_dir() {
-        Some(path) => path,
-        None => panic!("Failed to find the cache directory"),
-    };
+    INIT.call_once(|| {
+        // Get the path to the cache directory.
+        let cache_path = match dirs_next::cache_dir() {
+            Some(path) => path,
+            None => panic!("Failed to find the cache directory"),
+        };
 
-    // Create the log directory if it doesn't exist.
-    let log_dir = cache_path.join("Logs");
-    if !log_dir.exists() {
-        std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
-    }
+        // Create the log directory if it doesn't exist.
+        let log_dir = cache_path.join("Logs");
+        if !log_dir.exists() {
+            std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
+        }
 
-    // Create the log file inside the cache directory.
-    let log_file_path = log_dir.join("processor.log");
+        // Create the log file inside the cache directory.
+        let log_file_path = log_dir.join("processor.log");
 
-    let file = OpenOptions::new()
-        .write(true)      // Open for writing
-        .create(true)     // Create the file if it doesn't exist
-        .append(true)     // Append to the file if it exists
-        .open(&log_file_path)
-        .expect("Unable to open or create log file");
+        let file = OpenOptions::new()
+            .write(true)      // Open for writing
+            .create(true)     // Create the file if it doesn't exist
+            .append(true)     // Append to the file if it exists
+            .open(&log_file_path)
+            .expect("Unable to open or create log file");
 
-    // Create the MutexMakeWriter
-    let make_writer = MutexMakeWriter::new(file);
+        // Create the MutexMakeWriter
+        let make_writer = MutexMakeWriter::new(file);
 
-    // Initialize the subscriber with file-based logging
-    let subscriber = SubscriberBuilder::default()
-        .with_writer(make_writer)
-        .finish();
+        // Initialize the subscriber with file-based logging
+        let subscriber = SubscriberBuilder::default()
+            .with_writer(make_writer)
+            .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("Unable to set global subscriber");
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Unable to set global subscriber");
+    });
 }
 #[cfg(not(target_os = "ios"))]
 pub fn init_logging() {

@@ -15,6 +15,7 @@ use crate::types;
 #[no_mangle]
 pub unsafe extern "C" fn register_rust_logger() {
     logging::init_logging();
+    log_info!(target: "masternode-processor", "register_rust_logger");
 }
 
 /// Register all the callbacks for use across FFI
@@ -36,6 +37,7 @@ pub unsafe extern "C" fn register_processor(
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
 ) -> *mut MasternodeProcessor {
+    logging::init_logging();
     let processor = MasternodeProcessor::new(
         get_merkle_root_by_hash,
         get_block_height_by_hash,
