@@ -91,6 +91,7 @@ pub fn init_logging() {
 
         // Create the log file inside the cache directory.
         let log_file_path = log_dir.join("processor.log");
+        println!("Log file created: {:?}", log_file_path);
 
         let file = OpenOptions::new()
             .write(true)      // Open for writing
@@ -105,10 +106,12 @@ pub fn init_logging() {
         // Initialize the subscriber with file-based logging
         let subscriber = SubscriberBuilder::default()
             .with_writer(make_writer)
+            .with_ansi(false) // Disable ANSI colors
             .finish();
 
         tracing::subscriber::set_global_default(subscriber)
             .expect("Unable to set global subscriber");
+        println!("logger initialized");
     });
 }
 #[cfg(not(target_os = "ios"))]
