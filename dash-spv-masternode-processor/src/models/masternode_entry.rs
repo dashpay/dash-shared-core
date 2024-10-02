@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
+use logging::*;
+use tracing::*;
 use crate::chain::constants::CORE_PROTO_19_2;
 use crate::common::{Block, MasternodeType, SocketAddress};
 use crate::consensus::Encodable;
@@ -309,7 +311,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
-                info!("SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
+                log_info!(target: "masternode-processor", "SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
                 used_previous_operator_public_key_at_block_hash = key;
             }
         }
@@ -329,7 +331,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
-                info!("SME Hash for proTxHash {:?} : Using {hash} instead of {used_hash} for list at block height {block_height}", self.provider_registration_transaction_hash);
+                log_info!(target: "masternode-processor", "SME Hash for proTxHash {:?} : Using {hash} instead of {used_hash} for list at block height {block_height}", self.provider_registration_transaction_hash);
                 used_hash = hash;
             }
         }

@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
-
+use tracing::info;
+use logging::*;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::TX_MIN_OUTPUT_AMOUNT;
 use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
@@ -175,15 +176,15 @@ impl<'a> TransactionBuilder {
             })
             .collect();
 
-        println!("[RUST] CoinJoin tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
+        log_info!(target: "CoinJoin", "tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
 
         if !self.wallet_ex.borrow().commit_transaction(&vec_send, self.coin_control.clone(), is_denominating, client_session_id) {
-            println!("[RUST] CoinJoin tx_builder.commit: Failed to commit transaction");
+            log_info!(target: "CoinJoin", "tx_builder.commit: Failed to commit transaction");
             str_result.push_str("Failed to commit transaction");
             return false;
         }
 
-        println!("[RUST] CoinJoin Transaction committed");
+        log_info!(target: "CoinJoin", "tx_builder.commit: Transaction committed");
         str_result.push_str("Transaction committed");
         self.keep_keys = true;
         return true;
@@ -207,7 +208,7 @@ impl<'a> TransactionBuilder {
             return signed_tx.to_data().len() as i32;
         }
 
-        println!("[RUST] CoinJoin TxBuilder: Could not sign transaction");
+        log_info!(target: "CoinJoin", "TxBuilder: Could not sign transaction");
         return -1;
     }
 

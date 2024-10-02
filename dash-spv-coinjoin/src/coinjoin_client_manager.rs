@@ -1,5 +1,7 @@
 use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
+use tracing::{info, warn};
+use logging::*;
 use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, MixingLivecycleListener, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
 pub struct CoinJoinClientManager {
@@ -120,7 +122,7 @@ impl CoinJoinClientManager {
         }
 
         if !self.wallet_ex.borrow().is_synced() {
-            println!("[RUST] CoinJoin: not synced");
+            log_info!(target: "CoinJoin", "not synced");
             return;
         }
 
@@ -166,7 +168,7 @@ impl CoinJoinClientManager {
         }
 
         if !self.wallet_ex.borrow().is_synced() {
-            println!("[RUST] CoinJoin: wallet is not synced.");
+            log_info!(target: "CoinJoin", "wallet is not synced.");
             self.str_auto_denom_result = "Wallet is not synced.".to_string();
             return false;
         }
@@ -185,7 +187,7 @@ impl CoinJoinClientManager {
 
         if !self.is_waiting_for_new_block() {
             if self.masternodes_used.len() != self.last_masternode_used {
-                println!("[RUST] CoinJoin: Checking masternodesUsed: size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
+                log_info!(target: "CoinJoin", "Checking masternodesUsed: size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
                 self.last_masternode_used = self.masternodes_used.len();
             }
         }
@@ -194,7 +196,7 @@ impl CoinJoinClientManager {
             // remove the first masternodesUsed.size() - thresholdLow masternodes
             // this might be a problem for SPV
             self.masternodes_used.drain(0..(self.masternodes_used.len() - threshold_low));
-            println!("[RUST] CoinJoin: masternodesUsed: new size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
+            log_warn!(target: "CoinJoin", "masternodesUsed: new size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
         }
 
         if let Some(queue_manager) = &self.queue_queue_manager {
@@ -210,7 +212,7 @@ impl CoinJoinClientManager {
                     self.context
                 );
                 
-                println!("[RUST] CoinJoin: creating new session, current session amount: {} ", self.deq_sessions.len());
+                log_info!(target: "CoinJoin", "creating new session, current session amount {}: ", self.deq_sessions.len());
                 self.deq_sessions.push_back(new_session);
             }
 
@@ -223,7 +225,7 @@ impl CoinJoinClientManager {
                             
                     if current_time - self.last_time_report_too_recent > 15_000 {
                         self.str_auto_denom_result = "Last successful action was too recent.".to_string();
-                        println!("[RUST] CoinJoin do_automatic_denominating {}", self.str_auto_denom_result);
+                        log_info!(target: "CoinJoin", "do_automatic_denominating {}", self.str_auto_denom_result);
                         self.last_time_report_too_recent = current_time;
                     }
                     
@@ -266,8 +268,8 @@ impl CoinJoinClientManager {
         let mn_list = self.get_mn_list();
         let count_enabled = self.get_valid_mns_count(&mn_list);
         let count_not_excluded = count_enabled - self.masternodes_used.len();
-        println!("[RUST] CoinJoin: {} enabled masternodes, {} masternodes to choose from", count_enabled, count_not_excluded);
-        
+        log_info!(target: "CoinJoin", "{} enabled masternodes, {} masternodes to choose from", count_enabled, count_not_excluded);
+
         if count_not_excluded < 1 {
             return None;
         }
@@ -288,11 +290,11 @@ impl CoinJoinClientManager {
                 continue;
             }
 
-            println!("[RUST] CoinJoin: found, masternode={}", dmn.provider_registration_transaction_hash);
+            log_info!(target: "CoinJoin", "found, masternode={}", dmn.provider_registration_transaction_hash);
             return Some(dmn.clone());
         }
 
-        println!("[RUST] CoinJoin: failed get_random_not_used_masternode");
+        log_info!(target: "CoinJoin", "failed get_random_not_used_masternode");
         return None;
     }
 
@@ -335,7 +337,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn try_submit_denominate(&mut self, mn_addr: SocketAddress) -> bool {
-        println!("[RUST] CoinJoin: try_submit_denominate, address: {}", mn_addr);
+        log_info!(target: "CoinJoin", "try_submit_denominate, address: {}", mn_addr);
 
         for session in self.deq_sessions.iter_mut() {
             if let Some(mn_mixing) = &session.mixing_masternode {
@@ -343,10 +345,10 @@ impl CoinJoinClientManager {
                     session.submit_denominate();
                     return true;
                 } else {
-                    println!("[RUST] CoinJoin: mixingMasternode {} != mnAddr {} or {:?} != {:?}", mn_mixing.socket_address, mn_addr, session.base_session.state, PoolState::Queue);
+                    log_info!(target: "CoinJoin", "mixingMasternode {} != mnAddr {} or {:?} != {:?}", mn_mixing.socket_address, mn_addr, session.base_session.state, PoolState::Queue);
                 }
             } else {
-                println!("[RUST] CoinJoin: mixingMasternode is None");
+                log_info!(target: "CoinJoin", "mixingMasternode is None");
             }
         }
 
@@ -389,7 +391,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn change_options(&mut self, new_options: CoinJoinClientOptions) {
-        println!("[RUST] CoinJoin: updating client options: {:?}", new_options);
+        log_info!(target: "CoinJoin", "updating client options: {:?}", new_options);
         let mut options = self.options.borrow_mut();
         options.chain_type = new_options.chain_type;
         options.enable_coinjoin = new_options.enable_coinjoin;

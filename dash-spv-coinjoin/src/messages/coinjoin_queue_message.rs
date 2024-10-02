@@ -8,6 +8,8 @@ use dash_spv_masternode_processor::hashes::hex::ToHex;
 use dash_spv_masternode_processor::hashes::{sha256d, Hash};
 use dash_spv_masternode_processor::keys::BLSKey;
 use dash_spv_masternode_processor::models::OperatorPublicKey;
+use logging::*;
+use tracing::warn;
 use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
@@ -58,7 +60,7 @@ impl CoinJoinQueueMessage {
             ).verify_insecure(&hash, *signature);
 
             if !verified {
-                println!("[RUST] CoinJoinQueue-verifySignature failed");
+                log_warn!(target: "CoinJoinQueue", "verifySignature failed");
             }
 
             return verified;

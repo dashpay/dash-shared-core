@@ -7,7 +7,8 @@ use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 use ferment_interfaces::boxed;
-
+use logging::*;
+use tracing::{info, warn};
 use crate::ffi::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
 use crate::ffi::input_value::InputValue;
 use crate::messages::pool_message::PoolMessage;
@@ -43,6 +44,7 @@ impl CoinJoin {
         destroy_input_value: DestroyInputValue,
         context: *const std::ffi::c_void
     ) -> Self {
+        init_logging();
         Self {
             opaque_context: context,
             get_input_value_by_prevout_hash,
@@ -131,13 +133,12 @@ impl CoinJoin {
     // check to make sure the collateral provided by the client is valid
     pub fn is_collateral_valid(&self, tx_collateral: &Transaction, check_inputs: bool) -> bool {
         if tx_collateral.outputs.is_empty() {
-            // TODO: logs
-            println!("[RUST] CoinJoin: Collateral invalid due to no outputs: {}", tx_collateral.tx_hash.unwrap_or_default());
+            log_warn!(target: "CoinJoin", "Collateral invalid due to no outputs: {}", tx_collateral.tx_hash.unwrap_or_default());
             return false;
         }
 
         if tx_collateral.lock_time != 0 {
-            println!("[RUST] CoinJoin: Collateral invalid due to lock time != 0: {}", tx_collateral.tx_hash.unwrap_or_default());
+            log_warn!(target: "CoinJoin", "Collateral invalid due to lock time != 0: {}", tx_collateral.tx_hash.unwrap_or_default());
             return false;
         }
     
@@ -148,7 +149,7 @@ impl CoinJoin {
             n_value_out = n_value_out + txout.amount as i64;
     
             if txout.script_pub_key_type() != ScriptType::PayToPubkeyHash && !txout.is_script_unspendable() {
-                println!("[RUST] CoinJoin: Invalid Script, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
+                log_warn!(target: "CoinJoin", "Invalid Script, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }
@@ -159,21 +160,21 @@ impl CoinJoin {
                 
                 if let Some(input_value) = result {
                     if !input_value.is_valid {
-                        println!("[RUST] CoinJoin: spent or non-locked mempool input! txin={:?}", txin);
-                       return false;
+                        log_warn!(target: "CoinJoin", "spent or non-locked mempool input! txin={:?}", txin);
+                        return false;
                     }
 
                     n_value_in = n_value_in + input_value.value as i64;
                 } else {
-                    println!("[RUST] CoinJoin: -- Unknown inputs in collateral transaction, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
+                    log_warn!(target: "CoinJoin", "Unknown inputs in collateral transaction, txCollateral={}", tx_collateral.tx_hash().unwrap_or_default());
                     return false;
                 }
             }
 
-            println!("[RUST] CoinJoin: n_value_out={}, n_value_in={}", n_value_out, n_value_in);
+            log_info!(target: "CoinJoin", "n_value_out={}, n_value_in={}", n_value_out, n_value_in);
 
             if n_value_in - n_value_out < CoinJoin::get_collateral_amount() as i64 {
-                println!("[RUST] CoinJoin: did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
+                log_warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }

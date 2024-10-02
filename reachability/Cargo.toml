@@ -6,7 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libc = "0.2.158"
+libc = "0.2.139"
+logging = { path = "../logging" }
+tracing = "0.1.40"
 system-configuration = "0.5.0"
 tokio = { version = "1.25.0", features = ["full"] }
 

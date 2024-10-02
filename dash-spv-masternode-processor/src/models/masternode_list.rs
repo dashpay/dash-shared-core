@@ -1,5 +1,7 @@
 use std::cmp::min;
 use std::collections::BTreeMap;
+use logging::*;
+use tracing::*;
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::common::MasternodeType;
 use crate::consensus::Encodable;
@@ -122,7 +124,7 @@ impl MasternodeList {
             && ct_q_merkle_root.is_some()
             && ct_q_merkle_root.unwrap() == q_merkle_root.unwrap();
         if !has_valid_quorum_list_root {
-            warn!("LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
+            log_info!(target: "masternode-processor", "LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
                      tx.height,
                      tx.base.version,
                      tx.merkle_root_llmq_list,
