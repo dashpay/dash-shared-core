@@ -58,15 +58,6 @@ fn test_bls_multiplication() {
 }
 
 #[test]
-fn bls_pub() {
-    let bls_b = BLSKey::key_with_private_key("46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd", true).unwrap();
-    println!("key: privkey_raw {:?}", bls_b.seckey.0);
-    println!("key: pubkey_raw {:?}", bls_b.pubkey.0);
-    println!("Key: legacy {}", BLSKey::key_with_private_key("46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd", true).unwrap().public_key_uint());
-    println!("Key: basic {}", BLSKey::key_with_private_key("46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd", false).unwrap().public_key_uint());
-}
-
-#[test]
 fn test_bls_from_bip32_short_seed() {
     let private_key = PrivateKey::from_bip32_seed(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     println!("{:?}", &*private_key.to_bytes().as_slice());
@@ -192,8 +183,8 @@ fn test_bls_verify_random_signature_using_scheme<S: Scheme>(schema: S) {
 
 #[test]
 fn test_bls_basic_signature_verify_secure_aggregated() {
-    //test_bls_verify_random_signature_using_scheme(LegacySchemeMPL::new());
-    //test_bls_verify_random_signature_using_scheme(BasicSchemeMPL::new());
+    test_bls_verify_random_signature_using_scheme(LegacySchemeMPL::new());
+    test_bls_verify_random_signature_using_scheme(BasicSchemeMPL::new());
 }
 
 #[test]

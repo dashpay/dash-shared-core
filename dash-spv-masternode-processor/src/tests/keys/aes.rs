@@ -33,12 +33,6 @@ fn test_ecdsa_encryption_and_decryption() {
 }
 
 #[test]
-fn bls_pub() {
-    println!("Key: legacy {}", BLSKey::key_with_private_key("46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd", true).unwrap().public_key_uint());
-    println!("Key: basic {}", BLSKey::key_with_private_key("46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd", false).unwrap().public_key_uint());
-}
-
-#[test]
 fn test_bls_encryption_and_decryption() {
     let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
     let script_map = ChainType::TestNet.script_map();
