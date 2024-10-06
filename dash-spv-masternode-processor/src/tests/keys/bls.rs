@@ -69,9 +69,7 @@ fn bls_pub() {
 #[test]
 fn test_bls_from_bip32_short_seed() {
     let private_key = PrivateKey::from_bip32_seed(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-
-    //println!("{:?}", &*private_key.serialize());
-    //println!("{:?}", &*private_key.serialize().as_slice());
+    println!("{:?}", &*private_key.to_bytes().as_slice());
     assert_eq!(
         private_key.to_bytes().as_slice(),
         Vec::from_hex("46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd").unwrap().as_slice(),
@@ -87,14 +85,7 @@ fn test_bls_from_bip32_long_seed() {
     // let seed = [50, 67, 148, 112, 207, 6, 210, 118, 137, 125, 27, 144, 105, 189, 214, 228, 68, 83, 144, 205, 80, 105, 133, 222, 14, 26, 28, 136, 167, 111, 241, 118];
     // let secret =
     let private_key = PrivateKey::from_bip32_seed(&seed);
-    println!("private_key:{}", UInt256::from(private_key.to_bytes().as_slice()));
-    let public_key = private_key.g1_element().unwrap();
-    let pub_key_legacy = UInt384(crate::keys::bls_key::g1_element_serialized(&public_key, true));
-    println!("pub_key_legacy:{}", pub_key_legacy);
-    let pub_key_basic = UInt384(crate::keys::bls_key::g1_element_serialized(&public_key, false));
-    println!("pub_key_basic:{}", pub_key_basic);
-    //println!("{:?}", &*private_key.serialize());
-    //println!("{:?}", &*private_key.serialize().as_slice());
+    println!("{:?}", &*private_key.to_bytes().as_slice());
     assert_eq!(
         private_key.to_bytes().as_slice(),
         private_key_test_data.as_slice(),

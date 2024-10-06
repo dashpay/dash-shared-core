@@ -177,20 +177,8 @@ impl BLSKey {
     pub fn key_with_seed_data(seed: &[u8], use_legacy: bool) -> Self {
         let bls_private_key = PrivateKey::from_bip32_seed(seed);
         let bls_public_key = bls_private_key.g1_element().unwrap();
-        let seckey = UInt256::from(bls_private_key);
-        let sec_key_s = format!("{}", seckey);
-
+        let seckey = UInt256::from(&*bls_private_key.to_bytes());
         let pubkey = UInt384(g1_element_serialized(&bls_public_key, use_legacy));
-        let pubkey_s = format!("{}", pubkey);
-
-
-        let pub_key_legacy = UInt384(g1_element_serialized(&bls_public_key, true));
-        let pub_key_legacy_s = format!("{}", pub_key_legacy);
-        let pub_key_basic = UInt384(g1_element_serialized(&bls_public_key, false));
-        let pub_key_basic_s = format!("{}", pub_key_basic);
-
-        println!("pri_key:{} pub_key_leg:{} pub_key_basic:{}\n", seckey, pub_key_legacy_s, pub_key_basic_s);
-
         Self { seckey, pubkey, use_legacy, ..Default::default() }
     }
 
