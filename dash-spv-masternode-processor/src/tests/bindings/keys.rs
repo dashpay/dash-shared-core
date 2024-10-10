@@ -8,8 +8,6 @@ use crate::crypto::{UInt256, UInt384};
 use crate::ffi::IndexPathData;
 use crate::keys::KeyKind;
 use crate::types::opaque_key::OpaqueKey;
-#[cfg(feature = "use_serde")]
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[test]
 fn test_keys() {
