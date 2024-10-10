@@ -30,7 +30,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length);
     let result = process_mnlist_diff(&processor, message, is_from_snapshot, protocol_version, cache)
-        .map_or(std::ptr::null_mut(), ferment_interfaces::boxed);
+        .map_or(std::ptr::null_mut(), ferment::boxed);
     println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
     result
 }
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     process_qr_info(&processor, message, is_from_snapshot, protocol_version, is_rotated_quorums_presented, cache)
         .map_or(std::ptr::null_mut(), |result | {
             println!("process_qrinfo_from_message <- {:?} ms", instant.elapsed().as_millis());
-            ferment_interfaces::boxed(result)
+            ferment::boxed(result)
         })
 }
 
@@ -175,7 +175,7 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
     let read_var_int = |offset: &mut usize|
         encode::VarInt::from_bytes(message, offset).map_err(ProcessingError::from);
     let mut get_list_diff_result = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext|
-        ferment_interfaces::boxed(process_list_diff(list_diff, verification_context));
+        ferment::boxed(process_list_diff(list_diff, verification_context));
 
     let offset = &mut 0;
     let snapshot_at_h_c = read_snapshot(offset)?;
@@ -210,7 +210,7 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
         Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
         let quorum = models::LLMQEntry::from_bytes(message, offset).map_err(ProcessingError::from)?;
-        last_quorum_per_index_vec.push(ferment_interfaces::boxed(quorum.encode()));
+        last_quorum_per_index_vec.push(ferment::boxed(quorum.encode()));
     }
     let quorum_snapshot_list_count = read_var_int(offset)?.0 as usize;
     let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> =
@@ -228,7 +228,7 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
         let block_hash = list_diff.block_hash;
         mn_list_diff_list_vec.push(get_list_diff_result(list_diff, LLMQVerificationContext::None));
         let snapshot = snapshots.get(i).unwrap();
-        quorum_snapshot_list_vec.push(ferment_interfaces::boxed(snapshot.encode()));
+        quorum_snapshot_list_vec.push(ferment::boxed(snapshot.encode()));
         processor.provider.save_snapshot(block_hash, snapshot.clone());
     }
 
@@ -250,20 +250,20 @@ pub fn process_qr_info(processor: &MasternodeProcessor, message: &[u8], is_from_
         result_at_h_2c,
         result_at_h_3c,
         result_at_h_4c,
-        snapshot_at_h_c: ferment_interfaces::boxed(snapshot_at_h_c.encode()),
-        snapshot_at_h_2c: ferment_interfaces::boxed(snapshot_at_h_2c.encode()),
-        snapshot_at_h_3c: ferment_interfaces::boxed(snapshot_at_h_3c.encode()),
+        snapshot_at_h_c: ferment::boxed(snapshot_at_h_c.encode()),
+        snapshot_at_h_2c: ferment::boxed(snapshot_at_h_2c.encode()),
+        snapshot_at_h_3c: ferment::boxed(snapshot_at_h_3c.encode()),
         snapshot_at_h_4c: if extra_share {
-            ferment_interfaces::boxed(snapshot_at_h_4c.unwrap().encode())
+            ferment::boxed(snapshot_at_h_4c.unwrap().encode())
         } else {
             std::ptr::null_mut()
         },
         extra_share,
-        last_quorum_per_index: ferment_interfaces::boxed_vec(last_quorum_per_index_vec),
+        last_quorum_per_index: ferment::boxed_vec(last_quorum_per_index_vec),
         last_quorum_per_index_count,
-        quorum_snapshot_list: ferment_interfaces::boxed_vec(quorum_snapshot_list_vec),
+        quorum_snapshot_list: ferment::boxed_vec(quorum_snapshot_list_vec),
         quorum_snapshot_list_count,
-        mn_list_diff_list: ferment_interfaces::boxed_vec(mn_list_diff_list_vec),
+        mn_list_diff_list: ferment::boxed_vec(mn_list_diff_list_vec),
         mn_list_diff_list_count,
     };
     Ok(result)

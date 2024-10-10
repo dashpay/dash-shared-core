@@ -1,8 +1,7 @@
 extern crate cbindgen;
-extern crate ferment;
+extern crate ferment_sys;
 
-use std::process::Command;
-use ferment::{Builder, Crate};
+use ferment_sys::{Ferment, Lang, ObjC, XCodeConfig};
 
 // [parse.expand]
 // # A list of crate names that should be run through `cargo expand` before
@@ -11,27 +10,67 @@ use ferment::{Builder, Crate};
 // #
 // # default: []
 // crates = ["your_crate_name"]
-pub const SELF_NAME: &str = "dash_spv_apple_bindings";
 
-// .with_crates(vec!["platform-value", "platform-version", "dpp"])
+// pub const SELF_NAME: &str = "dash_spv_apple_bindings";
 
+// fn main() {
+//     let c_header = "target/dash_shared_core.h";
+//     match Ferment::with_crate_name(SELF_NAME)
+//         .with_default_mod_name()
+//         .with_external_crates(vec![
+//             "dash-spv-masternode-processor",
+//             "dash-spv-platform",
+//             "dash-sdk",
+//             "platform-value",
+//             "platform-version",
+//             "dpp",
+//             "drive-proof-verifier"
+//         ])
+//         .with_languages(vec![
+//             Lang::ObjC(ObjC::new(XCodeConfig {
+//                 class_prefix: "DS".to_string(),
+//                 framework_name: "dash_shared_core".to_string()
+//             })),
+//         ])
+//         .generate() {
+//         Ok(()) => match Command::new("cbindgen")
+//             .args(["--config", "cbindgen.toml", "-o", c_header])
+//             .status() {
+//             Ok(status) => println!("[cbindgen] [ok] generated into {c_header} with status: {status}"),
+//             Err(err) => panic!("[cbindgen] [error] {}", err)
+//         }
+//         Err(err) => panic!("[ferment] Can't create FFI expansion: {}", err)
+//     }
+//
+//
+// }
 fn main() {
-
-    let c_header = "target/dash_shared_core.h";
-    match Builder::new(Crate::current_with_name(SELF_NAME))
-        .with_mod_name("fermented")
-        // .with_crates(vec!["ferment-example", "platform-value", "dpp"])
-        .with_crates(vec!["dash-spv-masternode-processor", "dash-spv-platform", "dash-sdk", "platform-value", "platform-version", "dpp", "drive-proof-verifier"])
+    const SELF_NAME: &str = "dash_spv_apple_bindings";
+    match Ferment::with_crate_name(SELF_NAME)
+        .with_cbindgen_config("cbindgen.toml")
+        .with_default_mod_name()
+        .with_external_crates(vec![
+            "dash-spv-masternode-processor",
+            "dash-spv-platform",
+            "dash-sdk",
+            "platform-value",
+            "platform-version",
+            "dpp",
+            "drive-proof-verifier"
+        ])
+        .with_languages(vec![
+            Lang::ObjC(ObjC::new(XCodeConfig {
+                class_prefix: "DS".to_string(),
+                framework_name: "DashSharedCore".to_string(),
+                header_name: SELF_NAME.to_string()
+            })),
+        ])
         .generate() {
-        Ok(()) => match Command::new("cbindgen")
-            .args(["--config", "cbindgen.toml", "-o", c_header])
-            .status() {
-            Ok(status) => println!("[cbindgen] [ok] generated into {c_header} with status: {status}"),
-            Err(err) => panic!("[cbindgen] [error] {err}")
-        }
-        Err(err) => panic!("[ferment] Can't create FFI expansion: {err}")
+        Ok(_) => println!("[ferment] [ok]: {SELF_NAME}"),
+        Err(err) => panic!("[ferment] [err]: {}", err)
     }
 }
+
 
 // fn main() {
 //

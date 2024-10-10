@@ -1,5 +1,4 @@
 extern crate cbindgen;
-extern crate ferment;
 
 // use std::process::Command;
 // use ferment::Builder;

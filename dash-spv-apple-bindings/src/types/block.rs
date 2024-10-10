@@ -8,7 +8,7 @@ pub struct Block {
 impl Drop for Block {
     fn drop(&mut self) {
         unsafe {
-            ferment_interfaces::unbox_any(self.hash);
+            ferment::unbox_any(self.hash);
         }
     }
 }

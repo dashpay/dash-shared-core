@@ -88,7 +88,7 @@ pub unsafe extern "C" fn create_provider(
 // pub unsafe extern "C" fn register_processor<'a>(provider: *mut FFICoreProvider) -> *mut MasternodeProcessor<FFICoreProvider> {
 //     let processor = MasternodeProcessor::new(&*provider);
 //     println!("register_processor: {:?}", processor);
-//     ferment_interfaces::boxed(processor)
+//     ferment::boxed(processor)
 // }
 //
 // /// Unregister all the callbacks for use across FFI
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn create_provider(
 // #[no_mangle]
 // pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor<FFICoreProvider>) {
 //     println!("unregister_processor: {:?}", processor);
-//     let unboxed = ferment_interfaces::unbox_any(processor);
+//     let unboxed = ferment::unbox_any(processor);
 // }
 
 /// Initialize opaque cache to store needed information between FFI calls
@@ -105,7 +105,7 @@ pub unsafe extern "C" fn create_provider(
 pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCache {
     let cache = MasternodeProcessorCache::default();
     println!("processor_create_cache: {:?}", cache);
-    ferment_interfaces::boxed(cache)
+    ferment::boxed(cache)
 }
 
 /// Destroy opaque cache
@@ -113,7 +113,7 @@ pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCac
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
     println!("processor_destroy_cache: {:?}", cache);
-    let cache = ferment_interfaces::unbox_any(cache);
+    let cache = ferment::unbox_any(cache);
 }
 
 /// Remove models list from cache
@@ -160,49 +160,49 @@ pub unsafe extern "C" fn processor_clear_cache(cache: *mut MasternodeProcessorCa
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
-    ferment_interfaces::unbox_any(block_hash);
+    ferment::unbox_any(block_hash);
 }
 
 /// Destroys anonymous internal holder for UInt768
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_cl_signature(cl_signature: *mut [u8; 96]) {
-    ferment_interfaces::unbox_any(cl_signature);
+    ferment::unbox_any(cl_signature);
 }
 
 /// Destroys anonymous internal holder for UInt256
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_byte_array(data: *const u8, len: usize) {
-    ferment_interfaces::unbox_vec_ptr(data as *mut u8, len);
+    ferment::unbox_vec_ptr(data as *mut u8, len);
 }
 
 // /// # Safety
 // /// Destroys types::MNListDiffResult
 // #[no_mangle]
 // pub unsafe extern "C" fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
-//     ferment_interfaces::unbox_any(list);
+//     ferment::unbox_any(list);
 // }
 //
 // /// Destroys types::MNListDiffResult
 // /// # Safety
 // #[no_mangle]
 // pub unsafe extern "C" fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
-//     ferment_interfaces::unbox_any(result);
+//     ferment::unbox_any(result);
 // }
 //
 // /// Destroys types::LLMQRotationInfoResult
 // /// # Safety
 // #[no_mangle]
 // pub unsafe extern "C" fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
-//     ferment_interfaces::unbox_any(result);
+//     ferment::unbox_any(result);
 // }
 //
 // /// Destroys types::LLMQSnapshot
 // /// # Safety
 // #[no_mangle]
 // pub unsafe extern "C" fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
-//     ferment_interfaces::unbox_any(result);
+//     ferment::unbox_any(result);
 // }
 //
 // /// @Deprecated --> dash_spv_masternode_processor_common_block_Block_destroy
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn processor_destroy_byte_array(data: *const u8, len: usiz
 // /// # Safety
 // #[no_mangle]
 // pub unsafe extern "C" fn processor_destroy_block(result: *mut types::Block) {
-//     ferment_interfaces::unbox_any(result);
+//     ferment::unbox_any(result);
 // }
 //
 
@@ -223,13 +223,13 @@ pub unsafe extern "C" fn processor_destroy_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }
-    ferment_interfaces::unbox_string(ptr);
+    ferment::unbox_string(ptr);
 }
 
 /// Destroys UInt160
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_uint160(ptr: *mut [u8; 20]) {
-    ferment_interfaces::unbox_any(ptr);
+    ferment::unbox_any(ptr);
 }
 

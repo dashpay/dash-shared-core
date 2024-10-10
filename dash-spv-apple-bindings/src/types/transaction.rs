@@ -33,21 +33,21 @@ pub struct Transaction {
 //         }
 //         let mut inputs_vec: Vec<*mut TransactionInput> = Vec::with_capacity(inputs_count);
 //         for _i in 0..inputs_count {
-//             inputs_vec.push(ferment_interfaces::boxed(bytes.read_with::<TransactionInput>(offset, LE)?));
+//             inputs_vec.push(ferment::boxed(bytes.read_with::<TransactionInput>(offset, LE)?));
 //         }
 //         let outputs_count = bytes
 //             .read_with::<consensus::encode::VarInt>(offset, LE)?
 //             .0 as usize;
 //         let mut outputs_vec: Vec<*mut TransactionOutput> = Vec::new();
 //         for _i in 0..outputs_count {
-//             outputs_vec.push(ferment_interfaces::boxed(bytes.read_with::<TransactionOutput>(offset, LE)?));
+//             outputs_vec.push(ferment::boxed(bytes.read_with::<TransactionOutput>(offset, LE)?));
 //         }
 //         let lock_time = bytes.read_with::<u32>(offset, LE)?;
 //         Ok((
 //             Self {
-//                 inputs: ferment_interfaces::boxed_vec(inputs_vec),
+//                 inputs: ferment::boxed_vec(inputs_vec),
 //                 inputs_count,
-//                 outputs: ferment_interfaces::boxed_vec(outputs_vec),
+//                 outputs: ferment::boxed_vec(outputs_vec),
 //                 outputs_count,
 //                 tx_hash: null_mut(),
 //                 version,
@@ -64,9 +64,9 @@ pub struct Transaction {
 impl Drop for Transaction {
     fn drop(&mut self) {
         unsafe {
-            ferment_interfaces::unbox_any_vec_ptr(self.inputs, self.inputs_count);
-            ferment_interfaces::unbox_any_vec_ptr(self.outputs, self.outputs_count);
-            ferment_interfaces::unbox_any(self.tx_hash);
+            ferment::unbox_any_vec_ptr(self.inputs, self.inputs_count);
+            ferment::unbox_any_vec_ptr(self.outputs, self.outputs_count);
+            ferment::unbox_any(self.tx_hash);
         }
     }
 }

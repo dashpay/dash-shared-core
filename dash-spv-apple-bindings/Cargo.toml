@@ -10,6 +10,7 @@ publish = true
 [dependencies]
 anyhow = { version = "1.0.75" }
 blake3 = "1.3.2"
+byte = "0.2"
 dash-sdk = { path = "../../platform/packages/rs-sdk" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
 dash-spv-platform = { path = "../dash-spv-platform" }
@@ -25,9 +26,9 @@ dpp = { path = "../../platform/packages/rs-dpp", features = ["state-transitions"
 drive = { path = "../../platform/packages/rs-drive" }
 drive-proof-verifier = { path = "../../platform/packages/rs-drive-proof-verifier" }
 fancy-regex = "0.13.0"
-ferment-interfaces = { path = "../../ferment/ferment-interfaces" }
+ferment = { path = "../../ferment/ferment" }
 ferment-macro = { path = "../../ferment/ferment-macro" }
-#ferment-interfaces = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-interfaces" }
+#ferment = { git = "https://github.com/pankcuf/ferment.git", package = "ferment" }
 #ferment-macro = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-macro" }
 grovedb-version = "1.0.0-rc.2"
 indexmap = { version = "2.0.2", features = ["serde"] }
@@ -52,8 +53,8 @@ dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", fea
 
 [build-dependencies]
 cbindgen = "0.26.0"
-ferment = { path = "../../ferment/ferment" }
-#ferment = { git = "https://github.com/pankcuf/ferment.git", package = "ferment" }
+ferment-sys = { path = "../../ferment/ferment-sys" }
+#ferment-sys = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-sys" }
 
 [features]
 cbor = ["platform-value/cbor", "dpp/cbor", "dpp/ciborium"]

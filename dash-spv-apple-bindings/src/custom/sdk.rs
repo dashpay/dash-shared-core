@@ -1,4 +1,4 @@
-use ferment_interfaces::{boxed, FFIConversionFrom, FFIConversionTo, unbox_any};
+use ferment::{boxed, FFIConversionFrom, FFIConversionTo, unbox_any};
 
 #[allow(non_camel_case_types)]
 #[derive(Clone)]

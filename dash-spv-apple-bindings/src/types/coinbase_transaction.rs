@@ -1,4 +1,4 @@
-use ferment_interfaces::unbox_any;
+use ferment::unbox_any;
 use crate::types::transaction::Transaction;
 
 #[repr(C)]

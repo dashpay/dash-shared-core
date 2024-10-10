@@ -5,7 +5,7 @@ pub enum SocketAddr {
     V4 { ip: *mut [u8; 4], port: u16 },
     V6 { ip: *mut [u8; 16], port: u16, flowinfo: u32, scope_id: u32 },
 }
-impl ferment_interfaces::FFIConversionFrom<std::net::SocketAddr> for SocketAddr {
+impl ferment::FFIConversionFrom<std::net::SocketAddr> for SocketAddr {
     unsafe fn ffi_from_const(ffi: *const Self) -> std::net::SocketAddr {
         let ffi = &*ffi;
         match ffi {
@@ -16,13 +16,13 @@ impl ferment_interfaces::FFIConversionFrom<std::net::SocketAddr> for SocketAddr 
         }
     }
 }
-impl ferment_interfaces::FFIConversionTo<std::net::SocketAddr> for SocketAddr {
+impl ferment::FFIConversionTo<std::net::SocketAddr> for SocketAddr {
     unsafe fn ffi_to_const(obj: std::net::SocketAddr) -> *const Self {
-        ferment_interfaces::boxed(match obj {
+        ferment::boxed(match obj {
             std::net::SocketAddr::V4(addr) =>
-                Self::V4 { ip: ferment_interfaces::boxed(addr.ip().octets()), port: addr.port() },
+                Self::V4 { ip: ferment::boxed(addr.ip().octets()), port: addr.port() },
             std::net::SocketAddr::V6(addr) =>
-                Self::V6 { ip: ferment_interfaces::boxed(addr.ip().octets()), port: addr.port(), flowinfo: addr.flowinfo(), scope_id: addr.scope_id() }
+                Self::V6 { ip: ferment::boxed(addr.ip().octets()), port: addr.port(), flowinfo: addr.flowinfo(), scope_id: addr.scope_id() }
         })
     }
 }
@@ -31,8 +31,8 @@ impl Drop for SocketAddr {
     fn drop(&mut self) {
         unsafe {
             match self {
-                Self::V4 { ip, port } => { ferment_interfaces::unbox_any(ip); }
-                Self::V6 { ip, port, flowinfo, scope_id } => { ferment_interfaces::unbox_any(ip); }
+                Self::V4 { ip, port } => { ferment::unbox_any(ip); }
+                Self::V6 { ip, port, flowinfo, scope_id } => { ferment::unbox_any(ip); }
             }
         }
     }

@@ -10,13 +10,13 @@ use crate::FFIThreadSafeContext;
 
 #[derive(Clone)]
 pub struct CallbackSigner {
-    pub signer: Arc<dyn Fn(*const c_void, IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync>,
+    pub signer: Arc<dyn Fn(*const c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync>,
     pub context: Arc<FFIThreadSafeContext>
 }
 
 impl CallbackSigner {
     pub fn new<T>(signer: T, context: Arc<FFIThreadSafeContext>) -> Self
-        where T: Fn(*const c_void, IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static {
+        where T: Fn(*const c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static {
         Self { signer: Arc::new(signer), context }
     }
 }
@@ -29,6 +29,6 @@ impl Debug for CallbackSigner {
 
 impl Signer for CallbackSigner {
     fn sign(&self, identity_public_key: &IdentityPublicKey, data: &[u8]) -> Result<BinaryData, ProtocolError> {
-        (self.signer)(self.context.get(), identity_public_key.clone(), Vec::from(data))
+        (self.signer)(self.context.get(), identity_public_key, Vec::from(data))
     }
 }

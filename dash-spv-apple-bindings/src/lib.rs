@@ -73,7 +73,7 @@ impl DashSPVCore {
         context: *const std::os::raw::c_void) -> Self {
         let provider = unsafe { Box::from_raw(core_provider) };
         Self {
-            processor: ferment_interfaces::boxed(MasternodeProcessor::new(provider)),
+            processor: ferment::boxed(MasternodeProcessor::new(provider)),
             cache,
             platform,
             context,

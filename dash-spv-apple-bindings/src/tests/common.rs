@@ -1,6 +1,6 @@
 use std::{fs, io::Read, ptr::null_mut};
 use std::collections::BTreeMap;
-use ferment_interfaces::boxed;
+use ferment::boxed;
 use dash_spv_masternode_processor::chain::common::{ChainType, IHaveChainSettings};
 use dash_spv_masternode_processor::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt768};
 use dash_spv_masternode_processor::hashes::hex::{FromHex, ToHex};

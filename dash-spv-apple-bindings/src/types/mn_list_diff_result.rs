@@ -1,6 +1,6 @@
 use dash_spv_masternode_processor::processing;
 use std::ptr::null_mut;
-use ferment_interfaces::{boxed, boxed_vec, unbox_any, unbox_any_vec_ptr};
+use ferment::{boxed, boxed_vec, unbox_any, unbox_any_vec_ptr};
 use crate::ffi::to::{encode_masternodes_map, ToFFI};
 use crate::types;
 

@@ -37,7 +37,7 @@ pub extern "C" fn chain_devnet_from_identifier(identifier: *const c_char) -> Dev
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn devnet_identifier_for_chain_type(chain_type: ChainType) -> *mut c_char {
-    ferment_interfaces::FFIConversionTo::ffi_to_opt(chain_type.devnet_identifier())
+    ferment::FFIConversionTo::ffi_to_opt(chain_type.devnet_identifier())
 }
 
 /// # Safety

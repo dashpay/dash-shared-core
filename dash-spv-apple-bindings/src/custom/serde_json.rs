@@ -4,7 +4,7 @@
 pub struct serde_json_JsonValue {
     raw_err: *mut serde_json::Value,
 }
-impl ferment_interfaces::FFIConversionFrom<serde_json::Value> for serde_json_JsonValue {
+impl ferment::FFIConversionFrom<serde_json::Value> for serde_json_JsonValue {
     unsafe fn ffi_from_const(ffi: *const Self) -> serde_json::Value {
         let ffi = &*ffi;
         match &*ffi.raw_err {
@@ -17,16 +17,16 @@ impl ferment_interfaces::FFIConversionFrom<serde_json::Value> for serde_json_Jso
         }
     }
 }
-impl ferment_interfaces::FFIConversionTo<serde_json::Value> for serde_json_JsonValue {
+impl ferment::FFIConversionTo<serde_json::Value> for serde_json_JsonValue {
     unsafe fn ffi_to_const(obj: serde_json::Value) -> *const Self {
-        ferment_interfaces::boxed(serde_json_JsonValue { raw_err: ferment_interfaces::boxed(obj) })
+        ferment::boxed(serde_json_JsonValue { raw_err: ferment::boxed(obj) })
     }
 }
 
 impl Drop for serde_json_JsonValue {
     fn drop(&mut self) {
         unsafe {
-            ferment_interfaces::unbox_any(self.raw_err);
+            ferment::unbox_any(self.raw_err);
         }
     }
 }
@@ -37,24 +37,24 @@ impl Drop for serde_json_JsonValue {
 pub struct serde_json_Error {
     raw: *mut serde_json::Error,
 }
-impl ferment_interfaces::FFIConversionFrom<serde_json::Error> for serde_json_Error {
+impl ferment::FFIConversionFrom<serde_json::Error> for serde_json_Error {
     unsafe fn ffi_from_const(ffi: *const Self) -> serde_json::Error {
-        ferment_interfaces::FFIConversionFrom::ffi_from(ffi.cast_mut())
+        ferment::FFIConversionFrom::ffi_from(ffi.cast_mut())
     }
     unsafe fn ffi_from(ffi: *mut Self) -> serde_json::Error {
-        *ferment_interfaces::unbox_any((&*ffi).raw)
+        *ferment::unbox_any((&*ffi).raw)
     }
 }
-impl ferment_interfaces::FFIConversionTo<serde_json::Error> for serde_json_Error {
+impl ferment::FFIConversionTo<serde_json::Error> for serde_json_Error {
     unsafe fn ffi_to_const(obj: serde_json::Error) -> *const Self {
-        ferment_interfaces::boxed(serde_json_Error { raw: ferment_interfaces::boxed(obj) })
+        ferment::boxed(serde_json_Error { raw: ferment::boxed(obj) })
     }
 }
 
 impl Drop for serde_json_Error {
     fn drop(&mut self) {
         unsafe {
-            ferment_interfaces::unbox_any(self.raw);
+            ferment::unbox_any(self.raw);
         }
     }
 }
@@ -66,24 +66,24 @@ pub struct serde_json_Map_keys_String_values_platform_value_Value {
     raw: *mut serde_json::Map<String, platform_value::Value>,
 }
 
-impl ferment_interfaces::FFIConversionFrom<serde_json::Map<String, platform_value::Value>> for serde_json_Map_keys_String_values_platform_value_Value {
+impl ferment::FFIConversionFrom<serde_json::Map<String, platform_value::Value>> for serde_json_Map_keys_String_values_platform_value_Value {
     unsafe fn ffi_from_const(ffi: *const Self) -> serde_json::Map<String, platform_value::Value> {
         Self::ffi_from(ffi.cast_mut())
     }
     unsafe fn ffi_from(ffi: *mut Self) -> serde_json::Map<String, platform_value::Value> {
-        *ferment_interfaces::unbox_any((&*ffi).raw)
+        *ferment::unbox_any((&*ffi).raw)
     }
 }
-impl ferment_interfaces::FFIConversionTo<serde_json::Map<String, platform_value::Value>> for serde_json_Map_keys_String_values_platform_value_Value {
+impl ferment::FFIConversionTo<serde_json::Map<String, platform_value::Value>> for serde_json_Map_keys_String_values_platform_value_Value {
     unsafe fn ffi_to_const(obj: serde_json::Map<String, platform_value::Value>) -> *const Self {
-        ferment_interfaces::boxed(serde_json_Map_keys_String_values_platform_value_Value { raw: ferment_interfaces::boxed(obj) })
+        ferment::boxed(serde_json_Map_keys_String_values_platform_value_Value { raw: ferment::boxed(obj) })
     }
 }
 
 impl Drop for serde_json_Map_keys_String_values_platform_value_Value {
     fn drop(&mut self) {
         unsafe {
-            ferment_interfaces::unbox_any(self.raw);
+            ferment::unbox_any(self.raw);
         }
     }
 }

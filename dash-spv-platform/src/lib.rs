@@ -90,28 +90,35 @@ impl PlatformSDK {
         unsafe { &*self.sdk }
     }
 }
-
 #[ferment_macro::export]
 impl PlatformSDK {
     pub fn new<
         QP: Fn(*const std::os::raw::c_void, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
         DC: Fn(*const std::os::raw::c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
-        CS: Fn(*const std::os::raw::c_void, IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
+        CS: Fn(*const std::os::raw::c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
+        AC1: Fn(*const std::os::raw::c_void, u32, Vec<u8>, u32) -> Vec<u8> + Send + Sync + 'static,
+        AC2: Fn(u32, [u8; 32], u32) -> [u8; 96] + Send + Sync + 'static,
+        AC3: Fn(u32, [u8; 32], u32) -> [u8; 96],
+        AC4: Fn(*const std::os::raw::c_void, u32, String) -> String
     >(
         get_quorum_public_key: QP,
         get_data_contract: DC,
         callback_signer: CS,
+        ac1: AC1,
+        ac2: AC2,
+        ac3: AC3,
+        ac4: AC4,
         address_list: Option<Vec<&'static str>>,
         context: *const std::os::raw::c_void,
     ) -> Self {
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
         Self {
             foreign_identities: HashMap::new(),
-            runtime: ferment_interfaces::boxed(Runtime::new().unwrap()),
+            runtime: ferment::boxed(Runtime::new().unwrap()),
             callback_signer: CallbackSigner::new(callback_signer, context_arc.clone()),
-            sdk: ferment_interfaces::boxed(
+            sdk: ferment::boxed(
                 create_sdk(
-                    PlatformProvider::new(get_quorum_public_key, get_data_contract, context_arc),
+                    PlatformProvider::new(get_quorum_public_key, get_data_contract, ac1, ac2, context_arc),
                     address_list.unwrap_or(Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST))
                         .iter()
                         .filter_map(|s| Uri::from_str(s).ok())))

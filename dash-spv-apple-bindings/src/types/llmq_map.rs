@@ -11,7 +11,7 @@ pub struct LLMQMap {
 impl Drop for LLMQMap {
     fn drop(&mut self) {
         unsafe {
-            ferment_interfaces::unbox_any_vec_ptr(self.values, self.count);
+            ferment::unbox_any_vec_ptr(self.values, self.count);
         }
     }
 }

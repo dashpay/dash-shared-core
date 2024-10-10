@@ -8,7 +8,7 @@ pub struct LLMQIndexedHash {
 impl Drop for LLMQIndexedHash {
     fn drop(&mut self) {
         unsafe {
-            ferment_interfaces::unbox_any(self.hash);
+            ferment::unbox_any(self.hash);
         }
     }
 }

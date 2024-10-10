@@ -1,7 +1,7 @@
 use std::os::raw::{c_char, c_void};
 use std::ptr::null_mut;
 use dash_spv_masternode_processor::keys::{BLSKey, ECDSAKey, ED25519Key, Key, KeyKind};
-use ferment_interfaces::boxed;
+use ferment::boxed;
 
 pub trait AsOpaqueKey {
     fn to_opaque_ptr(self) -> *mut OpaqueKey;

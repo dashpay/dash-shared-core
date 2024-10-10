@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use ferment_interfaces::boxed;
+use ferment::boxed;
 use dash_spv_masternode_processor::block_store::MerkleBlock;
 use dash_spv_masternode_processor::chain::common::chain_type::{ChainType, DevnetType};
 use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};

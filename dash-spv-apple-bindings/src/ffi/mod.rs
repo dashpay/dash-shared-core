@@ -46,19 +46,19 @@ pub unsafe fn decode_derivation_path(indexes: *const u8, hardened: *const bool, 
 }
 
 pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
-    let k = ferment_interfaces::unbox_any(data);
+    let k = ferment::unbox_any(data);
     match *k {
-        OpaqueKey::ECDSA(key) => { let _ = ferment_interfaces::unbox_any(key); },
+        OpaqueKey::ECDSA(key) => { let _ = ferment::unbox_any(key); },
         OpaqueKey::BLSLegacy(key) |
-        OpaqueKey::BLSBasic(key) => { let _ = ferment_interfaces::unbox_any(key); },
-        OpaqueKey::ED25519(key) => { let _ = ferment_interfaces::unbox_any(key); },
+        OpaqueKey::BLSBasic(key) => { let _ = ferment::unbox_any(key); },
+        OpaqueKey::ED25519(key) => { let _ = ferment::unbox_any(key); },
     };
 }
 
 /// # Safety
 pub unsafe fn unbox_opaque_keys(data: *mut OpaqueKeys) {
-    let res = ferment_interfaces::unbox_any(data);
-    let keys = ferment_interfaces::unbox_vec_ptr(res.keys, res.len);
+    let res = ferment::unbox_any(data);
+    let keys = ferment::unbox_vec_ptr(res.keys, res.len);
     for &x in keys.iter() {
         unbox_opaque_key(x);
     }
@@ -66,10 +66,10 @@ pub unsafe fn unbox_opaque_keys(data: *mut OpaqueKeys) {
 
 /// # Safety
 pub unsafe fn unbox_opaque_serialized_keys(data: *mut OpaqueSerializedKeys) {
-    let res = ferment_interfaces::unbox_any(data);
-    let keys = ferment_interfaces::unbox_vec_ptr(res.keys, res.count);
+    let res = ferment::unbox_any(data);
+    let keys = ferment::unbox_vec_ptr(res.keys, res.count);
     for &x in keys.iter() {
-        ferment_interfaces::unbox_string(x)
+        ferment::unbox_string(x)
     }
 }
 

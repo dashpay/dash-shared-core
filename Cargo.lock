@@ -1247,7 +1247,7 @@ dependencies = [
  "drive",
  "drive-proof-verifier",
  "envy",
- "ferment-interfaces",
+ "ferment",
  "ferment-macro",
  "futures",
  "hex",
@@ -1283,8 +1283,8 @@ dependencies = [
  "dirs-next",
  "ed25519-dalek",
  "ferment",
- "ferment-interfaces",
  "ferment-macro",
+ "ferment-sys",
  "libc",
  "log",
  "reqwest 0.11.27",
@@ -1305,8 +1305,8 @@ dependencies = [
  "drive",
  "drive-proof-verifier",
  "ferment",
- "ferment-interfaces",
  "ferment-macro",
+ "ferment-sys",
  "http 0.2.12",
  "platform-value",
  "platform-version",
@@ -1320,6 +1320,7 @@ version = "0.4.15"
 dependencies = [
  "anyhow",
  "blake3 1.5.3",
+ "byte",
  "cbindgen 0.26.0",
  "dash-sdk",
  "dash-spv-masternode-processor",
@@ -1331,8 +1332,8 @@ dependencies = [
  "drive-proof-verifier",
  "fancy-regex",
  "ferment",
- "ferment-interfaces",
  "ferment-macro",
+ "ferment-sys",
  "grovedb-version",
  "indexmap 2.4.0",
  "jsonschema 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1566,7 +1567,7 @@ dependencies = [
  "derive_more",
  "ed25519-dalek",
  "env_logger 0.9.3",
- "ferment-interfaces",
+ "ferment",
  "ferment-macro",
  "getrandom",
  "hex",
@@ -1643,7 +1644,7 @@ dependencies = [
  "derive_more",
  "dpp",
  "drive",
- "ferment-interfaces",
+ "ferment",
  "ferment-macro",
  "hex",
  "platform-serialization",
@@ -1889,20 +1890,6 @@ dependencies = [
 name = "ferment"
 version = "0.1.4"
 dependencies = [
- "ansi_term",
- "cargo_metadata 0.18.1",
- "env_logger 0.11.5",
- "ferment-macro",
- "log",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "ferment-interfaces"
-version = "0.1.4"
-dependencies = [
  "indexmap 2.4.0",
 ]
 
@@ -1910,6 +1897,21 @@ dependencies = [
 name = "ferment-macro"
 version = "0.1.4"
 dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "ferment-sys"
+version = "0.1.4"
+dependencies = [
+ "ansi_term",
+ "cargo_metadata 0.18.1",
+ "env_logger 0.11.5",
+ "ferment-macro",
+ "log",
+ "objc",
+ "proc-macro2",
  "quote",
  "syn 1.0.109",
 ]
@@ -2996,6 +2998,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "malloc_buf"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "masternode-reward-shares-contract"
 version = "1.0.0-rc.2"
 dependencies = [
@@ -3270,6 +3281,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "objc"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "915b1b472bc21c53464d6c8461c9d3af805ba1ef837e1cac254428f4a77177b1"
+dependencies = [
+ "malloc_buf",
 ]
 
 [[package]]

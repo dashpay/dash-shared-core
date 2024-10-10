@@ -1,4 +1,4 @@
-use ferment_interfaces::{boxed, FFIConversionFrom, FFIConversionTo, unbox_any};
+use ferment::{boxed, FFIConversionFrom, FFIConversionTo, unbox_any};
 
 #[allow(non_camel_case_types)]
 #[ferment_macro::register(jsonschema::ValidationError)]

@@ -1,7 +1,7 @@
 // use byte::ctx::{Bytes, Endian};
 // use byte::{BytesExt, TryRead, LE};
 // use std::ptr::null_mut;
-// use ferment_interfaces::{boxed, boxed_vec, unbox_any};
+// use ferment::{boxed, boxed_vec, unbox_any};
 use dash_spv_masternode_processor::chain::common::LLMQType;
 use dash_spv_masternode_processor::common::LLMQVersion;
 
@@ -92,20 +92,20 @@ impl Drop for LLMQEntry {
     fn drop(&mut self) {
         unsafe {
             let entry = self;
-            ferment_interfaces::unbox_any(entry.all_commitment_aggregated_signature);
+            ferment::unbox_any(entry.all_commitment_aggregated_signature);
             if !entry.commitment_hash.is_null() {
-                ferment_interfaces::unbox_any(entry.commitment_hash);
+                ferment::unbox_any(entry.commitment_hash);
             }
-            ferment_interfaces::unbox_any(entry.entry_hash);
-            ferment_interfaces::unbox_any(entry.llmq_hash);
-            ferment_interfaces::unbox_any(entry.public_key);
-            ferment_interfaces::unbox_any(entry.threshold_signature);
-            ferment_interfaces::unbox_any(entry.verification_vector_hash);
-            ferment_interfaces::unbox_any(std::ptr::slice_from_raw_parts_mut::<u8>(
+            ferment::unbox_any(entry.entry_hash);
+            ferment::unbox_any(entry.llmq_hash);
+            ferment::unbox_any(entry.public_key);
+            ferment::unbox_any(entry.threshold_signature);
+            ferment::unbox_any(entry.verification_vector_hash);
+            ferment::unbox_any(std::ptr::slice_from_raw_parts_mut::<u8>(
                 entry.signers_bitset,
                 entry.signers_bitset_length,
             ));
-            ferment_interfaces::unbox_any(std::ptr::slice_from_raw_parts_mut::<u8>(
+            ferment::unbox_any(std::ptr::slice_from_raw_parts_mut::<u8>(
                 entry.valid_members_bitset,
                 entry.valid_members_bitset_length,
             ));
