@@ -413,7 +413,7 @@ impl ChainType {
 
     pub fn protocol_version(&self) -> u32 {
         match self {
-            ChainType::MainNet => 70228,
+            ChainType::MainNet => 70230,
             ChainType::TestNet => 70230,
             ChainType::DevNet(_) => 70230
         }

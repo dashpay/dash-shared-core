@@ -586,16 +586,16 @@ macro_rules! user_enum {
 
         #[cfg(feature = "serde")]
         #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-        impl<'de> $crate::serde::Deserialize<'de> for $name {
+        impl<'de> ::serde::Deserialize<'de> for $name {
             #[inline]
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
-                D: $crate::serde::Deserializer<'de>,
+                D: ::serde::Deserializer<'de>,
             {
                 use ::core::fmt::{self, Formatter};
 
                 struct Visitor;
-                impl<'de> $crate::serde::de::Visitor<'de> for Visitor {
+                impl<'de> ::serde::de::Visitor<'de> for Visitor {
                     type Value = $name;
 
                     fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
@@ -604,7 +604,7 @@ macro_rules! user_enum {
 
                     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
                     where
-                        E: $crate::serde::de::Error,
+                        E: ::serde::de::Error,
                     {
                         static FIELDS: &'static [&'static str] = &[$(stringify!($txt)),*];
 
@@ -616,14 +616,14 @@ macro_rules! user_enum {
 
                     fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
                     where
-                        E: $crate::serde::de::Error,
+                        E: ::serde::de::Error,
                     {
                         self.visit_str(v)
                     }
 
-                    fn visit_string<E>(self, v: $crate::prelude::String) -> Result<Self::Value, E>
+                    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
                     where
-                        E: $crate::serde::de::Error,
+                        E: ::serde::de::Error,
                     {
                         self.visit_str(&v)
                     }
@@ -636,10 +636,10 @@ macro_rules! user_enum {
 
         #[cfg(feature = "serde")]
         #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-        impl $crate::serde::Serialize for $name {
+        impl ::serde::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
-                S: $crate::serde::Serializer,
+                S: ::serde::Serializer,
             {
                 serializer.collect_str(&self)
             }
