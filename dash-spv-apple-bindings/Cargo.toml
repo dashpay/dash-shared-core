@@ -1,6 +1,6 @@
 [package]
 name = "dash_spv_apple_bindings"
-version = "0.4.16"
+version = "0.4.17"
 description = "C-bindings for using and interoperating with Dash SPV"
 readme = "README.md"
 edition = "2021"
@@ -13,7 +13,7 @@ tracing = "0.1.40"
 
 [dependencies.dash-spv-masternode-processor]
 path = "../dash-spv-masternode-processor"
-features = ["default", "generate-dashj-tests"]
+features = ["default", "generate-dashj-tests", "use_serde"]
 
 [dependencies.dash-spv-coinjoin]
 path = "../dash-spv-coinjoin"
