@@ -12,7 +12,6 @@ use dash_sdk::dpp::dashcore::secp256k1::rand::SeedableRng;
 use dash_sdk::dpp::data_contract::accessors::v0::DataContractV0Getters;
 use dash_sdk::dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dash_sdk::dpp::prelude::{BlockHeight, CoreBlockHeight};
-use dash_sdk::dpp::util::entropy_generator::DefaultEntropyGenerator;
 use dash_sdk::platform::{DocumentQuery, Fetch, FetchMany};
 use dash_sdk::platform::transition::put_document::PutDocument;
 use dash_sdk::platform::types::identity::PublicKeyHash;
@@ -23,9 +22,9 @@ use dpp::data_contract::DataContract;
 use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0};
 use dpp::document::{Document, DocumentV0Getters};
-use drive::dpp::util::entropy_generator::EntropyGenerator;
+use dpp::util::entropy_generator::{DefaultEntropyGenerator, EntropyGenerator};
 use drive::query::{OrderClause, WhereClause, WhereOperator};
-use http::Uri;
+use dash_sdk::sdk::Uri;
 use platform_version::version::{LATEST_PLATFORM_VERSION, PlatformVersion};
 use platform_value::{BinaryData, Identifier, Value};
 use tokio::runtime::Runtime;
@@ -95,7 +94,9 @@ impl PlatformSDK {
     pub fn new<
         QP: Fn(*const std::os::raw::c_void, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
         DC: Fn(*const std::os::raw::c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
+        AH: Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
         CS: Fn(*const std::os::raw::c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
+        CCS: Fn(*const std::os::raw::c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
         AC1: Fn(*const std::os::raw::c_void, u32, Vec<u8>, u32) -> Vec<u8> + Send + Sync + 'static,
         AC2: Fn(u32, [u8; 32], u32) -> [u8; 96] + Send + Sync + 'static,
         AC3: Fn(u32, [u8; 32], u32) -> [u8; 96],
@@ -103,11 +104,13 @@ impl PlatformSDK {
     >(
         get_quorum_public_key: QP,
         get_data_contract: DC,
+        get_platform_activation_height: AH,
         callback_signer: CS,
+        callback_can_sign: CCS,
         ac1: AC1,
         ac2: AC2,
-        ac3: AC3,
-        ac4: AC4,
+        _ac3: AC3,
+        _ac4: AC4,
         address_list: Option<Vec<&'static str>>,
         context: *const std::os::raw::c_void,
     ) -> Self {
@@ -115,10 +118,10 @@ impl PlatformSDK {
         Self {
             foreign_identities: HashMap::new(),
             runtime: ferment::boxed(Runtime::new().unwrap()),
-            callback_signer: CallbackSigner::new(callback_signer, context_arc.clone()),
+            callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc.clone()),
             sdk: ferment::boxed(
                 create_sdk(
-                    PlatformProvider::new(get_quorum_public_key, get_data_contract, ac1, ac2, context_arc),
+                    PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, ac1, ac2, context_arc),
                     address_list.unwrap_or(Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST))
                         .iter()
                         .filter_map(|s| Uri::from_str(s).ok())))
