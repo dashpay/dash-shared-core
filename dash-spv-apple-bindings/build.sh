@@ -47,7 +47,8 @@ for target in "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-apple-ios" "a
     fi
 done
 
-
+cargo clean
+cargo update
 rm -rf target/{framework,include,lib}
 cargo lipo --release
 build_targets=(
