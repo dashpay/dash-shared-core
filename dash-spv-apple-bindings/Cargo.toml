@@ -39,8 +39,6 @@ ferment = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", p
 ferment-macro = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment-macro" }
 #ferment = { path = "../../ferment/ferment" }
 #ferment-macro = { path = "../../ferment/ferment-macro" }
-#ferment = { git = "https://github.com/pankcuf/ferment.git", package = "ferment" }
-#ferment-macro = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-macro" }
 grovedb-version = "2.1.0"
 indexmap = { version = "2.0.2", features = ["serde"] }
 jsonschema = "0.22.3"

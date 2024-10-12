@@ -768,9 +768,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.29"
+version = "1.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58e804ac3194a48bb129643eb1d62fcc20d18c6b8c181704489353d13120bcd1"
+checksum = "b16803a61b81d9eabb7eae2588776c4c1e584b738ede45fdbb4c972cec1e9945"
 dependencies = [
  "jobserver",
  "libc",
@@ -1069,7 +1069,7 @@ dependencies = [
 [[package]]
 name = "dapi-grpc"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "dapi-grpc-macros",
  "futures-core",
@@ -1086,7 +1086,7 @@ dependencies = [
 [[package]]
 name = "dapi-grpc-macros"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "heck 0.5.0",
  "quote",
@@ -1131,7 +1131,7 @@ dependencies = [
 [[package]]
 name = "dash-sdk"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -1345,7 +1345,7 @@ dependencies = [
 [[package]]
 name = "dashpay-contract"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1356,7 +1356,7 @@ dependencies = [
 [[package]]
 name = "data-contracts"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "dashpay-contract",
  "dpns-contract",
@@ -1495,7 +1495,7 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 [[package]]
 name = "dpns-contract"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1506,7 +1506,7 @@ dependencies = [
 [[package]]
 name = "dpp"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1556,7 +1556,7 @@ dependencies = [
 [[package]]
 name = "drive"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "arc-swap",
  "base64 0.22.1",
@@ -1595,7 +1595,7 @@ dependencies = [
 [[package]]
 name = "drive-proof-verifier"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "bincode",
  "dapi-grpc",
@@ -1830,7 +1830,7 @@ checksum = "e8c02a5121d4ea3eb16a80748c74f5549a5665e4c21333c6098f283870fbdea6"
 [[package]]
 name = "feature-flags-contract"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1841,7 +1841,7 @@ dependencies = [
 [[package]]
 name = "ferment"
 version = "0.1.4"
-source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#eec599e2970519b8915ebe943ead208ff6dc62d4"
+source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#97693220f5f3053d2f11bdf9e2d3c621583593e8"
 dependencies = [
  "indexmap 2.6.0",
 ]
@@ -1849,7 +1849,7 @@ dependencies = [
 [[package]]
 name = "ferment-macro"
 version = "0.1.4"
-source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#eec599e2970519b8915ebe943ead208ff6dc62d4"
+source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#97693220f5f3053d2f11bdf9e2d3c621583593e8"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1858,7 +1858,7 @@ dependencies = [
 [[package]]
 name = "ferment-sys"
 version = "0.1.4"
-source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#eec599e2970519b8915ebe943ead208ff6dc62d4"
+source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#97693220f5f3053d2f11bdf9e2d3c621583593e8"
 dependencies = [
  "ansi_term",
  "cargo_metadata",
@@ -2887,7 +2887,7 @@ dependencies = [
 [[package]]
 name = "json-schema-compatibility-validator"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "json-patch",
  "once_cell",
@@ -3098,7 +3098,7 @@ dependencies = [
 [[package]]
 name = "masternode-reward-shares-contract"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -3585,7 +3585,7 @@ checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 [[package]]
 name = "platform-serialization"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "bincode",
  "platform-version",
@@ -3594,7 +3594,7 @@ dependencies = [
 [[package]]
 name = "platform-serialization-derive"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3605,7 +3605,7 @@ dependencies = [
 [[package]]
 name = "platform-value"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -3628,7 +3628,7 @@ dependencies = [
 [[package]]
 name = "platform-version"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "bincode",
  "ferment-macro",
@@ -3641,7 +3641,7 @@ dependencies = [
 [[package]]
 name = "platform-versioning"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4122,7 +4122,7 @@ dependencies = [
 [[package]]
 name = "rs-dapi-client"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "backon",
  "chrono",
@@ -5751,7 +5751,7 @@ dependencies = [
 [[package]]
 name = "withdrawals-contract"
 version = "1.4.0"
-source = "git+https://github.com/pankcuf/platform?branch=test/ferment#1ecf72b14048ec2cd056d5e6bfa0702d270a2fef"
+source = "git+https://github.com/pankcuf/platform?branch=test/ferment#49100ff90dd1b76846dd4c2936f3fbf54cf49a83"
 dependencies = [
  "num_enum 0.5.11",
  "platform-value",
