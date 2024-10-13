@@ -11,28 +11,67 @@ include_guard = "dash_shared_core_h"
 
 [parse]
 parse_deps = true
-#expand = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
+#expand = ["dash-spv-masternode-processor", ]
 include = [
+    "ferment",
     "dash-spv-masternode-processor",
     "dash-spv-platform",
     "dash-sdk",
     "platform-value",
     "platform-version",
-    "dpp",
-    "drive-proof-verifier"
+#    "dpp",
+    "drive-proof-verifier",
+    "rs-dapi-client",
+    "rs-merk-verify-c-binding"
 ]
 extra_bindings = [
+    "ferment",
     "dash-spv-masternode-processor",
     "dash-spv-platform",
     "dash-sdk",
     "platform-value",
     "platform-version",
     "dpp",
-    "drive-proof-verifier"
+    "drive-proof-verifier",
+    "rs-dapi-client",
+    "rs-merk-verify-c-binding"
 ]
 
 [enum]
 prefix_with_name = true
+
+[defines]
+"test" = "false"
+#"feature = cbor" = "platform-value/cbor", "dpp/cbor", "dpp/ciborium"
+"feature = core-types" = "dpp/core-types"
+"feature = data-contract-cbor-conversion" = "dpp/data-contract-cbor-conversion"
+"feature = data-contract-json-conversion" = "dpp/data-contract-json-conversion"
+"feature = data-contract-value-conversion" = "dpp/data-contract-value-conversion"
+"feature = document-cbor-conversion" = "dpp/document-cbor-conversion"
+"feature = document-json-conversion" = "dpp/document-json-conversion"
+"feature = document-value-conversion" = "dpp/document-value-conversion"
+"feature = extended-document" = "dpp/extended-document"
+"feature = factories" = "dpp/factories"
+"feature = fee-distribution" = "dpp/fee-distribution"
+"feature = fixtures-and-mocks" = "dpp/fixtures-and-mocks"
+"feature = identity-cbor-conversion" = "dpp/identity-cbor-conversion"
+"feature = identity-json-conversion" = "dpp/identity-json-conversion"
+"feature = identity-value-conversion" = "dpp/identity-value-conversion"
+"feature = json" = "platform-value/serde_json"
+"feature = json-object" = "dpp/json-object"
+"feature = json-schema-validation" = "dpp/json-schema-validation"
+"feature = message-signing" = "dpp/message-signing"
+"feature = mocks" = "dash-sdk/mocks"
+"feature = mock-versions" = "platform-version/mock-versions"
+"feature = platform-value" = "dpp/platform-value"
+"feature = state-transitions" = "false"
+"feature = state-transition-json-conversion" = "dpp/state-transition-json-conversion"
+"feature = state-transition-validation" = "dpp/state-transition-validation"
+"feature = state-transition-signing" = "false"
+"feature = std" = "platform-value/std"
+"feature = system_contracts" = "dpp/system_contracts"
+"feature = validation" = "dpp/validation"
+
 #rename_variants = "None"
 ## must_use = "MUST_USE_ENUM"
 #add_sentinel = false

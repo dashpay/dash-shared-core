@@ -58,7 +58,7 @@ serde_json = "1.0.85"
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default", "test-helpers"] }
 
 [build-dependencies]
-cbindgen = "0.26.0"
+cbindgen = "0.27.0"
 ferment-sys = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment-sys" }
 #ferment-sys = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-sys" }
 

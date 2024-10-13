@@ -32,7 +32,8 @@ use crate::signer::CallbackSigner;
 use crate::provider::PlatformProvider;
 use crate::thread_safe_context::FFIThreadSafeContext;
 
-pub const DEFAULT_TESTNET_ADDRESS_LIST: [&str; 28] = [
+// #[no_mangle]
+const DEFAULT_TESTNET_ADDRESS_LIST: [&str; 28] = [
     "34.214.48.68",
     "35.166.18.166",
     // "35.165.50.126",

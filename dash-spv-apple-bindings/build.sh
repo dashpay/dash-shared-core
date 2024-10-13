@@ -32,7 +32,9 @@ compare_version() {
 REQUIRED_VERSION=1.80.1
 CURRENT_VERSION=$(rustc -V | awk '{sub(/-.*/,"");print $2}')
 FRAMEWORK=DashSharedCore
-HEADER=dash_spv_apple_bindings
+LIB_NAME=dash_spv_apple_bindings
+HEADER=dash_shared_core
+WRAPPER=objc_wrapper
 
 echo "rustc -V: current ${CURRENT_VERSION} vs. required ${REQUIRED_VERSION}"
 if compare_version "${REQUIRED_VERSION}" "${CURRENT_VERSION}"; then
@@ -40,6 +42,7 @@ if compare_version "${REQUIRED_VERSION}" "${CURRENT_VERSION}"; then
   exit 1
 fi
 
+#cargo clean && cargo update
 cargo install cargo-lipo
 for target in "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-apple-ios" "aarch64-apple-ios" "aarch64-apple-ios-sim"; do
     if ! rustup target list | grep -q "${target} (installed)"; then
@@ -47,8 +50,6 @@ for target in "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-apple-ios" "a
     fi
 done
 
-cargo clean
-cargo update
 rm -rf target/{framework,include,lib}
 cargo lipo --release
 build_targets=(
@@ -60,50 +61,33 @@ build_targets=(
 
 )
 for target in "${build_targets[@]}"; do
-    if [ ! -f "../../target/$target/release/lib${HEADER}.a" ]; then
+    if [ ! -f "../../target/$target/release/lib${LIB_NAME}.a" ]; then
         cargo build --target="$target" --release &
     fi
 done
 wait
 mkdir -p target/{framework,include,lib/{ios,ios-simulator,macos}}
 
-lipo -create ../target/x86_64-apple-darwin/release/lib${HEADER}.a \
-  ../target/aarch64-apple-darwin/release/lib${HEADER}.a \
-  -output target/lib/macos/lib${HEADER}_macos.a &
-cp -r -p target/include/${HEADER}.h target/framework/include
-cp -r -p ../target/aarch64-apple-ios/release/lib${HEADER}.a target/lib/ios/lib${HEADER}_ios.a &
-lipo -create ../target/x86_64-apple-ios/release/lib${HEADER}.a  \
-  ../target/aarch64-apple-ios-sim/release/lib${HEADER}.a \
-  -output target/lib/ios-simulator/lib${HEADER}_ios.a &
+lipo -create ../target/x86_64-apple-darwin/release/lib${LIB_NAME}.a \
+  ../target/aarch64-apple-darwin/release/lib${LIB_NAME}.a \
+  -output target/lib/macos/lib${LIB_NAME}_macos.a &
+#cp -r -p target/include/${HEADER}.h target/framework/include/${HEADER}.h &
+cp -r -p ../target/aarch64-apple-ios/release/lib${LIB_NAME}.a target/lib/ios/lib${LIB_NAME}_ios.a &
+lipo -create ../target/x86_64-apple-ios/release/lib${LIB_NAME}.a  \
+  ../target/aarch64-apple-ios-sim/release/lib${LIB_NAME}.a \
+  -output target/lib/ios-simulator/lib${LIB_NAME}_ios.a &
 wait
 wait
 
 if which clang-format >/dev/null; then
-  find "target/include" -name 'objc_wrapper.h' -print0 | xargs -0 clang-format -i -style=file
+  find target/include -name ${WRAPPER}.h -print0 | xargs -0 clang-format -i -style=file
 else
     echo "warning: clang-format not installed, install it by running $(brew install clang-format)"
 fi
 
 xcodebuild -create-xcframework \
-	-library target/lib/ios/lib${HEADER}_ios.a -headers target/include \
-	-library target/lib/ios-simulator/lib${HEADER}_ios.a -headers target/include \
+	-library target/lib/ios/lib${LIB_NAME}_ios.a -headers target/include \
+	-library target/lib/ios-simulator/lib${LIB_NAME}_ios.a -headers target/include \
 	-output target/framework/${FRAMEWORK}.xcframework
-
-
-#lipo -create ../target/x86_64-apple-darwin/release/libdash_spv_apple_bindings.a \
-#  ../target/aarch64-apple-darwin/release/libdash_spv_apple_bindings.a \
-#  -output DashSharedCore/lib/macos/libdash_shared_core_macos.a
-#
-#cp -r -p ../target/dash_shared_core.h DashSharedCore/include
-#cp -r -p ../target/aarch64-apple-ios/release/libdash_spv_apple_bindings.a DashSharedCore/lib/ios/libdash_shared_core_ios.a
-#
-#lipo -create ../target/x86_64-apple-ios/release/libdash_spv_apple_bindings.a \
-#  ../target/aarch64-apple-ios-sim/release/libdash_spv_apple_bindings.a \
-#  -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
-#
-#xcodebuild -create-xcframework \
-#	-library DashSharedCore/lib/ios/libdash_shared_core_ios.a -headers DashSharedCore/include \
-#	-library DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a -headers DashSharedCore/include \
-#	-output DashSharedCore/framework/DashSharedCore.xcframework
 
 echo "Done building Dash Shared Core"
