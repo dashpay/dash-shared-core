@@ -41,7 +41,7 @@ extra_bindings = [
 prefix_with_name = true
 
 [defines]
-"test" = "false"
+"test" = "TEST"
 "feature = cbor" = "CBOR_AND_CBORIUM"
 "feature = core-types" = "DS_CORE_TYPES"
 "feature = data-contract-cbor-conversion" = "DPP_DATA_CONTRACT_CBOR_CONVERSION"
