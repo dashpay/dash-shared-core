@@ -12,8 +12,24 @@ include_guard = "dash_shared_core_h"
 [parse]
 parse_deps = true
 #expand = ["dash-spv-masternode-processor", "rs-merk-verify-c-binding"]
-include = ["dash-spv-masternode-processor", "dash-spv-platform", "rs-merk-verify-c-binding"]
-extra_bindings = ["dash-spv-masternode-processor", "dash-spv-platform", "rs-merk-verify-c-binding"]
+include = [
+    "dash-spv-masternode-processor",
+    "dash-spv-platform",
+    "dash-sdk",
+    "platform-value",
+    "platform-version",
+    "dpp",
+    "drive-proof-verifier"
+]
+extra_bindings = [
+    "dash-spv-masternode-processor",
+    "dash-spv-platform",
+    "dash-sdk",
+    "platform-value",
+    "platform-version",
+    "dpp",
+    "drive-proof-verifier"
+]
 
 [enum]
 prefix_with_name = true
