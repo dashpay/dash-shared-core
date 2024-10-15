@@ -15,50 +15,50 @@ pub enum KeyKind {
 
 #[derive(Clone, Debug)]
 #[ferment_macro::opaque]
-pub enum Key {
+pub enum OpaqueKey {
     ECDSA(ECDSAKey),
     BLS(BLSKey),
     ED25519(ED25519Key),
 }
 
-impl From<ECDSAKey> for Key {
+impl From<ECDSAKey> for OpaqueKey {
     fn from(value: ECDSAKey) -> Self {
-        Key::ECDSA(value)
+        OpaqueKey::ECDSA(value)
     }
 }
 
-impl From<BLSKey> for Key {
+impl From<BLSKey> for OpaqueKey {
     fn from(value: BLSKey) -> Self {
-        Key::BLS(value)
+        OpaqueKey::BLS(value)
     }
 }
 
-impl From<ED25519Key> for Key {
+impl From<ED25519Key> for OpaqueKey {
     fn from(value: ED25519Key) -> Self {
-        Key::ED25519(value)
+        OpaqueKey::ED25519(value)
     }
 }
 
-impl From<Key> for ECDSAKey {
-    fn from(value: Key) -> Self {
+impl From<OpaqueKey> for ECDSAKey {
+    fn from(value: OpaqueKey) -> Self {
         match value {
-            Key::ECDSA(key) => key,
+            OpaqueKey::ECDSA(key) => key,
             _ => panic!("trying to unwrap bls from different key type")
         }
     }
 }
-impl From<Key> for BLSKey {
-    fn from(value: Key) -> Self {
+impl From<OpaqueKey> for BLSKey {
+    fn from(value: OpaqueKey) -> Self {
         match value {
-            Key::BLS(key) => key,
+            OpaqueKey::BLS(key) => key,
             _ => panic!("trying to unwrap ecdsa from different key type")
         }
     }
 }
-impl From<Key> for ED25519Key {
-    fn from(value: Key) -> Self {
+impl From<OpaqueKey> for ED25519Key {
+    fn from(value: OpaqueKey) -> Self {
         match value {
-            Key::ED25519(key) => key,
+            OpaqueKey::ED25519(key) => key,
             _ => panic!("trying to unwrap ed25519 from different key type")
         }
     }
@@ -129,51 +129,51 @@ impl KeyKind {
             KeyKind::BLS | KeyKind::BLSBasic  => "_BLS_",
         }.to_string()
     }
-    pub fn private_key_from_extended_private_key_data(&self, data: &Vec<u8>) -> Result<Key, KeyError> {
+    pub fn private_key_from_extended_private_key_data(&self, data: &Vec<u8>) -> Result<OpaqueKey, KeyError> {
         match self {
-            KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(Key::ECDSA),
-            KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(Key::ED25519),
-            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from),
+            KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(OpaqueKey::ED25519),
+            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from),
         }
     }
 
-    pub fn key_with_private_key_data(&self, data: &[u8]) -> Result<Key, KeyError> {
+    pub fn key_with_private_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
         match self {
-            KeyKind::ECDSA => ECDSAKey::key_with_secret_data(data, true).map(Key::ECDSA),
-            KeyKind::ED25519 => ED25519Key::key_with_secret_data(data).map(Key::ED25519),
-            _ => BLSKey::key_with_private_key_data(data, *self == KeyKind::BLS).map(Key::BLS),
+            KeyKind::ECDSA => ECDSAKey::key_with_secret_data(data, true).map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::key_with_secret_data(data).map(OpaqueKey::ED25519),
+            _ => BLSKey::key_with_private_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS),
         }
     }
 
-    pub fn key_with_seed_data(&self, seed: &[u8]) -> Result<Key, KeyError> {
+    pub fn key_with_seed_data(&self, seed: &[u8]) -> Result<OpaqueKey, KeyError> {
         match self {
-            KeyKind::ECDSA => ECDSAKey::init_with_seed_data(seed).map(Key::ECDSA),
-            KeyKind::ED25519 => ED25519Key::init_with_seed_data(seed).map(Key::ED25519),
-            _ => BLSKey::extended_private_key_with_seed_data(seed, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from)
+            KeyKind::ECDSA => ECDSAKey::init_with_seed_data(seed).map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::init_with_seed_data(seed).map(OpaqueKey::ED25519),
+            _ => BLSKey::extended_private_key_with_seed_data(seed, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
         }
     }
 
-    pub fn key_with_public_key_data(&self, data: &[u8]) -> Result<Key, KeyError> {
+    pub fn key_with_public_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
         match self {
-            KeyKind::ECDSA => ECDSAKey::key_with_public_key_data(data).map(Key::ECDSA),
-            KeyKind::ED25519 => ED25519Key::key_with_public_key_data(data).map(Key::ED25519),
-            _ => Ok(Key::BLS(BLSKey::key_with_public_key(UInt384::from(data), *self == KeyKind::BLS))),
+            KeyKind::ECDSA => ECDSAKey::key_with_public_key_data(data).map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::key_with_public_key_data(data).map(OpaqueKey::ED25519),
+            _ => Ok(OpaqueKey::BLS(BLSKey::key_with_public_key(UInt384::from(data), *self == KeyKind::BLS))),
         }
     }
 
-    pub fn key_with_extended_public_key_data(&self, data: &Vec<u8>) -> Result<Key, KeyError> {
+    pub fn key_with_extended_public_key_data(&self, data: &Vec<u8>) -> Result<OpaqueKey, KeyError> {
         match self {
-            KeyKind::ECDSA => ECDSAKey::init_with_extended_public_key_data(data).map(Key::ECDSA),
-            KeyKind::ED25519 => ED25519Key::init_with_extended_public_key_data(data).map(Key::ED25519),
-            _ => BLSKey::init_with_extended_public_key_data(data, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from)
+            KeyKind::ECDSA => ECDSAKey::init_with_extended_public_key_data(data).map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::init_with_extended_public_key_data(data).map(OpaqueKey::ED25519),
+            _ => BLSKey::init_with_extended_public_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
         }
     }
 
-    pub fn key_with_extended_private_key_data(&self, data: &Vec<u8>) -> Result<Key, KeyError> {
+    pub fn key_with_extended_private_key_data(&self, data: &Vec<u8>) -> Result<OpaqueKey, KeyError> {
         match self {
-            KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(Key::ECDSA),
-            KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(Key::ED25519),
-            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(Key::BLS).map_err(KeyError::from)
+            KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(OpaqueKey::ED25519),
+            _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
         }
     }
 
@@ -205,146 +205,146 @@ impl KeyKind {
     }*/
 }
 
-impl IKey for Key {
+impl IKey for OpaqueKey {
     // type SK = T;
 
     fn r#type(&self) -> KeyKind {
         match self {
-            Key::ECDSA(..) => KeyKind::ECDSA,
-            Key::ED25519(..) => KeyKind::ED25519,
-            Key::BLS(key) => if key.use_legacy { KeyKind::BLS } else { KeyKind::BLSBasic }
+            OpaqueKey::ECDSA(..) => KeyKind::ECDSA,
+            OpaqueKey::ED25519(..) => KeyKind::ED25519,
+            OpaqueKey::BLS(key) => if key.use_legacy { KeyKind::BLS } else { KeyKind::BLSBasic }
         }
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         match self {
-            Key::ECDSA(key) => key.compact_sign(UInt256::from(data)).to_vec(),
-            Key::BLS(key) => key.sign(data),
-            Key::ED25519(key) => key.sign(data)
+            OpaqueKey::ECDSA(key) => key.compact_sign(UInt256::from(data)).to_vec(),
+            OpaqueKey::BLS(key) => key.sign(data),
+            OpaqueKey::ED25519(key) => key.sign(data)
         }
     }
 
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         match self {
-            Key::ECDSA(key) => key.verify(message_digest, signature),
-            Key::BLS(key) => key.verify_uint768(UInt256::from(message_digest), UInt768::from(signature)),
-            Key::ED25519(key) => key.verify(message_digest, signature),
+            OpaqueKey::ECDSA(key) => key.verify(message_digest, signature),
+            OpaqueKey::BLS(key) => key.verify_uint768(UInt256::from(message_digest), UInt768::from(signature)),
+            OpaqueKey::ED25519(key) => key.verify(message_digest, signature),
         }
     }
 
     fn secret_key(&self) -> UInt256 {
         match self {
-            Key::ECDSA(key) => key.seckey,
-            Key::BLS(key) => key.secret_key(),
-            Key::ED25519(key) => key.secret_key(),
+            OpaqueKey::ECDSA(key) => key.seckey,
+            OpaqueKey::BLS(key) => key.secret_key(),
+            OpaqueKey::ED25519(key) => key.secret_key(),
         }
     }
 
     fn chaincode(&self) -> UInt256 {
         match self {
-            Key::ECDSA(key) => key.chaincode(),
-            Key::BLS(key) => key.chaincode(),
-            Key::ED25519(key) => key.chaincode(),
+            OpaqueKey::ECDSA(key) => key.chaincode(),
+            OpaqueKey::BLS(key) => key.chaincode(),
+            OpaqueKey::ED25519(key) => key.chaincode(),
         }
     }
 
     fn fingerprint(&self) -> u32 {
         match self {
-            Key::ECDSA(key) => key.fingerprint(),
-            Key::BLS(key) => key.fingerprint(),
-            Key::ED25519(key) => key.fingerprint(),
+            OpaqueKey::ECDSA(key) => key.fingerprint(),
+            OpaqueKey::BLS(key) => key.fingerprint(),
+            OpaqueKey::ED25519(key) => key.fingerprint(),
         }
     }
 
     fn private_key_data(&self) -> Result<Vec<u8>, KeyError> {
         match self {
-            Key::ECDSA(key) => key.private_key_data(),
-            Key::BLS(key) => key.private_key_data(),
-            Key::ED25519(key) => key.private_key_data(),
+            OpaqueKey::ECDSA(key) => key.private_key_data(),
+            OpaqueKey::BLS(key) => key.private_key_data(),
+            OpaqueKey::ED25519(key) => key.private_key_data(),
         }
     }
 
     fn public_key_data(&self) -> Vec<u8> {
         match self {
-            Key::ECDSA(key) => key.public_key_data(),
-            Key::BLS(key) => key.public_key_data(),
-            Key::ED25519(key) => key.public_key_data(),
+            OpaqueKey::ECDSA(key) => key.public_key_data(),
+            OpaqueKey::BLS(key) => key.public_key_data(),
+            OpaqueKey::ED25519(key) => key.public_key_data(),
         }
     }
 
     fn extended_private_key_data(&self) -> Result<SecVec, KeyError> {
         match self {
-            Key::ECDSA(key) => key.extended_private_key_data(),
-            Key::BLS(key) => key.extended_private_key_data(),
-            Key::ED25519(key) => key.extended_private_key_data(),
+            OpaqueKey::ECDSA(key) => key.extended_private_key_data(),
+            OpaqueKey::BLS(key) => key.extended_private_key_data(),
+            OpaqueKey::ED25519(key) => key.extended_private_key_data(),
         }
     }
 
     fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
         match self {
-            Key::ECDSA(key) => key.extended_public_key_data(),
-            Key::BLS(key) => key.extended_public_key_data(),
-            Key::ED25519(key) => key.extended_public_key_data(),
+            OpaqueKey::ECDSA(key) => key.extended_public_key_data(),
+            OpaqueKey::BLS(key) => key.extended_public_key_data(),
+            OpaqueKey::ED25519(key) => key.extended_public_key_data(),
         }
     }
 
     fn private_derive_to_path<PATH>(&self, index_path: &PATH) -> Result<Self, KeyError>
         where PATH: IIndexPath<Item = u32> {
         match self {
-            Key::ECDSA(key) => key.private_derive_to_path(index_path).map(Into::into),
-            Key::BLS(key) => key.private_derive_to_path(index_path).map(Into::into),
-            Key::ED25519(key) => key.private_derive_to_path(index_path).map(Into::into),
+            OpaqueKey::ECDSA(key) => key.private_derive_to_path(index_path).map(Into::into),
+            OpaqueKey::BLS(key) => key.private_derive_to_path(index_path).map(Into::into),
+            OpaqueKey::ED25519(key) => key.private_derive_to_path(index_path).map(Into::into),
         }
     }
 
     fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item=UInt256> {
         match self {
-            Key::ECDSA(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
-            Key::BLS(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
-            Key::ED25519(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
+            OpaqueKey::ECDSA(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
+            OpaqueKey::BLS(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
+            OpaqueKey::ED25519(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
         }
     }
 
     fn public_derive_to_256bit_derivation_path<PATH>(&mut self, derivation_path: &PATH) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         match self {
-            Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
-            Key::BLS(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
-            Key::ED25519(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
+            OpaqueKey::ECDSA(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
+            OpaqueKey::BLS(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
+            OpaqueKey::ED25519(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
         }
     }
 
     fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, derivation_path: &PATH, offset: usize) -> Result<Self, KeyError>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         match self {
-            Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
-            Key::BLS(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
-            Key::ED25519(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
+            OpaqueKey::ECDSA(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
+            OpaqueKey::BLS(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
+            OpaqueKey::ED25519(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
         }
     }
 
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         match self {
-            Key::ECDSA(key) => key.serialized_private_key_for_script(script),
-            Key::BLS(key) => key.serialized_private_key_for_script(script),
-            Key::ED25519(key) => key.serialized_private_key_for_script(script),
+            OpaqueKey::ECDSA(key) => key.serialized_private_key_for_script(script),
+            OpaqueKey::BLS(key) => key.serialized_private_key_for_script(script),
+            OpaqueKey::ED25519(key) => key.serialized_private_key_for_script(script),
         }
     }
 
     fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
         match self {
-            Key::ECDSA(key) => key.hmac_256_data(data),
-            Key::BLS(key) => key.hmac_256_data(data),
-            Key::ED25519(key) => key.hmac_256_data(data),
+            OpaqueKey::ECDSA(key) => key.hmac_256_data(data),
+            OpaqueKey::BLS(key) => key.hmac_256_data(data),
+            OpaqueKey::ED25519(key) => key.hmac_256_data(data),
         }
     }
 
     fn forget_private_key(&mut self) {
         match self {
-            Key::ECDSA(key) => key.forget_private_key(),
-            Key::BLS(key) => key.forget_private_key(),
-            Key::ED25519(key) => key.forget_private_key(),
+            OpaqueKey::ECDSA(key) => key.forget_private_key(),
+            OpaqueKey::BLS(key) => key.forget_private_key(),
+            OpaqueKey::ED25519(key) => key.forget_private_key(),
         }
 
     }

@@ -5,7 +5,7 @@ pub mod ed25519_key;
 pub mod ecdsa_key;
 pub mod key;
 
-pub use self::key::Key;
+pub use self::key::OpaqueKey;
 pub use self::key::KeyKind;
 pub use self::bls_key::BLSKey;
 pub use self::ecdsa_key::ECDSAKey;
