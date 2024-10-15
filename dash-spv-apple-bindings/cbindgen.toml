@@ -19,6 +19,7 @@ include = [
     "dash-sdk",
     "platform-value",
     "platform-version",
+    # TODO: cbindgen fails with this crate for some reason so it doesn't expose opaque types
 #    "dpp",
     "drive-proof-verifier",
     "rs-dapi-client",

@@ -1173,8 +1173,8 @@ dependencies = [
  "drive",
  "drive-proof-verifier",
  "envy",
- "ferment 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
- "ferment-macro 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
+ "ferment",
+ "ferment-macro",
  "futures",
  "hex",
  "http 1.1.0",
@@ -1210,9 +1210,9 @@ dependencies = [
  "core2",
  "dirs-next",
  "ed25519-dalek",
- "ferment 0.1.4",
- "ferment-macro 0.1.4",
- "ferment-sys 0.1.4",
+ "ferment",
+ "ferment-macro",
+ "ferment-sys",
  "libc",
  "log",
  "reqwest 0.11.27",
@@ -1232,9 +1232,9 @@ dependencies = [
  "dash-sdk",
  "drive",
  "drive-proof-verifier",
- "ferment 0.1.4",
- "ferment-macro 0.1.4",
- "ferment-sys 0.1.4",
+ "ferment",
+ "ferment-macro",
+ "ferment-sys",
  "http 0.2.12",
  "platform-value",
  "platform-version",
@@ -1259,9 +1259,9 @@ dependencies = [
  "drive",
  "drive-proof-verifier",
  "fancy-regex",
- "ferment 0.1.4",
- "ferment-macro 0.1.4",
- "ferment-sys 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
+ "ferment",
+ "ferment-macro",
+ "ferment-sys",
  "grovedb-version",
  "indexmap 2.6.0",
  "jsonschema 0.22.3",
@@ -1549,8 +1549,8 @@ dependencies = [
  "derive_more 1.0.0",
  "ed25519-dalek",
  "env_logger 0.11.5",
- "ferment 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
- "ferment-macro 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
+ "ferment",
+ "ferment-macro",
  "getrandom",
  "hex",
  "indexmap 2.6.0",
@@ -1629,8 +1629,8 @@ dependencies = [
  "derive_more 1.0.0",
  "dpp",
  "drive",
- "ferment 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
- "ferment-macro 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
+ "ferment",
+ "ferment-macro",
  "hex",
  "platform-serialization",
  "platform-serialization-derive",
@@ -1868,24 +1868,9 @@ dependencies = [
 [[package]]
 name = "ferment"
 version = "0.1.4"
-dependencies = [
- "indexmap 2.6.0",
-]
-
-[[package]]
-name = "ferment"
-version = "0.1.4"
 source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#376bb32cbab3aa48365864a2682dafb773f0dc31"
 dependencies = [
  "indexmap 2.6.0",
-]
-
-[[package]]
-name = "ferment-macro"
-version = "0.1.4"
-dependencies = [
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -1900,28 +1885,13 @@ dependencies = [
 [[package]]
 name = "ferment-sys"
 version = "0.1.4"
-dependencies = [
- "ansi_term",
- "cargo_metadata",
- "cbindgen 0.27.0",
- "env_logger 0.11.5",
- "ferment-macro 0.1.4",
- "log",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "ferment-sys"
-version = "0.1.4"
 source = "git+https://github.com/pankcuf/ferment?branch=feat/reorg#376bb32cbab3aa48365864a2682dafb773f0dc31"
 dependencies = [
  "ansi_term",
  "cargo_metadata",
  "cbindgen 0.27.0",
  "env_logger 0.11.5",
- "ferment-macro 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
+ "ferment-macro",
  "log",
  "proc-macro2",
  "quote",
@@ -3650,7 +3620,7 @@ dependencies = [
  "bincode",
  "bs58 0.5.1",
  "ciborium",
- "ferment-macro 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
+ "ferment-macro",
  "hex",
  "indexmap 2.6.0",
  "lazy_static",
@@ -3670,7 +3640,7 @@ version = "1.4.0"
 source = "git+https://github.com/pankcuf/platform?branch=test/ferment#73e538866884551bfe6569370758072f064a45ba"
 dependencies = [
  "bincode",
- "ferment-macro 0.1.4 (git+https://github.com/pankcuf/ferment?branch=feat/reorg)",
+ "ferment-macro",
  "grovedb-version",
  "once_cell",
  "thiserror",

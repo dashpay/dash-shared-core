@@ -28,12 +28,10 @@ compare_version() {
     fi
     return 1
 }
-#REQUIRED_VERSION=1.66.0
 REQUIRED_VERSION=1.80.1
 CURRENT_VERSION=$(rustc -V | awk '{sub(/-.*/,"");print $2}')
 FRAMEWORK=DashSharedCore
 LIB_NAME=dash_spv_apple_bindings
-HEADER=dash_shared_core
 WRAPPER=objc_wrapper
 
 echo "rustc -V: current ${CURRENT_VERSION} vs. required ${REQUIRED_VERSION}"
@@ -62,7 +60,7 @@ build_targets=(
 )
 for target in "${build_targets[@]}"; do
     if [ ! -f "../../target/$target/release/lib${LIB_NAME}.a" ]; then
-        cargo build --target="$target" --release &
+        cargo build --target="$target" --features=objc --release &
     fi
 done
 wait
@@ -71,7 +69,6 @@ mkdir -p target/{framework,include,lib/{ios,ios-simulator,macos}}
 lipo -create ../target/x86_64-apple-darwin/release/lib${LIB_NAME}.a \
   ../target/aarch64-apple-darwin/release/lib${LIB_NAME}.a \
   -output target/lib/macos/lib${LIB_NAME}_macos.a &
-#cp -r -p target/include/${HEADER}.h target/framework/include/${HEADER}.h &
 cp -r -p ../target/aarch64-apple-ios/release/lib${LIB_NAME}.a target/lib/ios/lib${LIB_NAME}_ios.a &
 lipo -create ../target/x86_64-apple-ios/release/lib${LIB_NAME}.a  \
   ../target/aarch64-apple-ios-sim/release/lib${LIB_NAME}.a \

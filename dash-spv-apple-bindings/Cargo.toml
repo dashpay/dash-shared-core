@@ -35,10 +35,10 @@ rs-dapi-client = { git = "https://github.com/pankcuf/platform", branch = "test/f
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
 #rs-dapi-client = { path = "../../platform/packages/rs-dapi-client" }
 fancy-regex = "0.13.0"
-#ferment = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment" }
-#ferment-macro = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment-macro" }
-ferment = { path = "../../ferment/ferment" }
-ferment-macro = { path = "../../ferment/ferment-macro" }
+ferment = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment" }
+ferment-macro = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment-macro" }
+#ferment = { path = "../../ferment/ferment" }
+#ferment-macro = { path = "../../ferment/ferment-macro" }
 grovedb-version = "2.1.0"
 indexmap = { version = "2.0.2", features = ["serde"] }
 jsonschema = "0.22.3"
@@ -60,7 +60,7 @@ dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", fea
 [build-dependencies]
 cbindgen = "0.27.0"
 ferment-sys = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["objc"] }
-#ferment-sys = { path = "../../ferment/ferment-sys" }
+#ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }
 
 [features]
 cbor = ["platform-value/cbor", "dpp/cbor", "dpp/ciborium"]

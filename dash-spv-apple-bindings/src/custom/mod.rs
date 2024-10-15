@@ -1,4 +1,5 @@
 pub mod anyhow;
+pub mod byte;
 pub mod dashcore;
 pub mod dpp;
 pub mod grovedb_version;
