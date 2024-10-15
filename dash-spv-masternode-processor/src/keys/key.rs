@@ -4,8 +4,8 @@ use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyError};
 use crate::util::sec_vec::SecVec;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+#[ferment_macro::export]
 pub enum KeyKind {
     ECDSA = 0,
     BLS = 1,
@@ -14,6 +14,7 @@ pub enum KeyKind {
 }
 
 #[derive(Clone, Debug)]
+#[ferment_macro::opaque]
 pub enum Key {
     ECDSA(ECDSAKey),
     BLS(BLSKey),
@@ -89,11 +90,37 @@ impl From<KeyKind> for i16 {
 
 impl From<&KeyKind> for u8 {
     fn from(value: &KeyKind) -> Self {
-        *value as u8
+
+        value.clone() as u8
     }
 }
 
+
+
 impl KeyKind {
+    pub fn public_key_from_extended_public_key_data(&self, data: &[u8], index_path: &IndexPath<u32>) -> Result<Vec<u8>, KeyError> {
+        match self {
+            KeyKind::ECDSA => ECDSAKey::public_key_from_extended_public_key_data(data, index_path),
+            KeyKind::ED25519 => ED25519Key::public_key_from_extended_public_key_data(data, index_path),
+            _ => BLSKey::public_key_from_extended_public_key_data(data, index_path, *self == KeyKind::BLS),
+        }
+    }
+}
+
+/// TMP solution since ferment fails with expanding such a generic type
+#[ferment_macro::export]
+#[derive(Clone, Debug)]
+pub struct IndexPathU32 {
+    pub indexes: Vec<u32>,
+    pub hardened: Vec<bool>,
+}
+
+#[ferment_macro::export]
+impl KeyKind {
+    pub fn public_key_from_extended_public_key_data_at_index_path(&self, data: &[u8], index_path: &IndexPathU32) -> Result<Vec<u8>, KeyError> {
+        let index_path = IndexPath::new(index_path.indexes.clone());
+        self.public_key_from_extended_public_key_data(data, &index_path)
+    }
 
     pub fn derivation_string(&self) -> String {
         match self {
@@ -102,15 +129,6 @@ impl KeyKind {
             KeyKind::BLS | KeyKind::BLSBasic  => "_BLS_",
         }.to_string()
     }
-
-    pub fn public_key_from_extended_public_key_data(&self, data: &[u8], index_path: &IndexPath<u32>) -> Result<Vec<u8>, KeyError> {
-        match self {
-            KeyKind::ECDSA => ECDSAKey::public_key_from_extended_public_key_data(data, index_path),
-            KeyKind::ED25519 => ED25519Key::public_key_from_extended_public_key_data(data, index_path),
-            _ => BLSKey::public_key_from_extended_public_key_data(data, index_path, *self == KeyKind::BLS),
-        }
-    }
-
     pub fn private_key_from_extended_private_key_data(&self, data: &Vec<u8>) -> Result<Key, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(Key::ECDSA),

@@ -143,7 +143,7 @@ pub trait IIndexPath: Sized {
     }
     fn index_path_string(&self) -> String {
         if self.is_empty() {
-            format!("")
+            "".to_string()
         } else {
             self.indexes().into_iter().map(|index| index.to_string()).collect::<Vec<_>>().join(".")
         }
@@ -197,6 +197,8 @@ pub trait IIndexPath: Sized {
         writer
     }
 }
+
+
 
 #[derive(Debug, Default)]
 pub struct IndexPath<T> {

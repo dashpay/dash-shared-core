@@ -16,6 +16,7 @@ mod ffi_core_provider;
 // mod ffi;
 // mod types;
 pub mod custom;
+mod bindings;
 
 pub extern crate dash_spv_masternode_processor;
 pub extern crate dash_spv_platform;

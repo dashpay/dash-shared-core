@@ -1,7 +1,9 @@
 extern crate cbindgen;
 extern crate ferment_sys;
 
-use ferment_sys::{Ferment, Lang, ObjC, XCodeConfig};
+use ferment_sys::Ferment;
+#[cfg(feature = "objc")]
+use ferment_sys::{Lang, ObjC, XCodeConfig};
 
 fn main() {
     match Ferment::with_crate_name("dash_spv_apple_bindings")
@@ -18,11 +20,8 @@ fn main() {
             "rs-dapi-client"
         ])
         .with_languages(vec![
-            Lang::ObjC(ObjC::new(XCodeConfig {
-                class_prefix: "DS".to_string(),
-                framework_name: "DashSharedCore".to_string(),
-                header_name: "dash_shared_core".to_string()
-            })),
+            #[cfg(feature = "objc")]
+            Lang::ObjC(ObjC::new(XCodeConfig::new("DS", "DashSharedCore", "dash_shared_core"))),
         ])
         .generate() {
         Ok(_) => println!("[ferment] [ok]"),

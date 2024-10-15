@@ -119,7 +119,8 @@ pub trait IKey: Send + Sync + Debug {
 
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+#[ferment_macro::opaque]
 pub enum KeyError {
     WrongFormat,
     WrongLength(usize),
@@ -129,9 +130,9 @@ pub enum KeyError {
     Bytes(byte::Error),
     Secp256k1(secp256k1::Error),
     Base58(base58::Error),
-    Bls(bls_signatures::BlsError),
+    Bls(String),
     Hex(hashes::hex::Error),
-    EDSignature(ed25519_dalek::SignatureError),
+    EDSignature(String),
     UnableToDerive,
     DHKeyExchange,
     CCCrypt(i32),
@@ -182,7 +183,7 @@ impl From<secp256k1::Error> for KeyError {
 }
 impl From<bls_signatures::BlsError> for KeyError {
     fn from(value: bls_signatures::BlsError) -> Self {
-        Self::Bls(value)
+        Self::Bls(value.to_string())
     }
 }
 impl From<hashes::hex::Error> for KeyError {
@@ -192,6 +193,6 @@ impl From<hashes::hex::Error> for KeyError {
 }
 impl From<ed25519_dalek::SignatureError> for KeyError {
     fn from(value: ed25519_dalek::SignatureError) -> Self {
-        Self::EDSignature(value)
+        Self::EDSignature(value.to_string())
     }
 }
