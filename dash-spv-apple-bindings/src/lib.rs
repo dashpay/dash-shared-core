@@ -21,6 +21,7 @@ mod bindings;
 pub extern crate dash_spv_masternode_processor;
 pub extern crate dash_spv_platform;
 pub extern crate merk;
+pub extern crate bitcoin_hashes as hashes;
 
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use dash_spv_platform::PlatformSDK;

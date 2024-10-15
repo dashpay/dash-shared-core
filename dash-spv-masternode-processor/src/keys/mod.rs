@@ -18,7 +18,6 @@ use crate::chain::derivation::index_path::IIndexPath;
 use crate::chain::tx::protocol::SIGHASH_ALL;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::UInt256;
-use crate::keys::dip14::{IChildKeyDerivation, SignKey};
 use crate::util::address::address;
 use crate::util::base58;
 use crate::util::data_append::DataAppend;
@@ -60,10 +59,6 @@ pub trait IKey: Send + Sync + Debug {
         panic!("Should be overriden in implementation")
     }
     fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
-        panic!("Should be overriden in implementation")
-    }
-    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized + IChildKeyDerivation<INDEX, SK, PK>, PATH: IIndexPath<Item = INDEX>, SK: SignKey {
         panic!("Should be overriden in implementation")
     }
 

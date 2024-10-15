@@ -4,7 +4,7 @@ use hashes::{Hash, hex::FromHex, sha256, sha256d};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, BytesDecodable, Zeroable, UInt160, UInt256, UInt384, UInt768};
-use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}, KeyError};
+use crate::keys::{IKey, KeyKind, KeyError};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::KeyError::DHKeyExchange;
 use crate::models::OperatorPublicKey;
@@ -21,19 +21,20 @@ pub struct BLSKey {
     pub use_legacy: bool,
 }
 
+#[ferment_macro::export]
 impl BLSKey {
 
-    pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Result<Self, hashes::hex::Error> {
+    pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Result<BLSKey, hashes::hex::Error> {
         Vec::from_hex(string)
             .map(|data| Self::key_with_seed_data(&data, use_legacy))
     }
-    pub fn key_with_private_key(string: &str, use_legacy: bool) -> Result<Self, KeyError> {
+    pub fn key_with_private_key(string: &str, use_legacy: bool) -> Result<BLSKey, KeyError> {
         Vec::from_hex(string)
             .map_err(KeyError::from)
             .and_then(|data| Self::key_with_private_key_data(&data, use_legacy))
     }
 
-    pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
+    pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Result<BLSKey, KeyError> {
         UInt256::from_bytes(data, &mut 0)
             .map_err(KeyError::from)
             .and_then(|seckey| PrivateKey::from_bytes(data, use_legacy)
@@ -62,8 +63,15 @@ impl BLSKey {
             _ => Err(KeyError::Product)
         }
     }
+    pub fn key_with_extended_public_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
+        extended_public_key_from_bytes(bytes, use_legacy)
+            .map_err(KeyError::from)
+            .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
+    }
+
 }
 
+// #[ferment_macro::export]
 impl IKey for BLSKey {
     fn r#type(&self) -> KeyKind {
         KeyKind::BLS // &KeyType::BLSBasic
@@ -87,7 +95,7 @@ impl IKey for BLSKey {
         self.public_key_fingerprint()
     }
 
-    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> where Self: Sized {
+    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> {
         match self.seckey.is_zero() {
             true => Err(KeyError::EmptySecKey),
             false => Ok(self.seckey.0.to_vec()),
@@ -104,12 +112,6 @@ impl IKey for BLSKey {
 
     fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
         Ok(self.extended_public_key_data.clone())
-    }
-
-    fn private_derive_to_path2<SK, PK, PATH, INDEX>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized + IChildKeyDerivation<INDEX, SK, PK>,
-              PATH: IIndexPath<Item=INDEX>, SK: SignKey {
-        todo!()
     }
 
     fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
@@ -439,12 +441,6 @@ impl BLSKey {
         key.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path, key.use_legacy))
             .map(|pub_key_data| Self::key_with_public_key(UInt384::from(pub_key_data), key.use_legacy))
-    }
-
-    pub fn key_with_extended_public_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
-        extended_public_key_from_bytes(bytes, use_legacy)
-            .map_err(KeyError::from)
-            .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
     }
 
     pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, BlsError> {

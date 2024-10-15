@@ -25,6 +25,29 @@ pub struct ED25519Key {
     pub is_extended: bool,
 }
 
+#[ferment_macro::export]
+impl ED25519Key {
+    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        match bytes.len() {
+            // if len == 68 || len == 69 {
+            68 => {
+                let offset = &mut 0;
+                let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
+                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+                // if len == 69 {
+                //     // skip 1st byte as pub key was padded with 0x00
+                //     *offset += 1;
+                // }
+                let data: &[u8] = bytes.read_with(offset, Bytes::Len(32)).unwrap();
+                Self::public_key_from_bytes(data)
+                    .map_err(KeyError::from)
+                    .map(|pubkey| Self::init_with_extended_public_parts(pubkey.as_bytes().to_vec(), chaincode, fingerprint))
+            },
+            len => Err(KeyError::WrongLength(len))
+        }
+    }
+}
+
 impl IKey for ED25519Key
     where Self: IChildKeyDerivationData<u32, SigningKey, UInt256> + IChildKeyDerivationData<UInt256, SigningKey, UInt256> {
 
@@ -274,25 +297,7 @@ impl ED25519Key {
     }
 
 
-    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
-        match bytes.len() {
-            // if len == 68 || len == 69 {
-            68 => {
-                let offset = &mut 0;
-                let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
-                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
-                // if len == 69 {
-                //     // skip 1st byte as pub key was padded with 0x00
-                //     *offset += 1;
-                // }
-                let data: &[u8] = bytes.read_with(offset, Bytes::Len(32)).unwrap();
-                Self::public_key_from_bytes(data)
-                    .map_err(KeyError::from)
-                    .map(|pubkey| Self::init_with_extended_public_parts(pubkey.as_bytes().to_vec(), chaincode, fingerprint))
-            },
-            len => Err(KeyError::WrongLength(len))
-        }
-    }
+
 
     pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
         match bytes.len() {

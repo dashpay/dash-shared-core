@@ -1247,6 +1247,7 @@ name = "dash_spv_apple_bindings"
 version = "0.4.18"
 dependencies = [
  "anyhow",
+ "bitcoin_hashes 0.11.0",
  "blake3 1.5.4",
  "byte",
  "cbindgen 0.27.0",
