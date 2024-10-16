@@ -275,17 +275,6 @@ impl ECDSAKey {
         }
     }
 
-    pub fn secret_key_string(&self) -> String {
-        if self.has_private_key() {
-            self.seckey.0.to_hex()
-        } else {
-            String::new()
-        }
-    }
-    pub fn has_private_key(&self) -> bool {
-        !self.seckey.is_zero()
-    }
-
     pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
         bytes.read_with::<UInt256>(&mut 36, byte::LE)
             .map_err(KeyError::from)
@@ -300,6 +289,18 @@ impl IKey for ECDSAKey {
 
     fn kind(&self) -> KeyKind {
         KeyKind::ECDSA
+    }
+
+    fn secret_key_string(&self) -> String {
+        if self.has_private_key() {
+            self.seckey.0.to_hex()
+        } else {
+            String::new()
+        }
+    }
+
+    fn has_private_key(&self) -> bool {
+        !self.seckey.is_zero()
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {

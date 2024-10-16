@@ -37,6 +37,9 @@ pub trait DeriveKey<T>: Sized
 #[ferment_macro::export]
 pub trait IKey: Send + Sync + Debug {
     fn kind(&self) -> KeyKind;
+    fn secret_key_string(&self) -> String;
+    fn has_private_key(&self) -> bool;
+
     fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
         address::with_public_key_data(&self.public_key_data(), script_map)
     }

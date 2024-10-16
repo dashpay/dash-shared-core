@@ -238,6 +238,22 @@ impl IKey for OpaqueKey {
         }
     }
 
+    fn secret_key_string(&self) -> String {
+        match self {
+            OpaqueKey::ECDSA(key) => key.secret_key_string(),
+            OpaqueKey::BLS(key) => key.secret_key_string(),
+            OpaqueKey::ED25519(key) => key.secret_key_string(),
+        }
+    }
+
+    fn has_private_key(&self) -> bool {
+        match self {
+            OpaqueKey::ECDSA(key) => key.has_private_key(),
+            OpaqueKey::BLS(key) => key.has_private_key(),
+            OpaqueKey::ED25519(key) => key.has_private_key(),
+        }
+    }
+
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         match self {
             OpaqueKey::ECDSA(key) => key.compact_sign(UInt256::from(data)).to_vec(),

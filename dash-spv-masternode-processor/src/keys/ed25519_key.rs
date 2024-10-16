@@ -62,13 +62,6 @@ impl ED25519Key {
             .map_err(KeyError::from)
             .and_then(|data| Self::key_with_secret_data(&data))
     }
-    pub fn secret_key_string(&self) -> String {
-        self.seckey.0.to_hex()
-    }
-
-    pub fn has_private_key(&self) -> bool {
-        !self.seckey.is_zero()
-    }
 }
 
 #[ferment_macro::export]
@@ -76,6 +69,14 @@ impl IKey for ED25519Key {
 
     fn kind(&self) -> KeyKind {
         KeyKind::ED25519
+    }
+
+    fn secret_key_string(&self) -> String {
+        self.seckey.0.to_hex()
+    }
+
+    fn has_private_key(&self) -> bool {
+        !self.seckey.is_zero()
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {

@@ -77,7 +77,6 @@ impl BLSKey {
             .map_err(KeyError::from)
             .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
     }
-
 }
 
 #[ferment_macro::export]
@@ -85,6 +84,19 @@ impl IKey for BLSKey {
     fn kind(&self) -> KeyKind {
         KeyKind::BLS // &KeyType::BLSBasic
     }
+
+    fn secret_key_string(&self) -> String {
+        if self.seckey.is_zero() {
+            String::new()
+        } else {
+            hex_with_data(self.seckey.as_bytes())
+        }
+    }
+
+    fn has_private_key(&self) -> bool {
+        !self.seckey.is_zero()
+    }
+
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         self.sign_digest(UInt256::from(data)).as_bytes().to_vec()
     }
@@ -253,14 +265,6 @@ impl BLSKey {
             Ok(pk) if self.use_legacy => pk.fingerprint_legacy(),
             Ok(pk) => pk.fingerprint(),
             _ => 0
-        }
-    }
-
-    pub fn secret_key_string(&self) -> String {
-        if self.seckey.is_zero() {
-            String::new()
-        } else {
-            hex_with_data(self.seckey.as_bytes())
         }
     }
 
@@ -484,10 +488,6 @@ impl BLSKey {
                 extended_public_key_data: extended_public_key_serialized(&extended_public_key, true).to_vec(),
                 ..Default::default()
             })
-    }
-
-    pub fn has_private_key(&self) -> bool {
-        !self.seckey.is_zero()
     }
 
     pub fn hash160(&self) -> UInt160 {
