@@ -16,7 +16,7 @@ pub enum KeyKind {
 }
 
 #[derive(Clone, Debug)]
-#[ferment_macro::opaque]
+#[ferment_macro::export]
 pub enum OpaqueKey {
     ECDSA(ECDSAKey),
     BLS(BLSKey),
@@ -92,7 +92,6 @@ impl From<KeyKind> for i16 {
 
 impl From<&KeyKind> for u8 {
     fn from(value: &KeyKind) -> Self {
-
         value.clone() as u8
     }
 }

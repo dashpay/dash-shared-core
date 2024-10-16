@@ -454,7 +454,8 @@ impl BLSKey {
 
 /// For FFI
 impl BLSKey {
-    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Result<Self, KeyError> where Self: Sized, PATH: IIndexPath<Item=u32> {
+    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Result<Self, KeyError>
+        where Self: Sized, PATH: IIndexPath<Item=u32> {
         key.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path, key.use_legacy))
             .map(|pub_key_data| Self::key_with_public_key(UInt384::from(pub_key_data), key.use_legacy))
