@@ -11,7 +11,7 @@ use crate::chain::derivation::{BIP32_HARD, IIndexPath, IndexPath};
 use crate::chain::params::ScriptMap;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array, ECPoint, UInt160, UInt256, UInt512, Zeroable};
-use crate::keys::{KeyKind, KeyError, IKey};
+use crate::keys::{KeyKind, KeyError, IKey, DeriveKey};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::dip14::{secp256k1_point_from_bytes, IChildKeyDerivation};
 use crate::util::address::address::is_valid_dash_private_key;
@@ -275,8 +275,6 @@ impl ECDSAKey {
         }
     }
 
-
-
     pub fn secret_key_string(&self) -> String {
         if self.has_private_key() {
             self.seckey.0.to_hex()
@@ -297,10 +295,10 @@ impl ECDSAKey {
 
 }
 
+#[ferment_macro::export]
 impl IKey for ECDSAKey {
-    // type SK = UInt256;
 
-    fn r#type(&self) -> KeyKind {
+    fn kind(&self) -> KeyKind {
         KeyKind::ECDSA
     }
 
@@ -390,75 +388,6 @@ impl IKey for ECDSAKey {
                 Ok(writer)
             },
             extended => Err(KeyError::Extended(extended))
-        }
-    }
-
-    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = u32> {
-        let mut seckey = self.seckey.clone();
-        let mut chaincode = self.chaincode.clone();
-        let mut fingerprint = 0u32;
-        let length = path.length();
-        (0..length)
-            .into_iter()
-            .for_each(|position| {
-                if position + 1 == length {
-                    fingerprint = secp256k1::SecretKey::from_slice(&seckey.0)
-                        .map(|sk| secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &sk))
-                        .map(|pk| UInt160::hash160u32le(&pk.serialize()))
-                        .unwrap_or(0);
-                }
-                Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
-            });
-        Ok(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
-    }
-
-    // fn private_derive_to_path2<PATH, INDEX>(&self, path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=INDEX> {
-    //     todo!()
-        // let mut seckey = self.seckey.clone();
-        // let mut chaincode = self.chaincode.clone();
-        // let mut fingerprint = 0u32;
-        // let length = path.length();
-        // (0..length)
-        //     .into_iter()
-        //     .for_each(|position| {
-        //         if position + 1 == length {
-        //             fingerprint = secp256k1::SecretKey::from_slice(&seckey.0)
-        //                 .map(|sk| secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &sk))
-        //                 .map(|pk| UInt160::hash160(&pk.serialize()).u32_le())
-        //                 .unwrap_or(0);
-        //         }
-        //         Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
-        //     });
-        // Some(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
-    // }
-
-    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-        Self::private_derive_to_256bit_derivation_path_for_seckey_and_chaincode(self.seckey, self.chaincode, path)
-    }
-
-    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-        assert!(path.length() > offset, "derivation path offset must be smaller than the its length");
-        let mut chaincode = self.chaincode.clone();
-        let mut data = ECPoint::from(&self.public_key_data());
-        let mut fingerprint = 0u32;
-        let length = path.length();
-        (offset..length)
-            .into_iter()
-            .for_each(|position| {
-                if position + 1 == length { fingerprint = UInt160::hash160u32le(data.as_ref()); }
-                Self::derive_child_public_key(&mut data, &mut chaincode, path, position)
-            });
-        if let Ok(mut child_key) = Self::public_key_from_bytes(&data.0).map(|pubkey| Self::with_pubkey_compressed(pubkey, true)) {
-            child_key.chaincode = chaincode;
-            child_key.fingerprint = fingerprint;
-            child_key.is_extended = true;
-            Ok(child_key)
-        } else {
-            assert!(false, "Public key should be created");
-            Err(KeyError::UnableToDerive)
         }
     }
 
@@ -562,32 +491,60 @@ impl ECDSAKey {
         }
     }
 
-    // pub fn encrypt_data_for_public_key(&self, secret: &str, mut public_key: Self, initialization_vector: &str) -> Vec<u8> {
-    //     let key = Self::init_with_dh_key_exchange_with_public_key(public_key, self);
-    //     // DSECDSAKey *key = [DSECDSAKey keyWithDHKeyExchangeWithPublicKey:peerPubKey forPrivateKey:secretKey];
-    //
-    //     // return [self encryptWithDHECDSAKey:key usingInitializationVector:initializationVector];
-    //
-    // }
+}
 
-    // pub fn encrypt_with_dh_key(&self, dh_key: Self, initialization_vector: &Vec<u8>) -> Vec<u8> {
-    //
-    //     // unsigned char *iv = (unsigned char *)initializationVector.bytes;
-    //     //
-    //     // NSData *resultData = AES256EncryptDecrypt(kCCEncrypt, self, (uint8_t *)dhKey.publicKeyData.bytes, initializationVector.length ? iv : 0);
-    //     //
-    //     // NSMutableData *finalData = [initializationVector mutableCopy];
-    //     // [finalData appendData:resultData];
-    //     // return finalData;
-    //
-    // }
+impl DeriveKey<IndexPath<u32>> for ECDSAKey {
+    fn private_derive_to_path(&self, path: &IndexPath<u32>) -> Result<Self, KeyError> {
+        let mut seckey = self.seckey.clone();
+        let mut chaincode = self.chaincode.clone();
+        let mut fingerprint = 0u32;
+        let length = path.length();
+        (0..length)
+            .into_iter()
+            .for_each(|position| {
+                if position + 1 == length {
+                    fingerprint = secp256k1::SecretKey::from_slice(&seckey.0)
+                        .map(|sk| secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &sk))
+                        .map(|pk| UInt160::hash160u32le(&pk.serialize()))
+                        .unwrap_or(0);
+                }
+                Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
+            });
+        Ok(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
+    }
 
-    // pub fn key_with_dh_key_exchange_with_public_key(public_key: &Self, private_key: &Self) -> Option<Self> {
-    //     private_key.secret_key()
-    //         .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false))
-    //             .map(|pubkey| ECDSAKey::with_shared_secret(secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey), false)))
-    //         .ok()
-    // }
+    fn public_derive_to_path_with_offset(&mut self, path: &IndexPath<u32>, offset: usize) -> Result<Self, KeyError> {
+        unimplemented!("ECDSAKey::public_derive_to_path_with_offset")
+    }
+}
+
+impl DeriveKey<IndexPath<UInt256>> for ECDSAKey {
+    fn private_derive_to_path(&self, path: &IndexPath<UInt256>) -> Result<Self, KeyError> {
+        Self::private_derive_to_256bit_derivation_path_for_seckey_and_chaincode(self.seckey, self.chaincode, path)
+    }
+
+    fn public_derive_to_path_with_offset(&mut self, path: &IndexPath<UInt256>, offset: usize) -> Result<Self, KeyError> {
+        assert!(path.length() > offset, "derivation path offset must be smaller than the its length");
+        let mut chaincode = self.chaincode.clone();
+        let mut data = ECPoint::from(&self.public_key_data());
+        let mut fingerprint = 0u32;
+        let length = path.length();
+        (offset..length)
+            .into_iter()
+            .for_each(|position| {
+                if position + 1 == length { fingerprint = UInt160::hash160u32le(data.as_ref()); }
+                Self::derive_child_public_key(&mut data, &mut chaincode, path, position)
+            });
+        if let Ok(mut child_key) = Self::public_key_from_bytes(&data.0).map(|pubkey| Self::with_pubkey_compressed(pubkey, true)) {
+            child_key.chaincode = chaincode;
+            child_key.fingerprint = fingerprint;
+            child_key.is_extended = true;
+            Ok(child_key)
+        } else {
+            assert!(false, "Public key should be created");
+            Err(KeyError::UnableToDerive)
+        }
+    }
 }
 
 /// For FFI

@@ -1,7 +1,9 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
+use crate::chain::derivation::index_path::{Extremum, IndexHardSoft};
+use crate::consensus::Encodable;
 use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
-use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyError};
+use crate::keys::{BLSKey, DeriveKey, ECDSAKey, ED25519Key, IKey, KeyError};
 use crate::util::sec_vec::SecVec;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -205,10 +207,31 @@ impl KeyKind {
     }*/
 }
 
-impl IKey for OpaqueKey {
-    // type SK = T;
+impl<U> DeriveKey<IndexPath<U>> for OpaqueKey
+where U: Copy + Clone + Display + Debug + Encodable + IndexHardSoft + PartialEq + Extremum,
+      ECDSAKey: DeriveKey<IndexPath<U>>,
+      BLSKey: DeriveKey<IndexPath<U>>,
+      ED25519Key: DeriveKey<IndexPath<U>> {
+    fn private_derive_to_path(&self, path: &IndexPath<U>) -> Result<Self, KeyError> {
+        match self {
+            OpaqueKey::ECDSA(key) => key.private_derive_to_path(path).map(Into::into),
+            OpaqueKey::BLS(key) => key.private_derive_to_path(path).map(Into::into),
+            OpaqueKey::ED25519(key) => key.private_derive_to_path(path).map(Into::into),
+        }
+    }
+    fn public_derive_to_path_with_offset(&mut self, path: &IndexPath<U>, offset: usize) -> Result<Self, KeyError> {
+        match self {
+            OpaqueKey::ECDSA(key) => key.public_derive_to_path_with_offset(path, offset).map(Into::into),
+            OpaqueKey::BLS(key) => key.public_derive_to_path_with_offset(path, offset).map(Into::into),
+            OpaqueKey::ED25519(key) => key.public_derive_to_path_with_offset(path, offset).map(Into::into),
+        }
+    }
+}
 
-    fn r#type(&self) -> KeyKind {
+#[ferment_macro::export]
+impl IKey for OpaqueKey {
+
+    fn kind(&self) -> KeyKind {
         match self {
             OpaqueKey::ECDSA(..) => KeyKind::ECDSA,
             OpaqueKey::ED25519(..) => KeyKind::ED25519,
@@ -285,42 +308,6 @@ impl IKey for OpaqueKey {
             OpaqueKey::ECDSA(key) => key.extended_public_key_data(),
             OpaqueKey::BLS(key) => key.extended_public_key_data(),
             OpaqueKey::ED25519(key) => key.extended_public_key_data(),
-        }
-    }
-
-    fn private_derive_to_path<PATH>(&self, index_path: &PATH) -> Result<Self, KeyError>
-        where PATH: IIndexPath<Item = u32> {
-        match self {
-            OpaqueKey::ECDSA(key) => key.private_derive_to_path(index_path).map(Into::into),
-            OpaqueKey::BLS(key) => key.private_derive_to_path(index_path).map(Into::into),
-            OpaqueKey::ED25519(key) => key.private_derive_to_path(index_path).map(Into::into),
-        }
-    }
-
-    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item=UInt256> {
-        match self {
-            OpaqueKey::ECDSA(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
-            OpaqueKey::BLS(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
-            OpaqueKey::ED25519(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
-        }
-    }
-
-    fn public_derive_to_256bit_derivation_path<PATH>(&mut self, derivation_path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-        match self {
-            OpaqueKey::ECDSA(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
-            OpaqueKey::BLS(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
-            OpaqueKey::ED25519(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
-        }
-    }
-
-    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, derivation_path: &PATH, offset: usize) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-        match self {
-            OpaqueKey::ECDSA(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
-            OpaqueKey::BLS(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
-            OpaqueKey::ED25519(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
         }
     }
 

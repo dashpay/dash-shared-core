@@ -2,9 +2,10 @@ use bls_signatures::bip32::{ChainCode, ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
 use hashes::{Hash, hex::FromHex, sha256, sha256d};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
+use crate::chain::derivation::IndexPath;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, BytesDecodable, Zeroable, UInt160, UInt256, UInt384, UInt768};
-use crate::keys::{IKey, KeyKind, KeyError};
+use crate::keys::{IKey, KeyKind, KeyError, DeriveKey};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::KeyError::DHKeyExchange;
 use crate::models::OperatorPublicKey;
@@ -23,6 +24,14 @@ pub struct BLSKey {
 
 #[ferment_macro::export]
 impl BLSKey {
+
+    pub fn key_with_seed_data(seed: &[u8], use_legacy: bool) -> Self {
+        let bls_private_key = PrivateKey::from_bip32_seed(seed);
+        let bls_public_key = bls_private_key.g1_element().unwrap();
+        let seckey = UInt256::from(&*bls_private_key.to_bytes());
+        let pubkey = UInt384(g1_element_serialized(&bls_public_key, use_legacy));
+        Self { seckey, pubkey, use_legacy, ..Default::default() }
+    }
 
     pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Result<BLSKey, hashes::hex::Error> {
         Vec::from_hex(string)
@@ -71,9 +80,9 @@ impl BLSKey {
 
 }
 
-// #[ferment_macro::export]
+#[ferment_macro::export]
 impl IKey for BLSKey {
-    fn r#type(&self) -> KeyKind {
+    fn kind(&self) -> KeyKind {
         KeyKind::BLS // &KeyType::BLSBasic
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
@@ -114,13 +123,6 @@ impl IKey for BLSKey {
         Ok(self.extended_public_key_data.clone())
     }
 
-    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = u32> {
-        ExtendedPrivateKey::from_bytes(self.extended_private_key_data.as_slice())
-            .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, path), self.use_legacy))
-            .map_err(KeyError::from)
-    }
-
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         // if (uint256_is_zero(self.secretKey)) return nil;
         // NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
@@ -137,6 +139,28 @@ impl IKey for BLSKey {
 
     fn forget_private_key(&mut self) {
         self.seckey = UInt256::MIN;
+    }
+}
+
+impl DeriveKey<IndexPath<u32>> for BLSKey {
+    fn private_derive_to_path(&self, path: &IndexPath<u32>) -> Result<Self, KeyError> {
+        ExtendedPrivateKey::from_bytes(self.extended_private_key_data.as_slice())
+            .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, path), self.use_legacy))
+            .map_err(KeyError::from)
+    }
+
+    fn public_derive_to_path_with_offset(&mut self, path: &IndexPath<u32>, offset: usize) -> Result<Self, KeyError> {
+        panic!("This method is not implemented for BLSKey")
+    }
+}
+
+impl DeriveKey<IndexPath<UInt256>> for BLSKey {
+    fn private_derive_to_path(&self, path: &IndexPath<UInt256>) -> Result<Self, KeyError> {
+        self.private_derive_to_path(&path.base_index_path())
+    }
+
+    fn public_derive_to_path_with_offset(&mut self, path: &IndexPath<UInt256>, offset: usize) -> Result<Self, KeyError> {
+        panic!("This method is not implemented for BLSKey")
     }
 }
 
@@ -179,16 +203,9 @@ impl BLSKey {
         }
     }
 
-    pub fn key_with_seed_data(seed: &[u8], use_legacy: bool) -> Self {
-        let bls_private_key = PrivateKey::from_bip32_seed(seed);
-        let bls_public_key = bls_private_key.g1_element().unwrap();
-        let seckey = UInt256::from(&*bls_private_key.to_bytes());
-        let pubkey = UInt384(g1_element_serialized(&bls_public_key, use_legacy));
-        Self { seckey, pubkey, use_legacy, ..Default::default() }
-    }
 
 
-    pub fn init_with_bls_extended_public_key(bls_extended_public_key: &ExtendedPublicKey, use_legacy: bool) ->  Self {
+    pub fn init_with_bls_extended_public_key(bls_extended_public_key: &ExtendedPublicKey, use_legacy: bool) -> Self {
         let bls_public_key = bls_extended_public_key.public_key();
         Self {
             extended_public_key_data: extended_public_key_serialized(bls_extended_public_key, use_legacy).to_vec(),
@@ -262,7 +279,7 @@ impl BLSKey {
 
     pub fn public_derive_to_path<PATH>(&mut self, index_path: &PATH) -> Result<Self, KeyError>
         where PATH: IIndexPath<Item = u32> {
-        if (self.extended_public_key_data().is_err() || self.extended_public_key_data().unwrap().is_empty()) && self.extended_private_key_data.is_empty() {
+        if (self.extended_public_key_data().is_err() || self.extended_public_key_data()?.is_empty()) && self.extended_private_key_data.is_empty() {
             Err(KeyError::UnableToDerive)
         } else if let Ok(bls_extended_public_key) = self.bls_extended_public_key() {
             Ok(BLSKey::init_with_bls_extended_public_key(&BLSKey::public_derive(bls_extended_public_key, index_path, self.use_legacy), self.use_legacy))

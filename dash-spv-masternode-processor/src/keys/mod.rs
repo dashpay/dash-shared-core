@@ -6,92 +6,68 @@ pub mod ecdsa_key;
 pub mod key;
 
 pub use self::key::OpaqueKey;
-pub use self::key::KeyKind;
+// pub use self::key::KeyKind;
 pub use self::bls_key::BLSKey;
 pub use self::ecdsa_key::ECDSAKey;
 pub use self::ed25519_key::ED25519Key;
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use crate::chain::bip::bip32;
 use crate::chain::ScriptMap;
-use crate::chain::derivation::index_path::IIndexPath;
+use crate::chain::derivation::index_path::{Extremum, IIndexPath, IndexHardSoft};
 use crate::chain::tx::protocol::SIGHASH_ALL;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::UInt256;
+use crate::keys::key::KeyKind;
 use crate::util::address::address;
 use crate::util::base58;
 use crate::util::data_append::DataAppend;
 use crate::util::script::ScriptElement;
 use crate::util::sec_vec::SecVec;
 
-pub trait IKey: Send + Sync + Debug {
-    fn r#type(&self) -> KeyKind {
-        panic!("Should be overriden in implementation")
+pub trait DeriveKey<T>: Sized
+    where T: IIndexPath<Item: Copy + Clone + Display + Debug + Encodable + IndexHardSoft + PartialEq + Extremum> {
+    fn private_derive_to_path(&self, path: &T) -> Result<Self, KeyError>;
+    fn public_derive_to_path_with_offset(&mut self, path: &T, offset: usize) -> Result<Self, KeyError>;
+    fn public_derive_to_path(&mut self, path: &T) -> Result<Self, KeyError> {
+        self.public_derive_to_path_with_offset(path, 0)
     }
+}
+
+#[ferment_macro::export]
+pub trait IKey: Send + Sync + Debug {
+    fn kind(&self) -> KeyKind;
     fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
         address::with_public_key_data(&self.public_key_data(), script_map)
     }
-    fn sign(&self, data: &[u8]) -> Vec<u8> {
-        panic!("Should be overriden in implementation")
-    }
-    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
-        panic!("Should be overriden in implementation")
-    }
-    fn secret_key(&self) -> UInt256 {
-        panic!("Should be overriden in implementation")
-    }
+    fn sign(&self, data: &[u8]) -> Vec<u8>;
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool;
+    fn secret_key(&self) -> UInt256;
 
-    fn chaincode(&self) -> UInt256 {
-        panic!("Should be overriden in implementation")
-    }
+    fn chaincode(&self) -> UInt256;
+    fn fingerprint(&self) -> u32;
 
-    fn fingerprint(&self) -> u32 {
-        panic!("Should be overriden in implementation")
-    }
+    fn private_key_data(&self) -> Result<Vec<u8>, KeyError>;
+    fn public_key_data(&self) -> Vec<u8>;
+    fn extended_private_key_data(&self) -> Result<SecVec, KeyError>;
+    fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError>;
 
-    fn private_key_data(&self) -> Result<Vec<u8>, KeyError> {
-        panic!("Should be overriden in implementation")
-    }
-    fn public_key_data(&self) -> Vec<u8> {
-        panic!("Should be overriden in implementation")
-    }
-    fn extended_private_key_data(&self) -> Result<SecVec, KeyError> {
-        panic!("Should be overriden in implementation")
-    }
-    fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError> {
-        panic!("Should be overriden in implementation")
-    }
-
-    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = u32> {
-        panic!("Should be overriden in implementation")
-    }
-    fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-        self.private_derive_to_path(&path.base_index_path())
-    }
-    fn public_derive_to_256bit_derivation_path<PATH>(&mut self, path: &PATH) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-        self.public_derive_to_256bit_derivation_path_with_offset(path, 0)
-    }
-    fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
-        where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-        panic!("Should be overriden in implementation")
-    }
-    // fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self>
-    //     where Self: Sized, PATH: IIndexPath<Item = u32> {
-    //     key.extended_public_key_data().and_then()
+    // fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
+    //     where Self: Sized, PATH: IIndexPath<Item = u32>;
+    // fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
+    //     where Self: Sized, PATH: IIndexPath<Item = UInt256> {
+    //     self.private_derive_to_path(&path.base_index_path())
     // }
+    // fn public_derive_to_256bit_derivation_path<PATH>(&mut self, path: &PATH) -> Result<Self, KeyError>
+    //     where Self: Sized, PATH: IIndexPath<Item = UInt256> {
+    //     self.public_derive_to_256bit_derivation_path_with_offset(path, 0)
+    // }
+    // fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
+    //     where Self: Sized, PATH: IIndexPath<Item = UInt256>;
 
-    fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
-        panic!("Should be overriden in implementation")
-    }
-    fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
-        panic!("Should be overriden in implementation")
-    }
-    fn forget_private_key(&mut self) {
-        panic!("Should be overriden in implementation")
-    }
+    fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String;
+    fn hmac_256_data(&self, data: &[u8]) -> UInt256;
+    fn forget_private_key(&mut self);
 
     fn create_signature(&self, tx_input_script: &Vec<u8>, tx_data: &Vec<u8>) -> Vec<u8> {
         let mut sig = Vec::<u8>::new();
