@@ -1,4 +1,3 @@
-use std::mem;
 use byte::BytesExt;
 use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
