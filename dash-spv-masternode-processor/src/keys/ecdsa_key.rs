@@ -14,6 +14,7 @@ use crate::crypto::byte_util::{AsBytes, clone_into_array, ECPoint, UInt160, UInt
 use crate::keys::{KeyKind, KeyError, IKey, DeriveKey};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::dip14::{secp256k1_point_from_bytes, IChildKeyDerivation};
+use crate::util::address::address;
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
 use crate::util::sec_vec::SecVec;
@@ -301,6 +302,9 @@ impl IKey for ECDSAKey {
 
     fn has_private_key(&self) -> bool {
         !self.seckey.is_zero()
+    }
+    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
+        address::with_public_key_data(&self.public_key_data(), script_map)
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {

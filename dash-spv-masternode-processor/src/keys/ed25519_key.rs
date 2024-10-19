@@ -8,6 +8,7 @@ use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::chain::derivation::IndexPath;
 use crate::consensus::Encodable;
 use crate::keys::{IKey, KeyKind, dip14::IChildKeyDerivation, KeyError, DeriveKey};
+use crate::util::address::address;
 use crate::util::base58;
 use crate::util::sec_vec::SecVec;
 
@@ -77,6 +78,9 @@ impl IKey for ED25519Key {
 
     fn has_private_key(&self) -> bool {
         !self.seckey.is_zero()
+    }
+    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
+        address::with_public_key_data(&self.public_key_data(), script_map)
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {

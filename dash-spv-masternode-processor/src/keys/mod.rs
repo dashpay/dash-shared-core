@@ -19,7 +19,6 @@ use crate::chain::tx::protocol::SIGHASH_ALL;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::UInt256;
 use crate::keys::key::KeyKind;
-use crate::util::address::address;
 use crate::util::base58;
 use crate::util::data_append::DataAppend;
 use crate::util::script::ScriptElement;
@@ -40,10 +39,12 @@ pub trait IKey: Send + Sync + Debug {
     fn secret_key_string(&self) -> String;
     fn has_private_key(&self) -> bool;
 
-    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
-        address::with_public_key_data(&self.public_key_data(), script_map)
-    }
+    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String;
+    // fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
+    //     address::with_public_key_data(&self.public_key_data(), script_map)
+    // }
     fn sign(&self, data: &[u8]) -> Vec<u8>;
+    // fn sign_message_digest(&self)
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool;
     fn secret_key(&self) -> UInt256;
 

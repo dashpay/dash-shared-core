@@ -10,6 +10,7 @@ use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::KeyError::DHKeyExchange;
 use crate::models::OperatorPublicKey;
 use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
+use crate::util::address::address;
 
 #[derive(Clone, Debug, Default)]
 #[ferment_macro::opaque]
@@ -95,6 +96,9 @@ impl IKey for BLSKey {
 
     fn has_private_key(&self) -> bool {
         !self.seckey.is_zero()
+    }
+    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
+        address::with_public_key_data(&self.public_key_data(), script_map)
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {

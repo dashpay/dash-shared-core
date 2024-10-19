@@ -1,9 +1,10 @@
 use std::fmt::{Debug, Display};
-use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
+use crate::chain::{params::ScriptMap, derivation::{IIndexPath, IndexPath}};
 use crate::chain::derivation::index_path::{Extremum, IndexHardSoft};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
 use crate::keys::{BLSKey, DeriveKey, ECDSAKey, ED25519Key, IKey, KeyError};
+use crate::util::address::address;
 use crate::util::sec_vec::SecVec;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -234,7 +235,8 @@ impl IKey for OpaqueKey {
         match self {
             OpaqueKey::ECDSA(..) => KeyKind::ECDSA,
             OpaqueKey::ED25519(..) => KeyKind::ED25519,
-            OpaqueKey::BLS(key) => if key.use_legacy { KeyKind::BLS } else { KeyKind::BLSBasic }
+            OpaqueKey::BLS(BLSKey { use_legacy: true, .. }) => KeyKind::BLS,
+            OpaqueKey::BLS(BLSKey { use_legacy: false, .. }) => KeyKind::BLSBasic
         }
     }
 
@@ -252,6 +254,9 @@ impl IKey for OpaqueKey {
             OpaqueKey::BLS(key) => key.has_private_key(),
             OpaqueKey::ED25519(key) => key.has_private_key(),
         }
+    }
+    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
+        address::with_public_key_data(&self.public_key_data(), script_map)
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
