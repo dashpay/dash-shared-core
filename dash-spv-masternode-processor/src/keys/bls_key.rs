@@ -78,6 +78,11 @@ impl BLSKey {
             .map_err(KeyError::from)
             .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
     }
+
+    pub fn sign_digest(&self, md: UInt256) -> UInt768 {
+        self.sign_with_key(|| md.0)
+    }
+
 }
 
 #[ferment_macro::export]
@@ -155,6 +160,10 @@ impl IKey for BLSKey {
 
     fn forget_private_key(&mut self) {
         self.seckey = UInt256::MIN;
+    }
+
+    fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
+        self.sign_digest(digest).0.to_vec()
     }
 }
 
@@ -379,11 +388,8 @@ impl BLSKey {
         self.sign_with_key(|| sha256::Hash::hash(data).into_inner())
     }
 
-    pub fn sign_digest(&self, md: UInt256) -> UInt768 {
-        self.sign_with_key(|| md.0)
-    }
 
-    pub fn sign_message_digest(&self, digest: UInt256, completion: fn(bool, UInt768)) {
+    pub fn sign_message_digest_with_completion(&self, digest: UInt256, completion: fn(bool, UInt768)) {
         let signature = self.sign_digest(digest);
         completion(!signature.is_zero(), signature)
     }

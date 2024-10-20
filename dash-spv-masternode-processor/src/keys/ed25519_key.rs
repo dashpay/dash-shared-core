@@ -63,6 +63,11 @@ impl ED25519Key {
             .map_err(KeyError::from)
             .and_then(|data| Self::key_with_secret_data(&data))
     }
+    pub fn key_with_secret_data(data: &[u8]) -> Result<Self, KeyError> {
+        Self::secret_key_from_bytes(data)
+            .map_err(KeyError::from)
+            .map(|seckey| Self { seckey: seckey.into(), ..Default::default() })
+    }
 }
 
 #[ferment_macro::export]
@@ -187,6 +192,10 @@ impl IKey for ED25519Key {
         }
         self.seckey = UInt256::MIN;
     }
+
+    fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
+        self.sign(&digest.0)
+    }
 }
 
 impl DeriveKey<IndexPath<u32>> for ED25519Key {
@@ -268,11 +277,6 @@ impl ED25519Key {
         Self::key_with_extended_public_key_data(data)
     }
 
-    pub fn key_with_secret_data(data: &[u8]) -> Result<Self, KeyError> {
-        Self::secret_key_from_bytes(data)
-            .map_err(KeyError::from)
-            .map(|seckey| Self { seckey: seckey.into(), ..Default::default() })
-    }
 
     pub fn public_key_from_bytes(data: &[u8]) -> Result<VerifyingKey, SignatureError> {
         VerifyingKey::try_from(data)
@@ -307,6 +311,7 @@ impl ED25519Key {
         Ok(key.as_bytes().to_vec())
     }
 }
+
 
 /// For FFI
 impl ED25519Key {

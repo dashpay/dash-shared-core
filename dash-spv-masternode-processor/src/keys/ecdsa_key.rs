@@ -19,7 +19,7 @@ use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
 use crate::util::sec_vec::SecVec;
 
-const EXT_PUBKEY_SIZE: usize = 4 + mem::size_of::<UInt256>() + mem::size_of::<ECPoint>();
+const EXT_PUBKEY_SIZE: usize = 4 + size_of::<UInt256>() + size_of::<ECPoint>();
 
 #[derive(Clone, Debug, Default)]
 #[ferment_macro::opaque]
@@ -63,6 +63,24 @@ impl ECDSAKey {
         }
     }
 
+    /// Pieter Wuille's compact signature encoding used for bitcoin message signing
+    /// to verify a compact signature, recover a public key from the signature and verify that it matches the signer's pubkey
+    pub fn compact_sign(&self, message_digest: UInt256) -> [u8; 65] {
+        let mut sig = [0u8; 65];
+        if self.seckey.is_zero() {
+            warn!("Can't sign with a public key");
+            return sig;
+        }
+        let secp = secp256k1::Secp256k1::new();
+        let msg = Self::message_from_bytes(&message_digest.0).unwrap();
+        let seckey = self.secret_key().unwrap();
+        let rec_sig = secp.sign_ecdsa_recoverable(&msg, &seckey);
+        let (rec_id, bytes) = rec_sig.serialize_compact();
+        let version = 27 + rec_id.to_i32() as u8 + if self.compressed { 4 } else { 0 };
+        sig[0] = version;
+        sig[1..].copy_from_slice(&bytes);
+        sig
+    }
 }
 
 impl ECDSAKey {
@@ -282,7 +300,42 @@ impl ECDSAKey {
             .and_then(|key| Self::init_with_secret(key, true))
             .map(|key| Self::update_extended_params(key, bytes))
     }
+    pub fn deprecated_incorrect_extended_public_key_from_seed(
+        &self,
+        secret: &[u8],
+        chaincode: &[u8],
+        hashes: &[u8],
+        derivation_len: usize)
+        -> Result<Self, KeyError> {
+        let mut chaincode = UInt256::from(chaincode);
+        let mut key = UInt256::from(secret);
+        let mut writer = SecVec::new();
+        self.hash160().u32_le().enc(&mut writer);
+        (0..derivation_len).into_iter().for_each(|position| {
+            let soft_index = hashes.read_with::<u64>(&mut position.clone(), byte::LE).unwrap() as u32;
+            // let soft_index = slice.read_with::<u64>(&mut 0, byte::BE).unwrap() as u32;
+            let buf = &mut [0u8; 37];
+            if soft_index & BIP32_HARD != 0 {
+                buf[1..33].copy_from_slice(&key.0);
+            } else {
+                buf[..33].copy_from_slice(&secp256k1_point_from_bytes(&key.0));
+            }
+            buf[33..37].copy_from_slice(soft_index.to_be_bytes().as_slice());
+            let i = UInt512::hmac(chaincode.as_ref(), buf);
 
+            let mut sec_key = secp256k1::SecretKey::from_slice(&key.0).expect("invalid private key");
+            let tweak = Scalar::from_be_bytes(clone_into_array(&i.0[..32])).expect("invalid tweak");
+            sec_key = sec_key.add_tweak(&tweak).expect("failed to add tweak");
+            key.0.copy_from_slice(&sec_key.secret_bytes());
+            chaincode.0.copy_from_slice(&i.0[32..]);
+        });
+        ECDSAKey::key_with_secret(&key, true)
+            .and_then(|seckey| {
+                chaincode.enc(&mut writer);
+                writer.extend(seckey.public_key_data());
+                ECDSAKey::key_with_extended_public_key_data(&writer)
+            })
+    }
 }
 
 #[ferment_macro::export]
@@ -416,6 +469,11 @@ impl IKey for ECDSAKey {
         self.public_key_data_mut();
         self.seckey = UInt256::MIN;
     }
+
+    fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
+        self.compact_sign(digest)
+            .to_vec()
+    }
 }
 
 impl ECDSAKey {
@@ -435,24 +493,6 @@ impl ECDSAKey {
         self.pubkey.clone()
     }
 
-    /// Pieter Wuille's compact signature encoding used for bitcoin message signing
-    /// to verify a compact signature, recover a public key from the signature and verify that it matches the signer's pubkey
-    pub fn compact_sign(&self, message_digest: UInt256) -> [u8; 65] {
-        let mut sig = [0u8; 65];
-        if self.seckey.is_zero() {
-            warn!("Can't sign with a public key");
-            return sig;
-        }
-        let secp = secp256k1::Secp256k1::new();
-        let msg = Self::message_from_bytes(&message_digest.0).unwrap();
-        let seckey = self.secret_key().unwrap();
-        let rec_sig = secp.sign_ecdsa_recoverable(&msg, &seckey);
-        let (rec_id, bytes) = rec_sig.serialize_compact();
-        let version = 27 + rec_id.to_i32() as u8 + if self.compressed { 4 } else { 0 };
-        sig[0] = version;
-        sig[1..].copy_from_slice(&bytes);
-        sig
-    }
 
     pub fn hash160(&self) -> UInt160 {
         UInt160::hash160(&self.public_key_data())
@@ -615,15 +655,6 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
                 destination
             })
         )
-        // ECDSAKey::secret_key_from_bytes(public_key.seckey.as_bytes())
-        //     .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false)))
-        //     .map(|pubkey| secp256k1::ecdh::SharedSecret::new(&pubkey, &secret_key.secret_key().unwrap()))
-        //     .map_err(KeyError::from)
-        //     .and_then(|shared_secret| <Self as CryptoData<ECDSAKey>>::encrypt(self, shared_secret.secret_bytes(), initialization_vector))
-        //     .map(|encrypted_data| {
-        //         destination.extend(encrypted_data);
-        //         destination
-        //     })
     }
 
     fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &ECDSAKey, public_key: &ECDSAKey, iv_size: usize) -> Result<Vec<u8>, KeyError> {
@@ -640,13 +671,12 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
 
     fn encrypt_with_dh_key_using_iv(&self, key: &ECDSAKey, initialization_vector: Vec<u8>) -> Result<Vec<u8>, KeyError> {
         let mut destination = initialization_vector.clone();
-        let pubkey_data = key.public_key_from_inner_secret_key_serialized().unwrap_or(key.public_key_data());
+        let pubkey_data = key.public_key_from_inner_secret_key_serialized()
+            .unwrap_or(key.public_key_data());
         // TODO: make it crash-safe
         if pubkey_data.is_empty() {
             Err(KeyError::DHKeyExchange)
         } else {
-            // ed25519_dalek::SecretKey::try_from(&i.0[..32])
-
             match (<&[u8] as TryInto<[u8; 32]>>::try_into(&pubkey_data[..32]),
                    <Vec<u8> as TryInto<[u8; 16]>>::try_into(initialization_vector)) {
                 (Ok(key_data), Ok(iv_data)) =>
@@ -657,45 +687,7 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
                         }),
                 _ => Err(KeyError::DHKeyExchange)
             }
-            // pubkey_data[..32]
-            //     .try_into()
-            //     .and_then(|key_data: [u8; 32]| initialization_vector
-            //         .try_into()
-            //         .and_then(|iv_data: [u8; 16]| match <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data) {
-            //             Ok(encrypted_data) => {
-            //                 destination.extend(encrypted_data);
-            //                 destination
-            //             },
-            //             Err(err) => Err(err)
-            //         }))
-            //     .map_err(KeyError::from)
-                    // .map(|encrypted_data| {
-                    //     destination.extend(encrypted_data);
-                    //     destination
-                    // }))
-
-            // pubkey_data[..32].try_into()
-            //     .and_then(|key_data: [u8; 32]| initialization_vector.try_into()
-            //         .map_err(KeyError::from)
-            //         .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
-            //         .map(|encrypted_data| {
-            //             destination.extend(encrypted_data);
-            //             destination
-            //         }))
         }
-
-
-        // key.public_key()
-        //     .ok()
-        //     .map(|pubk| if key.compressed { pubk.serialize().to_vec() } else { pubk.serialize_uncompressed().to_vec() })
-        //     // .or(key.public_key_from_inner_secret_key_serialized())
-        //     .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
-        //     .and_then(|key_data: [u8; 32]| initialization_vector.try_into().ok()
-        //         .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
-        //         .map(|encrypted_data| {
-        //             destination.extend(encrypted_data);
-        //             destination
-        //         }))
     }
 
     fn decrypt_with_dh_key_using_iv_size(&self, key: &ECDSAKey, iv_size: usize) -> Result<Vec<u8>, KeyError> {
@@ -705,43 +697,5 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
             .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().map_err(KeyError::from)
                 .and_then(|iv_data: [u8; 16]|
                     <Self as CryptoData<ECDSAKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, iv_data)))
-    }
-}
-
-impl ECDSAKey {
-    pub fn deprecated_incorrect_extended_public_key_from_seed(
-        &self,
-        secret: &[u8],
-        chaincode: &[u8],
-        hashes: &[u8],
-        derivation_len: usize)
-        -> Result<Self, KeyError> {
-        let mut chaincode = UInt256::from(chaincode);
-        let mut key = UInt256::from(secret);
-        let mut writer = SecVec::new();
-        self.hash160().u32_le().enc(&mut writer);
-        (0..derivation_len).into_iter().for_each(|position| {
-            let soft_index = hashes.read_with::<u64>(&mut position.clone(), byte::LE).unwrap() as u32;
-            // let soft_index = slice.read_with::<u64>(&mut 0, byte::BE).unwrap() as u32;
-            let buf = &mut [0u8; 37];
-            if soft_index & BIP32_HARD != 0 {
-                buf[1..33].copy_from_slice(&key.0);
-            } else {
-                buf[..33].copy_from_slice(&secp256k1_point_from_bytes(&key.0));
-            }
-            buf[33..37].copy_from_slice(soft_index.to_be_bytes().as_slice());
-            let i = UInt512::hmac(chaincode.as_ref(), buf);
-            let mut sec_key = secp256k1::SecretKey::from_slice(&key.0).expect("invalid private key");
-            let tweak = Scalar::from_be_bytes(clone_into_array(&i.0[..32])).expect("invalid tweak");
-            sec_key = sec_key.add_tweak(&tweak).expect("failed to add tweak");
-            key.0.copy_from_slice(&sec_key.secret_bytes());
-            chaincode.0.copy_from_slice(&i.0[32..]);
-        });
-        ECDSAKey::key_with_secret(&key, true)
-            .and_then(|seckey| {
-                chaincode.enc(&mut writer);
-                writer.extend(seckey.public_key_data());
-                ECDSAKey::key_with_extended_public_key_data(&writer)
-            })
     }
 }

@@ -91,7 +91,7 @@ pub trait IKey: Send + Sync + Debug {
         sig
     }
 
-
+    fn sign_message_digest(&self, digest: UInt256) -> Vec<u8>;
 }
 
 #[derive(Clone, Debug)]

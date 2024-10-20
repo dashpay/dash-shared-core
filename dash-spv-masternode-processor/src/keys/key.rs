@@ -355,4 +355,12 @@ impl IKey for OpaqueKey {
         }
 
     }
+
+    fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
+      match self {
+            OpaqueKey::ECDSA(key) => key.sign_message_digest(digest),
+            OpaqueKey::BLS(key) => key.sign_message_digest(digest),
+            OpaqueKey::ED25519(key) => key.sign_message_digest(digest),
+        }
+    }
 }
