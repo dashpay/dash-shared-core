@@ -27,9 +27,5 @@ http = { version = "0.2.12" }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 tokio-util = { version = "0.7.10" }
 
-[build-dependencies]
-#ferment-sys = { git = "https://github.com/pankcuf/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["objc"] }
-#ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }
-
 [lib]
 name = "dash_spv_platform"
