@@ -92,6 +92,8 @@ pub trait IKey: Send + Sync + Debug {
     }
 
     fn sign_message_digest(&self, digest: UInt256) -> Vec<u8>;
+    fn private_key_data_equal_to(&self, other_private_key_data: &[u8; 32]) -> bool;
+    fn public_key_data_equal_to(&self, other_public_key_data: &Vec<u8>) -> bool;
 }
 
 #[derive(Clone, Debug)]

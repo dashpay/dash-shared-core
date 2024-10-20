@@ -68,6 +68,9 @@ impl ED25519Key {
             .map_err(KeyError::from)
             .map(|seckey| Self { seckey: seckey.into(), ..Default::default() })
     }
+    pub fn hash160(&self) -> UInt160 {
+        UInt160::hash160(&self.public_key_data())
+    }
 }
 
 #[ferment_macro::export]
@@ -195,6 +198,14 @@ impl IKey for ED25519Key {
 
     fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
         self.sign(&digest.0)
+    }
+    fn private_key_data_equal_to(&self, other_private_key_data: &[u8; 32]) -> bool {
+
+        self.seckey.0.eq(other_private_key_data)
+    }
+
+    fn public_key_data_equal_to(&self, other_public_key_data: &Vec<u8>) -> bool {
+        self.public_key_data().eq(other_public_key_data)
     }
 }
 
@@ -325,8 +336,5 @@ impl ED25519Key {
     }
 
 
-    pub fn hash160(&self) -> UInt160 {
-        UInt160::hash160(&self.public_key_data())
-    }
 
 }

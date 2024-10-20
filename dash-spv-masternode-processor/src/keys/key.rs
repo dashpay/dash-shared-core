@@ -151,7 +151,7 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_seed_data(seed).map(OpaqueKey::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_seed_data(seed).map(OpaqueKey::ED25519),
-            _ => BLSKey::extended_private_key_with_seed_data(seed, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
+            _ => BLSKey::extended_private_key_with_seed_data(seed, *self == KeyKind::BLS).map(OpaqueKey::BLS)
         }
     }
 
@@ -357,10 +357,25 @@ impl IKey for OpaqueKey {
     }
 
     fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
-      match self {
+        match self {
             OpaqueKey::ECDSA(key) => key.sign_message_digest(digest),
             OpaqueKey::BLS(key) => key.sign_message_digest(digest),
             OpaqueKey::ED25519(key) => key.sign_message_digest(digest),
         }
     }
+    fn private_key_data_equal_to(&self, other_private_key_data: &[u8; 32]) -> bool {
+        match self {
+            OpaqueKey::ECDSA(key) =>
+                key.private_key_data_equal_to(other_private_key_data),
+            OpaqueKey::BLS(key) =>
+                key.private_key_data_equal_to(other_private_key_data),
+            OpaqueKey::ED25519(key) =>
+                key.private_key_data_equal_to(other_private_key_data),
+        }
+    }
+
+    fn public_key_data_equal_to(&self, other: &Vec<u8>) -> bool {
+        self.public_key_data().eq(other)
+    }
+
 }

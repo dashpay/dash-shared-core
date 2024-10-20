@@ -336,6 +336,10 @@ impl ECDSAKey {
                 ECDSAKey::key_with_extended_public_key_data(&writer)
             })
     }
+    pub fn hash160(&self) -> UInt160 {
+        UInt160::hash160(&self.public_key_data())
+    }
+
 }
 
 #[ferment_macro::export]
@@ -474,6 +478,13 @@ impl IKey for ECDSAKey {
         self.compact_sign(digest)
             .to_vec()
     }
+    fn private_key_data_equal_to(&self, other_private_key_data: &[u8; 32]) -> bool {
+        self.seckey.0.eq(other_private_key_data)
+    }
+
+    fn public_key_data_equal_to(&self, other_public_key_data: &Vec<u8>) -> bool {
+        self.public_key_data().eq(other_public_key_data)
+    }
 }
 
 impl ECDSAKey {
@@ -494,9 +505,6 @@ impl ECDSAKey {
     }
 
 
-    pub fn hash160(&self) -> UInt160 {
-        UInt160::hash160(&self.public_key_data())
-    }
 
     pub fn serialized_auth_private_key_from_seed(seed: &[u8], script_map: ScriptMap) -> String {
         let key = UInt512::bip32_seed_key(seed);

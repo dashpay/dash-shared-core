@@ -82,6 +82,14 @@ impl BLSKey {
     pub fn sign_digest(&self, md: UInt256) -> UInt768 {
         self.sign_with_key(|| md.0)
     }
+    pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
+        ExtendedPrivateKey::from_seed(seed)
+            .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&bls_extended_private_key, use_legacy))
+            .map_err(KeyError::from)
+    }
+    pub fn hash160(&self) -> UInt160 {
+        UInt160::hash160(&self.public_key_data())
+    }
 
 }
 
@@ -164,6 +172,14 @@ impl IKey for BLSKey {
 
     fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
         self.sign_digest(digest).0.to_vec()
+    }
+
+    fn private_key_data_equal_to(&self, other_private_key_data: &[u8; 32]) -> bool {
+        self.seckey.0.eq(other_private_key_data)
+    }
+
+    fn public_key_data_equal_to(&self, other_public_key_data: &Vec<u8>) -> bool {
+        self.public_key_data().eq(other_public_key_data)
     }
 }
 
@@ -255,11 +271,6 @@ impl BLSKey {
             pubkey: UInt384(g1_element_serialized(&bls_public_key, use_legacy)),
             use_legacy,
         })
-    }
-
-    pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Result<Self, BlsError> {
-        ExtendedPrivateKey::from_seed(seed)
-            .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&bls_extended_private_key, use_legacy))
     }
 
 
@@ -500,9 +511,6 @@ impl BLSKey {
             })
     }
 
-    pub fn hash160(&self) -> UInt160 {
-        UInt160::hash160(&self.public_key_data())
-    }
 
 }
 
