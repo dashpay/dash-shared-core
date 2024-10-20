@@ -82,6 +82,10 @@ impl BLSKey {
     pub fn sign_digest(&self, md: UInt256) -> UInt768 {
         self.sign_with_key(|| md.0)
     }
+    pub fn sign_data(&self, data: &[u8]) -> UInt768 {
+        self.sign_with_key(|| sha256d::Hash::hash(data).into_inner())
+    }
+
     pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
         ExtendedPrivateKey::from_seed(seed)
             .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&bls_extended_private_key, use_legacy))
@@ -389,10 +393,6 @@ impl BLSKey {
         } else {
             UInt768::MAX
         }
-    }
-
-    pub fn sign_data(&self, data: &[u8]) -> UInt768 {
-        self.sign_with_key(|| sha256d::Hash::hash(data).into_inner())
     }
 
     pub fn sign_data_single_sha256(&self, data: &[u8]) -> UInt768 {
