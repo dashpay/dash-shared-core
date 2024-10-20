@@ -32,58 +32,8 @@ pub struct ECDSAKey {
     pub is_extended: bool,
 }
 
-#[ferment_macro::export]
 impl ECDSAKey {
-    pub fn key_with_secret_data(data: &[u8], compressed: bool) -> Result<ECDSAKey, KeyError> {
-        Self::secret_key_from_bytes(data)
-            .map_err(KeyError::from)
-            .map(|seckey| Self::with_seckey(seckey, compressed))
-    }
-    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
-        let len = bytes.len();
-        match len {
-            69 | 101 => {
-                let offset = &mut 0;
-                let fingerprint = bytes.read_with::<u32>(offset, byte::LE)?;
-                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE)?;
-                let pubkeydata: &[u8] = bytes.read_with(offset, Bytes::Len(len - *offset))?;
-                let compressed = pubkeydata.len() == 33;
-                Self::public_key_from_bytes(pubkeydata)
-                    .map_err(KeyError::from)
-                    .map(|pubkey| Self {
-                        fingerprint,
-                        chaincode,
-                        compressed,
-                        pubkey: if compressed { pubkey.serialize().to_vec() } else { pubkey.serialize_uncompressed().to_vec() },
-                        is_extended: true,
-                        ..Default::default()
-                    })
-            },
-            len => Err(KeyError::WrongLength(len))
-        }
-    }
 
-    /// Pieter Wuille's compact signature encoding used for bitcoin message signing
-    /// to verify a compact signature, recover a public key from the signature and verify that it matches the signer's pubkey
-    pub fn compact_sign(&self, message_digest: UInt256) -> [u8; 65] {
-        let mut sig = [0u8; 65];
-        if self.seckey.is_zero() {
-            warn!("Can't sign with a public key");
-            return sig;
-        }
-        let secp = secp256k1::Secp256k1::new();
-        let msg = Self::message_from_bytes(&message_digest.0).unwrap();
-        let seckey = self.secret_key().unwrap();
-        let rec_sig = secp.sign_ecdsa_recoverable(&msg, &seckey);
-        let (rec_id, bytes) = rec_sig.serialize_compact();
-        let version = 27 + rec_id.to_i32() as u8 + if self.compressed { 4 } else { 0 };
-        sig[0] = version;
-        sig[1..].copy_from_slice(&bytes);
-        sig
-    }
-}
-
-impl ECDSAKey {
     fn with_shared_secret(secret: secp256k1::ecdh::SharedSecret, compressed: bool) -> Self {
         Self { pubkey: secret.secret_bytes().to_vec(), compressed, ..Default::default() }
     }
@@ -167,6 +117,35 @@ impl ECDSAKey {
 /// Shorthands
 #[ferment_macro::export]
 impl ECDSAKey {
+    pub fn key_with_secret_data(data: &[u8], compressed: bool) -> Result<Self, KeyError> {
+        Self::secret_key_from_bytes(data)
+            .map_err(KeyError::from)
+            .map(|seckey| Self::with_seckey(seckey, compressed))
+    }
+    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        let len = bytes.len();
+        match len {
+            69 | 101 => {
+                let offset = &mut 0;
+                let fingerprint = bytes.read_with::<u32>(offset, byte::LE)?;
+                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE)?;
+                let pubkeydata: &[u8] = bytes.read_with(offset, Bytes::Len(len - *offset))?;
+                let compressed = pubkeydata.len() == 33;
+                Self::public_key_from_bytes(pubkeydata)
+                    .map_err(KeyError::from)
+                    .map(|pubkey| Self {
+                        fingerprint,
+                        chaincode,
+                        compressed,
+                        pubkey: if compressed { pubkey.serialize().to_vec() } else { pubkey.serialize_uncompressed().to_vec() },
+                        is_extended: true,
+                        ..Default::default()
+                    })
+            },
+            len => Err(KeyError::WrongLength(len))
+        }
+    }
+
     pub fn public_key_data_from_seed(seed: &[u8], compressed: bool) -> Option<Vec<u8>> {
         Self::secret_key_from_bytes(seed)
             .ok()
@@ -299,6 +278,36 @@ impl ECDSAKey {
             .map_err(KeyError::from)
             .and_then(|key| Self::init_with_secret(key, true))
             .map(|key| Self::update_extended_params(key, bytes))
+    }
+
+    /// Pieter Wuille's compact signature encoding used for bitcoin message signing
+    /// to verify a compact signature, recover a public key from the signature and verify that it matches the signer's pubkey
+    pub fn compact_sign(&self, message_digest: UInt256) -> [u8; 65] {
+        let mut sig = [0u8; 65];
+        if self.seckey.is_zero() {
+            warn!("Can't sign with a public key");
+            return sig;
+        }
+        let secp = secp256k1::Secp256k1::new();
+        let msg = Self::message_from_bytes(&message_digest.0).unwrap();
+        let seckey = self.secret_key().unwrap();
+        let rec_sig = secp.sign_ecdsa_recoverable(&msg, &seckey);
+        let (rec_id, bytes) = rec_sig.serialize_compact();
+        let version = 27 + rec_id.to_i32() as u8 + if self.compressed { 4 } else { 0 };
+        sig[0] = version;
+        sig[1..].copy_from_slice(&bytes);
+        sig
+    }
+    pub fn key_with_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Result<Self, KeyError> {
+        if compact_sig.len() != 65 {
+            return Err(KeyError::Secp256k1(secp256k1::Error::InvalidSignature));
+        }
+        RecoveryId::from_i32(((compact_sig[0] - 27) % 4) as i32)
+            .and_then(|recid| RecoverableSignature::from_compact(&compact_sig[1..], recid)
+                .and_then(|sig| Secp256k1::new()
+                    .recover_ecdsa(&secp256k1::Message::from(message_digest), &sig)
+                    .map(|pubkey| ECDSAKey::with_pubkey_compressed(pubkey, compact_sig[0] - 27 >= 4))))
+            .map_err(KeyError::from)
     }
     pub fn deprecated_incorrect_extended_public_key_from_seed(
         &self,
@@ -610,16 +619,6 @@ impl ECDSAKey {
             .and_then(|pub_key_data| Self::key_with_public_key_data(&pub_key_data))
     }
 
-    pub fn key_with_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Result<ECDSAKey, secp256k1::Error> {
-        if compact_sig.len() != 65 {
-            return Err(secp256k1::Error::InvalidSignature);
-        }
-        RecoveryId::from_i32(((compact_sig[0] - 27) % 4) as i32)
-            .and_then(|recid| RecoverableSignature::from_compact(&compact_sig[1..], recid)
-                .and_then(|sig| Secp256k1::new()
-                    .recover_ecdsa(&secp256k1::Message::from(message_digest), &sig)
-                    .map(|pubkey| ECDSAKey::with_pubkey_compressed(pubkey, compact_sig[0] - 27 >= 4))))
-    }
 
 
     pub fn serialized_extended_private_key_from_seed(seed: &[u8], index_path: IndexPath<UInt256>, chain_type: ChainType) -> Result<String, KeyError> {
