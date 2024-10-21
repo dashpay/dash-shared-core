@@ -18,6 +18,7 @@ pub mod address {
         base58::encode_slice(&writer)
     }
 
+    #[ferment_macro::export]
     pub fn with_public_key_data(data: &[u8], map: &ScriptMap) -> String {
         let mut writer = SecVec::with_capacity(21);
         map.pubkey.enc(&mut writer);
