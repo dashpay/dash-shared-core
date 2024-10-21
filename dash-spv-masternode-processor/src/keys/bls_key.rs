@@ -63,6 +63,33 @@ impl BLSKey {
     pub fn key_with_public_key(pubkey: UInt384, use_legacy: bool) -> Self {
         Self { pubkey, use_legacy, ..Default::default() }
     }
+    pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
+        ExtendedPrivateKey::from_bytes(bytes)
+            .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
+            .map_err(KeyError::from)
+    }
+
+    pub fn migrate_from_legacy_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        ExtendedPublicKey::from_bytes_legacy(bytes)
+            .map_err(KeyError::from)
+            .map(|extended_public_key| Self {
+                pubkey: UInt384(g1_element_serialized(&extended_public_key.public_key(), false)),
+                chaincode: extended_public_key.chain_code().into(),
+                extended_public_key_data: extended_public_key_serialized(&extended_public_key, false).to_vec(),
+                ..Default::default()
+            })
+    }
+
+    pub fn migrate_from_basic_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        ExtendedPublicKey::from_bytes(bytes)
+            .map_err(KeyError::from)
+            .map(|extended_public_key| Self {
+                pubkey: UInt384(g1_element_serialized(&extended_public_key.public_key(), true)),
+                chaincode: extended_public_key.chain_code().into(),
+                extended_public_key_data: extended_public_key_serialized(&extended_public_key, true).to_vec(),
+                ..Default::default()
+            })
+    }
 
     pub fn product(&self, public_key: &BLSKey) -> Result<[u8; 48], KeyError> {
         match (self.bls_private_key(), public_key.bls_public_key(), self.use_legacy) {
@@ -485,33 +512,6 @@ impl BLSKey {
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path, key.use_legacy))
             .map(|pub_key_data| Self::key_with_public_key(UInt384::from(pub_key_data), key.use_legacy))
     }
-
-    pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, BlsError> {
-        ExtendedPrivateKey::from_bytes(bytes)
-            .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
-    }
-
-    pub fn migrate_from_legacy_extended_public_key_data(bytes: &[u8]) -> Result<Self, BlsError> {
-        ExtendedPublicKey::from_bytes_legacy(bytes)
-            .map(|extended_public_key| Self {
-                pubkey: UInt384(g1_element_serialized(&extended_public_key.public_key(), false)),
-                chaincode: extended_public_key.chain_code().into(),
-                extended_public_key_data: extended_public_key_serialized(&extended_public_key, false).to_vec(),
-                ..Default::default()
-            })
-    }
-
-    pub fn migrate_from_basic_extended_public_key_data(bytes: &[u8]) -> Result<Self, BlsError> {
-        ExtendedPublicKey::from_bytes(bytes)
-            .map(|extended_public_key| Self {
-                pubkey: UInt384(g1_element_serialized(&extended_public_key.public_key(), true)),
-                chaincode: extended_public_key.chain_code().into(),
-                extended_public_key_data: extended_public_key_serialized(&extended_public_key, true).to_vec(),
-                ..Default::default()
-            })
-    }
-
-
 }
 
 
