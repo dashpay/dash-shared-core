@@ -17,7 +17,7 @@ pub trait DataAppend: std::io::Write {
     fn append_coinbase_message<W: std::io::Write>(&self, message: &String, height: u32, writer: W) -> W;
     fn append_devnet_genesis_coinbase_message(devnet_type: DevnetType, protocol_version: u32, writer: Self) -> Self;
     fn append_credit_burn_script_pub_key_for_address(address: &String, script_map: &ScriptMap, writer: Self) -> Self;
-    fn append_proposal_info(proposal_info: &Vec<u8>, writer: Self) -> Self;
+    fn append_proposal_info(proposal_info: &[u8], writer: Self) -> Self;
     fn append_script_pub_key_for_address(address: &str, script_map: &ScriptMap, writer: Self) -> Self;
     fn append_script_push_data<W: std::io::Write>(&self, writer: W);
     fn append_shapeshift_memo_for_address(address: String, writer: Self) -> Self;
@@ -109,7 +109,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         }
     }
 
-    fn append_proposal_info(proposal_info: &Vec<u8>, mut writer: Self) -> Self {
+    fn append_proposal_info(proposal_info: &[u8], mut writer: Self) -> Self {
         let hash = sha256d::Hash::hash(proposal_info).into_inner();
         OP_RETURN.into_u8().enc(&mut writer);
         // TODO check we need to write varint

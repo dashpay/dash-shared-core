@@ -280,11 +280,11 @@ impl ED25519Key {
         Self { fingerprint, chaincode, pubkey, is_extended: true, ..Default::default() }
     }
 
-    pub fn init_with_extended_private_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
+    pub fn init_with_extended_private_key_data(data: &[u8]) -> Result<Self, KeyError> {
         Self::key_with_extended_private_key_data(data)
     }
 
-    pub fn init_with_extended_public_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
+    pub fn init_with_extended_public_key_data(data: &[u8]) -> Result<Self, KeyError> {
         Self::key_with_extended_public_key_data(data)
     }
 

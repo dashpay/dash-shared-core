@@ -238,12 +238,12 @@ impl DeriveKey<IndexPath<UInt256>> for BLSKey {
 
 impl BLSKey {
 
-    pub fn init_with_extended_private_key_data(data: &Vec<u8>, use_legacy: bool) -> Result<Self, BlsError> {
+    pub fn init_with_extended_private_key_data(data: &[u8], use_legacy: bool) -> Result<Self, BlsError> {
         ExtendedPrivateKey::from_bytes(data)
             .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&bls_extended_private_key, use_legacy))
     }
 
-    pub fn init_with_extended_public_key_data(data: &Vec<u8>, use_legacy: bool) -> Result<Self, BlsError> {
+    pub fn init_with_extended_public_key_data(data: &[u8], use_legacy: bool) -> Result<Self, BlsError> {
         extended_public_key_from_bytes(data, use_legacy)
             .map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
     }

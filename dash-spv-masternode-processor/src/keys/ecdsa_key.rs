@@ -1,4 +1,3 @@
-use std::mem;
 use byte::BytesExt;
 use byte::ctx::Bytes;
 use hashes::sha256;
@@ -214,14 +213,14 @@ impl ECDSAKey {
             .map(|seckey| Self::with_seckey(seckey, compressed))
     }
 
-    pub fn init_with_extended_private_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
+    pub fn init_with_extended_private_key_data(data: &[u8]) -> Result<Self, KeyError> {
         data.read_with::<UInt256>(&mut 36, byte::LE)
             .map_err(KeyError::from)
             .and_then(|secret| Self::init_with_secret(secret, true))
             .map(|key| Self::update_extended_params(key, data))
     }
 
-    pub fn init_with_extended_public_key_data(data: &Vec<u8>) -> Result<Self, KeyError> {
+    pub fn init_with_extended_public_key_data(data: &[u8]) -> Result<Self, KeyError> {
         Self::init_with_public_key(data[36..].to_vec())
             .map_err(KeyError::from)
             .map(|key| Self::update_extended_params(key, data))
@@ -532,7 +531,7 @@ impl ECDSAKey {
         base58::check_encode_slice(&writer)
     }
 
-    pub fn serialized_private_master_key_from_seed(seed: &Vec<u8>, chain_type: ChainType) -> String {
+    pub fn serialized_private_master_key_from_seed(seed: &[u8], chain_type: ChainType) -> String {
         let i = UInt512::bip32_seed_key(seed);
         bip32::Key::new(0, 0, UInt256::MIN, UInt256::from(&i.0[32..]), i.0[..32].to_vec(), false)
             .serialize(chain_type)
