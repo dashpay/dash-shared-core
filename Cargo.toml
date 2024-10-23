@@ -19,4 +19,4 @@ keywords = ["crypto", "dash", "spv"]
 [profile.release]
 lto = "thin"
 opt-level = 3
-#debug = true
+debug = true

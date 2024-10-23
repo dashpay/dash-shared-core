@@ -21,7 +21,7 @@ use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
 use dash_spv_masternode_processor::util::address::address;
 use ferment_interfaces::{boxed, unbox_any_vec, unbox_vec_ptr};
 use logging::*;
-use tracing::{info, error};
+use tracing::{info, error, debug};
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
 use crate::ffi::callbacks::{AddPendingMasternode, AvailableCoins, CommitTransaction, DestroyCoinJoinKeys, DestroyGatheredOutputs, DestroySelectedCoins, DestroyWalletTransaction, DisconnectMasternode, FreshCoinJoinAddress, GetCoinJoinKeys, GetWalletTransaction, InputsWithAmount, IsBlockchainSynced, IsMasternodeOrDisconnectRequested, IsMineInput, SelectCoinsGroupedByAddresses, SendMessage, SignTransaction, StartManagerAsync};
@@ -33,7 +33,6 @@ use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::tx_destination::TxDestination;
 use crate::models::tx_outpoint::TxOutPoint;
 use crate::models::CoinJoinClientOptions;
-use crate::utils::coin_format::CoinFormat;
 
 pub struct WalletEx {
     context: *const std::ffi::c_void,
@@ -184,7 +183,7 @@ impl WalletEx {
         if wtx.is_none() {
             // no such tx in this wallet
             rounds_ref = -1;
-            log_error!(target: "CoinJoin", "FAILED    {:?} {} (no such tx)", outpoint, rounds_ref);
+            log_debug!(target: "CoinJoin", "FAILED    {:?} {} (no such tx)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -194,7 +193,7 @@ impl WalletEx {
         if outpoint.index >= transaction.outputs.len() as u32 {
             // should never actually hit this
             rounds_ref = -4;
-            log_error!(target: "CoinJoin", "FAILED    {:?} {} (bad index)", outpoint, rounds_ref);
+            log_debug!(target: "CoinJoin", "FAILED    {:?} {} (bad index)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -203,7 +202,7 @@ impl WalletEx {
 
         if CoinJoin::is_collateral_amount(tx_out.amount) {
             rounds_ref = -3;
-            log_info!(target: "CoinJoin", "UPDATED    {:?} {} (collateral)", outpoint, rounds_ref);
+            log_debug!(target: "CoinJoin", "UPDATED    {:?} {} (collateral)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -211,7 +210,7 @@ impl WalletEx {
         // make sure the final output is non-denominate
         if !CoinJoin::is_denominated_amount(tx_out.amount) {
             rounds_ref = -2;
-            log_info!(target: "CoinJoin", "UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
+            log_debug!(target: "CoinJoin", "UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
             self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
             return rounds_ref;
         }
@@ -220,7 +219,7 @@ impl WalletEx {
             if !CoinJoin::is_denominated_amount(out.amount) {
                 // this one is denominated but there is another non-denominated output found in the same tx
                 rounds_ref = 0;
-                log_info!(target: "CoinJoin", "UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
+                log_debug!(target: "CoinJoin", "UPDATED    {:?} {} (non-denominated)", outpoint, rounds_ref);
                 self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
                 return rounds_ref;
             }
@@ -249,7 +248,7 @@ impl WalletEx {
             0
         };
 
-        log_info!(target: "CoinJoin", "UPDATED    {:?} {} (coinjoin)", outpoint, rounds_ref);
+        log_debug!(target: "CoinJoin", "UPDATED    {:?} {} (coinjoin)", outpoint, rounds_ref);
         self.map_outpoint_rounds_cache.insert(outpoint, rounds_ref);
         rounds_ref
     }
@@ -393,8 +392,10 @@ impl WalletEx {
 
     pub fn get_unused_key(&mut self, internal: bool) -> TxDestination {
         if self.unused_keys.is_empty() {
-            log_info!(target: "CoinJoin", "WalletEx - obtaining fresh key");
-            log_info!(target: "CoinJoin", "WalletEx - keyUsage map has unused keys: {}, unused key count: {}", !self.key_usage.is_empty() && self.key_usage.values().all(|used| !used), self.unused_keys.len());
+            if !self.key_usage.is_empty() && self.key_usage.values().all(|used| !used) {
+                log_info!(target: "CoinJoin", "WalletEx - keyUsage map has unused keys, unused key count: {}", self.unused_keys.len());
+            }
+
             return Some(self.fresh_receive_key(internal));
         }
 
@@ -404,9 +405,7 @@ impl WalletEx {
         if let Some(pair) = self.unused_keys.iter().next() {
             key = *pair.0;
             item = pair.1.clone();
-
-            log_info!(target: "CoinJoin", "WalletEx - reusing key: {:?}", address::with_script_sig(&item, &self.options.borrow().chain_type.script_map()));
-            log_info!(target: "CoinJoin", "WalletEx - keyUsage map says this key is used: {}, unused key count: {}", self.key_usage.get(&key).unwrap(), self.unused_keys.len());
+            log_info!(target: "CoinJoin", "WalletEx - reusing key - is this key used: {}, unused key count: {}", self.key_usage.get(&key).unwrap(), self.unused_keys.len());
         } else {
             return None;
         }
@@ -423,7 +422,7 @@ impl WalletEx {
             let key_id = UInt256::sha256(key);
             self.unused_keys.insert(key_id, key.clone());
             self.key_usage.insert(key_id, false);
-            log_info!(target: "CoinJoin", "WalletEx - add unused key: {:?}", address::with_script_sig(&key, &self.options.borrow().chain_type.script_map()));
+            log_debug!(target: "CoinJoin", "WalletEx - add unused key: {:?}", address::with_script_sig(&key, &self.options.borrow().chain_type.script_map()));
         }
     }
 
@@ -432,7 +431,7 @@ impl WalletEx {
             let key_id = UInt256::sha256(key);
             self.unused_keys.remove(&key_id);
             self.key_usage.insert(key_id, true);
-            log_info!(target: "CoinJoin", "WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.borrow().chain_type.script_map()));
+            log_debug!(target: "CoinJoin", "WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.borrow().chain_type.script_map()));
         }
     }
 
@@ -455,13 +454,13 @@ impl WalletEx {
         }
 
         for (_, key) in &self.unused_keys {
-            log_info!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
+            log_debug!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
         }
 
         for (key_id, used) in &self.key_usage {
             if !used {
                 if let Some(key) = self.unused_keys.get(key_id) {
-                    log_info!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
+                    log_debug!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
                 }
             }
         }
@@ -480,7 +479,7 @@ impl WalletEx {
             }
             
             if let Some(key) = self.unused_keys.get(&key_id) {
-                log_info!(target: "CoinJoin", "WalletEx - key used: {:?}", address::with_script_pub_key(key, &self.options.borrow().chain_type.script_map()));
+                log_debug!(target: "CoinJoin", "WalletEx - key used: {:?}", address::with_script_pub_key(key, &self.options.borrow().chain_type.script_map()));
             }
         }
     }
@@ -540,7 +539,6 @@ impl WalletEx {
         coin_control.coin_type = CoinType::OnlyReadyToMix;
     
         let mut coins = self.available_coins(true, coin_control);
-        log_info!(target: "CoinJoin", "vCoins.size(): {}", coins.len());
         coins.shuffle(&mut rand::thread_rng());
     
         for out in coins.iter() {
@@ -558,20 +556,11 @@ impl WalletEx {
                 signature: Some(Vec::new()),
                 sequence: TXIN_SEQUENCE
             };
-            let script_pub_key = out.output.script.clone();
             let rounds = self.get_real_outpoint_coinjoin_rounds(out.tx_outpoint.clone(), 0);
     
             value_total += value;
-            vec_tx_dsin_ret.push(CoinJoinTransactionInput::new(txin, script_pub_key, rounds));
+            vec_tx_dsin_ret.push(CoinJoinTransactionInput::new(txin, rounds));
             set_recent_tx_ids.insert(tx_hash);
-
-            log_info!(target: "CoinJoin", "hash: {}, value: {} val_duffs: {}", tx_hash.reversed(), value.to_friendly_string(), value);
-        }
-    
-        log_info!(target: "CoinJoin", "setRecentTxIds.size(): {}", set_recent_tx_ids.len());
-        
-        if set_recent_tx_ids.is_empty() {
-            log_info!(target: "CoinJoin", "No results found for {}", CoinJoin::denomination_to_amount(denom).to_friendly_string());
         }
     
         return value_total > 0;

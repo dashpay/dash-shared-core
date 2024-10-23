@@ -44,7 +44,6 @@ impl CoinJoin {
         destroy_input_value: DestroyInputValue,
         context: *const std::ffi::c_void
     ) -> Self {
-        init_logging();
         Self {
             opaque_context: context,
             get_input_value_by_prevout_hash,

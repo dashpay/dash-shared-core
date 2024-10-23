@@ -1,5 +1,5 @@
 #[cfg(target_os = "ios")]
-use tracing::{error, warn, info};
+use tracing::{error, warn, info, debug};
 
 #[cfg(target_os = "ios")]
 use std::sync::Once;
@@ -204,5 +204,34 @@ macro_rules! log_info {
     };
     ($($arg:tt)*) => {
         println!("[default_log_prefix] INFO: {}", format!($($arg)*))
+    };
+}
+
+// Conditional macro for logging info with optional log prefix
+#[cfg(target_os = "ios")]
+#[macro_export]
+macro_rules! log_debug {
+    (target: $target:expr, $($arg:tt)*) => {
+        {
+            debug!(target: $target, $($arg)*); // Logs to file via tracing
+            println!("DEBUG [{}]: {}", $target, format!($($arg)*)); // Console output
+        }
+    };
+    ($($arg:tt)*) => {
+        {
+            debug!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            println!("DEBUG [default_log_prefix]: {}", format!($($arg)*)); // Console output
+        }
+    };
+}
+
+#[cfg(not(target_os = "ios"))]
+#[macro_export]  // Ensures the macro is available across the crate
+macro_rules! log_debug {
+    (target: $target:expr, $($arg:tt)*) => {
+        println!("[{}] DEBUG: {}", $target, format!($($arg)*))
+    };
+    ($($arg:tt)*) => {
+        println!("[default_log_prefix] DEBUG: {}", format!($($arg)*))
     };
 }

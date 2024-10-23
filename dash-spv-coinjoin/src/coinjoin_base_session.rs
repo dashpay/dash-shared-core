@@ -52,7 +52,7 @@ impl CoinJoinBaseSession {
         let mut result = ValidInOuts::new();
         
         if vin.len() != vout.len() {
-            log_error!(target: "CoinJoin dsf", "ERROR: inputs vs outputs size mismatch! {} vs {}", vin.len(), vout.len());
+            log_error!(target: "CoinJoin", "ERROR: inputs vs outputs size mismatch! {} vs {}", vin.len(), vout.len());
             result.message_id = PoolMessage::ErrSizeMismatch;
             result.consume_collateral = true;
             result.result = false;
@@ -65,7 +65,7 @@ impl CoinJoinBaseSession {
             let mut result = ValidInOuts::new();
 
             if denom != self.session_denom {
-                log_error!(target: "CoinJoin dsf", "ERROR: incompatible denom {} ({}) != sessionDenom {} ({})",
+                log_error!(target: "CoinJoin", "ERROR: incompatible denom {} ({}) != sessionDenom {} ({})",
                     denom, CoinJoin::denomination_to_string(denom), self.session_denom, CoinJoin::denomination_to_string(self.session_denom));
                 result.message_id = PoolMessage::ErrDenom;
                 result.consume_collateral = true;
@@ -77,7 +77,7 @@ impl CoinJoinBaseSession {
             let hex = tx_out.script.as_ref().unwrap_or(&vec![]).to_hex();
 
             if tx_out.script_pub_key_type() != ScriptType::PayToPubkeyHash {
-                log_error!(target: "CoinJoin dsf", "ERROR: invalid scriptPubKey={}", hex);
+                log_error!(target: "CoinJoin", "ERROR: invalid scriptPubKey={}", hex);
                 result.message_id = PoolMessage::ErrInvalidScript;
                 result.consume_collateral = true;
                 result.result = false;
@@ -86,7 +86,7 @@ impl CoinJoinBaseSession {
             }
 
             if !set_scrip_pub_keys.insert(hex.clone()) {
-                log_error!(target: "CoinJoin dsf", "ERROR: already have this script! scriptPubKey={}", hex);
+                log_error!(target: "CoinJoin", "ERROR: already have this script! scriptPubKey={}", hex);
                 result.message_id = PoolMessage::ErrAlreadyHave;
                 result.consume_collateral = true;
                 result.result = false;
@@ -113,10 +113,8 @@ impl CoinJoinBaseSession {
         }
 
         for tx_in in vin {
-            log_info!(target: "CoinJoin dsf", "tx_in={:?}", tx_in);
-
             if tx_in.input_hash.0.is_empty() {
-                log_error!(target: "CoinJoin dsf", "ERROR: invalid input!");
+                log_error!(target: "CoinJoin", "ERROR: invalid input! {:?}", tx_in);
                 result.message_id = PoolMessage::ErrInvalidInput;
                 result.consume_collateral = true;
                 result.result = false;

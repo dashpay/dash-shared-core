@@ -1,5 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-use tracing::info;
+use tracing::debug;
 use logging::*;
 use crate::wallet_ex::WalletEx;
 use super::tx_destination::TxDestination;
@@ -54,7 +54,7 @@ impl<'a> ReserveDestination {
         if self.key.is_some() {
             self.wallet_ex.borrow_mut().remove_unused_key(&self.key);
         } else {
-            log_info!(target: "CoinJoin", "cannot keep key");
+            log_debug!(target: "CoinJoin", "cannot keep key");
         }
 
         self.key = None;
@@ -64,7 +64,7 @@ impl<'a> ReserveDestination {
         if self.key.is_some() {
             self.wallet_ex.borrow_mut().add_unused_key(&self.key);
         } else {
-            log_info!(target: "CoinJoin", "cannot return key");
+            log_debug!(target: "CoinJoin", "cannot return key");
         }
 
         self.key = None;
