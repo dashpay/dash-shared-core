@@ -9,7 +9,7 @@ use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 use ferment_interfaces::boxed;
 use logging::*;
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 use crate::ffi::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
 use crate::ffi::input_value::InputValue;
 use crate::messages::pool_message::PoolMessage;
@@ -160,7 +160,8 @@ impl CoinJoin {
                 
                 if let Some(input_value) = result {
                     if !input_value.is_valid {
-                        log_warn!(target: "CoinJoin", "spent or non-locked mempool input! txin={:?}", txin);
+                        log_warn!(target: "CoinJoin", "spent or non-locked mempool input!");
+                        log_debug!(target: "CoinJoin", "txin={:?}", txin);
                         return false;
                     }
 
@@ -174,7 +175,8 @@ impl CoinJoin {
             log_info!(target: "CoinJoin", "n_value_out={}, n_value_in={}", n_value_out, n_value_in);
 
             if n_value_in - n_value_out < CoinJoin::get_collateral_amount() as i64 {
-                log_warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
+                log_warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}", n_value_out - n_value_in);
+                log_debug!(target: "CoinJoin", "txCollateral={:?}", tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }

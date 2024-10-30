@@ -679,7 +679,7 @@ impl WalletEx {
             result
         };
 
-        log_info!(target: "CoinJoin", "WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.borrow().chain_type.script_map()));
+        log_debug!(target: "CoinJoin", "WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.borrow().chain_type.script_map()));
         self.key_usage.insert(UInt256::sha256(&fresh_key), true);
 
         return fresh_key;

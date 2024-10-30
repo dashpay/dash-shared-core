@@ -319,10 +319,11 @@ impl CoinJoinClientSession {
             let message_sent = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr, false);
             
             if message_sent {
-                log_info!(target: "CoinJoin dsa", "sent {} to {}", pending_request.dsa, pending_request.addr);
+                log_info!(target: "CoinJoin", "sent dsa to {}", pending_request.addr);
+                log_debug!(target: "CoinJoin", "dsa={}", pending_request.dsa);
                 self.pending_dsa_request = None;
             } else if pending_request.is_expired() {
-                log_warn!(target: "CoinJoin dsa", "failed to connect to {}; reason: cannot find peer", pending_request.addr);
+                log_warn!(target: "CoinJoin", "failed to connect to {}; reason: cannot find peer", pending_request.addr);
                 self.set_status(PoolStatus::ConnectionTimeout);
                 self.queue_session_lifecycle_listeners(true, self.base_session.state, PoolMessage::ErrConnectionTimeout);
                 self.set_null();
@@ -890,7 +891,8 @@ impl CoinJoinClientSession {
             );
         }
 
-        log_info!(target: "CoinJoin", "sign collateral: {:?}", tx_collateral);
+        log_info!(target: "CoinJoin", "sign collateral");
+        log_debug!(target: "CoinJoin", "tx_collateral={:?}", tx_collateral);
         if let Some(signed_tx) = self.mixing_wallet.borrow().sign_transaction(&tx_collateral, false) {
             if let Some(tx_id) = signed_tx.tx_hash {
                 self.tx_my_collateral = Some(signed_tx);
@@ -1248,7 +1250,8 @@ impl CoinJoinClientSession {
             tx.outputs.push(pair.1);
         }
 
-        log_info!(target: "CoinJoin", "Submitting partial tx {:?} to session {}", tx, self.base_session.session_id);
+        log_info!(target: "CoinJoin", "Submitting partial tx to session {}", self.base_session.session_id);
+        log_debug!(target: "CoinJoin", "tx={:?}", tx);
 
         // Store our entry for later use
         let entry = CoinJoinEntry {
@@ -1498,7 +1501,8 @@ impl CoinJoinClientSession {
                 if !found {
                     // Something went wrong and we'll refuse to sign. It's possible we'll be charged collateral. But that's
                     // better than signing if the transaction doesn't look like what we wanted.
-                    log_warn!(target: "CoinJoin dss", "an output is missing, refusing to sign! txout={:?}", txout);
+                    log_warn!(target: "CoinJoin", "an output is missing, refusing to sign!");
+                    log_debug!(target: "CoinJoin", "txout={:?}", txout);
                     self.unlock_coins();
                     self.key_holder_storage.return_all();
                     self.set_null();
@@ -1524,7 +1528,8 @@ impl CoinJoinClientSession {
                 } else {
                     // Can't find one of my own inputs, refuse to sign. It's possible we'll be charged collateral. But that's
                     // better than signing if the transaction doesn't look like what we wanted.
-                    log_warn!(target: "CoinJoin dss", "missing input! txdsin={:?}", txin);
+                    log_warn!(target: "CoinJoin", "missing input!");
+                    log_debug!(target: "CoinJoin", "txdsin={:?}", txin);
                     self.unlock_coins();
                     self.key_holder_storage.return_all();
                     self.set_null();
@@ -1554,7 +1559,8 @@ impl CoinJoinClientSession {
 
             // push all of our signatures to the Masternode
             let message = CoinJoinSignedInputs { inputs: signed_inputs };
-            log_info!(target: "CoinJoin", "pushing signed inputs to the masternode, {}", message);
+            log_info!(target: "CoinJoin", "pushing signed inputs to the masternode");
+            log_debug!(target: "CoinJoin", "{}", message);
             let mut buffer = vec![];
             message.consensus_encode(&mut buffer).unwrap();
             self.mixing_wallet.borrow_mut().send_message(buffer, message.get_message_type(), peer, true);

@@ -107,6 +107,11 @@ pub fn init_logging() {
         let subscriber = SubscriberBuilder::default()
             .with_writer(make_writer)
             .with_ansi(false) // Disable ANSI colors
+            .with_max_level(if cfg!(debug_assertions) {
+                tracing::Level::DEBUG
+            } else {
+                tracing::Level::INFO
+            })
             .finish();
 
         tracing::subscriber::set_global_default(subscriber)
