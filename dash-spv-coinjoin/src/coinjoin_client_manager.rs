@@ -211,7 +211,7 @@ impl CoinJoinClientManager {
                     self.context
                 );
                 
-                log_info!(target: "CoinJoin", "creating new session, current session amount {}: ", self.deq_sessions.len());
+                log_info!(target: "CoinJoin", "creating new session, current session amount: {}", self.deq_sessions.len());
                 self.deq_sessions.push_back(new_session);
             }
 

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::{from::FromFFI, unboxer::unbox_any}, models::MasternodeEntry};
 use ferment_interfaces::boxed;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use logging::*;
 use crate::{coinjoin_client_manager::CoinJoinClientManager, constants::COINJOIN_QUEUE_TIMEOUT, ffi::callbacks::{DestroyMasternode, MasternodeByHash, ValidMasternodeCount}, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage};
 
@@ -73,7 +73,7 @@ impl CoinJoinClientQueueManager {
                 if !self.spamming_masternodes.contains_key(&dsq.pro_tx_hash) {
                     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                     self.spamming_masternodes.insert(dsq.pro_tx_hash, current_time);
-                    log_info!(target: "CoinJoin", "Peer {:?} is sending WAY too many dsq messages for a masternode {:?}", from_peer.ip_address, dsq.pro_tx_hash);
+                    log_debug!(target: "CoinJoin", "Peer {:?} is sending WAY too many dsq messages for a masternode {:?}", from_peer.ip_address, dsq.pro_tx_hash);
                 }
                 return;
             }
@@ -113,7 +113,13 @@ impl CoinJoinClientQueueManager {
                 }
 
                 self.masternode_metadata_manager.allow_mixing(dmn.provider_registration_transaction_hash);
-                log_info!(target: "CoinJoin", "new CoinJoin queue ({}) from masternode {}", dsq, dmn.socket_address);
+                let log_msg = format!("new CoinJoin queue ({}) from masternode {}", dsq, dmn.socket_address);
+
+                if dsq.ready {
+                    log_info!(target: "CoinJoin", "{}", log_msg);
+                } else {
+                    log_debug!(target: "CoinJoin", "{}", log_msg);
+                }
 
                 self.mark_already_joined_queue_as_tried(&mut dsq);
                 self.coinjoin_queue.push(dsq);

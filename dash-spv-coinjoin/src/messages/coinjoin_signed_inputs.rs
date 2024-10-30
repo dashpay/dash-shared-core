@@ -17,6 +17,19 @@ impl CoinJoinMessageType for CoinJoinSignedInputs {
     }
 }
 
+impl std::fmt::Display for CoinJoinSignedInputs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoinJoinSignedInputs {{ inputs: [")?;
+        for (i, input) in self.inputs.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{{ input_hash: {}, index: {} }}", input.input_hash, input.index)?;
+        }
+        write!(f, "] }}")
+    }
+}
+
 impl encode::Encodable for CoinJoinSignedInputs {
     #[inline]
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {

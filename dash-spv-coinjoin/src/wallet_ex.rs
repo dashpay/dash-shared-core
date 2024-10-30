@@ -297,12 +297,12 @@ impl WalletEx {
         // This should only be used if maxOupointsPerAddress was NOT specified.
         if max_outpoints_per_address == -1 && anonymizable && skip_unconfirmed {
             if skip_denominated && self.anonymizable_tally_cached_non_denom {
-                log_info!(target: "CoinJoin", "SelectCoinsGroupedByAddresses - using cache for non-denom inputs {}", self.vec_anonymizable_tally_cached_non_denom.len());
+                log_debug!(target: "CoinJoin", "SelectCoinsGroupedByAddresses - using cache for non-denom inputs {}", self.vec_anonymizable_tally_cached_non_denom.len());
                 return self.vec_anonymizable_tally_cached_non_denom.clone();
             }
 
             if !skip_denominated && self.anonymizable_tally_cached {
-                log_info!(target: "CoinJoin", "SelectCoinsGroupedByAddresses - using cache for all inputs {}", self.vec_anonymizable_tally_cached.len());
+                log_debug!(target: "CoinJoin", "SelectCoinsGroupedByAddresses - using cache for all inputs {}", self.vec_anonymizable_tally_cached.len());
                 return self.vec_anonymizable_tally_cached.clone();
             }
         }
@@ -325,11 +325,11 @@ impl WalletEx {
         // This should only be used if nMaxOupointsPerAddress was NOT specified.
         if max_outpoints_per_address == -1 && anonymizable && skip_unconfirmed && !vec_tally_ret.is_empty() {
             if skip_denominated {
-                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - set cache for non-denom inputs, len: {}", vec_tally_ret.len());
+                log_debug!(target: "CoinJoin", "SelectCoinsGroupedByAddresses - set cache for non-denom inputs, len: {}", vec_tally_ret.len());
                 self.vec_anonymizable_tally_cached_non_denom = vec_tally_ret.clone();
                 self.anonymizable_tally_cached_non_denom = true;
             } else {
-                println!("[RUST] CoinJoin: SelectCoinsGroupedByAddresses - set cache for all inputs, len: {}", vec_tally_ret.len());
+                log_debug!(target: "CoinJoin", "SelectCoinsGroupedByAddresses - set cache for all inputs, len: {}", vec_tally_ret.len());
                 self.vec_anonymizable_tally_cached = vec_tally_ret.clone();
                 self.anonymizable_tally_cached = true;
             }
@@ -371,7 +371,8 @@ impl WalletEx {
 
     pub fn get_wallet_transaction(&self, hash: UInt256) -> Option<Transaction> {
         unsafe {
-            let wtx = (self.get_wallet_transaction)(boxed(hash.0), self.context);
+            let boxed_hash = boxed(hash.0);
+            let wtx = (self.get_wallet_transaction)(boxed_hash, self.context);
             
             if wtx.is_null() {
                 return None;
@@ -379,6 +380,7 @@ impl WalletEx {
             
             let transaction = (*wtx).decode();
             (self.destroy_transaction)(wtx);
+            unbox_any(boxed_hash);
             Some(transaction)
         }
     }
@@ -496,7 +498,8 @@ impl WalletEx {
                     .collect()
             );
             
-            result = (self.commit_transaction)(boxed_vec, vec_send.len(), encoded_coin_control, is_denominating, boxed(client_session_id.0), self.context);
+            let boxed_client_session_id = boxed(client_session_id.0); // Released in DashSync
+            result = (self.commit_transaction)(boxed_vec, vec_send.len(), encoded_coin_control, is_denominating, boxed_client_session_id, self.context);
             let vec = unbox_vec_ptr(boxed_vec, vec_send.len());
             unbox_any_vec(vec);
             let unboxed_coin_control = unbox_any(encoded_coin_control);
@@ -512,14 +515,16 @@ impl WalletEx {
 
     pub fn sign_transaction(&self, tx: &Transaction, anyone_can_pay: bool) -> Option<Transaction> {
         unsafe {
-            let raw_tx = (self.sign_transaction)(boxed(tx.encode()), anyone_can_pay, self.context);
+            let boxed_tx = boxed(tx.encode());
+            let raw_tx = (self.sign_transaction)(boxed_tx, anyone_can_pay, self.context);
 
             if raw_tx.is_null() {
                 return None;
             }
 
-            let signed_tx =  (*raw_tx).decode();
+            let signed_tx = (*raw_tx).decode();
             (self.destroy_transaction)(raw_tx);
+            unbox_any(boxed_tx);
 
             return Some(signed_tx);
         }
@@ -657,7 +662,13 @@ impl WalletEx {
     }
 
     fn is_mine_input(&self, txin: &TransactionInput) -> bool {
-        unsafe { (self.is_mine_input)(boxed(txin.input_hash.0), txin.index, self.context) }
+        unsafe {
+            let boxed_txin_hash = boxed(txin.input_hash.0);
+            let is_mine = (self.is_mine_input)(boxed_txin_hash, txin.index, self.context);
+            unbox_any(boxed_txin_hash);
+            
+            return is_mine;
+        }
     }
 
     fn fresh_receive_key(&mut self, internal: bool) -> Vec<u8> {
