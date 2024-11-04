@@ -32,7 +32,7 @@ impl Balance {
 
 impl fmt::Display for Balance {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[RUST] CoinJoin: Balance(my_trusted: {}, anonymized: {}, denominated_trusted: {})\n",
+        write!(f, "Balance(my_trusted: {}, anonymized: {}, denominated_trusted: {})",
             self.my_trusted,
             self.anonymized,
             self.denominated_trusted

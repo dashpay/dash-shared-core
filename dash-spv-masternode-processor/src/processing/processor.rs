@@ -137,10 +137,10 @@ impl MasternodeProcessor {
                 if let Some(best_cl_signature) = self.find_cl_signature(work_block_hash, cached_cl_signatures) {
                     return LLMQModifierType::CoreV20(llmq_type, work_block_height, best_cl_signature);
                 } else {
-                    log_warn!(target: "masternode-processor", "llmq_modifier_type: clsig not found for block hash: {} ({})", work_block_hash, work_block_hash.reversed());
+                    log_debug!(target: "masternode-processor", "llmq_modifier_type: clsig not found for block hash: {} ({})", work_block_hash, work_block_hash.reversed());
                 }
             } else {
-                log_warn!(target: "masternode-processor", "llmq_modifier_type: block not found for height: {}", work_block_height);
+                log_debug!(target: "masternode-processor", "llmq_modifier_type: block not found for height: {}", work_block_height);
             }
         }
         LLMQModifierType::PreCoreV20(llmq_type, work_block_hash)
@@ -377,10 +377,10 @@ impl MasternodeProcessor {
                                 signatures.insert(llmq_hash_minus_8, signature.clone());
                                 cache.cl_signatures.insert(llmq_hash_minus_8, signature.clone());
                             } else {
-                                log_warn!(target: "masternode-processor", "WARN: unknown hash for {}", llmq_height - 8);
+                                log_debug!(target: "masternode-processor", "unknown hash for {}", llmq_height - 8);
                             }
                         } else {
-                            log_warn!(target: "masternode-processor", "WARN: unknown height for {}", quorum.llmq_hash);
+                            log_debug!(target: "masternode-processor", "unknown height for {}", quorum.llmq_hash);
                         }
                     }
                     if verification_context.should_validate_quorum_of_type(quorum.llmq_type, self.chain_type) {
@@ -535,11 +535,11 @@ impl MasternodeProcessor {
                         // println!("{:#?}", sorted_combined_mns_list.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
                         snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count, quarter_size)
                     } else {
-                        log_info!(target: "masternode-processor", "MISSING: snapshot for block at height: {}: {}", work_block_height, work_block_hash);
+                        log_debug!(target: "masternode-processor", "MISSING: snapshot for block at height: {}: {}", work_block_height, work_block_hash);
                         vec![]
                     }
                 } else {
-                    log_info!(target: "masternode-processor", "MISSING: masternode_list for block at height: {}: {}", work_block_height, work_block_hash);
+                    log_debug!(target: "masternode-processor", "MISSING: masternode_list for block at height: {}: {}", work_block_height, work_block_hash);
                     vec![]
                 }
             }
@@ -576,7 +576,7 @@ impl MasternodeProcessor {
                     // println!("{:#?}", masternode_list);
                     // println!("••••");
                     if masternode_list.masternodes.len() < quarter_size {
-                        log_info!(target: "masternode-processor", "models list at {}: {} has less masternodes ({}) then required for quarter size: ({})", work_block_height, work_block_hash, masternode_list.masternodes.len(), quarter_size);
+                        log_debug!(target: "masternode-processor", "models list at {}: {} has less masternodes ({}) then required for quarter size: ({})", work_block_height, work_block_hash, masternode_list.masternodes.len(), quarter_size);
                         quarter_quorum_members
                     } else {
                         let mut used_at_h_masternodes = Vec::<models::MasternodeEntry>::new();
@@ -649,7 +649,7 @@ impl MasternodeProcessor {
                                 }
                                 if idx == initial_loop_idx {
                                     if !updated {
-                                        log_info!(target: "masternode-processor", "there are not enough MNs {}: {} then required for quarter size: ({})", work_block_height, work_block_hash, quarter_size);
+                                        log_debug!(target: "masternode-processor", "there are not enough MNs {}: {} then required for quarter size: ({})", work_block_height, work_block_hash, quarter_size);
                                         return vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
                                     }
                                     updated = false;
@@ -664,7 +664,7 @@ impl MasternodeProcessor {
                         quarter_quorum_members
                     }
                 } else {
-                    log_info!(target: "masternode-processor", "missing models list for height: {}: {}", work_block_height, work_block_hash);
+                    log_debug!(target: "masternode-processor", "missing models list for height: {}: {}", work_block_height, work_block_hash);
                     quarter_quorum_members
                 }
             }

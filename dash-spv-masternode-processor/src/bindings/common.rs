@@ -79,7 +79,7 @@ pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCac
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
-    log_info!(target: "masternode-processor", "processor_destroy_cache: {:?}", cache);
+    log_debug!(target: "masternode-processor", "processor_destroy_cache: {:?}", cache);
     let cache = unbox_any(cache);
 }
 
@@ -87,7 +87,7 @@ pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessor
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
-    log_info!(target: "masternode-processor", "processor_remove_masternode_list_from_cache_for_block_hash: {:?} {:p}", block_hash, cache);
+    log_debug!(target: "masternode-processor", "processor_remove_masternode_list_from_cache_for_block_hash: {:?} {:p}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
         (*cache).remove_masternode_list(&hash);
     }

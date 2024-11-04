@@ -1,6 +1,6 @@
 use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 use logging::*;
 use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, MixingLivecycleListener, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
@@ -122,7 +122,7 @@ impl CoinJoinClientManager {
         }
 
         if !self.wallet_ex.borrow().is_synced() {
-            log_info!(target: "CoinJoin", "not synced");
+            log_debug!(target: "CoinJoin", "not synced");
             return;
         }
 
@@ -167,7 +167,7 @@ impl CoinJoinClientManager {
             return false;
         }
 
-        if !self.wallet_ex.borrow().is_synced() {
+        if !dry_run && !self.wallet_ex.borrow().is_synced() {
             log_info!(target: "CoinJoin", "wallet is not synced.");
             self.str_auto_denom_result = "Wallet is not synced.".to_string();
             return false;
@@ -179,7 +179,7 @@ impl CoinJoinClientManager {
         //     return false;
         // }
 
-        let mn_count_enabled = self.get_valid_mns_count(&self.get_mn_list());
+        let mn_count_enabled = if dry_run { 0 } else { self.get_valid_mns_count(&self.get_mn_list()) };
 
         // If we've used 90% of the Masternode list then drop the oldest first ~30%
         let threshold_high = (mn_count_enabled as f64 * 0.9) as usize;
@@ -187,7 +187,6 @@ impl CoinJoinClientManager {
 
         if !self.is_waiting_for_new_block() {
             if self.masternodes_used.len() != self.last_masternode_used {
-                log_info!(target: "CoinJoin", "Checking masternodesUsed: size: {}, threshold: {}", self.masternodes_used.len(), threshold_high);
                 self.last_masternode_used = self.masternodes_used.len();
             }
         }
@@ -212,7 +211,7 @@ impl CoinJoinClientManager {
                     self.context
                 );
                 
-                log_info!(target: "CoinJoin", "creating new session, current session amount {}: ", self.deq_sessions.len());
+                log_info!(target: "CoinJoin", "creating new session, current session amount: {}", self.deq_sessions.len());
                 self.deq_sessions.push_back(new_session);
             }
 
@@ -268,7 +267,6 @@ impl CoinJoinClientManager {
         let mn_list = self.get_mn_list();
         let count_enabled = self.get_valid_mns_count(&mn_list);
         let count_not_excluded = count_enabled - self.masternodes_used.len();
-        log_info!(target: "CoinJoin", "{} enabled masternodes, {} masternodes to choose from", count_enabled, count_not_excluded);
 
         if count_not_excluded < 1 {
             return None;
@@ -337,18 +335,16 @@ impl CoinJoinClientManager {
     }
 
     pub fn try_submit_denominate(&mut self, mn_addr: SocketAddress) -> bool {
-        log_info!(target: "CoinJoin", "try_submit_denominate, address: {}", mn_addr);
-
         for session in self.deq_sessions.iter_mut() {
             if let Some(mn_mixing) = &session.mixing_masternode {
                 if mn_mixing.socket_address == mn_addr && session.base_session.state == PoolState::Queue {
                     session.submit_denominate();
                     return true;
                 } else {
-                    log_info!(target: "CoinJoin", "mixingMasternode {} != mnAddr {} or {:?} != {:?}", mn_mixing.socket_address, mn_addr, session.base_session.state, PoolState::Queue);
+                    log_debug!(target: "CoinJoin", "mixingMasternode {} != mnAddr {} or {:?} != {:?}", mn_mixing.socket_address, mn_addr, session.base_session.state, PoolState::Queue);
                 }
             } else {
-                log_info!(target: "CoinJoin", "mixingMasternode is None");
+                log_debug!(target: "CoinJoin", "mixingMasternode is None");
             }
         }
 
@@ -391,18 +387,10 @@ impl CoinJoinClientManager {
     }
 
     pub fn change_options(&mut self, new_options: CoinJoinClientOptions) {
-        log_info!(target: "CoinJoin", "updating client options: {:?}", new_options);
-        let mut options = self.options.borrow_mut();
-        options.chain_type = new_options.chain_type;
-        options.enable_coinjoin = new_options.enable_coinjoin;
-        options.coinjoin_amount = new_options.coinjoin_amount;
-        options.coinjoin_sessions = new_options.coinjoin_sessions;
-        options.coinjoin_rounds = new_options.coinjoin_rounds;
-        options.coinjoin_random_rounds = new_options.coinjoin_random_rounds;
-        options.coinjoin_denoms_goal = new_options.coinjoin_denoms_goal;
-        options.coinjoin_denoms_hardcap = new_options.coinjoin_denoms_hardcap;
-        options.coinjoin_multi_session = new_options.coinjoin_multi_session;
-        options.denom_only = new_options.denom_only;
+        if new_options != *self.options.borrow() {
+            log_info!(target: "CoinJoin", "updating client options: {:?}", new_options);
+            *self.options.borrow_mut() = new_options.clone();
+        }
     }
 
     pub fn get_real_outpoint_coinjoin_rounds(&mut self, outpoint: TxOutPoint, rounds: i32) -> i32 {

@@ -5,6 +5,7 @@ use dash_spv_masternode_processor::common::block::Block;
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
 use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::to::ToFFI;
+use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 
 use crate::ffi::callbacks::HasChainLock;
@@ -49,7 +50,13 @@ impl CoinJoinBroadcastTx {
             return true; // mined more than an hour ago
         }
 
-        return unsafe { has_chain_lock(boxed(block.encode()), context) }; 
+        return unsafe {
+            let boxed_block = boxed(block.encode());
+            let is_chain_locked = has_chain_lock(boxed_block, context);
+            unbox_any(boxed_block);
+            
+            is_chain_locked
+        }; 
     }
 }
 

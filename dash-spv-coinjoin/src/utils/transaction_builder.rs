@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
-use tracing::info;
+use tracing::{info, debug};
 use logging::*;
 use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::TX_MIN_OUTPUT_AMOUNT;
@@ -176,15 +176,15 @@ impl<'a> TransactionBuilder {
             })
             .collect();
 
-        log_info!(target: "CoinJoin", "tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
+        log_debug!(target: "CoinJoin", "tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
 
         if !self.wallet_ex.borrow().commit_transaction(&vec_send, self.coin_control.clone(), is_denominating, client_session_id) {
-            log_info!(target: "CoinJoin", "tx_builder.commit: Failed to commit transaction");
+            log_debug!(target: "CoinJoin", "tx_builder.commit: Failed to commit transaction");
             str_result.push_str("Failed to commit transaction");
             return false;
         }
 
-        log_info!(target: "CoinJoin", "tx_builder.commit: Transaction committed");
+        log_debug!(target: "CoinJoin", "tx_builder.commit: Transaction committed");
         str_result.push_str("Transaction committed");
         self.keep_keys = true;
         return true;

@@ -4,11 +4,12 @@ use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::DUFFS;
 use dash_spv_masternode_processor::common::Block;
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
+use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
 use ferment_interfaces::boxed;
 use logging::*;
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 use crate::ffi::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
 use crate::ffi::input_value::InputValue;
 use crate::messages::pool_message::PoolMessage;
@@ -44,7 +45,6 @@ impl CoinJoin {
         destroy_input_value: DestroyInputValue,
         context: *const std::ffi::c_void
     ) -> Self {
-        init_logging();
         Self {
             opaque_context: context,
             get_input_value_by_prevout_hash,
@@ -160,7 +160,8 @@ impl CoinJoin {
                 
                 if let Some(input_value) = result {
                     if !input_value.is_valid {
-                        log_warn!(target: "CoinJoin", "spent or non-locked mempool input! txin={:?}", txin);
+                        log_warn!(target: "CoinJoin", "spent or non-locked mempool input!");
+                        log_debug!(target: "CoinJoin", "txin={:?}", txin);
                         return false;
                     }
 
@@ -174,7 +175,8 @@ impl CoinJoin {
             log_info!(target: "CoinJoin", "n_value_out={}, n_value_in={}", n_value_out, n_value_in);
 
             if n_value_in - n_value_out < CoinJoin::get_collateral_amount() as i64 {
-                log_warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}, txCollateral={}", n_value_out - n_value_in, tx_collateral.tx_hash().unwrap_or_default());
+                log_warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}", n_value_out - n_value_in);
+                log_debug!(target: "CoinJoin", "txCollateral={:?}", tx_collateral.tx_hash().unwrap_or_default());
                 return false;
             }
         }
@@ -331,7 +333,8 @@ impl CoinJoin {
 
     fn get_input_value_by_prevout_hash(&self, prevout_hash: UInt256, index: u32) -> Option<InputValue> {
         unsafe {
-            let input_ptr = (self.get_input_value_by_prevout_hash)(boxed(prevout_hash.0), index, self.opaque_context);
+            let boxed_prevout_hash = boxed(prevout_hash.0);
+            let input_ptr = (self.get_input_value_by_prevout_hash)(boxed_prevout_hash, index, self.opaque_context);
             
             if input_ptr.is_null() {
                 return None 
@@ -339,7 +342,9 @@ impl CoinJoin {
 
             let input_value: InputValue = std::ptr::read(input_ptr);
             (self.destroy_input_value)(input_ptr);
-            Some(input_value)
+            unbox_any(boxed_prevout_hash);
+            
+            return Some(input_value);
         }
     }
 

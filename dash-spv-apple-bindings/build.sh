@@ -49,19 +49,12 @@ rustup target add x86_64-apple-ios
 rustup target add aarch64-apple-ios
 rustup target add aarch64-apple-ios-sim
 
-cargo lipo
-cargo build --target=x86_64-apple-darwin 
-cargo build --target=aarch64-apple-darwin
-cargo build --target=x86_64-apple-ios
-cargo build --target=aarch64-apple-ios
-cargo build --target=aarch64-apple-ios-sim
-
-# cargo lipo --release
-# cargo build --target=x86_64-apple-darwin --release
-# cargo build --target=aarch64-apple-darwin --release
-# cargo build --target=x86_64-apple-ios --release
-# cargo build --target=aarch64-apple-ios --release
-# cargo build --target=aarch64-apple-ios-sim --release
+cargo lipo --release
+cargo build --target=x86_64-apple-darwin --release
+cargo build --target=aarch64-apple-darwin --release
+cargo build --target=x86_64-apple-ios --release
+cargo build --target=aarch64-apple-ios --release
+cargo build --target=aarch64-apple-ios-sim --release
 
 mkdir -p DashSharedCore/framework
 mkdir -p DashSharedCore/include
@@ -69,27 +62,16 @@ mkdir -p DashSharedCore/lib/ios
 mkdir -p DashSharedCore/lib/ios-simulator
 mkdir -p DashSharedCore/lib/macos
 
-lipo -create ../target/x86_64-apple-darwin/debug/libdash_spv_apple_bindings.a \
-  ../target/aarch64-apple-darwin/debug/libdash_spv_apple_bindings.a \
+lipo -create ../target/x86_64-apple-darwin/release/libdash_spv_apple_bindings.a \
+  ../target/aarch64-apple-darwin/release/libdash_spv_apple_bindings.a \
   -output DashSharedCore/lib/macos/libdash_shared_core_macos.a
 
 cp -r -p ../target/dash_shared_core.h DashSharedCore/include
-cp -r -p ../target/aarch64-apple-ios/debug/libdash_spv_apple_bindings.a DashSharedCore/lib/ios/libdash_shared_core_ios.a
+cp -r -p ../target/aarch64-apple-ios/release/libdash_spv_apple_bindings.a DashSharedCore/lib/ios/libdash_shared_core_ios.a
 
-lipo -create ../target/x86_64-apple-ios/debug/libdash_spv_apple_bindings.a \
-  ../target/aarch64-apple-ios-sim/debug/libdash_spv_apple_bindings.a \
+lipo -create ../target/x86_64-apple-ios/release/libdash_spv_apple_bindings.a \
+  ../target/aarch64-apple-ios-sim/release/libdash_spv_apple_bindings.a \
   -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
-
-# lipo -create ../target/x86_64-apple-darwin/release/libdash_spv_apple_bindings.a \
-#   ../target/aarch64-apple-darwin/release/libdash_spv_apple_bindings.a \
-#   -output DashSharedCore/lib/macos/libdash_shared_core_macos.a
-
-# cp -r -p ../target/dash_shared_core.h DashSharedCore/include
-# cp -r -p ../target/aarch64-apple-ios/release/libdash_spv_apple_bindings.a DashSharedCore/lib/ios/libdash_shared_core_ios.a
-
-# lipo -create ../target/x86_64-apple-ios/release/libdash_spv_apple_bindings.a \
-#   ../target/aarch64-apple-ios-sim/release/libdash_spv_apple_bindings.a \
-#   -output DashSharedCore/lib/ios-simulator/libdash_shared_core_ios.a
 
 xcodebuild -create-xcframework \
 	-library DashSharedCore/lib/ios/libdash_shared_core_ios.a -headers DashSharedCore/include \
