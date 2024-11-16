@@ -12,6 +12,7 @@ anyhow = { version = "1.0.75" }
 bitcoin_hashes = { version = "0.11.0", default-features = false }
 blake3 = "1.3.2"
 byte = "0.2"
+dash-spv-crypto = { path = "../dash-spv-crypto", features = ["default"] }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default"] }
 dash-spv-platform = { path = "../dash-spv-platform" }
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "dash-spv-apple-bindings",
+    "dash-spv-crypto",
     "dash-spv-example-app",
     "dash-spv-masternode-processor",
     "dash-spv-platform",

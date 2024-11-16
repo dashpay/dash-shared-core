@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
-use crate::chain::common::llmq_type::LLMQType;
-use crate::crypto::byte_util::{Reversable, UInt256};
-use crate::models;
-use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry};
-use crate::tx::coinbase_transaction::CoinbaseTransaction;
-use crate::util::data_ops::merkle_root_from_hashes;
+use dash_spv_crypto::crypto::byte_util::{Reversable, UInt256};
+use dash_spv_crypto::llmq::LLMQEntry;
+use dash_spv_crypto::network::LLMQType;
+use dash_spv_crypto::tx::CoinbaseTransaction;
+use dash_spv_crypto::util::data_ops::merkle_root_from_hashes;
+use crate::{models, models::{masternode_entry::MasternodeEntry}};
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]

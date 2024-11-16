@@ -4,31 +4,24 @@ use std::io::Read;
 use std::num::ParseIntError;
 use byte::BytesExt;
 use byte::ctx::Bytes;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use crate::chain::common::{ChainType, LLMQType};
-use crate::common::{Bitset, LLMQSnapshotSkipMode, LLMQVersion, MasternodeType, SocketAddress};
-use crate::consensus::encode::VarInt;
-use crate::crypto::{VarArray, VarBytes, byte_util::{BytesDecodable, Reversable, UInt160, UInt256, UInt384, UInt768}};
+use dash_spv_crypto::consensus::encode::VarInt;
+use dash_spv_crypto::crypto::{VarArray, VarBytes, byte_util::{BytesDecodable, Reversable, UInt160, UInt256, UInt384, UInt768}};
+use dash_spv_crypto::keys::OperatorPublicKey;
+use dash_spv_crypto::llmq::{Bitset, LLMQEntry, LLMQVersion};
+use dash_spv_crypto::network::LLMQType;
+use dash_spv_crypto::tx::CoinbaseTransaction;
+use dash_spv_crypto::util::base58;
+use crate::common::{LLMQSnapshotSkipMode, MasternodeType, SocketAddress};
 use crate::hashes::hex::FromHex;
 use crate::models;
-// use crate::models::OperatorPublicKey;
-use crate::tx::CoinbaseTransaction;
-use crate::util::base58;
 
-impl ChainType {
-    pub fn identifier(&self) -> String {
-        match self {
-            ChainType::MainNet => "mainnet".to_string(),
-            ChainType::TestNet => "testnet".to_string(),
-            ChainType::DevNet(dev) => dev.identifier()
-        }
-    }
-
-    pub fn load_message(&self, filename: &str) -> Vec<u8> {
-        let name = format!("{}/{}", self.identifier(), filename);
-        message_from_file(name.as_str())
-    }
+pub fn load_message(chain_id: &str, filename: &str) -> Vec<u8> {
+    let name = format!("{}/{}", chain_id, filename);
+    message_from_file(name.as_str())
 }
+
 
 pub fn get_file_as_byte_vec(filename: &str) -> Vec<u8> {
     //println!("get_file_as_byte_vec: {}", filename);
@@ -149,9 +142,9 @@ pub struct Llmq {
     pub members_sig: String,
 }
 
-impl From<Llmq> for models::LLMQEntry {
+impl From<Llmq> for LLMQEntry {
     fn from(llmq: Llmq) -> Self {
-        models::LLMQEntry::new(
+        LLMQEntry::new(
             LLMQVersion::from(llmq.version as u16),
             LLMQType::from(llmq.llmq_type as u8),
             block_hash_to_block_hash(llmq.quorum_hash),
@@ -284,14 +277,14 @@ pub fn value_to_masternode_list(value: &serde_json::Value) -> models::Masternode
     }
 }
 
-pub fn quorums_to_quorums_vec(value: Vec<Llmq>) -> Vec<models::LLMQEntry> {
-    value.into_iter().map(models::LLMQEntry::from).collect()
+pub fn quorums_to_quorums_vec(value: Vec<Llmq>) -> Vec<LLMQEntry> {
+    value.into_iter().map(LLMQEntry::from).collect()
 }
 
-pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> {
-    let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = BTreeMap::new();
+pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> {
+    let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
     value.into_iter().for_each(|llmq| {
-        let entry = models::LLMQEntry::from(llmq);
+        let entry = LLMQEntry::from(llmq);
         quorums
             .entry(entry.llmq_type)
             .or_insert_with(BTreeMap::new)
@@ -358,7 +351,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             let public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
             let version = node.version.unwrap_or(0);
             let is_valid = u8::from(node.is_valid);
-            let operator_public_key = models::OperatorPublicKey {
+            let operator_public_key = OperatorPublicKey {
                 data: public_key,
                 version
             };

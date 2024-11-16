@@ -4,12 +4,12 @@ use std::collections::BTreeMap;
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
-use crate::chain::constants::CORE_PROTO_19_2;
+use dash_spv_crypto::consensus::Encodable;
+use dash_spv_crypto::crypto::byte_util::{UInt160, UInt256, Zeroable};
+use dash_spv_crypto::keys::OperatorPublicKey;
+use dash_spv_crypto::network::CORE_PROTO_19_2;
+use dash_spv_crypto::util::data_ops::short_hex_string_from;
 use crate::common::{block::Block, masternode_type::MasternodeType, socket_address::SocketAddress};
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::{UInt160, UInt256, Zeroable};
-use crate::models::operator_public_key::OperatorPublicKey;
-use crate::util::data_ops::short_hex_string_from;
 
 // (block height, list diff version (2: BLSBasic), protocol_version)
 #[derive(Clone, Copy)]

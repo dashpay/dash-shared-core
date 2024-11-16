@@ -6,9 +6,9 @@ use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
 use crate::common::llmq_snapshot_skip_mode::LLMQSnapshotSkipMode;
-use crate::consensus::encode::VarInt;
-use crate::crypto::{byte_util::BytesDecodable, data_ops::Data};
-use crate::impl_bytes_decodable;
+use dash_spv_crypto::consensus::encode::VarInt;
+use dash_spv_crypto::crypto::data_ops::Data;
+use dash_spv_crypto::impl_bytes_decodable;
 
 #[derive(Clone)]
 #[ferment_macro::export]

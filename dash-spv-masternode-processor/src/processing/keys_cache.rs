@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::keys::{BLSKey, ECDSAKey, ED25519Key};
+use dash_spv_crypto::keys::{BLSKey, ECDSAKey, ED25519Key};
 
 #[derive(Clone, Default)]
 pub struct KeysCache {

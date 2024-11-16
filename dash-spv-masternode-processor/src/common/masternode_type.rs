@@ -2,7 +2,7 @@ use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
-use crate::crypto::byte_util::BytesDecodable;
+use dash_spv_crypto::crypto::byte_util::BytesDecodable;
 
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]

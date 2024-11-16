@@ -1,14 +1,14 @@
 use byte::BytesExt;
 use hashes::hex::ToHex;
 use std::collections::{BTreeMap, HashSet};
-use crate::chain::common::LLMQType;
-use crate::chain::constants::{CORE_PROTO_20, CORE_PROTO_BLS_BASIC, CORE_PROTO_DIFF_VERSION_ORDER};
-use crate::consensus::encode::VarInt;
-use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt768};
-use crate::crypto::var_array::VarArray;
-use crate::models::{LLMQEntry, MasternodeEntry};
+use dash_spv_crypto::network::{LLMQType, CORE_PROTO_20, CORE_PROTO_BLS_BASIC, CORE_PROTO_DIFF_VERSION_ORDER};
+use dash_spv_crypto::consensus::encode::VarInt;
+use dash_spv_crypto::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt768};
+use dash_spv_crypto::crypto::var_array::VarArray;
+use dash_spv_crypto::llmq::LLMQEntry;
+use dash_spv_crypto::tx::CoinbaseTransaction;
+use crate::models::MasternodeEntry;
 use crate::models::masternode_entry::MasternodeReadContext;
-use crate::tx::CoinbaseTransaction;
 
 #[derive(Clone)]
 pub struct MNListDiff {

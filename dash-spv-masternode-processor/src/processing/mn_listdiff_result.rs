@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
-use crate::crypto::byte_util::UInt256;
-use crate::models::{llmq_entry::LLMQEntry, masternode_entry::MasternodeEntry, masternode_list::MasternodeList};
+use dash_spv_crypto::crypto::byte_util::UInt256;
+use dash_spv_crypto::llmq::LLMQEntry;
+use crate::models::{masternode_entry::MasternodeEntry, masternode_list::MasternodeList};
 
 #[derive(Clone)]
 #[ferment_macro::export]

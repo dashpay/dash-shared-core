@@ -1,4 +1,5 @@
-use crate::models::{llmq_entry::LLMQEntry, snapshot::LLMQSnapshot};
+use dash_spv_crypto::llmq::LLMQEntry;
+use crate::models::snapshot::LLMQSnapshot;
 use crate::processing::mn_listdiff_result::MNListDiffResult;
 
 #[derive(Clone, Debug)]

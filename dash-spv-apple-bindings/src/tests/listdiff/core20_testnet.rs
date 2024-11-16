@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use dash_spv_masternode_processor::chain::common::ChainType;
+use dash_spv_crypto::network::ChainType;
+use dash_spv_masternode_processor::test_helpers::load_message;
 use crate::tests::common::assert_diff_chain;
 
 #[test]
@@ -138,7 +139,7 @@ struct ListDiff_70230 {
 
 #[test]
 pub fn test_core_20_rc1_testnet_etalon() {
-    let qrinfo_8792: QRInfoV20 = serde_json::from_slice(&ChainType::TestNet.load_message("qrinfo_530000_904144__70230.json")).unwrap();
+    let qrinfo_8792: QRInfoV20 = serde_json::from_slice(&load_message(ChainType::TestNet.identifier(), "qrinfo_530000_904144__70230.json")).unwrap();
     println!("qrinfo");
 }
 

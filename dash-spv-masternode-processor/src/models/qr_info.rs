@@ -1,7 +1,8 @@
 use byte::{BytesExt, TryRead};
-use crate::consensus::encode::VarInt;
-use crate::crypto::byte_util::BytesDecodable;
-use crate::models::{LLMQEntry, LLMQSnapshot, LLMQVerificationContext, MNListDiff};
+use dash_spv_crypto::consensus::encode::VarInt;
+use dash_spv_crypto::crypto::byte_util::BytesDecodable;
+use dash_spv_crypto::llmq::LLMQEntry;
+use crate::models::{LLMQSnapshot, LLMQVerificationContext, MNListDiff};
 use crate::processing::{CoreProvider, MNListDiffResult, QRInfoResult};
 
 pub struct QRInfo {

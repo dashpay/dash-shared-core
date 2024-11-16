@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
 use byte::BytesExt;
 use crate::{common, processing};
-use crate::chain::common::{LLMQType, LLMQParams};
+use dash_spv_crypto::llmq::{LLMQEntry, LLMQModifierType};
+use dash_spv_crypto::network::{LLMQType, LLMQParams};
+use dash_spv_crypto::crypto::byte_util::{Reversable, UInt256, UInt768};
 use crate::common::LLMQSnapshotSkipMode;
-use crate::crypto::byte_util::{Reversable, UInt256, UInt768};
-use crate::models::{LLMQEntry, LLMQIndexedHash, LLMQModifierType, LLMQSnapshot, LLMQVerificationContext, MasternodeEntry, MasternodeList, mn_list_diff::MNListDiff, QRInfo};
+use crate::models::{LLMQIndexedHash, LLMQSnapshot, LLMQVerificationContext, MasternodeEntry, MasternodeList, mn_list_diff::MNListDiff, QRInfo, llmq_entry};
 use crate::models::masternode_list::{score_masternodes_map};
 use crate::processing::core_provider::CoreProvider;
 use crate::processing::{CoreProviderError, LLMQValidationStatus, MasternodeProcessorCache, ProcessingError};
@@ -291,7 +292,7 @@ impl MasternodeProcessor {
             .and_then(|MasternodeList { masternodes, .. }| {
                 let block_height = self.provider.lookup_block_height_by_hash(llmq_block_hash);
                 self.find_valid_masternodes_for_quorum(quorum, block_height, skip_removed_masternodes, masternodes, cache)
-                    .and_then(|valid_masternodes| quorum.verify(valid_masternodes, block_height))
+                    .and_then(|valid_masternodes| llmq_entry::verify(quorum, valid_masternodes, block_height))
             })
     }
 
@@ -304,7 +305,7 @@ impl MasternodeProcessor {
         masternodes: BTreeMap<UInt256, MasternodeEntry>,
         cache: &mut MasternodeProcessorCache
     ) -> Result<Vec<MasternodeEntry>, CoreProviderError> {
-        Ok(quorum.valid_masternodes(self.provider.chain_type(), masternodes, block_height, self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8, &cache.cl_signatures)))
+        Ok(llmq_entry::valid_masternodes(quorum, self.provider.chain_type(), masternodes, block_height, self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8, &cache.cl_signatures)))
     }
 
     fn quorum_quarter_members_by_reconstruction_type(

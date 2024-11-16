@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
-use crate::chain::common::llmq_type::LLMQType;
-use crate::crypto::byte_util::{UInt256, UInt768};
+use dash_spv_crypto::network::LLMQType;
+use dash_spv_crypto::crypto::byte_util::{UInt256, UInt768};
 use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 
 #[derive(Clone, Default)]

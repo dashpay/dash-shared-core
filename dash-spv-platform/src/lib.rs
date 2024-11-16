@@ -1,8 +1,8 @@
-pub mod signer;
+pub mod identity;
 pub mod provider;
+pub mod signer;
 pub mod thread_safe_context;
-
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
@@ -26,6 +26,7 @@ use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use platform_version::version::{LATEST_PLATFORM_VERSION, PlatformVersion};
 use platform_value::{BinaryData, Identifier, Value};
 use tokio::runtime::Runtime;
+use crate::identity::manager::IdentityManager;
 use crate::signer::CallbackSigner;
 use crate::provider::PlatformProvider;
 use crate::thread_safe_context::FFIThreadSafeContext;
@@ -80,7 +81,7 @@ pub struct PlatformSDK {
     pub runtime: *mut Runtime,
     pub sdk: *mut Sdk,
     pub callback_signer: CallbackSigner,
-    pub foreign_identities: HashMap<Identifier, Identity>,
+    pub identity_manager: IdentityManager,
 }
 
 impl PlatformSDK {
@@ -115,7 +116,7 @@ impl PlatformSDK {
     ) -> Self {
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
         Self {
-            foreign_identities: HashMap::new(),
+            identity_manager: IdentityManager::new(),
             runtime: ferment::boxed(Runtime::new().unwrap()),
             callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc.clone()),
             sdk: ferment::boxed(
@@ -239,6 +240,9 @@ impl PlatformSDK  {
         Document::fetch_many(self.sdk_ref(), query).await
     }
 
+    pub async fn fetch_identities_by_key_hashes(&self, ) -> Result<Vec<Identity>, ProtocolError> {
+
+    }
 }
 
 pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {

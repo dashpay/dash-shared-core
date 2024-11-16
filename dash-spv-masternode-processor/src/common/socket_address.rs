@@ -1,7 +1,7 @@
 use std::io;
 use byte::{BytesExt, TryRead};
-use crate::consensus::{Decodable, Encodable, encode};
-use crate::crypto::byte_util::UInt128;
+use dash_spv_crypto::consensus::{Decodable, Encodable, encode};
+use dash_spv_crypto::crypto::UInt128;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]

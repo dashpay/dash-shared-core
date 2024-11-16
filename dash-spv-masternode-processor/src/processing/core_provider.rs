@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
-use crate::chain::common::{ChainType, IHaveChainSettings};
-use crate::crypto::byte_util::{UInt256, UInt768, Zeroable};
+use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
+use dash_spv_crypto::crypto::byte_util::{UInt256, UInt768, Zeroable};
 use crate::models::{snapshot::LLMQSnapshot, masternode_list::MasternodeList};
 use crate::processing::ProcessingError;
 

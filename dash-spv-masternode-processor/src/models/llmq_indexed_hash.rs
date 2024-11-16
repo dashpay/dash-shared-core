@@ -1,4 +1,4 @@
-use crate::crypto::byte_util::UInt256;
+use dash_spv_crypto::crypto::UInt256;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
