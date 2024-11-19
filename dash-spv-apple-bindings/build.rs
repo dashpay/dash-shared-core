@@ -10,6 +10,7 @@ fn main() {
         .with_cbindgen_config_from_file("cbindgen.toml")
         .with_default_mod_name()
         .with_external_crates(vec![
+            "dash-spv-crypto",
             "dash-spv-masternode-processor",
             "dash-spv-platform",
             "dash-sdk",

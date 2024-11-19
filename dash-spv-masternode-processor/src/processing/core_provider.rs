@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use dash_spv_crypto::crypto::byte_util::{UInt256, UInt768, Zeroable};
 use crate::models::{snapshot::LLMQSnapshot, masternode_list::MasternodeList};
-use crate::processing::ProcessingError;
+use crate::processing::processing_error::ProcessingError;
 
 #[ferment_macro::opaque]
 pub trait CoreProvider: std::fmt::Debug {
@@ -84,6 +84,7 @@ pub enum CoreProviderError {
     BadBlockHash(UInt256),
     BlockHashNotFoundAt(u32),
     NoMasternodeList,
+    HexError(hashes::hex::Error)
 }
 impl std::fmt::Display for CoreProviderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -93,6 +94,7 @@ impl std::fmt::Display for CoreProviderError {
             CoreProviderError::BadBlockHash(h) => format!("CoreProviderError::BadBlockHash({h})"),
             CoreProviderError::BlockHashNotFoundAt(h) => format!("CoreProviderError::BlockHashNotFound({h})"),
             CoreProviderError::NoMasternodeList => "CoreProviderError::NoMasternodeList".to_string(),
+            CoreProviderError::HexError(err) => "CoreProviderError::HexError".to_string(),
         })
     }
 }

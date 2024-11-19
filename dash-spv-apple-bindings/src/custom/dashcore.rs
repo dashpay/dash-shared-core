@@ -1,5 +1,5 @@
 use dashcore::hashes::Hash;
-use dashcore::secp256k1::ThirtyTwoByteHash;
+// use dashcore::secp256k1::ThirtyTwoByteHash;
 
 #[allow(non_camel_case_types)]
 #[ferment_macro::register(dashcore::OutPoint)]
@@ -16,7 +16,7 @@ impl ferment::FFIConversionFrom<dashcore::OutPoint> for OutPoint {
 }
 impl ferment::FFIConversionTo<dashcore::OutPoint> for OutPoint {
     unsafe fn ffi_to_const(obj: dashcore::OutPoint) -> *const Self {
-        ferment::boxed(OutPoint { txid: ferment::boxed(obj.txid.to_raw_hash().into_32()), vout: obj.vout })
+        ferment::boxed(OutPoint { txid: ferment::boxed(obj.txid.to_raw_hash().into()), vout: obj.vout })
     }
 }
 

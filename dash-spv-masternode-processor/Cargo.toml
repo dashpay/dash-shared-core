@@ -14,7 +14,7 @@ secp-lowmemory = ["secp256k1/lowmemory"]
 secp-recovery = ["secp256k1/recovery"]
 generate-dashj-tests = []
 test-helpers = []
-#serde = ["use_serde"]
+use_serde = ["serde"]
 # At least one of std, no-std must be enabled.
 #
 # The no-std feature doesn't disable std - you need to turn off the std feature for that by disabling default.
@@ -44,7 +44,7 @@ ferment-macro = { git = "https://github.com/pankcuf/ferment", branch = "feat/reo
 
 rs-x11-hash = "0.1.8"
 secp256k1 = { version = "0.26.0", features = [ "recovery", "rand-std", "bitcoin_hashes" ] }
-serde = { version = "1.0.209", features = ["derive"], optional = true }
+serde = { version = "1.0.215", features = ["derive"], optional = true }
 serde_json = "1.0.85"
 simplelog = "0.12.2"
 zeroize = "1.5.7"
@@ -53,6 +53,7 @@ bincode = "2.0.0-rc.3"
 [dev-dependencies]
 base64 = "0.21.0"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde = { version = "1.0.209", features = ["derive"] }
 
 [lib]
 name = "dash_spv_masternode_processor"

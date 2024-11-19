@@ -1,5 +1,7 @@
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use dash_spv_crypto::network::ChainType;
+#[cfg(feature = "serde")]
 use dash_spv_masternode_processor::test_helpers::load_message;
 use crate::tests::common::assert_diff_chain;
 
@@ -21,6 +23,8 @@ pub fn test_core20_activated_testnet() {
         None);
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[derive(Serialize, Deserialize)]
 struct LLMQ {
     pub version: i64,
@@ -47,6 +51,8 @@ struct LLMQ {
     pub members_sig: String,
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[derive(Serialize, Deserialize)]
 struct Masternode {
     #[serde(rename = "nVersion")]
@@ -66,6 +72,8 @@ struct Masternode {
     pub is_valid: bool,
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[derive(Serialize, Deserialize)]
 struct QRInfoV20 {
     #[serde(rename = "extraShare")]
@@ -94,6 +102,8 @@ struct QRInfoV20 {
     pub mn_list_diff_list: Vec<ListDiff_70230>,
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[derive(Serialize, Deserialize)]
 struct DeletedLLMQ {
     #[serde(rename = "llmqType")]
@@ -101,12 +111,16 @@ struct DeletedLLMQ {
     #[serde(rename = "quorumHash")]
     pub quorum_hash: String,
 }
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[derive(Serialize, Deserialize)]
 struct LLMQCLSig {
 
 }
 
 #[allow(non_camel_case_types)]
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[derive(Serialize, Deserialize)]
 struct ListDiff_70230 {
     #[serde(rename = "nVersion")]
@@ -137,9 +151,10 @@ struct ListDiff_70230 {
 
 
 
+#[cfg(feature = "serde")]
 #[test]
 pub fn test_core_20_rc1_testnet_etalon() {
-    let qrinfo_8792: QRInfoV20 = serde_json::from_slice(&load_message(ChainType::TestNet.identifier(), "qrinfo_530000_904144__70230.json")).unwrap();
+    let qrinfo_8792: QRInfoV20 = serde_json::from_slice(&load_message(ChainType::TestNet.identifier().as_str(), "qrinfo_530000_904144__70230.json")).unwrap();
     println!("qrinfo");
 }
 

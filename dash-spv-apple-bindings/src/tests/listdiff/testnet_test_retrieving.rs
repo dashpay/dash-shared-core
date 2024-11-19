@@ -1,9 +1,11 @@
-use dash_spv_masternode_processor::chain::common::ChainType;
-use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
+use std::sync::{Arc, RwLock};
+use dash_spv_crypto::network::ChainType;
+use dash_spv_crypto::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
-use dash_spv_masternode_processor::util::data_ops::merkle_root_from_hashes;
-use crate::ffi::from::FromFFI;
-use crate::tests::common::{create_default_context_and_cache,process_mnlistdiff, register_default_processor};
+use dash_spv_crypto::util::data_ops::merkle_root_from_hashes;
+use dash_spv_masternode_processor::test_helpers::load_message;
+use dash_spv_masternode_processor::tests::FFIContext;
+use crate::ffi_core_provider::FFICoreProvider;
 
 fn init_hashes() -> Vec<UInt256> {
     vec![
@@ -342,33 +344,42 @@ fn init_hashes() -> Vec<UInt256> {
 #[test]
 fn testnet_test_retrieve_saved_hashes() {
     let chain = ChainType::TestNet;
-    let mut context = create_default_context_and_cache(chain, false);
-    let bytes_122064 = chain.load_message("MNL_0_122064.dat");
-    let processor = register_default_processor(&mut context);
-    let result_122064 = process_mnlistdiff(bytes_122064, processor, &mut context, 70221, false, true);
-    let result_122064 = unsafe { &*result_122064 };
+    let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
+    let bytes_122064 = load_message(chain.identifier(), "MNL_0_122064.dat");
+    let bytes_122088 = load_message(chain.identifier(), "MNL_122064_122088.dat");
+    let processor = FFICoreProvider::default_processor(&context, chain);
+
+
+    let result_122064 = {
+        let mut ctx = context.write().unwrap();
+        processor.mn_list_diff_result_from_message(&bytes_122064, true, 70221, &mut ctx.cache)
+            .expect("Result must be valid")
+    };
     assert!(result_122064.is_valid(), "Result must be valid");
-    let bytes_122088 = chain.load_message("MNL_122064_122088.dat");
-    let result_122088 = process_mnlistdiff(bytes_122088, processor, &mut context, 70221, false, true);
-    let result_122088 = unsafe { &*result_122088 };
+
+    let result_122088 = {
+        let mut ctx = context.write().unwrap();
+        processor.mn_list_diff_result_from_message(&bytes_122088, true, 70221, &mut ctx.cache)
+            .expect("Result must be valid")
+    };
     assert!(result_122088.is_valid(), "Result must be valid");
 
-    let block_hash_122064 = unsafe { UInt256(*result_122064.block_hash) };
-    let block_hash_122088 = unsafe { UInt256(*result_122088.block_hash) };
-    let list_122064 = unsafe { (*result_122064.masternode_list).decode() };
-    let list_122088 = unsafe { (*result_122088.masternode_list).decode() };
-
-    let reloaded_list_122064 = context.cache.mn_lists.get(&block_hash_122064).unwrap();
-    let reloaded_list_122088 = context.cache.mn_lists.get(&block_hash_122088).unwrap();
+    let block_hash_122064 = result_122064.block_hash;
+    let block_hash_122088 = result_122088.block_hash;
+    let list_122064 = &result_122064.masternode_list;
+    let list_122088 = &result_122088.masternode_list;
+    let ctx = context.read().unwrap();
+    let reloaded_list_122064 = ctx.cache.mn_lists.get(&block_hash_122064).unwrap();
+    let reloaded_list_122088 = ctx.cache.mn_lists.get(&block_hash_122088).unwrap();
 
     let entry_hash = UInt256::from_hex("1bde434d4f68064d3108a09443ea45b4a6c6ac1f537a533efc36878cef2eb10f").unwrap().reverse();
     let entry_122064 = list_122064.masternodes.get(&entry_hash).unwrap();
     let entry_122088 = list_122088.masternodes.get(&entry_hash).unwrap();
     assert_ne!(entry_122064, entry_122088, "These should NOT be the same object (unless we changed how this worked)");
 
-    assert_eq!(entry_122088.clone().previous_entry_hashes.into_values().collect::<Vec<UInt256>>(),
-               vec![UInt256::from_hex("14d8f2de996a2515815abeb8f111a3ffe8582443ce7a43a8399c1a1c86c65543").unwrap()],
-               "This is what it used to be");
+    assert_eq!(
+        Vec::from_iter(entry_122088.previous_entry_hashes.values().cloned()),
+        vec![UInt256::from_hex("14d8f2de996a2515815abeb8f111a3ffe8582443ce7a43a8399c1a1c86c65543").unwrap()], "This is what it used to be");
 
     assert_eq!(entry_122064.entry_hash, UInt256::from_hex("14d8f2de996a2515815abeb8f111a3ffe8582443ce7a43a8399c1a1c86c65543").unwrap(), "The hash of the sme should be this");
     assert_eq!(entry_122088.entry_hash, UInt256::from_hex("e001033590361b172da9cb352f9736dbe9453c6a389068f7b76d71f9f3044d3b").unwrap(), "The hash changed to this");

@@ -9,6 +9,7 @@ use dash_spv_crypto::llmq::LLMQEntry;
 use dash_spv_crypto::tx::CoinbaseTransaction;
 use crate::models::MasternodeEntry;
 use crate::models::masternode_entry::MasternodeReadContext;
+use crate::processing::CoreProvider;
 
 #[derive(Clone)]
 pub struct MNListDiff {
@@ -91,10 +92,10 @@ impl std::fmt::Debug for MNListDiff {
 // }
 
 impl MNListDiff {
-    pub fn new<F: Fn(UInt256) -> u32>(
+    pub fn new(
         message: &[u8],
         offset: &mut usize,
-        block_height_lookup: F,
+        provider: &dyn CoreProvider,
         protocol_version: u32,
 ) -> Result<Self, byte::Error> {
         let mut version = 1;
@@ -103,8 +104,8 @@ impl MNListDiff {
         }
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
-        let base_block_height = block_height_lookup(base_block_hash);
-        let block_height = block_height_lookup(block_hash);
+        let base_block_height = provider.lookup_block_height_by_hash(base_block_hash);
+        let block_height = provider.lookup_block_height_by_hash(block_hash);
         let total_transactions = u32::from_bytes(message, offset)?;
         let merkle_hashes = VarArray::<UInt256>::from_bytes(message, offset)?;
         let merkle_flags_count = VarInt::from_bytes(message, offset)?.0 as usize;

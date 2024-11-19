@@ -706,3 +706,39 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
                     <Self as CryptoData<ECDSAKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, iv_data)))
     }
 }
+
+#[test]
+fn test_keys() {
+    let extended_public_key_data_string = "3dc2e416b0f9fcfd74fe847ccd80f71cf961e7c4ddede29ce5e4b72a19ebccf2831ba2d803740b52e94ad4d526ff2b4340646b2ce1423545755b5825fabc741d1d74c155d7";
+    let extended_public_key_data = Vec::from_hex(extended_public_key_data_string).unwrap();
+    let extended_public_key = ECDSAKey::key_with_extended_public_key_data(&extended_public_key_data)
+        .expect("ECDSA Key restored from extended public key data")
+        .extended_public_key_data()
+        .expect("Deserialized extended public key data");
+    assert_eq!(extended_public_key.to_hex(), extended_public_key_data_string);
+}
+
+#[test]
+fn test_ecdsa_encryption_and_decryption() {
+    let alice_secret = UInt256::from_hex("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+    let alice_key_pair = ECDSAKey::key_with_secret(&alice_secret, true).unwrap();
+    let bob_secret = UInt256::from_hex("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140").unwrap();
+    let mut bob_key_pair = ECDSAKey::key_with_secret(&bob_secret, true).unwrap();
+    let key = ECDSAKey::init_with_dh_key_exchange_with_public_key(&mut bob_key_pair, &alice_key_pair).unwrap();
+    let key_public_key_data_hex = key.public_key_data().to_hex();
+    assert_eq!(key_public_key_data_hex, "fbd27dbb9e7f471bf3de3704a35e884e37d35c676dc2cc8c3cc574c3962376d2", "they should be the same data");
+    let secret = "my little secret is a pony that never sleeps";
+    let mut data = secret.as_bytes().to_vec();
+    // Alice is sending to Bob
+    let iv = Vec::from_hex("eac5bcd6eb85074759e0261497428c9b").unwrap();
+    let encrypted = <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_secret_key_using_iv(&mut data, &alice_key_pair, &bob_key_pair, iv);
+    assert!(encrypted.is_ok(), "Encrypted data is None");
+    let mut encrypted = encrypted.unwrap();
+    assert_eq!(encrypted.to_hex(), "eac5bcd6eb85074759e0261497428c9b3725d3b9ec4d739a842116277c6ace81549089be0d11a54ee09a99dcf7ac695a8ea56d41bf0b62def90b6f78f8b0aca9");
+    // Bob is receiving from Alice
+    let decrypted = <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_secret_key(&mut encrypted, &bob_key_pair, &alice_key_pair);
+    assert!(decrypted.is_ok(), "Decrypted data is None");
+    let decrypted = decrypted.unwrap();
+    let decrypted_str = String::from_utf8(decrypted).unwrap();
+    assert_eq!(secret, decrypted_str.as_str(), "they should be the same string");
+}

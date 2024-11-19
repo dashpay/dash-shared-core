@@ -231,3 +231,23 @@ pub fn score_masternodes_map(
         )
         .collect()
 }
+
+#[cfg(all(test,feature = "serde"))]
+impl From<crate::tests::serde_helper::MNList> for MasternodeList {
+    fn from(value: crate::tests::serde_helper::MNList) -> Self {
+        let block_hash = crate::tests::serde_helper::block_hash_to_block_hash(value.block_hash);
+        let known_height = value.known_height;
+        let masternode_merkle_root = Some(crate::tests::serde_helper::block_hash_to_block_hash(value.masternode_merkle_root));
+        let llmq_merkle_root = Some(crate::tests::serde_helper::block_hash_to_block_hash(value.quorum_merkle_root));
+        let masternodes = crate::tests::serde_helper::nodes_to_masternodes(value.mn_list);
+        let quorums = crate::tests::serde_helper::quorums_to_quorums_map(value.new_quorums);
+        Self {
+            block_hash,
+            known_height,
+            masternode_merkle_root,
+            llmq_merkle_root,
+            masternodes,
+            quorums
+        }
+    }
+}

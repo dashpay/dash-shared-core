@@ -1,7 +1,7 @@
-mod input;
-mod output;
-mod tx;
-mod coinbase;
+pub mod input;
+pub mod output;
+pub mod tx;
+pub mod coinbase;
 
 use crate::impl_bytes_decodable;
 pub use self::input::TransactionInput;

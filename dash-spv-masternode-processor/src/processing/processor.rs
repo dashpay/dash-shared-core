@@ -5,10 +5,10 @@ use dash_spv_crypto::llmq::{LLMQEntry, LLMQModifierType};
 use dash_spv_crypto::network::{LLMQType, LLMQParams};
 use dash_spv_crypto::crypto::byte_util::{Reversable, UInt256, UInt768};
 use crate::common::LLMQSnapshotSkipMode;
-use crate::models::{LLMQIndexedHash, LLMQSnapshot, LLMQVerificationContext, MasternodeEntry, MasternodeList, mn_list_diff::MNListDiff, QRInfo, llmq_entry};
+use crate::models::{LLMQIndexedHash, LLMQSnapshot, LLMQVerificationContext, MasternodeEntry, MasternodeList, mn_list_diff::MNListDiff, QRInfo, llmq};
 use crate::models::masternode_list::{score_masternodes_map};
-use crate::processing::core_provider::CoreProvider;
-use crate::processing::{CoreProviderError, LLMQValidationStatus, MasternodeProcessorCache, ProcessingError};
+use crate::processing::core_provider::{CoreProvider, CoreProviderError};
+use crate::processing::{LLMQValidationStatus, MasternodeProcessorCache, processing_error::ProcessingError};
 
 pub enum LLMQQuarterType {
     AtHeightMinus3Cycles,
@@ -292,7 +292,7 @@ impl MasternodeProcessor {
             .and_then(|MasternodeList { masternodes, .. }| {
                 let block_height = self.provider.lookup_block_height_by_hash(llmq_block_hash);
                 self.find_valid_masternodes_for_quorum(quorum, block_height, skip_removed_masternodes, masternodes, cache)
-                    .and_then(|valid_masternodes| llmq_entry::verify(quorum, valid_masternodes, block_height))
+                    .and_then(|valid_masternodes| llmq::verify(quorum, valid_masternodes, block_height))
             })
     }
 
@@ -305,7 +305,7 @@ impl MasternodeProcessor {
         masternodes: BTreeMap<UInt256, MasternodeEntry>,
         cache: &mut MasternodeProcessorCache
     ) -> Result<Vec<MasternodeEntry>, CoreProviderError> {
-        Ok(llmq_entry::valid_masternodes(quorum, self.provider.chain_type(), masternodes, block_height, self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8, &cache.cl_signatures)))
+        Ok(llmq::valid_masternodes(quorum, self.provider.chain_type(), masternodes, block_height, self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8, &cache.cl_signatures)))
     }
 
     fn quorum_quarter_members_by_reconstruction_type(
@@ -332,16 +332,14 @@ impl MasternodeProcessor {
                             LLMQQuarterReconstructionType::New { previous_quarters, skip_removed_masternodes } => {
                                 let (used_at_h_masternodes, unused_at_h_masternodes, used_at_h_indexed_masternodes) =
                                     masternode_list.usage_info(previous_quarters, skip_removed_masternodes, quorum_count);
-                                let skip_type = LLMQQuarterUsageType::New(used_at_h_indexed_masternodes);
-                                Ok(apply_skip_strategy_of_type(skip_type, used_at_h_masternodes, unused_at_h_masternodes, work_block_height, quorum_modifier, quorum_count, quarter_size))
+                                Ok(apply_skip_strategy_of_type(LLMQQuarterUsageType::New(used_at_h_indexed_masternodes), used_at_h_masternodes, unused_at_h_masternodes, work_block_height, quorum_modifier, quorum_count, quarter_size))
                             },
                             LLMQQuarterReconstructionType::Snapshot { cached_llmq_snapshots } => {
                                 self.provider.find_snapshot(work_block_hash, cached_llmq_snapshots)
                                     .map(|snapshot| {
                                         let (used_at_h_masternodes, unused_at_h_masternodes) =
                                             usage_info_from_snapshot(masternode_list, &snapshot, quorum_modifier, work_block_height);
-                                        let skip_type = LLMQQuarterUsageType::Snapshot(snapshot);
-                                        apply_skip_strategy_of_type(skip_type, used_at_h_masternodes, unused_at_h_masternodes, work_block_height, quorum_modifier, quorum_count, quarter_size)
+                                        apply_skip_strategy_of_type(LLMQQuarterUsageType::Snapshot(snapshot), used_at_h_masternodes, unused_at_h_masternodes, work_block_height, quorum_modifier, quorum_count, quarter_size)
                                     })
                             }
                         }
@@ -417,6 +415,7 @@ impl MasternodeProcessor {
         } else {
             cached_llmq_members.insert(llmq_type, BTreeMap::new());
         }
+
         let cached_members_of_llmq_type = cached_llmq_members.get_mut(&llmq_type).unwrap();
         let llmq_params = llmq_type.params();
         let quorum_index = block_height % llmq_params.dkg_params.interval;
@@ -452,10 +451,16 @@ impl MasternodeProcessor {
     }
 
     pub fn read_list_diff_from_message(&self, message: &[u8], offset: &mut usize, protocol_version: u32) -> Result<MNListDiff, byte::Error> {
-        MNListDiff::new(message, offset, |block_hash| self.provider.lookup_block_height_by_hash(block_hash), protocol_version)
+        MNListDiff::new(message, offset, &*self.provider, protocol_version)
     }
 
-    pub fn mn_list_diff_result_from_message(&self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, cache: &mut MasternodeProcessorCache) -> Result<processing::MNListDiffResult, ProcessingError> {
+    pub fn mn_list_diff_result_from_message(
+        &self,
+        message: &[u8],
+        is_from_snapshot: bool,
+        protocol_version: u32,
+        cache: &mut MasternodeProcessorCache
+    ) -> Result<processing::MNListDiffResult, ProcessingError> {
         self.read_list_diff_from_message(message, &mut 0, protocol_version)
             .map_err(ProcessingError::from)
             .and_then(|list_diff| {
@@ -509,7 +514,7 @@ fn apply_skip_strategy_of_type(
         unused_at_h_masternodes,
         quorum_modifier,
         work_block_height);
-    let sorted_combined_mns_list = sorted_unused_mns_list.into_iter().chain(sorted_used_mns_list.into_iter()).collect::<Vec<MasternodeEntry>>();
+    let sorted_combined_mns_list = Vec::from_iter(sorted_unused_mns_list.into_iter().chain(sorted_used_mns_list.into_iter()));
     match skip_type {
         LLMQQuarterUsageType::Snapshot(snapshot) => {
             match snapshot.skip_list_mode {
@@ -521,12 +526,12 @@ fn apply_skip_strategy_of_type(
                 }
                 LLMQSnapshotSkipMode::SkipFirst => {
                     let mut first_entry_index = 0;
-                    let processed_skip_list = snapshot.skip_list.into_iter().map(|s| if first_entry_index == 0 {
+                    let processed_skip_list = Vec::from_iter(snapshot.skip_list.into_iter().map(|s| if first_entry_index == 0 {
                         first_entry_index = s;
                         s
                     } else {
                         first_entry_index + s
-                    }).collect::<Vec<_>>();
+                    }));
                     let mut idx = 0;
                     let mut skip_idx = 0;
                     (0..quorum_count).map(|_| {
@@ -637,3 +642,4 @@ fn valid_masternodes_for_rotated_quorum_map(
         .collect::<BTreeMap<_, _>>();
     sort_scored_masternodes(scored_masternodes)
 }
+

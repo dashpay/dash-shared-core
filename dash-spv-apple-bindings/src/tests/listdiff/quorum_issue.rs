@@ -1,5 +1,7 @@
-use dash_spv_masternode_processor::chain::common::ChainType;
-use crate::tests::common::{create_default_context_and_cache, load_masternode_lists_for_files};
+use std::sync::{Arc, RwLock};
+use dash_spv_crypto::network::ChainType;
+use dash_spv_masternode_processor::tests::FFIContext;
+use crate::tests::common::load_masternode_lists_for_files;
 
 #[test]
 fn test_quorum_issue() {
@@ -36,10 +38,11 @@ fn test_quorum_issue() {
         "MNL_1098960_1098984.dat".to_string(),
         "MNL_1098984_1099008.dat".to_string(),
     ];
-    let context = &mut create_default_context_and_cache(chain, false);
-    let (success, lists) = load_masternode_lists_for_files(files, false, context);
+    let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
+    let ctx = context.read().unwrap();
+    let (success, lists) = load_masternode_lists_for_files(files, false, Arc::clone(&context), chain);
     assert!(success, "Unsuccessful");
     lists.iter().for_each(|(hash, node)| {
-        println!("Testing quorum of models list at height {}", context.block_for_hash(*hash).unwrap().height);
+        println!("Testing quorum of models list at height {}", ctx.block_for_hash(*hash).unwrap().height);
     });
 }

@@ -12,7 +12,7 @@ use dash_spv_crypto::llmq::entry::LLMQEntry;
 use dash_spv_crypto::llmq::modifier::LLMQModifierType;
 use crate::models::masternode_list::score_masternodes_map;
 use crate::models::MasternodeEntry;
-use crate::processing::CoreProviderError;
+use crate::processing::core_provider::CoreProviderError;
 use crate::processing::llmq_validation_status::{LLMQValidationStatus, LLMQPayloadValidationStatus};
 
 #[derive(PartialEq)]

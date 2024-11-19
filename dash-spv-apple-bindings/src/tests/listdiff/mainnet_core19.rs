@@ -1,4 +1,4 @@
-use dash_spv_masternode_processor::chain::common::ChainType;
+use dash_spv_crypto::network::ChainType;
 use crate::tests::common::assert_diff_chain;
 
 #[test]

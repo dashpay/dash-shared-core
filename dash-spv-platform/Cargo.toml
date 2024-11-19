@@ -17,7 +17,9 @@ publish = false
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
 dapi-grpc = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dapi-grpc" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
+dash-spv-crypto = { path = "../dash-spv-crypto" }
 dispatch = "0.2.0"
+dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp", features = ["state-transitions"] }
 drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
 drive-proof-verifier = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive-proof-verifier" }
 platform-value = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-value" }

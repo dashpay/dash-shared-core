@@ -1,4 +1,4 @@
-use crate::processing::CoreProviderError;
+use crate::processing::core_provider::CoreProviderError;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LLMQValidationStatus {

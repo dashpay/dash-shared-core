@@ -1,8 +1,8 @@
 pub mod addresses {
-    use dash_spv_masternode_processor::crypto::byte_util::UInt160;
-    use dash_spv_masternode_processor::util::address::address;
-    use dash_spv_masternode_processor::chain::common::chain_type::ChainType;
-    use dash_spv_masternode_processor::util::data_append::DataAppend;
+    use dash_spv_crypto::crypto::byte_util::UInt160;
+    use dash_spv_crypto::network::ChainType;
+    use dash_spv_crypto::util::address::address;
+    use dash_spv_crypto::util::data_append::DataAppend;
 
     #[ferment_macro::export]
     pub fn address_from_hash160(hash: UInt160, chain_type: ChainType) -> String {

@@ -2,6 +2,9 @@ pub mod identity;
 pub mod provider;
 pub mod signer;
 pub mod thread_safe_context;
+pub mod error;
+pub mod util;
+
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -26,7 +29,7 @@ use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use platform_version::version::{LATEST_PLATFORM_VERSION, PlatformVersion};
 use platform_value::{BinaryData, Identifier, Value};
 use tokio::runtime::Runtime;
-use crate::identity::manager::IdentityManager;
+use crate::identity::manager::IdentitiesManager;
 use crate::signer::CallbackSigner;
 use crate::provider::PlatformProvider;
 use crate::thread_safe_context::FFIThreadSafeContext;
@@ -79,9 +82,9 @@ fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Uri>>(provide
 #[ferment_macro::opaque]
 pub struct PlatformSDK {
     pub runtime: *mut Runtime,
-    pub sdk: *mut Sdk,
+    pub sdk: *const Sdk,
     pub callback_signer: CallbackSigner,
-    pub identity_manager: IdentityManager,
+    pub identity_manager: IdentitiesManager,
 }
 
 impl PlatformSDK {
@@ -115,16 +118,21 @@ impl PlatformSDK {
         context: *const std::os::raw::c_void,
     ) -> Self {
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
+
+        let sdk = create_sdk(
+            PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, ac1, ac2, context_arc.clone()),
+            address_list.unwrap_or(Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST))
+                .iter()
+                .filter_map(|s| Uri::from_str(s).ok()));
+
+
+
+        let sdk_arc = Arc::new(sdk);
         Self {
-            identity_manager: IdentityManager::new(),
+            identity_manager: IdentitiesManager::new(&sdk_arc),
             runtime: ferment::boxed(Runtime::new().unwrap()),
-            callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc.clone()),
-            sdk: ferment::boxed(
-                create_sdk(
-                    PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, ac1, ac2, context_arc),
-                    address_list.unwrap_or(Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST))
-                        .iter()
-                        .filter_map(|s| Uri::from_str(s).ok())))
+            callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc),
+            sdk: Arc::into_raw(sdk_arc)
         }
     }
     pub async fn fetch_contract_by_id(&self, id: Identifier) -> Result<Option<DataContract>, Error> {
@@ -240,9 +248,9 @@ impl PlatformSDK  {
         Document::fetch_many(self.sdk_ref(), query).await
     }
 
-    pub async fn fetch_identities_by_key_hashes(&self, ) -> Result<Vec<Identity>, ProtocolError> {
-
-    }
+    // pub async fn fetch_identities_by_key_hashes(&self, ) -> Result<Vec<Identity>, ProtocolError> {
+    //
+    // }
 }
 
 pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {

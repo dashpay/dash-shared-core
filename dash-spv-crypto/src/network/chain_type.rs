@@ -143,7 +143,7 @@ impl From<&str> for DevnetType {
 
 #[ferment_macro::export]
 impl DevnetType {
-    pub fn identifier(&self) -> &str {
+    pub fn identifier(&self) -> String {
         match self {
             DevnetType::JackDaniels => "devnet-jack-daniels",
             DevnetType::Devnet333 => "devnet-333",
@@ -156,7 +156,7 @@ impl DevnetType {
             DevnetType::Screwdriver => "devnet-screwdriver",
             DevnetType::Absinthe => "devnet-absinthe",
             DevnetType::Bintang => "devnet-bintang",
-        }
+        }.to_string()
     }
 
     pub fn version(&self) -> u16 {
@@ -336,7 +336,7 @@ impl ChainType {
         }
     }
 
-    pub fn devnet_identifier(&self) -> Option<&str> {
+    pub fn devnet_identifier(&self) -> Option<String> {
         if let ChainType::DevNet(devnet_type) = self {
             Some(devnet_type.identifier())
         } else {
@@ -539,17 +539,12 @@ impl ChainType {
         height >= self.core20_activation_height()
     }
 
-}
-
-
-#[cfg(test)]
-impl ChainType {
-    pub fn identifier(&self) -> &str {
+    pub fn identifier(&self) -> String {
         match self {
-            ChainType::MainNet => "mainnet",
-            ChainType::TestNet => "testnet",
+            ChainType::MainNet => "mainnet".to_string(),
+            ChainType::TestNet => "testnet".to_string(),
             ChainType::DevNet(dev) => dev.identifier()
         }
     }
-
 }
+

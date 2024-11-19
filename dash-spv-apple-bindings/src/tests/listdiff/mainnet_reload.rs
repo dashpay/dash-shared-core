@@ -1,5 +1,7 @@
-use dash_spv_masternode_processor::chain::common::chain_type::ChainType;
-use crate::tests::common::{create_default_context_and_cache, load_masternode_lists_for_files};
+use std::sync::{Arc, RwLock};
+use dash_spv_crypto::network::chain_type::ChainType;
+use dash_spv_masternode_processor::tests::FFIContext;
+use crate::tests::common::load_masternode_lists_for_files;
 
 #[test]
 fn test_mainnet_reload_with_processor() {
@@ -37,8 +39,9 @@ fn test_mainnet_reload_with_processor() {
     ]
         .map(Into::into)
         .to_vec();
-    let mut context = create_default_context_and_cache(chain, false);
-    let (success, lists) = load_masternode_lists_for_files(files, true, &mut context);
+
+    let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
+    let (success, lists) = load_masternode_lists_for_files(files, true, context, chain);
     assert!(success, "Unsuccessful");
     assert_eq!(lists.len(), 29, "There should be 29 models lists");
 }

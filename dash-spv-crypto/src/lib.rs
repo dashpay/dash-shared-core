@@ -1,4 +1,6 @@
 pub extern crate bitcoin_hashes as hashes;
+pub extern crate secp256k1;
+extern crate simplelog;
 
 pub mod bip;
 pub mod blockdata;

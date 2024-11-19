@@ -15,6 +15,16 @@ impl MerkleBlock {
             merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
     }
 
+    pub fn hash(&self) -> UInt256 {
+        self.hash
+    }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+    pub fn merkle_root_reversed(&self) -> UInt256 {
+        self.merkleroot.reversed()
+    }
+
     pub fn reversed(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
         MerkleBlock {
             height,

@@ -32,7 +32,7 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
         let block_height_lookup = |block_hash|
             provider.lookup_block_height_by_hash(block_hash);
         let read_list_diff = |offset: &mut usize|
-            MNListDiff::new(bytes, offset, block_height_lookup, protocol_version);
+            MNListDiff::new(bytes, offset, provider, protocol_version);
         let read_snapshot = |offset: &mut usize|
             LLMQSnapshot::from_bytes(bytes, offset);
         let read_var_int = |offset: &mut usize|

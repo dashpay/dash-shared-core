@@ -1,18 +1,14 @@
 use std::collections::BTreeMap;
-use std::sync::Arc;
-use dash_spv_masternode_processor::block_store::init_mainnet_store;
-use dash_spv_masternode_processor::chain::common::ChainType;
-use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
+use std::sync::{Arc, RwLock};
+use dash_spv_crypto::crypto::byte_util::{Reversable, UInt256};
+use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::models;
-use dash_spv_masternode_processor::processing::{CoreProvider, MasternodeProcessor};
-use dash_spv_masternode_processor::test_helpers::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
-use crate::common::processor_create_cache;
-use crate::ffi::from::FromFFI;
+use dash_spv_masternode_processor::processing::{CoreProvider, MasternodeProcessor, MasternodeProcessorCache};
+use dash_spv_masternode_processor::test_helpers::block_hash_to_block_hash;
+use dash_spv_masternode_processor::tests::serde_helper::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo};
 use crate::ffi_core_provider::FFICoreProvider;
-use crate::masternode::process_qr_info;
-use crate::tests::common::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_cl_signature_by_block_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, save_cl_signature_in_cache, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
-
+use crate::tests::common::FFIContext;
 #[test]
 fn mainnet_quorum_quarters() {
     let chain = ChainType::MainNet;
@@ -62,26 +58,9 @@ fn mainnet_quorum_quarters() {
     let masternode_list_8888 = models::MasternodeList::new(list_diff_8888.added_or_modified_masternodes, added_quorums_8888, block_hash_8888, block_height_8888, true);
 
     let chain = ChainType::MainNet;
-    let cache = unsafe { &mut *processor_create_cache() };
-    let context = &mut (FFIContext { chain, cache, is_dip_0024: true, blocks: init_mainnet_store() });
-    let provider = FFICoreProvider::new(
-        get_merkle_root_by_hash_default,
-        get_block_height_by_hash_from_context,
-        get_block_hash_by_height_from_context,
-        get_llmq_snapshot_by_block_hash_from_context,
-        get_cl_signature_by_block_hash_from_context,
-        save_llmq_snapshot_in_cache,
-        save_cl_signature_in_cache,
-        get_masternode_list_by_block_hash_from_cache,
-        masternode_list_save_in_cache,
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        hash_destroy_default,
-        snapshot_destroy_default,
-        should_process_diff_with_range_default,
-        context as *mut _ as *mut std::ffi::c_void,
-        chain
-    );
+    let mut context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, true)));
+    let provider = FFICoreProvider::register_default(Arc::clone(&context));
+    let cache = context.write().unwrap();
     let processor = MasternodeProcessor::new(Arc::new(provider));
 
     let bytes = chain.load_message("QRINFO_0_1739226.dat");
@@ -93,18 +72,18 @@ fn mainnet_quorum_quarters() {
     processor.provider.save_masternode_list(block_hash_8888, &masternode_list_8888);
 
 
-    let snapshot_8792_h_c = snapshot_to_snapshot(qrinfo_8792.quorum_snapshot_at_hminus_c);
-    let snapshot_8792_h_2c = snapshot_to_snapshot(qrinfo_8792.quorum_snapshot_at_hminus2c);
-    let snapshot_8792_h_3c = snapshot_to_snapshot(qrinfo_8792.quorum_snapshot_at_hminus3c);
-    let snapshot_8840_h_c = snapshot_to_snapshot(qrinfo_8840.quorum_snapshot_at_hminus_c);
-    let snapshot_8840_h_2c = snapshot_to_snapshot(qrinfo_8840.quorum_snapshot_at_hminus2c);
-    let snapshot_8840_h_3c = snapshot_to_snapshot(qrinfo_8840.quorum_snapshot_at_hminus3c);
-    let snapshot_8888_h_c = snapshot_to_snapshot(qrinfo_8888.quorum_snapshot_at_hminus_c);
-    let snapshot_8888_h_2c = snapshot_to_snapshot(qrinfo_8888.quorum_snapshot_at_hminus2c);
-    let snapshot_8888_h_3c = snapshot_to_snapshot(qrinfo_8888.quorum_snapshot_at_hminus3c);
-    let snapshot_8936_h_c = snapshot_to_snapshot(qrinfo_8936.quorum_snapshot_at_hminus_c);
-    let snapshot_8936_h_2c = snapshot_to_snapshot(qrinfo_8936.quorum_snapshot_at_hminus2c);
-    let snapshot_8936_h_3c = snapshot_to_snapshot(qrinfo_8936.quorum_snapshot_at_hminus3c);
+    let snapshot_8792_h_c = models::LLMQSnapshot::from(qrinfo_8792.quorum_snapshot_at_hminus_c);
+    let snapshot_8792_h_2c = models::LLMQSnapshot::from(qrinfo_8792.quorum_snapshot_at_hminus2c);
+    let snapshot_8792_h_3c = models::LLMQSnapshot::from(qrinfo_8792.quorum_snapshot_at_hminus3c);
+    let snapshot_8840_h_c = models::LLMQSnapshot::from(qrinfo_8840.quorum_snapshot_at_hminus_c);
+    let snapshot_8840_h_2c = models::LLMQSnapshot::from(qrinfo_8840.quorum_snapshot_at_hminus2c);
+    let snapshot_8840_h_3c = models::LLMQSnapshot::from(qrinfo_8840.quorum_snapshot_at_hminus3c);
+    let snapshot_8888_h_c = models::LLMQSnapshot::from(qrinfo_8888.quorum_snapshot_at_hminus_c);
+    let snapshot_8888_h_2c = models::LLMQSnapshot::from(qrinfo_8888.quorum_snapshot_at_hminus2c);
+    let snapshot_8888_h_3c = models::LLMQSnapshot::from(qrinfo_8888.quorum_snapshot_at_hminus3c);
+    let snapshot_8936_h_c = models::LLMQSnapshot::from(qrinfo_8936.quorum_snapshot_at_hminus_c);
+    let snapshot_8936_h_2c = models::LLMQSnapshot::from(qrinfo_8936.quorum_snapshot_at_hminus2c);
+    let snapshot_8936_h_3c = models::LLMQSnapshot::from(qrinfo_8936.quorum_snapshot_at_hminus3c);
 
     let block_hash_8792_h_c = block_hash_to_block_hash(qrinfo_8792.mn_list_diff_at_hminus_c.block_hash).reversed();
     let block_hash_8792_h_2c = block_hash_to_block_hash(qrinfo_8792.mn_list_diff_at_hminus2c.block_hash).reversed();
@@ -132,15 +111,24 @@ fn mainnet_quorum_quarters() {
     processor.provider.save_snapshot(block_hash_8936_h_c, snapshot_8936_h_c);
     processor.provider.save_snapshot(block_hash_8936_h_2c, snapshot_8936_h_2c);
     processor.provider.save_snapshot(block_hash_8936_h_3c, snapshot_8936_h_3c);
-    let old_result = process_qr_info(&processor, &old_bytes, true, 70221, true, context.cache);
-    let old_result2 = process_qr_info(&processor, &old_bytes2, true, 70221, true, context.cache);
-    let result = process_qr_info(&processor, &bytes, true, 70221, true, context.cache);
-    let result = result.unwrap();
+
+
+    let old_result = processor.qr_info_result_from_message(&old_bytes, true, 70221, true, cache);
+    let old_result2 = processor.qr_info_result_from_message(&old_bytes2, true, 70221, true, cache);
+    let result = processor.qr_info_result_from_message(&bytes, true, 70221, true, cache);
+    let last_quorum = result.unwrap().last_quorum_per_index.first().expect("Last llmq persist");
     let block_height = 1738944;
-    let last_quorum_per_index = unsafe { *(&*result.last_quorum_per_index) };
-    let mut last_quorum = unsafe { { &*(last_quorum_per_index.add(0)) }.decode() };
     let block_hash = last_quorum.llmq_hash;
     let llmq_type = last_quorum.llmq_type;
+
+    // let old_result = process_qr_info(&processor, &old_bytes, true, 70221, true, context.cache);
+    // let old_result2 = process_qr_info(&processor, &old_bytes2, true, 70221, true, context.cache);
+    // let result = process_qr_info(&processor, &bytes, true, 70221, true, context.cache);
+    // let result = result.unwrap();
+    // let last_quorum_per_index = unsafe { *(&*result.last_quorum_per_index) };
+    // let mut last_quorum = unsafe { { &*(last_quorum_per_index.add(0)) }.decode() };
+    // let block_hash = last_quorum.llmq_hash;
+    // let llmq_type = last_quorum.llmq_type;
     // let mut last_quorum = result.last_quorum_per_index.first().cloned().unwrap();
     let nodes = processor.get_rotated_masternodes_for_quorum(
         llmq_type,

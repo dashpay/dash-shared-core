@@ -1,4 +1,4 @@
-pub mod llmq_entry;
+pub mod llmq;
 pub mod llmq_indexed_hash;
 pub mod llmq_typed_hash;
 pub mod masternode_entry;
@@ -7,7 +7,7 @@ pub mod mn_list_diff;
 pub mod snapshot;
 pub mod qr_info;
 
-pub use self::llmq_entry::LLMQVerificationContext;
+pub use self::llmq::LLMQVerificationContext;
 pub use self::llmq_indexed_hash::LLMQIndexedHash;
 pub use self::llmq_typed_hash::LLMQTypedHash;
 pub use self::masternode_entry::MasternodeEntry;

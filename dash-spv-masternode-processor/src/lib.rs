@@ -5,7 +5,7 @@ pub extern crate secp256k1;
 #[macro_use] extern crate log;
 extern crate simplelog;
 
-#[cfg(test)]
+// #[cfg(test)]
 pub mod tests;
 
 #[cfg(feature = "test-helpers")]
