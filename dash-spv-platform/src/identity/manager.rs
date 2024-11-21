@@ -9,36 +9,62 @@ use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
 use dash_spv_crypto::hashes::{hash160, Hash};
 use dash_spv_crypto::keys::{ECDSAKey, IKey};
 use crate::error::Error;
-use crate::util::Retry;
+use crate::util::{RetryStrategy, StreamSpec, StreamStrategy, Validator};
 
 #[ferment_macro::export]
-pub enum IdentityMonitorOptions {
+pub enum IdentityMonitorValidator {
     None = 0,
     AcceptNotFoundAsNotAnError = 1,
 }
-impl IdentityMonitorOptions {
+impl IdentityMonitorValidator {
     pub fn accept_not_found(&self) -> bool {
         match self {
-            IdentityMonitorOptions::None => false,
-            IdentityMonitorOptions::AcceptNotFoundAsNotAnError => true
+            IdentityMonitorValidator::None => false,
+            IdentityMonitorValidator::AcceptNotFoundAsNotAnError => true
         }
     }
 }
-
-// type ResultCallback = Box<dyn Fn(Result<Identity, Error>) + Send + Sync>;
-
+impl Validator<Option<Identity>> for IdentityMonitorValidator {
+    fn validate(&self, value: &Option<Identity>) -> bool {
+        value.is_some() || value.is_none() && self.accept_not_found()
+    }
+}
 
 #[derive(Clone)]
 #[ferment_macro::opaque]
 pub struct IdentitiesManager {
     pub sdk: Arc<Sdk>,
-    // pub queue: dispatch_queue_attr_t,
     pub foreign_identities: HashMap<Identifier, Identity>,
 }
+
+impl StreamSpec for IdentityMonitorValidator {
+    type Validator = IdentityMonitorValidator;
+    type Result = Option<Identity>;
+    type Error = dash_sdk::Error;
+}
+
 const KEYS_TO_CHECK: u32 = 5;
 
 #[ferment_macro::export]
 impl IdentitiesManager {
+
+    // pub async fn fetch_by_name(&self, username: String, domain: String, contract_id: Identifier) -> Result<Option<Identity>, Error> {
+    //     // platformDocumentsRequest.pathPredicate = [NSPredicate predicateWithFormat:@"normalizedParentDomainName == %@", [domain lowercaseString]];
+    //     // platformDocumentsRequest.predicate = [NSPredicate predicateWithFormat:@"normalizedLabel == %@", [username lowercaseString]];
+    //     match DataContract::fetch_by_identifier(&self.sdk, contract_id).await? {
+    //         Some(contract) => {},
+    //         None => Ok(None)
+    //     }
+    // }
+    pub async fn fetch_by_id(&self, id: Identifier) -> Result<Option<Identity>, Error> {
+        Identity::fetch_by_identifier(&self.sdk, id).await.map_err(Error::from)
+    }
+    pub async fn fetch_by_key_hash(&self, key_hash: PublicKeyHash) -> Result<Option<Identity>, Error> {
+        Identity::fetch(&self.sdk, key_hash).await.map_err(Error::from)
+    }
+    pub async fn fetch_balance(&self, id: Identifier) -> Result<Option<u64>, Error> {
+        u64::fetch_by_identifier(&self.sdk, id).await.map_err(Error::from)
+    }
     pub async fn get_identities_by_pub_key_hashes_at_index_range(&self, extended_public_key: &ECDSAKey, unused_index: u32) -> Result<BTreeMap<u32, Identity>, Error> {
         let mut identities = BTreeMap::new();
         for i in unused_index..KEYS_TO_CHECK {
@@ -53,39 +79,28 @@ impl IdentitiesManager {
         }
         Ok(identities)
     }
-    pub async fn identity_monitor(
-        &self,
-        unique_id: Identifier,
-        retry: Retry,
-        options: IdentityMonitorOptions,
-    ) -> Result<Option<Identity>, Error> {
-        match retry.perform(|| async { Identity::fetch_by_identifier(&self.sdk, unique_id).await }).await {
-            Ok(Some(identity)) => Ok(Some(identity)),
-            Ok(None) if matches!(options, IdentityMonitorOptions::AcceptNotFoundAsNotAnError) => Ok(None),
-            Ok(None) => Err(Error::Any(500, "Platform returned no identity when one was expected".to_string())),
-            Err(err) => Err(Error::MaxRetryExceeded(err.to_string())),
-        }
-    }
 
+    pub async fn identity_monitor(&self, unique_id: Identifier, retry: RetryStrategy, options: IdentityMonitorValidator) -> Result<Option<Identity>, Error> {
+        self.identity_stream::<IdentityMonitorValidator>(unique_id, retry, options).await
+    }
 }
 impl IdentitiesManager {
     pub fn new(sdk: &Arc<Sdk>) -> Self {
         Self { foreign_identities: HashMap::new(), sdk: Arc::clone(sdk) }
     }
+    pub async fn identity_stream<SPEC>(
+        &self,
+        unique_id: Identifier,
+        retry: RetryStrategy,
+        validator: SPEC::Validator,
+    ) -> Result<SPEC::Result, Error>
+    where SPEC: StreamSpec<Result=Option<Identity>, Error=dash_sdk::Error> {
+        StreamStrategy::<SPEC>::with_retry(retry)
+            .with_validator(validator)
+            .on_max_retries_reached(dash_sdk::Error::Generic("Max retry reached".to_string()))
+            .stream(|| async { Identity::fetch_by_identifier(&self.sdk, unique_id).await })
+            .await
+            .map_err(Error::from)
+    }
 
-    // pub async fn identity_monitor<T>(
-    //     &self,
-    //     unique_id: Identifier,
-    //     retry: Retry,
-    //     options: IdentityMonitorOptions,
-    //     completion: Box<T>,
-    // ) where T: Fn(Result<Option<Identity>, Error>) + Send + Sync {
-    //     let result = match retry.perform(|| async { Identity::fetch_by_identifier(&self.sdk, unique_id).await }).await {
-    //         Ok(Some(identity)) => Ok(Some(identity)),
-    //         Ok(None) if matches!(options, IdentityMonitorOptions::AcceptNotFoundAsNotAnError) => Ok(None),
-    //         Ok(None) => Err(Error::Any(500, "Platform returned no identity when one was expected".to_string())),
-    //         Err(err) => Err(Error::MaxRetryExceeded(err.to_string())),
-    //     };
-    //     completion(result)
-    // }
 }
