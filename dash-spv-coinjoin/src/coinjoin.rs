@@ -172,7 +172,7 @@ impl CoinJoin {
                 }
             }
 
-            log_info!(target: "CoinJoin", "n_value_out={}, n_value_in={}", n_value_out, n_value_in);
+            log_debug!(target: "CoinJoin", "is_collateral_valid, values: n_value_out={}, n_value_in={}", n_value_out, n_value_in);
 
             if n_value_in - n_value_out < CoinJoin::get_collateral_amount() as i64 {
                 log_warn!(target: "CoinJoin", "did not include enough fees in transaction: fees: {}", n_value_out - n_value_in);

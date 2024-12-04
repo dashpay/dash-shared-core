@@ -161,6 +161,7 @@ pub type SessionLifecycleListener = unsafe extern "C" fn(
     denomination: u32,
     state: PoolState,
     message: PoolMessage,
+    status: PoolStatus,
     ip_address: *mut [u8; 16],
     joined: bool,
     context: *const c_void

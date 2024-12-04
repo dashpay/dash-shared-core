@@ -1,6 +1,6 @@
-use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
+use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::{byte_util::Reversable, UInt256}, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
-use tracing::{info, warn, debug};
+use tracing::{info, warn, debug, error};
 use logging::*;
 use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, ffi::callbacks::{DestroyMasternodeList, GetMasternodeList, IsWaitingForNewBlock, MixingLivecycleListener, SessionLifecycleListener, UpdateSuccessBlock}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{tx_outpoint::TxOutPoint, Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 
@@ -200,7 +200,7 @@ impl CoinJoinClientManager {
 
         if let Some(queue_manager) = &self.queue_queue_manager {
             let mut result = true;
-
+            
             if self.deq_sessions.len() < self.options.borrow().coinjoin_sessions as usize {
                 let new_session = CoinJoinClientSession::new(
                     self.coinjoin.clone(),
@@ -288,11 +288,11 @@ impl CoinJoinClientManager {
                 continue;
             }
 
-            log_info!(target: "CoinJoin", "found, masternode={}", dmn.provider_registration_transaction_hash);
+            log_info!(target: "CoinJoin", "mn found, proTxHash={}", dmn.provider_registration_transaction_hash);
             return Some(dmn.clone());
         }
 
-        log_info!(target: "CoinJoin", "failed get_random_not_used_masternode");
+        log_error!(target: "CoinJoin", "failed get_random_not_used_masternode");
         return None;
     }
 
@@ -388,7 +388,9 @@ impl CoinJoinClientManager {
 
     pub fn change_options(&mut self, new_options: CoinJoinClientOptions) {
         if new_options != *self.options.borrow() {
-            log_info!(target: "CoinJoin", "updating client options: {:?}", new_options);
+            if self.options.borrow().enable_coinjoin || new_options.enable_coinjoin {
+                log_info!(target: "CoinJoin", "updating client options: {:?}", new_options);
+            }
             *self.options.borrow_mut() = new_options.clone();
         }
     }
@@ -398,6 +400,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn reset_pool(&mut self) {
+        println!("[RUST] CoinJoin: reset_pool, self.deq_sessions.len(): {}", self.deq_sessions.len());
         self.masternodes_used.clear();
 
         for session in &mut self.deq_sessions {
@@ -430,6 +433,12 @@ impl CoinJoinClientManager {
     }
 
     fn queue_mixing_lifecycle_listeners(&self, is_complete: bool, is_interrupted: bool) {
+        println!("[RUST] CoinJoin: queue_mixing_lifecycle_listeners, self.deq_sessions.len(): {}", self.deq_sessions.len());
+        for session in &self.deq_sessions {
+            println!("[RUST] CoinJoin: session {:?} status {:?}", session.id, session.base_session.status);
+            println!("[RUST] CoinJoin: session outpoints_locked: {:?}", session.outpoints_locked.iter().map(|x| x.hash.reversed().to_string()).collect::<Vec<String>>());
+        }
+
         let statuses: Vec<PoolStatus> = self.deq_sessions.iter().map(|x| x.base_session.status).collect();
         let length = statuses.len();
 

@@ -271,8 +271,6 @@ impl<'a> TransactionBuilder {
 
     /// Clear the output vector and keep/return the included keys depending on the value of fKeepKeys
     pub fn clear(&mut self) {
-        println!("[RUST] CoinJoin TxBuilder: clear");
-
         let mut vec_outputs_tmp = self.outputs.clone();
         self.outputs.clear();
 
