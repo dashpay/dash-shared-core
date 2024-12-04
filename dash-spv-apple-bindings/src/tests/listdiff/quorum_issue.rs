@@ -40,9 +40,11 @@ fn test_quorum_issue() {
     ];
     let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
     let ctx = context.read().unwrap();
-    let (success, lists) = load_masternode_lists_for_files(files, false, Arc::clone(&context), chain);
+    let success = load_masternode_lists_for_files(files, false, Arc::clone(&context), chain);
     assert!(success, "Unsuccessful");
-    lists.iter().for_each(|(hash, node)| {
+    let ctx = context.read().unwrap();
+    let cache_lock = ctx.cache.read().unwrap();
+    cache_lock.mn_lists.iter().for_each(|(hash, node)| {
         println!("Testing quorum of models list at height {}", ctx.block_for_hash(*hash).unwrap().height);
     });
 }

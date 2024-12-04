@@ -512,7 +512,8 @@ fn test_processor_devnet_333_2() {
             let context_clone = Arc::clone(&context);
             Arc::new(move |block_hash| {
                 let ctx = context_clone.read().unwrap();
-                ctx.cache
+                let cache = ctx.cache.read().unwrap();
+                cache
                     .cl_signatures
                     .get(&block_hash)
                     .map(|c| Ok(c.clone()))
@@ -522,16 +523,18 @@ fn test_processor_devnet_333_2() {
         save_llmq_snapshot: {
             let context_clone = Arc::clone(&context);
             Arc::new(move |block_hash, snapshot| {
-                let mut ctx = context_clone.write().unwrap();
-                ctx.cache.add_snapshot(block_hash, snapshot);
+                let ctx = context_clone.write().unwrap();
+                let mut cache = ctx.cache.write().unwrap();
+                cache.add_snapshot(block_hash, snapshot);
                 true
             })
         },
         save_cl_signature: {
             let context_clone = Arc::clone(&context);
             Arc::new(move |block_hash, sig| {
-                let mut ctx = context_clone.write().unwrap();
-                ctx.cache.add_cl_signature(block_hash, sig);
+                let ctx = context_clone.write().unwrap();
+                let mut cache = ctx.cache.write().unwrap();
+                cache.add_cl_signature(block_hash, sig);
                 true
             })
         },
@@ -539,7 +542,8 @@ fn test_processor_devnet_333_2() {
             let context_clone = Arc::clone(&context);
             Arc::new(move |block_hash| {
                 let ctx = context_clone.read().unwrap();
-                ctx.cache
+                let cache = ctx.cache.read().unwrap();
+                cache
                     .mn_lists
                     .get(&block_hash)
                     .cloned()
@@ -549,8 +553,9 @@ fn test_processor_devnet_333_2() {
         save_masternode_list: {
             let context_clone = Arc::clone(&context);
             Arc::new(move |block_hash, list| {
-                let mut ctx = context_clone.write().unwrap();
-                ctx.cache.mn_lists.insert(block_hash, list);
+                let ctx = context_clone.write().unwrap();
+                let mut cache = ctx.cache.write().unwrap();
+                cache.mn_lists.insert(block_hash, list);
                 true
             })
         },

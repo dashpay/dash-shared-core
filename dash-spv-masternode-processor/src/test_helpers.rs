@@ -29,8 +29,8 @@ pub fn message_from_file(name: &str) -> Vec<u8> {
 
 
 
-pub fn block_hash_to_block_hash(block_hash: String) -> UInt256 {
-    UInt256::from_hex(block_hash.as_str()).unwrap()
+pub fn block_hash_to_block_hash(block_hash: String) -> [u8; 32] {
+    UInt256::from_hex(block_hash.as_str()).unwrap().0
 }
 
 

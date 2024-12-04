@@ -352,15 +352,19 @@ fn testnet_test_retrieve_saved_hashes() {
 
     let result_122064 = {
         let mut ctx = context.write().unwrap();
-        processor.mn_list_diff_result_from_message(&bytes_122064, true, 70221, &mut ctx.cache)
-            .expect("Result must be valid")
+        let result = processor.mn_list_diff_result_from_message(&bytes_122064, true, 70221, &mut ctx.cache)
+            .expect("Result must be valid");
+        drop(ctx);
+        result
     };
     assert!(result_122064.is_valid(), "Result must be valid");
 
     let result_122088 = {
         let mut ctx = context.write().unwrap();
-        processor.mn_list_diff_result_from_message(&bytes_122088, true, 70221, &mut ctx.cache)
-            .expect("Result must be valid")
+        let result = processor.mn_list_diff_result_from_message(&bytes_122088, true, 70221, &mut ctx.cache)
+            .expect("Result must be valid");
+        drop(ctx);
+        result
     };
     assert!(result_122088.is_valid(), "Result must be valid");
 
@@ -369,8 +373,9 @@ fn testnet_test_retrieve_saved_hashes() {
     let list_122064 = &result_122064.masternode_list;
     let list_122088 = &result_122088.masternode_list;
     let ctx = context.read().unwrap();
-    let reloaded_list_122064 = ctx.cache.mn_lists.get(&block_hash_122064).unwrap();
-    let reloaded_list_122088 = ctx.cache.mn_lists.get(&block_hash_122088).unwrap();
+    let cache_lock = ctx.cache.read().unwrap();
+    let reloaded_list_122064 = cache_lock.mn_lists.get(&block_hash_122064).unwrap();
+    let reloaded_list_122088 = cache_lock.mn_lists.get(&block_hash_122088).unwrap();
 
     let entry_hash = UInt256::from_hex("1bde434d4f68064d3108a09443ea45b4a6c6ac1f537a533efc36878cef2eb10f").unwrap().reverse();
     let entry_122064 = list_122064.masternodes.get(&entry_hash).unwrap();

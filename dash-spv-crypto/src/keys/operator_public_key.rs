@@ -8,7 +8,7 @@ use crate::keys::BLSKey;
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
 pub struct OperatorPublicKey {
-    pub data: UInt384,
+    pub data: [u8; 48],
     pub version: u16,
 }
 
@@ -32,7 +32,7 @@ impl Encodable for OperatorPublicKey {
 impl Decodable for OperatorPublicKey {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let data = UInt384::consensus_decode(&mut d)?;
+        let data = <[u8; 48]>::consensus_decode(&mut d)?;
         Ok(Self { data, version: 0 })
     }
 }
@@ -41,7 +41,7 @@ impl Decodable for OperatorPublicKey {
 // Ctx: (version, protocol_version)
 impl<'a> TryRead<'a, u16> for OperatorPublicKey {
     fn try_read(bytes: &'a [u8], version: u16) -> byte::Result<(Self, usize)> {
-        let data = bytes.read_with::<UInt384>(&mut 0, byte::LE)?;
+        let data = bytes.read_with::<UInt384>(&mut 0, byte::LE)?.0;
         Ok((OperatorPublicKey { data, version }, 48))
     }
 }
@@ -49,9 +49,9 @@ impl<'a> TryRead<'a, u16> for OperatorPublicKey {
 impl From<OperatorPublicKey> for Option<G1Element> {
     fn from(value: OperatorPublicKey) -> Self {
         if value.is_legacy() {
-            G1Element::from_bytes_legacy(&value.data.0)
+            G1Element::from_bytes_legacy(&value.data)
         } else {
-            G1Element::from_bytes(&value.data.0)
+            G1Element::from_bytes(&value.data)
         }.ok()
     }
 }

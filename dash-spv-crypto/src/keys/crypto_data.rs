@@ -8,8 +8,9 @@ pub trait DHKey: Send + Sync + Debug {
     fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Result<Self, KeyError> where Self: Sized;
 }
 // TODO: generalise this
-pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: CryptoData<K> {
-
+pub trait CryptoData<K>: Send + Sync + Debug
+where K: IKey + Clone,
+      Vec<u8>: CryptoData<K> {
     #[inline]
     fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
         use secp256k1::rand;
@@ -101,4 +102,11 @@ pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: Crypto
         }
     }
 }
+
+// impl<K> CryptoData<K> for K where K: IKey + Clone,
+//                                   Vec<u8>: CryptoData<K> {
+//
+// }
+//
+
 

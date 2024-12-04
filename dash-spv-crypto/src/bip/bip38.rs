@@ -2,7 +2,8 @@ use bip38::{Decrypt, Encrypt};
 use byte::BytesExt;
 use crate::crypto::byte_util::UInt256;
 use crate::keys::{ECDSAKey, KeyError};
-use crate::util::{base58, ScriptMap};
+use crate::network::ChainType;
+use crate::util::{base58, is_valid_dash_address_for_script_map, is_valid_dash_private_key, ScriptMap};
 
 const BIP38_NOEC_PREFIX: u16 = 0x0142;
 const BIP38_EC_PREFIX: u16 = 0x0143;
@@ -37,7 +38,7 @@ impl BIP38 for ECDSAKey {
     }
 
     fn bip38_key_with_passphrase(&self, passphrase: &str, script: &ScriptMap) -> Result<String, KeyError> {
-        self.seckey.0.encrypt(passphrase, false, script.pubkey)
+        self.seckey.encrypt(passphrase, false, script.pubkey)
             .map_err(KeyError::from)
     }
 
@@ -60,4 +61,17 @@ impl BIP38 for ECDSAKey {
             _ => false
         }
     }
+}
+
+#[ferment_macro::export]
+pub fn is_valid_payment_request_address(key: String, chain_type: ChainType) -> bool {
+    let script_map = chain_type.script_map();
+    is_valid_dash_address_for_script_map(&key, &script_map) ||
+        is_valid_dash_private_key(&key, &script_map) ||
+        is_valid_bip38_key(&key)
+}
+
+#[ferment_macro::export]
+pub fn is_valid_bip38_key(key: &str) -> bool {
+    ECDSAKey::is_valid_bip38_key(key)
 }

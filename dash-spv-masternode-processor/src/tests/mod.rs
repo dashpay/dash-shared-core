@@ -1,5 +1,7 @@
 #[cfg(feature = "test-helpers")]
-use dash_spv_crypto::crypto::{UInt256, UInt768};
+use std::sync::Arc;
+#[cfg(feature = "test-helpers")]
+use dash_spv_crypto::crypto::UInt256;
 #[cfg(feature = "test-helpers")]
 use dash_spv_crypto::network::{ChainType, DevnetType, IHaveChainSettings};
 #[cfg(feature = "test-helpers")]
@@ -20,22 +22,22 @@ pub mod listdiff;
 #[cfg(feature = "serde")]
 pub mod serde_helper;
 
-#[cfg(feature = "test-helpers")]
 #[derive(Debug)]
+#[cfg(feature = "test-helpers")]
 pub struct FFIContext {
     pub chain: ChainType,
     pub is_dip_0024: bool,
-    pub cache: MasternodeProcessorCache,
+    pub cache: Arc<MasternodeProcessorCache>,
     // TODO:: make it initialized from json file with blocks
     pub blocks: Vec<MerkleBlock>,
 }
 
 #[cfg(feature = "test-helpers")]
 impl FFIContext {
-    pub fn block_for_hash(&self, hash: UInt256) -> Option<&MerkleBlock> {
-        self.blocks.iter().find(|block| block.hash == hash)
+    pub fn block_for_hash(&self, hash: [u8; 32]) -> Option<&MerkleBlock> {
+        self.blocks.iter().find(|block| block.hash.0 == hash)
     }
-    pub fn block_height_for_hash(&self, block_hash: UInt256) -> u32 {
+    pub fn block_height_for_hash(&self, block_hash: [u8; 32]) -> u32 {
         self.block_for_hash(block_hash)
             .map(MerkleBlock::height)
             .unwrap_or(u32::MAX)
@@ -53,13 +55,13 @@ impl FFIContext {
 
 
     pub fn genesis_as_ptr(&self) -> *const u8 {
-        self.chain.genesis_hash().0.as_ptr()
+        self.chain.genesis_hash().as_ptr()
     }
 
     pub fn chain_default(chain: ChainType, is_dip_0024: bool, blocks: Vec<MerkleBlock>) -> Self {
-        Self { chain, is_dip_0024, cache: MasternodeProcessorCache::default(), blocks }
+        Self { chain, is_dip_0024, cache: Arc::new(MasternodeProcessorCache::default()), blocks }
     }
-    pub fn create_default_context(chain: ChainType, is_dip_0024: bool, cache: MasternodeProcessorCache) -> Self {
+    pub fn create_default_context(chain: ChainType, is_dip_0024: bool, cache: Arc<MasternodeProcessorCache>) -> Self {
         let blocks = match chain {
             ChainType::MainNet => init_mainnet_store(),
             ChainType::TestNet => init_testnet_store(),
@@ -79,8 +81,8 @@ impl FFIContext {
         Self::chain_default(ChainType::DevNet(devnet), is_dip_0024, blocks)
     }
 
-    pub fn add_cl_signature(&mut self, block_hash: UInt256, sig: UInt768) {
-        self.cache.add_cl_signature(block_hash, sig);
-    }
+    // pub fn add_cl_signature(&mut self, block_hash: UInt256, sig: UInt768) {
+    //     self.cache.add_cl_signature(block_hash, sig);
+    // }
 
 }

@@ -1,5 +1,4 @@
 use std::{fs, io::Read};
-use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 #[cfg(feature = "test-helpers")]
 use hashes::hex::ToHex;
@@ -9,7 +8,6 @@ use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::logger::register_rust_logger;
 use dash_spv_masternode_processor::processing::{MNListDiffResult, QRInfoResult};
 use dash_spv_masternode_processor::block_store::MerkleBlock;
-use dash_spv_masternode_processor::models;
 // #[cfg(feature = "serde")]
 // use dash_spv_masternode_processor::test_helpers::Block;
 use dash_spv_masternode_processor::test_helpers::load_message;
@@ -449,6 +447,7 @@ pub fn perform_mnlist_diff_test_for_message(
     let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
     let mut ctx = context.write().unwrap();
     let processor = FFICoreProvider::default_processor(&context, chain);
+    // let cache_lock = Arc::new(RwLock::new(ctx.cache));
     let result = processor.mn_list_diff_result_from_message(&bytes, true, 70221, &mut ctx.cache)
         .expect("Failed to process mnlistdiff");
     let masternode_list = result.masternode_list;
@@ -483,16 +482,16 @@ pub fn load_masternode_lists_for_files(
     assert_validity: bool,
     context: Arc<RwLock<FFIContext>>,
     chain_type: ChainType
-) -> (bool, BTreeMap<UInt256, models::MasternodeList>) {
+) -> bool {
     let processor = FFICoreProvider::default_processor(&context, chain_type);
-    let mut ctx = context.write().unwrap();
+    let ctx = context.read().unwrap();
     for file in files {
         let bytes = load_message(chain_type.identifier(), file.as_str());
         let result = processor.mn_list_diff_result_from_message(
             &bytes,
             false,
             70221,
-            &mut ctx.cache
+            &ctx.cache
         ).expect("Failed to process mnlistdiff");
         // let result = unsafe { process_mnlistdiff_from_message(
         //     bytes.as_ptr(),
@@ -513,8 +512,10 @@ pub fn load_masternode_lists_for_files(
         // let masternode_list = unsafe { &*result.masternode_list };
         // let masternode_list_decoded = unsafe { masternode_list.decode() };
     }
-    let lists = ctx.cache.mn_lists.clone();
-    (true, lists)
+    true
+    // lctx.cache.read().unwrap();
+    // let lists = ctx.cache.mn_lists.clone();
+    // (true, lists)
 }
 pub fn extract_protocol_version_from_filename(filename: &str) -> Option<u32> {
     filename.split("__")
@@ -533,30 +534,31 @@ pub fn assert_diff_chain(chain: ChainType, diff_files: &[&'static str], qrinfo_f
         let message = load_message(chain.identifier(), filename);
         let result = processor.mn_list_diff_result_from_message(&message, true, protocol_version, &mut ctx.cache)
             .expect("Failed to process mnlistdiff");
-        let mut ctx = context.write().unwrap();
         assert_diff_result(&ctx, &result);
-        ctx.cache.mn_lists.insert(result.block_hash, result.masternode_list);
+        let mut cache = ctx.cache.write().unwrap();
+        cache.mn_lists.insert(result.block_hash, result.masternode_list);
     });
     ctx.is_dip_0024 = true;
     qrinfo_files.iter().for_each(|filename| {
         let protocol_version = extract_protocol_version_from_filename(filename).unwrap_or(70219);
         let message = load_message(chain.identifier(), filename);
-        let result = processor.qr_info_result_from_message(&message, true, protocol_version, true, &mut ctx.cache)
+        let result = processor.qr_info_result_from_message(&message, true, protocol_version, true, &ctx.cache)
             .expect("Failed to process qrinfo");
         assert_qrinfo_result(&ctx, &result);
+        let mut cache = ctx.cache.write().unwrap();
         if !result.result_at_h_4c.is_some() {
             let result = result.result_at_h_4c.unwrap();
-            ctx.cache.mn_lists.insert(result.block_hash, result.masternode_list);
+            cache.mn_lists.insert(result.block_hash, result.masternode_list);
         }
         let result_at_h_3c = result.result_at_h_3c;
-        ctx.cache.mn_lists.insert(result_at_h_3c.block_hash, result_at_h_3c.masternode_list);
+        cache.mn_lists.insert(result_at_h_3c.block_hash, result_at_h_3c.masternode_list);
         let result_at_h_2c = result.result_at_h_2c;
-        ctx.cache.mn_lists.insert(result_at_h_2c.block_hash, result_at_h_2c.masternode_list);
+        cache.mn_lists.insert(result_at_h_2c.block_hash, result_at_h_2c.masternode_list);
         let result_at_h_c = result.result_at_h_c;
-        ctx.cache.mn_lists.insert(result_at_h_c.block_hash, result_at_h_c.masternode_list);
+        cache.mn_lists.insert(result_at_h_c.block_hash, result_at_h_c.masternode_list);
         let result_at_h = result.result_at_h;
-        ctx.cache.mn_lists.insert(result_at_h.block_hash, result_at_h.masternode_list);
+        cache.mn_lists.insert(result_at_h.block_hash, result_at_h.masternode_list);
         let result_at_tip = result.result_at_tip;
-        ctx.cache.mn_lists.insert(result_at_tip.block_hash, result_at_tip.masternode_list);
+        cache.mn_lists.insert(result_at_tip.block_hash, result_at_tip.masternode_list);
     });
 }

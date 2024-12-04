@@ -1,11 +1,10 @@
-use byte::BytesExt;
+use byte::{BytesExt, LE};
 use hashes::hex::ToHex;
 use std::collections::{BTreeMap, HashSet};
 use dash_spv_crypto::network::{LLMQType, CORE_PROTO_20, CORE_PROTO_BLS_BASIC, CORE_PROTO_DIFF_VERSION_ORDER};
 use dash_spv_crypto::consensus::encode::VarInt;
-use dash_spv_crypto::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt768};
-use dash_spv_crypto::crypto::var_array::VarArray;
-use dash_spv_crypto::llmq::LLMQEntry;
+use dash_spv_crypto::crypto::byte_util::{BytesDecodable, Reversed, UInt256, UInt768};
+use dash_spv_crypto::llmq::entry::LLMQEntry;
 use dash_spv_crypto::tx::CoinbaseTransaction;
 use crate::models::MasternodeEntry;
 use crate::models::masternode_entry::MasternodeReadContext;
@@ -13,15 +12,15 @@ use crate::processing::CoreProvider;
 
 #[derive(Clone)]
 pub struct MNListDiff {
-    pub base_block_hash: UInt256,
-    pub block_hash: UInt256,
+    pub base_block_hash: [u8; 32],
+    pub block_hash: [u8; 32],
     pub total_transactions: u32,
-    pub merkle_hashes: Vec<UInt256>,
+    pub merkle_hashes: Vec<[u8; 32]>,
     pub merkle_flags: Vec<u8>,
     pub coinbase_transaction: CoinbaseTransaction,
-    pub deleted_masternode_hashes: Vec<UInt256>,
-    pub added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
-    pub deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
+    pub deleted_masternode_hashes: Vec<[u8; 32]>,
+    pub added_or_modified_masternodes: BTreeMap<[u8; 32], MasternodeEntry>,
+    pub deleted_quorums: BTreeMap<LLMQType, Vec<[u8; 32]>>,
     pub added_quorums: Vec<LLMQEntry>,
     pub base_block_height: u32,
     pub block_height: u32,
@@ -35,7 +34,7 @@ pub struct MNListDiff {
     // 19.3 goes with 70229?
     // 20.0 goes with 70230+
     // clsig, heights
-    pub quorums_cls_sigs: BTreeMap<UInt768, HashSet<u16>>,
+    pub quorums_cls_sigs: BTreeMap<[u8; 96], HashSet<u16>>,
 }
 
 impl std::fmt::Debug for MNListDiff {
@@ -102,12 +101,24 @@ impl MNListDiff {
         if protocol_version >= CORE_PROTO_DIFF_VERSION_ORDER {
             version = u16::from_bytes(message, offset)?
         }
-        let base_block_hash = UInt256::from_bytes(message, offset)?;
-        let block_hash = UInt256::from_bytes(message, offset)?;
+        let base_block_hash = UInt256::from_bytes(message, offset)?.0;
+        let block_hash = UInt256::from_bytes(message, offset)?.0;
         let base_block_height = provider.lookup_block_height_by_hash(base_block_hash);
         let block_height = provider.lookup_block_height_by_hash(block_hash);
         let total_transactions = u32::from_bytes(message, offset)?;
-        let merkle_hashes = VarArray::<UInt256>::from_bytes(message, offset)?;
+
+        let num_merkle_hashes = VarInt::from_bytes(message, offset)?.0 as usize;
+        // let arr_len = var_int.0 as usize;
+        let mut merkle_hashes = Vec::with_capacity(num_merkle_hashes);
+        for _i  in 0..num_merkle_hashes {
+            match message.read_with::<UInt256>(offset, LE) {
+                Ok(data) => { merkle_hashes.push(data.0); },
+                Err(err) => { return Err(err); }
+            }
+        }
+
+
+        // let merkle_hashes = VarArray::<[u8; 32]>::from_bytes(message, offset)?;
         let merkle_flags_count = VarInt::from_bytes(message, offset)?.0 as usize;
         let merkle_flags: &[u8] = message.read_with(offset, byte::ctx::Bytes::Len(merkle_flags_count))?;
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
@@ -117,13 +128,13 @@ impl MNListDiff {
         }
         let masternode_read_ctx = MasternodeReadContext(block_height, version, protocol_version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
-        let mut deleted_masternode_hashes: Vec<UInt256> =
+        let mut deleted_masternode_hashes: Vec<[u8; 32]> =
             Vec::with_capacity(deleted_masternode_count as usize);
         for _i in 0..deleted_masternode_count {
-            deleted_masternode_hashes.push(UInt256::from_bytes(message, offset)?);
+            deleted_masternode_hashes.push(UInt256::from_bytes(message, offset)?.0);
         }
         let added_masternode_count = VarInt::from_bytes(message, offset)?.0;
-        let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
+        let added_or_modified_masternodes: BTreeMap<[u8; 32], MasternodeEntry> = (0..added_masternode_count)
             .fold(BTreeMap::new(), |mut acc, _| {
                 if let Ok(entry) = message.read_with::<MasternodeEntry>(offset, masternode_read_ctx) {
                     acc.insert(entry.provider_registration_transaction_hash.reversed(), entry);
@@ -131,14 +142,14 @@ impl MNListDiff {
                 acc
             });
 
-        let mut deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>> = BTreeMap::new();
+        let mut deleted_quorums: BTreeMap<LLMQType, Vec<[u8; 32]>> = BTreeMap::new();
         let mut added_quorums = Vec::<LLMQEntry>::new();
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         if quorums_active {
             let deleted_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..deleted_quorums_count {
                 let llmq_type = LLMQType::from_bytes(message, offset)?;
-                let llmq_hash = UInt256::from_bytes(message, offset)?;
+                let llmq_hash = UInt256::from_bytes(message, offset)?.0;
                 deleted_quorums
                     .entry(llmq_type)
                     .or_insert_with(Vec::new)
@@ -153,7 +164,7 @@ impl MNListDiff {
         if protocol_version >= CORE_PROTO_20 {
             let quorums_cl_sigs_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..quorums_cl_sigs_count {
-                let signature = UInt768::from_bytes(message, offset)?;
+                let signature = UInt768::from_bytes(message, offset)?.0;
                 let index_set_length = VarInt::from_bytes(message, offset)?.0 as usize;
                 let mut index_set = HashSet::with_capacity(index_set_length);
                 for _i in 0..index_set_length {
@@ -167,7 +178,7 @@ impl MNListDiff {
             base_block_hash,
             block_hash,
             total_transactions,
-            merkle_hashes: merkle_hashes.1,
+            merkle_hashes,
             merkle_flags: merkle_flags.to_vec(),
             coinbase_transaction,
             deleted_masternode_hashes,

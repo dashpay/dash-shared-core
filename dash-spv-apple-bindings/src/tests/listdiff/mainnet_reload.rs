@@ -41,7 +41,9 @@ fn test_mainnet_reload_with_processor() {
         .to_vec();
 
     let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
-    let (success, lists) = load_masternode_lists_for_files(files, true, context, chain);
+    let success = load_masternode_lists_for_files(files, true, Arc::clone(&context), chain);
     assert!(success, "Unsuccessful");
-    assert_eq!(lists.len(), 29, "There should be 29 models lists");
+    let context_lock = context.read().unwrap();
+    let cache_lock = context_lock.cache.read().unwrap();
+    assert_eq!(cache_lock.mn_lists.len(), 29, "There should be 29 models lists");
 }

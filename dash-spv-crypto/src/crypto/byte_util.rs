@@ -17,6 +17,9 @@ pub trait AsBytes {
 
 pub trait Reversable {
     fn reverse(&mut self) -> Self;
+    // fn reversed(&self) -> Self;
+}
+pub trait Reversed {
     fn reversed(&self) -> Self;
 }
 
@@ -171,6 +174,17 @@ macro_rules! define_try_read_to_big_uint {
                 Ok(($uint_type(data), $byte_len))
             }
         }
+        // impl<'a> TryRead<'a, Endian> for [u8; $byte_len] {
+        //     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+        //         // Ok(($uint_type(bytes[..$byte_len].try_into().unwrap_or([0u8; $byte_len])), $byte_len))
+        //         let mut offset = 0usize;
+        //         let mut data: [u8; $byte_len] = [0u8; $byte_len];
+        //         for i in 0..$byte_len {
+        //             data[i] = bytes.read_with::<u8>(&mut offset, endian)?;
+        //         }
+        //         Ok((data, $byte_len))
+        //     }
+        // }
     }
 }
 
@@ -262,7 +276,6 @@ macro_rules! define_bytes_to_big_uint {
             }
         }
 
-
         // TODO: as it's often use to compare hashes
         // it's needs to be optimized
         impl Reversable for $uint_type {
@@ -270,12 +283,22 @@ macro_rules! define_bytes_to_big_uint {
                 self.0.reverse();
                 *self
             }
+        }
+        impl Reversed for $uint_type {
             fn reversed(&self) -> Self {
                 let mut s = self.0.clone();
                 s.reverse();
                 $uint_type(s)
             }
         }
+        impl Reversed for [u8; $byte_len] {
+            fn reversed(&self) -> Self {
+                let mut s = self.clone();
+                s.reverse();
+                s
+            }
+        }
+
         impl FromHex for $uint_type {
             fn from_byte_iter<I>(iter: I) -> std::result::Result<Self, hex::Error>
                 where I: Iterator<Item=std::result::Result<u8, hashes::hex::Error>> +
@@ -298,6 +321,11 @@ macro_rules! define_bytes_to_big_uint {
                 !self.0.iter().any(|&byte| byte > 0)
             }
         }
+        impl Zeroable for [u8; $byte_len] {
+            fn is_zero(&self) -> bool {
+                !self.iter().any(|&byte| byte > 0)
+            }
+        }
 
         impl $uint_type {
             pub const MIN: Self = $uint_type([0; $byte_len]);
@@ -312,7 +340,6 @@ macro_rules! define_bytes_to_big_uint {
         }
     }
 }
-
 
 impl_decodable!(u8, 1);
 impl_decodable!(u16, 2);
@@ -334,6 +361,8 @@ define_bytes_to_big_uint!(UInt512, 64);
 define_bytes_to_big_uint!(UInt768, 96);
 
 define_bytes_to_big_uint!(ECPoint, 33);
+
+
 
 pub const fn merge<const N: usize>(mut buf: [u8; N], bytes: &[u8]) -> [u8; N] {
     let mut i = 0;
@@ -830,6 +859,7 @@ impl UInt256 {
     }
 }
 
+
 impl UInt256 {
     pub fn hmac<T: Hash<Inner = [u8; 32]>>(key: &[u8], input: &[u8]) -> Self {
         let mut engine = HmacEngine::<T>::new(key);
@@ -896,4 +926,15 @@ impl UInt512 {
         result[32..].copy_from_slice(&b.0);
         Self(result)
     }
+}
+pub fn sup(lhs: [u8; 32], rhs: &[u8; 32]) -> bool {
+    for i in (0..32).rev() {
+        if lhs[i] > rhs[i] {
+            return true;
+        } else if lhs[i] < rhs[i] {
+            return false;
+        }
+    }
+    // equal
+    false
 }

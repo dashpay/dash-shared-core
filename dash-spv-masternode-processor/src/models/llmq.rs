@@ -6,7 +6,7 @@ use serde::ser::SerializeStruct;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings, LLMQType};
-use dash_spv_crypto::crypto::byte_util::{AsBytes, Reversable, UInt256};
+use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_crypto::keys::BLSKey;
 use dash_spv_crypto::llmq::entry::LLMQEntry;
 use dash_spv_crypto::llmq::modifier::LLMQModifierType;
@@ -250,19 +250,19 @@ pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, 
         use_legacy,
     );
     if !all_commitment_aggregated_signature_validated {
-        println!("••• INVALID AGGREGATED SIGNATURE {}: {:?} ({})", block_height, entry.llmq_type, entry.all_commitment_aggregated_signature);
+        println!("••• INVALID AGGREGATED SIGNATURE {}: {:?} ({})", block_height, entry.llmq_type, entry.all_commitment_aggregated_signature.to_hex());
         return LLMQValidationStatus::InvalidAggregatedSignature;
     }
     // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
     // This is an aggregated BLS signature verification.
     let quorum_signature_validated = BLSKey::verify_quorum_signature(
-        commitment_hash.as_bytes(),
-        entry.threshold_signature.as_bytes(),
-        entry.public_key.as_bytes(),
+        &commitment_hash,
+        &entry.threshold_signature,
+        &entry.public_key,
         use_legacy,
     );
     if !quorum_signature_validated {
-        println!("••• INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, entry.llmq_type, entry.threshold_signature);
+        println!("••• INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, entry.llmq_type, entry.threshold_signature.to_hex());
         return LLMQValidationStatus::InvalidQuorumSignature;
     }
     println!("••• quorum {:?} validated at {}", entry.llmq_type, block_height);
@@ -300,7 +300,7 @@ pub fn validate_payload(entry: &LLMQEntry) -> LLMQPayloadValidationStatus {
 }
 
 
-pub fn valid_masternodes(entry: &LLMQEntry, chain_type: ChainType, masternodes: BTreeMap<UInt256, MasternodeEntry>, block_height: u32, llmq_modifier: LLMQModifierType) -> Vec<MasternodeEntry> {
+pub fn valid_masternodes(entry: &LLMQEntry, chain_type: ChainType, masternodes: BTreeMap<[u8; 32], MasternodeEntry>, block_height: u32, llmq_modifier: LLMQModifierType) -> Vec<MasternodeEntry> {
     let llmq_type = entry.llmq_type;
     let hpmn_only = llmq_type == chain_type.platform_type() && !entry.version.use_bls_legacy();
     let quorum_modifier = llmq_modifier.build_llmq_hash();
@@ -308,7 +308,7 @@ pub fn valid_masternodes(entry: &LLMQEntry, chain_type: ChainType, masternodes: 
     let masternode_count = masternodes.len();
     let score_dictionary = score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
     let count = min(masternode_count, score_dictionary.len());
-    let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
+    let mut scores: Vec<[u8; 32]> = score_dictionary.clone().into_keys().collect();
     scores.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
     let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
     // TODO: is that correct to take count here before checking validity?

@@ -13,20 +13,22 @@ pub use self::ecdsa_key::ECDSAKey;
 pub use self::ed25519_key::ED25519Key;
 pub use self::operator_public_key::OperatorPublicKey;
 
-use std::fmt::{Debug, Display};
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::UInt256;
+use std::fmt::Debug;
+use hashes::{sha256d, Hash};
+use crate::consensus::{encode, Encodable};
 use crate::bip::bip32;
+use crate::consensus::encode::Error;
 use crate::derivation::index_path::{Extremum, IIndexPath, IndexHardSoft};
 use crate::keys::key::KeyKind;
+use crate::network::ChainType;
 use crate::network::protocol::SIGHASH_ALL;
-use crate::util::{base58, data_append::DataAppend, script::ScriptElement, ScriptMap, sec_vec::SecVec};
+use crate::util::{base58, data_append::DataAppend, script::ScriptElement, sec_vec::SecVec};
 
 pub trait DeriveKey<T>: Sized
-    where T: IIndexPath<Item: Copy + Clone + Display + Debug + Encodable + IndexHardSoft + PartialEq + Extremum> {
+    where T: IIndexPath<Item: Copy + Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum> {
     fn private_derive_to_path(&self, path: &T) -> Result<Self, KeyError>;
-    fn public_derive_to_path_with_offset(&mut self, path: &T, offset: usize) -> Result<Self, KeyError>;
-    fn public_derive_to_path(&mut self, path: &T) -> Result<Self, KeyError> {
+    fn public_derive_to_path_with_offset(&self, path: &T, offset: usize) -> Result<Self, KeyError>;
+    fn public_derive_to_path(&self, path: &T) -> Result<Self, KeyError> {
         self.public_derive_to_path_with_offset(path, 0)
     }
 }
@@ -37,16 +39,16 @@ pub trait IKey: Send + Sync + Debug {
     fn secret_key_string(&self) -> String;
     fn has_private_key(&self) -> bool;
 
-    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String;
+    fn address_with_public_key_data(&self, chain: ChainType) -> String;
     // fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
     //     address::with_public_key_data(&self.public_key_data(), script_map)
     // }
     fn sign(&self, data: &[u8]) -> Vec<u8>;
     // fn sign_message_digest(&self)
-    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool;
-    fn secret_key(&self) -> UInt256;
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError>;
+    fn secret_key(&self) -> [u8; 32];
 
-    fn chaincode(&self) -> UInt256;
+    fn chaincode(&self) -> [u8; 32];
     fn fingerprint(&self) -> u32;
 
     fn private_key_data(&self) -> Result<Vec<u8>, KeyError>;
@@ -67,14 +69,15 @@ pub trait IKey: Send + Sync + Debug {
     // fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
     //     where Self: Sized, PATH: IIndexPath<Item = UInt256>;
 
-    fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String;
-    fn hmac_256_data(&self, data: &[u8]) -> UInt256;
+    fn serialized_private_key_for_script(&self, chain_prefix: u8) -> String;
+    fn hmac_256_data(&self, data: &[u8]) -> [u8; 32];
     fn forget_private_key(&mut self);
 
     fn create_signature(&self, tx_input_script: &Vec<u8>, tx_data: &Vec<u8>) -> Vec<u8> {
         let mut sig = Vec::<u8>::new();
-        let hash = UInt256::sha256d(tx_data);
-        let mut s = self.sign(&hash.0.to_vec());
+        let hash = sha256d::Hash::hash(tx_data);
+        // let hash = UInt256::sha256d(tx_data);
+        let mut s = self.sign(hash.as_ref());
         let elem = tx_input_script.script_elements();
         (SIGHASH_ALL as u8).enc(&mut s);
         s.append_script_push_data(&mut sig);
@@ -89,31 +92,32 @@ pub trait IKey: Send + Sync + Debug {
         sig
     }
 
-    fn sign_message_digest(&self, digest: UInt256) -> Vec<u8>;
+    fn sign_message_digest(&self, digest: [u8; 32]) -> Vec<u8>;
     fn private_key_data_equal_to(&self, other_private_key_data: &[u8; 32]) -> bool;
     fn public_key_data_equal_to(&self, other_public_key_data: &Vec<u8>) -> bool;
 }
 
 #[derive(Clone, Debug)]
-#[ferment_macro::opaque]
+#[ferment_macro::export]
 pub enum KeyError {
     WrongFormat,
     WrongLength(usize),
     Extended(bool),
-    Bip32(bip32::Error),
-    Bip38(bip38::Error),
-    Bytes(byte::Error),
-    Secp256k1(secp256k1::Error),
-    Base58(base58::Error),
-    Bls(String),
-    Hex(hashes::hex::Error),
-    EDSignature(String),
+    // Bip32(bip32::Error),
+    // Bip38(bip38::Error),
+    // Bytes(byte::Error),
+    // Secp256k1(secp256k1::Error),
+    // Base58(base58::Error),
+    // Bls(String),
+    // Hex(hashes::hex::Error),
+    // EDSignature(String),
     UnableToDerive,
     DHKeyExchange,
     CCCrypt(i32),
     EmptySecKey,
     Product,
-    TryFromSliceError(std::array::TryFromSliceError)
+    Any(String),
+    // TryFromSliceError(std::array::TryFromSliceError)
 }
 
 impl std::fmt::Display for KeyError {
@@ -125,49 +129,64 @@ impl std::error::Error for KeyError {}
 
 impl From<std::array::TryFromSliceError> for KeyError {
     fn from(value: std::array::TryFromSliceError) -> Self {
-        Self::TryFromSliceError(value)
+        // Self::TryFromSliceError(value)
+        Self::Any(value.to_string())
     }
 }
 
 impl From<base58::Error> for KeyError {
     fn from(value: base58::Error) -> Self {
-        Self::Base58(value)
+        Self::Any(value.to_string())
+        // Self::Base58(value)
     }
 }
 
 impl From<bip32::Error> for KeyError {
     fn from(value: bip32::Error) -> Self {
-        Self::Bip32(value)
+        // Self::Bip32(value)
+        Self::Any(format!("{value:?}"))
     }
 }
 impl From<bip38::Error> for KeyError {
     fn from(value: bip38::Error) -> Self {
-        Self::Bip38(value)
+        Self::Any(value.to_string())
+        // Self::Bip38(value)
     }
 }
 
 impl From<byte::Error> for KeyError {
     fn from(value: byte::Error) -> Self {
-        Self::Bytes(value)
+        Self::Any(format!("{value:?}"))
+        // Self::Bytes(value)
     }
 }
 impl From<secp256k1::Error> for KeyError {
     fn from(value: secp256k1::Error) -> Self {
-        Self::Secp256k1(value)
+        Self::Any(value.to_string())
+        // Self::Secp256k1(value)
     }
 }
 impl From<bls_signatures::BlsError> for KeyError {
     fn from(value: bls_signatures::BlsError) -> Self {
-        Self::Bls(value.to_string())
+        // Self::Bls(value.to_string())
+        Self::Any(value.to_string())
     }
 }
 impl From<hashes::hex::Error> for KeyError {
     fn from(value: hashes::hex::Error) -> Self {
-        Self::Hex(value)
+        Self::Any(value.to_string())
+        // Self::Hex(value)
     }
 }
 impl From<ed25519_dalek::SignatureError> for KeyError {
     fn from(value: ed25519_dalek::SignatureError) -> Self {
-        Self::EDSignature(value.to_string())
+        // Self::EDSignature(value.to_string())
+        Self::Any(value.to_string())
+    }
+}
+
+impl From<encode::Error> for KeyError {
+    fn from(value: Error) -> Self {
+        Self::Any(value.to_string())
     }
 }

@@ -90,7 +90,7 @@ pub struct Transaction {
     pub outputs: Vec<TransactionOutput>,
     pub lock_time: u32,
     pub version: u16,
-    pub tx_hash: Option<UInt256>,
+    pub tx_hash: Option<[u8; 32]>,
     pub tx_type: TransactionType,
     pub payload_offset: usize,
     pub block_height: u32,
@@ -194,7 +194,7 @@ impl Transaction {
         self.inputs.clone()
     }
 
-    pub fn tx_hash(&self) -> Option<UInt256> {
+    pub fn tx_hash(&self) -> Option<[u8; 32]> {
         self.tx_hash
     }
 
@@ -221,7 +221,7 @@ impl Decodable for Transaction {
             tx_hash: None,
             payload_offset: 0,
         };
-        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()));
+        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()).0);
         Ok(tx)
     }
 }
@@ -259,7 +259,7 @@ impl<'a> TryRead<'a, Endian> for Transaction {
             tx_hash: None,
             block_height: TX_UNCONFIRMED as u32,
         };
-        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()));
+        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()).0);
         Ok((tx, *offset))
     }
 }

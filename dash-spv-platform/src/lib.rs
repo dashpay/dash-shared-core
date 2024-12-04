@@ -79,9 +79,8 @@ const DEFAULT_TESTNET_ADDRESS_LIST: [&str; 28] = [
     "54.213.204.85"
 ];
 fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Uri>>(provider: C, address_list: T) -> Sdk {
-    SdkBuilder::with_context_provider(
-        SdkBuilder::new(AddressList::from_iter(address_list)),
-        provider)
+    SdkBuilder::new(AddressList::from_iter(address_list))
+        .with_context_provider(provider)
         .build()
         .unwrap()
 }
@@ -121,26 +120,18 @@ impl PlatformSDK {
         AH: Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
         CS: Fn(*const std::os::raw::c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
         CCS: Fn(*const std::os::raw::c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
-        AC1: Fn(*const std::os::raw::c_void, u32, Vec<u8>, u32) -> Vec<u8> + Send + Sync + 'static,
-        AC2: Fn(u32, [u8; 32], u32) -> [u8; 96] + Send + Sync + 'static,
-        AC3: Fn(u32, [u8; 32], u32) -> [u8; 96],
-        AC4: Fn(*const std::os::raw::c_void, u32, String) -> String
     >(
         get_quorum_public_key: QP,
         get_data_contract: DC,
         get_platform_activation_height: AH,
         callback_signer: CS,
         callback_can_sign: CCS,
-        ac1: AC1,
-        ac2: AC2,
-        _ac3: AC3,
-        _ac4: AC4,
         address_list: Option<Vec<&'static str>>,
         context: *const std::os::raw::c_void,
     ) -> Self {
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
         let sdk = create_sdk(
-            PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, ac1, ac2, context_arc.clone()),
+            PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, context_arc.clone()),
             address_list.unwrap_or(Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST))
                 .iter()
                 .filter_map(|s| Uri::from_str(s).ok()));
@@ -165,6 +156,10 @@ impl PlatformSDK {
             .await
             .map_err(Error::from)
             .map(|status| status.is_some())
+    }
+
+    pub async fn check_ping_times_for_current_masternode_list(&self) {
+
     }
     pub async fn put_document(
         &self,
@@ -203,6 +198,11 @@ impl PlatformSDK {
         let query = QueryKind::outgoing_contact_requests(contract, document_type)?;
         self.doc_manager.documents_with_query(query).await
     }
+
+    // pub async fn check_ping_times(&self, masternodes: Vec<MasternodeEntry>) -> Result<GetStatusResponse, Error> {
+    //     self.sdk_ref()
+    //         .execute(GetStatusRequest::default(), RequestSettings::default())
+    // }
 }
 
 impl PlatformSDK  {

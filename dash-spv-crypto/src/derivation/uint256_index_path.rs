@@ -1,18 +1,17 @@
 use std::cmp;
 use std::cmp::Ordering;
 use std::hash::Hash;
-use crate::crypto::byte_util::UInt256;
 use super::IIndexPath;
 
 #[derive(Clone, Debug, Default, Eq, Hash)]
 pub struct UInt256IndexPath {
-    pub indexes: Vec<UInt256>,
+    pub indexes: Vec<[u8; 32]>,
     pub hardened_indexes: Vec<bool>,
     // hash: u64,
 }
 
 impl IIndexPath for UInt256IndexPath {
-    type Item = UInt256;
+    type Item = [u8; 32];
     fn new(indexes: Vec<Self::Item>) -> Self {
         Self { indexes, ..Default::default() }
     }

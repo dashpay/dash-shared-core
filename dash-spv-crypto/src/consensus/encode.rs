@@ -542,8 +542,11 @@ impl_array!(8);
 impl_array!(10);
 impl_array!(12);
 impl_array!(16);
+impl_array!(20);
 impl_array!(32);
 impl_array!(33);
+impl_array!(48);
+impl_array!(96);
 
 impl Decodable for [u16; 8] {
     #[inline]
@@ -615,8 +618,8 @@ impl_vec!(bool);
 impl_vec!(crate::crypto::byte_util::UInt256);
 impl_vec!(crate::tx::TransactionInput);
 impl_vec!(crate::tx::TransactionOutput);
-impl_vec!(crate::llmq::LLMQEntry);
-
+impl_vec!(crate::llmq::entry::LLMQEntry);
+impl_vec!([u8; 32]);
 // #[cfg(feature = "std")] impl_vec!(Inventory);
 // #[cfg(feature = "std")] impl_vec!((u32, Address));
 // #[cfg(feature = "std")] impl_vec!(AddrV2Message);

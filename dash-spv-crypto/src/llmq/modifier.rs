@@ -1,15 +1,15 @@
+use hashes::{sha256d, Hash};
 use crate::consensus::Encodable;
 use crate::consensus::encode::VarInt;
-use crate::crypto::{UInt256, UInt768};
 use crate::network::LLMQType;
 
 pub enum LLMQModifierType {
-    PreCoreV20(LLMQType, UInt256),
-    CoreV20(LLMQType, u32, UInt768),
+    PreCoreV20(LLMQType, [u8; 32]),
+    CoreV20(LLMQType, u32, [u8; 96]),
 }
 
 impl LLMQModifierType {
-    pub fn build_llmq_hash(&self) -> UInt256 {
+    pub fn build_llmq_hash(&self) -> [u8; 32] {
         let mut writer = vec![];
         match *self {
             LLMQModifierType::PreCoreV20(llmq_type, block_hash) => {
@@ -22,6 +22,6 @@ impl LLMQModifierType {
                 cl_signature.enc(&mut writer);
             }
         }
-        UInt256::sha256d(writer)
+        sha256d::Hash::hash(writer.as_ref()).into_inner()
     }
 }

@@ -1,13 +1,16 @@
 use byte::{BytesExt, TryRead};
 use std::collections::BTreeMap;
+use hashes::hex::ToHex;
+use hashes::{sha256, sha256d, Hash};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
 use dash_spv_crypto::consensus::Encodable;
 use dash_spv_crypto::crypto::byte_util::{UInt160, UInt256, Zeroable};
-use dash_spv_crypto::keys::OperatorPublicKey;
-use dash_spv_crypto::network::CORE_PROTO_19_2;
+use dash_spv_crypto::keys::{ECDSAKey, OperatorPublicKey};
+use dash_spv_crypto::network::{ChainType, CORE_PROTO_19_2};
+use dash_spv_crypto::util::address;
 use dash_spv_crypto::util::data_ops::short_hex_string_from;
 use crate::common::{block::Block, masternode_type::MasternodeType, socket_address::SocketAddress};
 
@@ -18,22 +21,22 @@ pub struct MasternodeReadContext(pub u32, pub u16, pub u32);
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
 pub struct MasternodeEntry {
-    pub provider_registration_transaction_hash: UInt256,
-    pub confirmed_hash: UInt256,
-    pub confirmed_hash_hashed_with_provider_registration_transaction_hash: Option<UInt256>,
+    pub provider_registration_transaction_hash: [u8; 32],
+    pub confirmed_hash: [u8; 32],
+    pub confirmed_hash_hashed_with_provider_registration_transaction_hash: Option<[u8; 32]>,
     pub socket_address: SocketAddress,
     pub operator_public_key: OperatorPublicKey,
     pub previous_operator_public_keys: BTreeMap<Block, OperatorPublicKey>,
-    pub previous_entry_hashes: BTreeMap<Block, UInt256>,
+    pub previous_entry_hashes: BTreeMap<Block, [u8; 32]>,
     pub previous_validity: BTreeMap<Block, bool>,
     pub known_confirmed_at_height: Option<u32>,
     pub update_height: u32,
-    pub key_id_voting: UInt160,
+    pub key_id_voting: [u8; 20],
     pub is_valid: bool,
     pub mn_type: MasternodeType,
     pub platform_http_port: u16,
-    pub platform_node_id: UInt160,
-    pub entry_hash: UInt256,
+    pub platform_node_id: [u8; 20],
+    pub entry_hash: [u8; 32],
 }
 
 #[cfg(feature = "generate-dashj-tests")]
@@ -44,7 +47,7 @@ impl Serialize for MasternodeEntry {
         state.serialize_field("confirmed_hash", &self.confirmed_hash)?;
         state.serialize_field("ip_address", &self.socket_address.ip_address)?;
         state.serialize_field("port", &self.socket_address.port)?;
-        state.serialize_field("operator_public_key", &self.operator_public_key.data)?;
+        state.serialize_field("operator_public_key", &self.operator_public_key.data.to_hex())?;
         state.serialize_field("key_id_voting", &self.key_id_voting)?;
         state.serialize_field("is_valid", &self.is_valid)?;
         state.serialize_field("mn_type", &self.mn_type)?;
@@ -124,11 +127,11 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             1 // legacy
         };
         let provider_registration_transaction_hash =
-            bytes.read_with::<UInt256>(offset, byte::LE)?;
-        let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
+            bytes.read_with::<UInt256>(offset, byte::LE)?.0;
+        let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?.0;
         let socket_address = bytes.read_with::<SocketAddress>(offset, ())?;
         let operator_public_key = bytes.read_with::<OperatorPublicKey>(offset, version)?;
-        let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
+        let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?.0;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);
          let mn_type = if version >= 2 {
@@ -138,9 +141,9 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
         };
         let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
             (bytes.read_with::<u16>(offset, byte::BE)?,
-             bytes.read_with::<UInt160>(offset, byte::LE)?)
+             bytes.read_with::<UInt160>(offset, byte::LE)?.0)
         } else {
-            (0u16, UInt160::MIN)
+            (0u16, [0u8; 20])
         };
         let mut entry = Self::new(
             version,
@@ -166,15 +169,15 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
 impl MasternodeEntry {
     pub fn new(
         version: u16,
-        provider_registration_transaction_hash: UInt256,
-        confirmed_hash: UInt256,
+        provider_registration_transaction_hash: [u8; 32],
+        confirmed_hash: [u8; 32],
         socket_address: SocketAddress,
-        key_id_voting: UInt160,
+        key_id_voting: [u8; 20],
         operator_public_key: OperatorPublicKey,
         is_valid: u8,
         mn_type: MasternodeType,
         platform_http_port: u16,
-        platform_node_id: UInt160,
+        platform_node_id: [u8; 20],
         update_height: u32,
         protocol_version: u32,
     ) -> Self {
@@ -212,15 +215,8 @@ impl MasternodeEntry {
             entry_hash,
         }
     }
-
-
-    pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
-        self.known_confirmed_at_height
-            .and_then(|h| (h <= block_height)
-                .then_some(self.confirmed_hash))
-    }
-
-    pub fn update_confirmed_hash(&mut self, hash: UInt256) {
+    
+    pub fn update_confirmed_hash(&mut self, hash: [u8; 32]) {
         self.confirmed_hash = hash;
         if !self.provider_registration_transaction_hash.is_zero() {
             self.update_confirmed_hash_hashed_with_pro_reg_tx_hash();
@@ -239,23 +235,6 @@ impl MasternodeEntry {
         self.confirmed_hash_hashed_with_provider_registration_transaction_hash = Some(hash)
     }
 
-    pub fn confirmed_hash_hashed_with_pro_reg_tx_hash_at(
-        &self,
-        block_height: u32,
-    ) -> Option<UInt256> {
-        if self.known_confirmed_at_height.is_none() || self.known_confirmed_at_height? <= block_height {
-            self.confirmed_hash_hashed_with_provider_registration_transaction_hash
-        } else {
-            Some(Self::hash_confirmed_hash(
-                UInt256::default(),
-                self.provider_registration_transaction_hash,
-            ))
-        }
-    }
-
-    pub fn host(&self) -> String {
-        format!("{}", self.socket_address)
-    }
 
     /*pub fn payload_data(&self) -> UInt256 {
         Self::calculate_entry_hash(
@@ -271,70 +250,10 @@ impl MasternodeEntry {
         )
     }*/
 
-    pub fn hash_confirmed_hash(confirmed_hash: UInt256, provider_registration_transaction_hash: UInt256) -> UInt256 {
-        UInt256::sha256(&[provider_registration_transaction_hash.0, confirmed_hash.0].concat())
-    }
 
-    pub fn is_valid_at(&self, block_height: u32) -> bool {
-        if self.previous_validity.is_empty() || block_height == u32::MAX {
-            return self.is_valid;
-        }
-        let mut min_distance = u32::MAX;
-        let mut is_valid = self.is_valid;
-        for (&Block { height, .. }, &validity) in &self.previous_validity {
-            if height <= block_height {
-                continue;
-            }
-            let distance = height - block_height;
-            if distance < min_distance {
-                min_distance = distance;
-                is_valid = validity;
-            }
-        }
-        is_valid
-    }
 
-    pub fn operator_public_key_at(&self, block_height: u32) -> OperatorPublicKey {
-        if self.previous_operator_public_keys.is_empty() {
-            return self.operator_public_key;
-        }
-        let mut min_distance = u32::MAX;
-        let mut used_previous_operator_public_key_at_block_hash = self.operator_public_key;
-        for (&Block { height, .. }, &key) in &self.previous_operator_public_keys {
-            if height <= block_height {
-                continue;
-            }
-            let distance = height - block_height;
-            if distance < min_distance {
-                min_distance = distance;
-                info!("SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
-                used_previous_operator_public_key_at_block_hash = key;
-            }
-        }
-        used_previous_operator_public_key_at_block_hash
-    }
 
-    pub fn entry_hash_at(&self, block_height: u32) -> UInt256 {
-        if self.previous_entry_hashes.is_empty() || block_height == u32::MAX {
-            return self.entry_hash;
-        }
-        let mut min_distance = u32::MAX;
-        let mut used_hash = self.entry_hash;
-        for (&crate::common::Block { height, .. }, &hash) in &self.previous_entry_hashes {
-            if height <= block_height {
-                continue;
-            }
-            let distance = height - block_height;
-            if distance < min_distance {
-                min_distance = distance;
-                info!("SME Hash for proTxHash {:?} : Using {hash} instead of {used_hash} for list at block height {block_height}", self.provider_registration_transaction_hash);
-                used_hash = hash;
-            }
-        }
-        used_hash
-    }
-
-    pub fn score(&self, modifier: UInt256, block_height: u32) -> Option<UInt256> {
+    pub fn score(&self, modifier: [u8; 32], block_height: u32) -> Option<[u8; 32]> {
         if !self.is_valid_at(block_height) ||
             self.confirmed_hash.is_zero() ||
             self.confirmed_hash_at(block_height).is_none() {
@@ -345,16 +264,13 @@ impl MasternodeEntry {
             hash.enc(&mut buffer);
         }
         modifier.enc(&mut buffer);
-        let score = UInt256::sha256(&buffer);
-        (!score.is_zero() && !score.0.is_empty()).then_some(score)
+        let score = sha256::Hash::hash(&buffer).into_inner();
+        (!score.is_zero() && !score.is_empty()).then_some(score)
     }
 
 
-    pub fn unique_id(&self) -> String {
-        short_hex_string_from(&self.provider_registration_transaction_hash.0)
-    }
 
-    pub fn update_with_previous_entry(&mut self, entry: &mut MasternodeEntry, block_height: u32, block_hash: UInt256) {
+    pub fn update_with_previous_entry(&mut self, entry: &mut MasternodeEntry, block_height: u32, block_hash: [u8; 32]) {
         let block = crate::common::Block::new(block_height, block_hash);
         self.previous_validity = entry
             .previous_validity
@@ -387,19 +303,155 @@ impl MasternodeEntry {
     }
 }
 
+#[ferment_macro::export]
+impl MasternodeEntry {
+    pub fn entry_hash_at(&self, block_height: u32) -> [u8; 32] {
+        if self.previous_entry_hashes.is_empty() || block_height == u32::MAX {
+            return self.entry_hash;
+        }
+        let mut min_distance = u32::MAX;
+        let mut used_hash = self.entry_hash;
+        for (&crate::common::Block { height, .. }, &hash) in &self.previous_entry_hashes {
+            if height <= block_height {
+                continue;
+            }
+            let distance = height - block_height;
+            if distance < min_distance {
+                min_distance = distance;
+                info!("SME Hash for proTxHash {:?} : Using {} instead of {} for list at block height {block_height}", hash.to_hex(), used_hash.to_hex(), self.provider_registration_transaction_hash.to_hex());
+                used_hash = hash;
+            }
+        }
+        used_hash
+    }
+    pub fn operator_public_key_at(&self, block_height: u32) -> OperatorPublicKey {
+        if self.previous_operator_public_keys.is_empty() {
+            return self.operator_public_key;
+        }
+        let mut min_distance = u32::MAX;
+        let mut used_previous_operator_public_key_at_block_hash = self.operator_public_key;
+        for (&Block { height, .. }, &key) in &self.previous_operator_public_keys {
+            if height <= block_height {
+                continue;
+            }
+            let distance = height - block_height;
+            if distance < min_distance {
+                min_distance = distance;
+                info!("SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
+                used_previous_operator_public_key_at_block_hash = key;
+            }
+        }
+        used_previous_operator_public_key_at_block_hash
+    }
+    pub fn hash_confirmed_hash(confirmed_hash: [u8; 32], provider_registration_transaction_hash: [u8; 32]) -> [u8; 32] {
+        sha256::Hash::hash(&[provider_registration_transaction_hash, confirmed_hash].concat()).into_inner()
+    }
+
+    pub fn is_valid_at(&self, block_height: u32) -> bool {
+        if self.previous_validity.is_empty() || block_height == u32::MAX {
+            return self.is_valid;
+        }
+        let mut min_distance = u32::MAX;
+        let mut is_valid = self.is_valid;
+        for (&Block { height, .. }, &validity) in &self.previous_validity {
+            if height <= block_height {
+                continue;
+            }
+            let distance = height - block_height;
+            if distance < min_distance {
+                min_distance = distance;
+                is_valid = validity;
+            }
+        }
+        is_valid
+    }
+    pub fn unique_id(&self) -> String {
+        short_hex_string_from(&self.provider_registration_transaction_hash)
+    }
+    pub fn confirmed_hash_hashed_with_pro_reg_tx_hash_at(
+        &self,
+        block_height: u32,
+    ) -> Option<[u8; 32]> {
+        if self.known_confirmed_at_height.is_none() || self.known_confirmed_at_height? <= block_height {
+            self.confirmed_hash_hashed_with_provider_registration_transaction_hash
+        } else {
+            Some(Self::hash_confirmed_hash(
+                [0u8; 32],
+                self.provider_registration_transaction_hash,
+            ))
+        }
+    }
+
+    pub fn host(&self) -> String {
+        format!("{}", self.socket_address)
+    }
+    pub fn confirmed_hash_at(&self, block_height: u32) -> Option<[u8; 32]> {
+        self.known_confirmed_at_height
+            .and_then(|h| (h <= block_height)
+                .then_some(self.confirmed_hash))
+    }
+
+    pub fn address_is_equal_to(&self, addr: [u8; 16]) -> bool {
+        addr.eq(&self.socket_address.ip_address)
+    }
+
+    pub fn confirmed_hash_is_equal_to(&self, confirmed_hash: [u8; 32]) -> bool {
+        confirmed_hash.eq(&self.confirmed_hash)
+    }
+
+    pub fn key_id_is_equal_to(&self, key_id: [u8; 20]) -> bool {
+        key_id.eq(&self.key_id_voting)
+    }
+    pub fn key_id_matches_with_secret_key(&self, secret_key: &str, chain_type: ChainType) -> bool {
+        if let Ok(key) = ECDSAKey::key_with_private_key(secret_key, chain_type) {
+            key.hash160().eq(&self.key_id_voting)
+        } else {
+            false
+        }
+    }
+    pub fn operator_pub_key_is_equal_to(&self, operator_public_key_id: [u8; 48]) -> bool {
+        operator_public_key_id.eq(&self.operator_public_key.data)
+    }
+    pub fn platform_node_id_is_equal_to(&self, platform_node_id: [u8; 20]) -> bool {
+        platform_node_id.eq(&self.platform_node_id)
+    }
+    pub fn type_is_equal_to(&self, mn_type: u16) -> bool {
+        MasternodeType::from(mn_type).eq(&self.mn_type)
+    }
+    pub fn type_uint(&self) -> u16 {
+        self.mn_type.into()
+    }
+
+    pub fn operator_public_key_address(&self, chain_type: ChainType) -> String {
+        address::address::with_public_key_data(&self.operator_public_key.data, chain_type)
+    }
+    pub fn voting_address(&self, chain_type: ChainType) -> String {
+        let script_map = chain_type.script_map();
+        address::address::from_hash160_for_script_map(&self.key_id_voting, &script_map)
+    }
+    pub fn evo_node_address(&self, chain_type: ChainType) -> String {
+        let script_map = chain_type.script_map();
+        address::address::from_hash160_for_script_map(&self.platform_node_id, &script_map)
+    }
+
+    pub fn merged_with_entry(&self, entry: &MasternodeEntry, block_height: u32) {
+
+    }
+}
+
 pub fn calculate_entry_hash(
     version: u16,
-    provider_registration_transaction_hash: UInt256,
-    confirmed_hash: UInt256,
+    provider_registration_transaction_hash: [u8; 32],
+    confirmed_hash: [u8; 32],
     socket_address: SocketAddress,
     operator_public_key: OperatorPublicKey,
-    key_id_voting: UInt160,
+    key_id_voting: [u8; 20],
     is_valid: u8,
     mn_type: MasternodeType,
     platform_http_port: u16,
-    platform_node_id: UInt160,
+    platform_node_id: [u8; 20],
     protocol_version: u32,
-) -> UInt256 {
+) -> [u8; 32] {
     let mut writer = Vec::<u8>::new();
     provider_registration_transaction_hash.enc(&mut writer);
     confirmed_hash.enc(&mut writer);
@@ -414,5 +466,105 @@ pub fn calculate_entry_hash(
             platform_node_id.enc(&mut writer);
         }
     }
-    UInt256::sha256d(writer)
+    sha256d::Hash::hash(&writer).into_inner()
+}
+
+#[ferment_macro::export]
+pub fn new(
+    version: u16,
+    provider_registration_transaction_hash: [u8; 32],
+    confirmed_hash: [u8; 32],
+    ip_address: [u8; 16],
+    port: u16,
+    key_id_voting: [u8; 20],
+    operator_public_key_data: [u8; 48],
+    operator_public_key_version: u16,
+    is_valid: u8,
+    mn_type: u16,
+    platform_http_port: u16,
+    platform_node_id: [u8; 20],
+    update_height: u32,
+    protocol_version: u32
+) -> MasternodeEntry {
+    MasternodeEntry::new(
+        version,
+        provider_registration_transaction_hash,
+        confirmed_hash,
+        SocketAddress { ip_address, port },
+        key_id_voting,
+        OperatorPublicKey { data: operator_public_key_data, version: operator_public_key_version },
+        is_valid,
+        MasternodeType::from(mn_type),
+        platform_http_port,
+        platform_node_id,
+        update_height,
+        protocol_version
+    )
+}
+#[ferment_macro::export]
+pub fn from_entity(
+    version: u16,
+    provider_registration_transaction_hash: [u8; 32],
+    confirmed_hash: [u8; 32],
+    ip_address: [u8; 16],
+    port: u16,
+    key_id_voting: [u8; 20],
+    operator_public_key_data: [u8; 48],
+    operator_public_key_version: u16,
+    is_valid: bool,
+    mn_type: u16,
+    platform_http_port: u16,
+    platform_node_id: [u8; 20],
+    update_height: u32,
+    confirmed_hash_hashed_with_provider_registration_transaction_hash: [u8; 32],
+    known_confirmed_at_height: u32,
+    entry_hash: [u8; 32],
+    previous_entry_hashes: Vec<[u8; 68]>,
+    previous_operator_public_keys: Vec<[u8; 86]>,
+    previous_validity: Vec<[u8; 37]>,
+) -> MasternodeEntry {
+    let previous_entry_hashes = previous_entry_hashes
+        .into_iter()
+        .map(|bytes| {
+            let hash: [u8; 32] = bytes[..32].try_into().unwrap();
+            let height = u32::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35]]);
+            let entry_hash: [u8; 32] = bytes[36..].try_into().unwrap();
+            (Block { height, hash }, entry_hash)
+        })
+        .collect();
+    let previous_operator_public_keys = previous_operator_public_keys.into_iter().map(|bytes| {
+        let hash: [u8; 32] = bytes[..32].try_into().unwrap();
+        let height = u32::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35]]);
+        let data: [u8; 48] = bytes[36..84].try_into().unwrap();
+        let version = u16::from_le_bytes([bytes[84], bytes[85]]);
+        (Block { height, hash }, OperatorPublicKey { data, version } )
+    }).collect();
+    let previous_validity = previous_validity
+        .into_iter()
+        .map(|bytes| {
+            let hash: [u8; 32] = bytes[..32].try_into().unwrap();
+            let height = u32::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35]]);
+            let b: bool = bytes[36] != 0;
+            (Block { height, hash }, b)
+        })
+        .collect();
+
+    MasternodeEntry {
+        provider_registration_transaction_hash,
+        confirmed_hash,
+        confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(confirmed_hash_hashed_with_provider_registration_transaction_hash),
+        socket_address: SocketAddress { ip_address, port },
+        operator_public_key: OperatorPublicKey { data: operator_public_key_data, version: operator_public_key_version },
+        previous_operator_public_keys,
+        previous_entry_hashes,
+        previous_validity,
+        known_confirmed_at_height: Some(known_confirmed_at_height),
+        update_height,
+        key_id_voting,
+        is_valid,
+        mn_type: MasternodeType::from(mn_type),
+        platform_http_port,
+        platform_node_id,
+        entry_hash,
+    }
 }

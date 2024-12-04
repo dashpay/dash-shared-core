@@ -25,12 +25,17 @@ impl Serialize for LLMQVersion {
     }
 }
 
+#[ferment_macro::export]
 impl LLMQVersion {
     pub fn use_bls_legacy(&self) -> bool {
         *self == Self::Default || *self == Self::Indexed
     }
     pub fn use_rotated_quorums(&self) -> bool {
         *self == Self::Indexed || *self == Self::BLSBasicIndexed
+    }
+
+    pub fn index(&self) -> u16 {
+        u16::from(*self)
     }
 }
 
@@ -88,4 +93,9 @@ impl<'a> BytesDecodable<'a, LLMQVersion> for LLMQVersion {
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<Self> {
         bytes.read_with::<LLMQVersion>(offset, byte::LE)
     }
+}
+
+#[ferment_macro::export]
+pub fn from_u16(value: u16) -> LLMQVersion {
+    LLMQVersion::from(value)
 }

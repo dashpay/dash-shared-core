@@ -1,8 +1,8 @@
 use secp256k1::rand;
 use secp256k1::rand::Rng;
 use std::fmt::Write;
+use hashes::{sha256d, Hash};
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::UInt256;
 
 #[inline]
 pub fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
@@ -32,7 +32,7 @@ pub fn short_hex_string_from(data: &[u8]) -> String {
 }
 
 #[inline]
-pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
+pub fn merkle_root_from_hashes(hashes: Vec<[u8; 32]>) -> Option<[u8; 32]> {
     let length = hashes.len();
     let mut level = hashes;
     match length {
@@ -40,12 +40,12 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
         _ => {
             while level.len() != 1 {
                 let len = level.len();
-                let mut higher_level = Vec::<UInt256>::with_capacity((0.5 * len as f64).ceil() as usize);
+                let mut higher_level = Vec::<[u8; 32]>::with_capacity((0.5 * len as f64).ceil() as usize);
                 for pair in level.chunks(2) {
                     let mut buffer = Vec::with_capacity(64);
                     pair[0].enc(&mut buffer);
                     (pair.get(1).unwrap_or(&pair[0])).enc(&mut buffer);
-                    higher_level.push(UInt256::sha256d(buffer));
+                    higher_level.push(sha256d::Hash::hash(buffer.as_ref()).into_inner());
                 }
                 level = higher_level;
             }

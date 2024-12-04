@@ -20,6 +20,12 @@ impl SecVec {
     }
 }
 
+#[ferment_macro::export]
+impl SecVec {
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.inner.clone()
+    }
+}
 impl Drop for SecVec {
     fn drop(&mut self) {
         self.inner.zeroize();
@@ -49,3 +55,4 @@ impl io::Write for SecVec {
         self.inner.flush()
     }
 }
+

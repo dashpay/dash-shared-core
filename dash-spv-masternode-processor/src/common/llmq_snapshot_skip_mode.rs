@@ -61,3 +61,15 @@ impl<'a> TryRead<'a, Endian> for LLMQSnapshotSkipMode {
         ))
     }
 }
+
+#[ferment_macro::export]
+impl LLMQSnapshotSkipMode {
+    pub fn index(&self) -> u32 {
+        u32::from(*self)
+    }
+}
+
+#[ferment_macro::export]
+pub fn from_index(index: u32) -> LLMQSnapshotSkipMode {
+   LLMQSnapshotSkipMode::from(index)
+}

@@ -4,12 +4,13 @@ pub mod address {
     use crate::util::params::{BITCOIN_PUBKEY_ADDRESS, BITCOIN_SCRIPT_ADDRESS, ScriptMap};
     use crate::consensus::Encodable;
     use crate::crypto::byte_util::{clone_into_array, UInt160};
+    use crate::network::ChainType;
     use crate::util::base58;
     use crate::util::data_append::DataAppend;
     use crate::util::script::ScriptElement;
     use crate::util::sec_vec::SecVec;
 
-    pub fn from_hash160_for_script_map(hash: &UInt160, map: &ScriptMap) -> String {
+    pub fn from_hash160_for_script_map(hash: &[u8; 20], map: &ScriptMap) -> String {
         let mut writer: Vec<u8> = Vec::new();
         map.pubkey.enc(&mut writer);
         hash.enc(&mut writer);
@@ -19,9 +20,13 @@ pub mod address {
     }
 
     #[ferment_macro::export]
-    pub fn with_public_key_data(data: &[u8], map: &ScriptMap) -> String {
+    pub fn with_public_key_data(data: &[u8], map: ChainType) -> String {
+        with_public_key_data_and_script_pub_key(data, map.script_map().pubkey)
+    }
+    #[ferment_macro::export]
+    pub fn with_public_key_data_and_script_pub_key(data: &[u8], script_pub_key: u8) -> String {
         let mut writer = SecVec::with_capacity(21);
-        map.pubkey.enc(&mut writer);
+        script_pub_key.enc(&mut writer);
         UInt160::hash160(data).enc(&mut writer);
         base58::check_encode_slice(&writer)
     }

@@ -5,6 +5,7 @@ use byte::{BytesExt, TryRead, TryWrite};
 use serde::{Serialize, Serializer};
 use crate::consensus::{Decodable, Encodable, encode};
 use crate::crypto::byte_util::BytesDecodable;
+use crate::network::ChainType;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
@@ -423,5 +424,26 @@ impl Decodable for LLMQType {
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         u8::consensus_decode(&mut d)
             .map(LLMQType::from)
+    }
+}
+
+#[ferment_macro::export]
+pub fn dkg_rotation_params(chain_type: ChainType) -> DKGParams {
+    if chain_type.is_devnet_any() {
+        DKG_DEVNET_DIP_0024
+    } else {
+        DKG_60_75
+    }
+}
+#[ferment_macro::export]
+impl LLMQType {
+    pub fn index(&self) -> u8 {
+        u8::from(*self)
+    }
+    pub fn from_u16(index: u16) -> LLMQType {
+        LLMQType::from(index as u8)
+    }
+    pub fn from_u8(index: u8) -> LLMQType {
+        LLMQType::from(index)
     }
 }

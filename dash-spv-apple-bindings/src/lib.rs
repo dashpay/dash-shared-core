@@ -5,7 +5,11 @@ mod address;
 // mod chain;
 // mod common;
 // mod crypto;
+#[cfg(not(test))]
 mod fermented;
+#[cfg(not(test))]
+mod fermented_extended;
+
 // mod keys;
 // mod masternode;
 // mod tx;
@@ -23,6 +27,7 @@ pub extern crate dash_spv_platform;
 pub extern crate merk;
 pub extern crate bitcoin_hashes as hashes;
 
+use std::sync::Arc;
 use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use dash_spv_platform::PlatformSDK;
 use crate::ffi_core_provider::FFICoreProvider;
@@ -60,8 +65,8 @@ use crate::ffi_core_provider::FFICoreProvider;
 #[derive(Debug)]
 #[ferment_macro::opaque]
 pub struct DashSPVCore {
-    pub processor: *mut MasternodeProcessor,
-    pub cache: *mut MasternodeProcessorCache,
+    pub processor: Arc<MasternodeProcessor>,
+    pub cache: Arc<MasternodeProcessorCache>,
     pub platform: *mut PlatformSDK,
     context: *const std::os::raw::c_void,
 }
@@ -70,16 +75,27 @@ pub struct DashSPVCore {
 impl DashSPVCore {
     pub fn new(
         core_provider: *mut FFICoreProvider,
-        cache: *mut MasternodeProcessorCache,
+        // cache: *mut MasternodeProcessorCache,
         platform: *mut PlatformSDK,
         context: *const std::os::raw::c_void) -> Self {
-        let provider = unsafe { Box::from_raw(core_provider) };
+        // let cache = unsafe { Arc::from_raw(cache) };
+        let provider = unsafe { Arc::from_raw(core_provider) };
+        // let provider_arc = Arc::new(provider);
+        // let cache = unsafe { Box::from_raw(cache) };
+        let cache = Arc::new(MasternodeProcessorCache::default());
         Self {
-            processor: ferment::boxed(MasternodeProcessor::new(provider)),
+            processor: Arc::new(MasternodeProcessor::new(provider, Arc::clone(&cache))),
             cache,
             platform,
             context,
         }
+    }
+
+    pub fn cache(&self) -> Arc<MasternodeProcessorCache> {
+        Arc::clone(&self.cache)
+    }
+    pub fn processor(&self) -> Arc<MasternodeProcessor> {
+        Arc::clone(&self.processor)
     }
 }
 

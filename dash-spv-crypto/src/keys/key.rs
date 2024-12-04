@@ -1,11 +1,15 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
+use hashes::{sha256d, Hash};
 use crate::derivation::{IIndexPath, IndexPath, index_path::{Extremum, IndexHardSoft}};
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
+use crate::crypto::byte_util::{clone_into_array, Reversed, UInt256, UInt384, UInt768};
 use crate::keys::{BLSKey, DeriveKey, ECDSAKey, ED25519Key, IKey, KeyError};
+use crate::keys::bls_key::g1_element_serialized;
+use crate::keys::crypto_data::CryptoData;
 use crate::network::ChainType;
 use crate::util::address::address;
-use crate::util::ScriptMap;
+use crate::util::data_append::DataAppend;
+use crate::util::script::ScriptElement;
 use crate::util::sec_vec::SecVec;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -98,18 +102,218 @@ impl From<&KeyKind> for u8 {
     }
 }
 
+#[ferment_macro::export]
+impl OpaqueKey {
+    pub fn hash160(&self) -> [u8; 20] {
+        match self {
+            OpaqueKey::ECDSA(key) => key.hash160(),
+            OpaqueKey::BLS(key) => key.hash160(),
+            OpaqueKey::ED25519(key) => key.hash160(),
+        }
+    }
+    pub fn check_payload_signature(&self, key_hash: [u8; 20]) -> bool {
+        self.hash160().eq(&key_hash)
+    }
+    pub fn create_tx_signature(&self, data: &[u8], tx_input_script: Vec<u8>) -> Vec<u8> {
+        let mut sig = Vec::new();
+        let hash = sha256d::Hash::hash(data.as_ref()).into_inner();
+        let signed_data = match self {
+            OpaqueKey::ECDSA(key) => key.sign(&hash),
+            OpaqueKey::BLS(key) => key.sign(&hash),
+            OpaqueKey::ED25519(key) => key.sign(&hash),
+        };
+        let mut s = Vec::new();
+        s.extend(signed_data);
+        s.push(0x01);
+        s.append_script_push_data(&mut sig);
+        match tx_input_script.script_elements()[..] {
+            // pay-to-pubkey-hash scriptSig
+            [.., ScriptElement::Number(0x88/*OP_EQUALVERIFY*/), _elem] => {
+                self.public_key_data().append_script_push_data(&mut sig);
+            },
+            _ => {}
+        }
+        sig
+    }
 
+    pub fn create_account_reference(&self, extended_public_key: OpaqueKey, account_number: usize) -> u32 {
+        let extended_public_key_data = extended_public_key
+            .extended_public_key_data()
+            .unwrap_or_default();
+        let account_secret_key = self.hmac_256_data(&extended_public_key_data).reversed();
+        let account_secret_key28 = u32::from_le_bytes(clone_into_array(&account_secret_key[..4])) >> 4;
+        let shortened_account_bits = (account_number as u32) & 0x0FFFFFFF;
+        let version = 0; // currently set to 0
+        let version_bits = version << 28;
+        // this is the account ref
+        version_bits | (account_secret_key28 ^ shortened_account_bits)
+    }
+
+    pub fn public_derive_to_256_path_with_offset(&mut self, path: &IndexPathU256, offset: usize) -> Result<Self, KeyError> {
+        self.public_derive_to_path_with_offset(&IndexPath::from(path), offset)
+    }
+
+    pub fn public_key_from_extended_public_key_data_at_index_path(&self, index_path: IndexPathU32) -> Result<Self, KeyError> {
+        let index_path = IndexPath::from(index_path);
+        match self {
+            OpaqueKey::ECDSA(key) =>
+                key.public_key_from_extended_public_key_data_at_index_path(&index_path)
+                    .map(OpaqueKey::ECDSA),
+            OpaqueKey::BLS(key) =>
+                key.public_key_from_extended_public_key_data_at_index_path(&index_path)
+                    .map(OpaqueKey::BLS),
+            OpaqueKey::ED25519(key) =>
+                key.public_key_from_extended_public_key_data_at_index_path(&index_path)
+                    .map(OpaqueKey::ED25519)
+        }
+    }
+    pub fn public_key_data_at_index_path(&self, index_path: IndexPathU32) -> Result<Vec<u8>, KeyError> {
+        let index_path = IndexPath::from(index_path);
+        match self {
+            OpaqueKey::ECDSA(key) =>
+                key.extended_public_key_data()
+                    .and_then(|data| ECDSAKey::public_key_from_extended_public_key_data(&data, &index_path)),
+            OpaqueKey::BLS(key) =>
+                key.extended_public_key_data()
+                    .and_then(|data| BLSKey::public_key_from_extended_public_key_data(&data, &index_path, key.use_legacy)),
+
+            OpaqueKey::ED25519(key) =>
+                key.extended_public_key_data()
+                    .and_then(|data| ED25519Key::public_key_data_from_extended_public_key_data(&data, &index_path)),
+        }
+    }
+
+
+    // Encryption
+    pub fn encrypt_data(&self, public_key: OpaqueKey, data: &[u8]) -> Result<Vec<u8>, KeyError> {
+        match (self, public_key) {
+            (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
+                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
+                CryptoData::encrypt_with_dh_key(&data.to_vec(), &new_key)
+            }
+            (OpaqueKey::BLS(key), OpaqueKey::BLS(public_key)) if key.use_legacy == public_key.use_legacy => {
+                let pubkey = public_key.bls_public_key().map_err(KeyError::from)?;
+                let seckey = key.bls_private_key().map_err(KeyError::from)?;
+                let product = (pubkey * seckey).map_err(KeyError::from)?;
+                let new_key = BLSKey::key_with_public_key(g1_element_serialized(&product, key.use_legacy), key.use_legacy);
+                CryptoData::encrypt_with_dh_key(&data.to_vec(), &new_key)
+            }
+            _ => Err(KeyError::DHKeyExchange)
+        }
+    }
+    pub fn encrypt_data_using_iv(&self, public_key: OpaqueKey, data: &[u8], iv: Vec<u8>) -> Result<Vec<u8>, KeyError> {
+        match (self, public_key) {
+            (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
+                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
+                CryptoData::encrypt_with_dh_key_using_iv(&data.to_vec(), &new_key, iv)
+            }
+            (OpaqueKey::BLS(key), OpaqueKey::BLS(public_key)) if key.use_legacy == public_key.use_legacy => {
+                let pubkey = public_key.bls_public_key().map_err(KeyError::from)?;
+                let seckey = key.bls_private_key().map_err(KeyError::from)?;
+                let product = (pubkey * seckey).map_err(KeyError::from)?;
+                let new_key = BLSKey::key_with_public_key(g1_element_serialized(&product, key.use_legacy), key.use_legacy);
+                CryptoData::encrypt_with_dh_key_using_iv(&data.to_vec(), &new_key, iv)
+            }
+            _ => Err(KeyError::DHKeyExchange)
+        }
+    }
+
+    pub fn decrypt_data(&self, public_key: OpaqueKey, data: &[u8]) -> Result<Vec<u8>, KeyError> {
+        match (self, public_key) {
+            (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
+                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
+                CryptoData::decrypt_with_dh_key(&data.to_vec(), &new_key)
+            }
+            (OpaqueKey::BLS(key), OpaqueKey::BLS(public_key)) if key.use_legacy == public_key.use_legacy => {
+                let pubkey = public_key.bls_public_key().map_err(KeyError::from)?;
+                let seckey = key.bls_private_key().map_err(KeyError::from)?;
+                let product = (pubkey * seckey).map_err(KeyError::from)?;
+                let new_key = BLSKey::key_with_public_key(g1_element_serialized(&product, key.use_legacy), key.use_legacy);
+                CryptoData::decrypt_with_dh_key(&data.to_vec(), &new_key)
+            }
+            _ => Err(KeyError::DHKeyExchange)
+        }
+    }
+
+    pub fn decrypt_data_using_iv_size(&self, public_key: OpaqueKey, data: &[u8], iv_size: usize) -> Result<Vec<u8>, KeyError> {
+        match (self, public_key) {
+            (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
+                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
+                CryptoData::decrypt_with_dh_key_using_iv_size(&data.to_vec(), &new_key, iv_size)
+            }
+            (OpaqueKey::BLS(key), OpaqueKey::BLS(public_key)) if key.use_legacy == public_key.use_legacy => {
+                let pubkey = public_key.bls_public_key().map_err(KeyError::from)?;
+                let seckey = key.bls_private_key().map_err(KeyError::from)?;
+                let product = (pubkey * seckey).map_err(KeyError::from)?;
+                let new_key = BLSKey::key_with_public_key(g1_element_serialized(&product, key.use_legacy), key.use_legacy);
+                CryptoData::decrypt_with_dh_key_using_iv_size(&data.to_vec(), &new_key, iv_size)
+            }
+            _ => Err(KeyError::DHKeyExchange)
+        }
+    }
+
+    pub fn encrypt_data_with_dh_key(&self, data: Vec<u8>) -> Result<Vec<u8>, KeyError> {
+        match self {
+            OpaqueKey::ECDSA(key) =>
+                CryptoData::encrypt_with_dh_key(&data, key),
+            OpaqueKey::BLS(key) =>
+                CryptoData::encrypt_with_dh_key(&data, key),
+            _ => Err(KeyError::DHKeyExchange),
+        }
+    }
+    pub fn decrypt_data_with_dh_key(&self, data: Vec<u8>) -> Result<Vec<u8>, KeyError> {
+        match self {
+            OpaqueKey::ECDSA(key) =>
+                CryptoData::decrypt_with_dh_key(&data, key),
+            OpaqueKey::BLS(key) =>
+                CryptoData::decrypt_with_dh_key(&data, key),
+            _ => Err(KeyError::DHKeyExchange),
+        }
+    }
+    pub fn encrypt_data_with_dh_key_using_iv(&self, data: Vec<u8>, iv: Vec<u8>) -> Result<Vec<u8>, KeyError> {
+        match self {
+            OpaqueKey::ECDSA(key) =>
+                CryptoData::encrypt_with_dh_key_using_iv(&data, key, iv),
+            OpaqueKey::BLS(key) =>
+                CryptoData::encrypt_with_dh_key_using_iv(&data, key, iv),
+            _ => Err(KeyError::DHKeyExchange),
+        }
+    }
+
+    pub fn decrypt_data_with_dh_key_using_iv_size(&self, data: Vec<u8>, iv_size: usize) -> Result<Vec<u8>, KeyError> {
+        match self {
+            OpaqueKey::ECDSA(key) =>
+                CryptoData::decrypt_with_dh_key_using_iv_size(&data, key, iv_size),
+            OpaqueKey::BLS(key) =>
+                CryptoData::decrypt_with_dh_key_using_iv_size(&data, key, iv_size),
+            _ => Err(KeyError::DHKeyExchange),
+        }
+    }
+
+}
 
 impl KeyKind {
     pub fn public_key_from_extended_public_key_data(&self, data: &[u8], index_path: &IndexPath<u32>) -> Result<Vec<u8>, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::public_key_from_extended_public_key_data(data, index_path),
-            KeyKind::ED25519 => ED25519Key::public_key_from_extended_public_key_data(data, index_path),
+            KeyKind::ED25519 => ED25519Key::public_key_data_from_extended_public_key_data(data, index_path),
             _ => BLSKey::public_key_from_extended_public_key_data(data, index_path, *self == KeyKind::BLS),
         }
     }
 
-    pub fn derive_key_from_seed(&self, seed: &[u8], derivation_path: &IndexPath<UInt256>) -> Result<OpaqueKey, KeyError> {
+    pub fn derive_key_from_seed(&self, seed: &[u8], derivation_path: &IndexPath<[u8; 32]>) -> Result<OpaqueKey, KeyError> {
         self.key_with_seed_data(seed)
             .and_then(|top_key| top_key.private_derive_to_path(derivation_path))
     }
@@ -117,7 +321,7 @@ impl KeyKind {
         &self,
         seed: &[u8],
         index_paths: Vec<IndexPath<u32>>,
-        derivation_path: &IndexPath<UInt256>
+        derivation_path: &IndexPath<[u8; 32]>
     ) -> Result<Vec<OpaqueKey>, KeyError> {
         self.derive_key_from_seed(seed, derivation_path)
             .map(|derivation_path_extended_key|
@@ -131,15 +335,15 @@ impl KeyKind {
         &self,
         seed: &[u8],
         index_paths: Vec<IndexPath<u32>>,
-        derivation_path: &IndexPath<UInt256>,
+        derivation_path: &IndexPath<[u8; 32]>,
         chain_type: ChainType,
     ) -> Result<Vec<String>, KeyError> {
         self.derive_key_from_seed(seed, derivation_path)
             .map(|derivation_path_extended_key| {
-                let script = chain_type.script_map();
+                let script = chain_type.script_map().privkey;
                 index_paths.iter()
                     .map(|index_path| derivation_path_extended_key.private_derive_to_path(index_path)
-                        .map(|private_key| private_key.serialized_private_key_for_script(&script)))
+                        .map(|private_key| private_key.serialized_private_key_for_script(script)))
                     .flatten()
                     .collect()
             })
@@ -156,26 +360,17 @@ pub struct IndexPathU32 {
 #[ferment_macro::export]
 #[derive(Clone, Debug)]
 pub struct IndexPathU256 {
-    pub indexes: Vec<UInt256>,
+    pub indexes: Vec<[u8; 32]>,
     pub hardened: Vec<bool>,
 }
 
-#[ferment_macro::export]
-impl IndexPathU256 {
-    // pub fn new(indexes: ) -> Self {
-    //     Self::new_hardened(indexes, vec![])
-    // }
-
-
-}
-
-impl From<IndexPathU256> for IndexPath<UInt256> {
+impl From<IndexPathU256> for IndexPath<[u8; 32]> {
     fn from(value: IndexPathU256) -> Self {
         let IndexPathU256 { indexes, hardened } = value;
         IndexPath::new_hardened(indexes, hardened)
     }
 }
-impl From<&IndexPathU256> for IndexPath<UInt256> {
+impl From<&IndexPathU256> for IndexPath<[u8; 32]> {
     fn from(value: &IndexPathU256) -> Self {
         IndexPath::from(value.clone())
     }
@@ -198,9 +393,27 @@ impl KeyKind {
         let index_path = IndexPath::from(index_path);
         self.public_key_from_extended_public_key_data(data, &index_path)
     }
+    pub fn public_key_from_extended_public_key_data_at_index_path_256(&self, data: &[u8], index_path: &IndexPathU256) -> Result<OpaqueKey, KeyError> {
+        let index_path = IndexPath::from(index_path);
+        self.key_with_seed_data(data)
+            .and_then(|seed_key| seed_key.private_derive_to_path(&index_path.base_index_path()))
+    }
+    pub fn private_key_at_index_path_wrapped(&self, seed: &[u8], index_path: IndexPathU32, derivation_path: IndexPathU256) -> Result<OpaqueKey, KeyError> {
+        self.derive_key_from_seed_wrapped(seed, derivation_path)
+            .and_then(|key| key.private_derive_to_path(&IndexPath::from(index_path)))
+    }
     pub fn derive_key_from_seed_wrapped(&self, seed: &[u8], derivation_path: IndexPathU256) -> Result<OpaqueKey, KeyError> {
         self.key_with_seed_data(seed)
             .and_then(|top_key| top_key.private_derive_to_path(&IndexPath::from(derivation_path)))
+    }
+
+    pub fn key_with_private_key(&self, secret: &str, chain_type: ChainType) -> Result<OpaqueKey, KeyError> {
+        match self {
+            KeyKind::ECDSA => ECDSAKey::key_with_private_key(secret, chain_type).map(OpaqueKey::ECDSA),
+            KeyKind::BLS => BLSKey::key_with_private_key(secret, true).map(OpaqueKey::BLS),
+            KeyKind::BLSBasic => BLSKey::key_with_private_key(secret, false).map(OpaqueKey::BLS),
+            KeyKind::ED25519 => ED25519Key::key_with_private_key(secret).map(OpaqueKey::ED25519),
+        }
     }
 
     pub fn private_keys_at_index_paths_wrapped(
@@ -225,10 +438,10 @@ impl KeyKind {
     ) -> Result<Vec<String>, KeyError> {
         self.derive_key_from_seed_wrapped(seed, derivation_path)
             .map(|derivation_path_extended_key| {
-                let script = chain_type.script_map();
+                let script = chain_type.script_map().privkey;
                 index_paths.into_iter()
                     .map(|index_path| derivation_path_extended_key.private_derive_to_path(&IndexPath::from(index_path))
-                        .map(|private_key| private_key.serialized_private_key_for_script(&script)))
+                        .map(|private_key| private_key.serialized_private_key_for_script(script)))
                     .flatten()
                     .collect()
             })
@@ -240,6 +453,14 @@ impl KeyKind {
             KeyKind::ECDSA => "",
             KeyKind::ED25519 => "_ED_",
             KeyKind::BLS | KeyKind::BLSBasic  => "_BLS_",
+        }.to_string()
+    }
+    pub fn key_storage_prefix(&self) -> String {
+        match self {
+            KeyKind::ECDSA => "",
+            KeyKind::BLS => "_BLS_",
+            KeyKind::BLSBasic => "_BLS_B_",
+            KeyKind::ED25519 => "_ED25519_"
         }.to_string()
     }
     pub fn private_key_from_extended_private_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
@@ -270,7 +491,7 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::key_with_public_key_data(data).map(OpaqueKey::ECDSA),
             KeyKind::ED25519 => ED25519Key::key_with_public_key_data(data).map(OpaqueKey::ED25519),
-            _ => Ok(OpaqueKey::BLS(BLSKey::key_with_public_key(UInt384::from(data), *self == KeyKind::BLS))),
+            _ => Ok(OpaqueKey::BLS(BLSKey::key_with_public_key(UInt384::from(data).0, *self == KeyKind::BLS))),
         }
     }
 
@@ -287,6 +508,22 @@ impl KeyKind {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_private_key_data(data).map(OpaqueKey::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(OpaqueKey::ED25519),
             _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
+        }
+    }
+
+    pub fn derive_key_from_extended_private_key_data_for_index_path(&self, data: &[u8], index_path: IndexPathU32) -> Result<OpaqueKey, KeyError> {
+        let index_path = IndexPath::from(index_path);
+        match self {
+            KeyKind::ECDSA => ECDSAKey::key_with_extended_private_key_data(data)
+                .and_then(|key| key.private_derive_to_path(&index_path))
+                .map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::key_with_extended_private_key_data(data)
+                .and_then(|key| key.private_derive_to_path(&index_path))
+                .map(OpaqueKey::ED25519),
+            _ => BLSKey::key_with_extended_private_key_data(data, *self == KeyKind::BLS)
+                .and_then(|key| key.private_derive_to_path(&index_path))
+                .map(OpaqueKey::BLS)
+
         }
     }
 
@@ -316,10 +553,11 @@ impl KeyKind {
             None
         }
     }*/
+
 }
 
 impl<U> DeriveKey<IndexPath<U>> for OpaqueKey
-where U: Copy + Clone + Display + Debug + Encodable + IndexHardSoft + PartialEq + Extremum,
+where U: Copy + Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum,
       ECDSAKey: DeriveKey<IndexPath<U>>,
       BLSKey: DeriveKey<IndexPath<U>>,
       ED25519Key: DeriveKey<IndexPath<U>> {
@@ -330,7 +568,7 @@ where U: Copy + Clone + Display + Debug + Encodable + IndexHardSoft + PartialEq 
             OpaqueKey::ED25519(key) => key.private_derive_to_path(path).map(Into::into),
         }
     }
-    fn public_derive_to_path_with_offset(&mut self, path: &IndexPath<U>, offset: usize) -> Result<Self, KeyError> {
+    fn public_derive_to_path_with_offset(&self, path: &IndexPath<U>, offset: usize) -> Result<Self, KeyError> {
         match self {
             OpaqueKey::ECDSA(key) => key.public_derive_to_path_with_offset(path, offset).map(Into::into),
             OpaqueKey::BLS(key) => key.public_derive_to_path_with_offset(path, offset).map(Into::into),
@@ -366,27 +604,27 @@ impl IKey for OpaqueKey {
             OpaqueKey::ED25519(key) => key.has_private_key(),
         }
     }
-    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
-        address::with_public_key_data(&self.public_key_data(), script_map)
+    fn address_with_public_key_data(&self, chain: ChainType) -> String {
+        address::with_public_key_data(&self.public_key_data(), chain)
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         match self {
-            OpaqueKey::ECDSA(key) => key.compact_sign(UInt256::from(data)).to_vec(),
+            OpaqueKey::ECDSA(key) => key.compact_sign(UInt256::from(data).0).to_vec(),
             OpaqueKey::BLS(key) => key.sign(data),
             OpaqueKey::ED25519(key) => key.sign(data)
         }
     }
 
-    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError> {
         match self {
             OpaqueKey::ECDSA(key) => key.verify(message_digest, signature),
-            OpaqueKey::BLS(key) => key.verify_uint768(UInt256::from(message_digest), UInt768::from(signature)),
+            OpaqueKey::BLS(key) => Ok(key.verify_uint768(UInt256::from(message_digest).0, UInt768::from(signature).0)),
             OpaqueKey::ED25519(key) => key.verify(message_digest, signature),
         }
     }
 
-    fn secret_key(&self) -> UInt256 {
+    fn secret_key(&self) -> [u8; 32] {
         match self {
             OpaqueKey::ECDSA(key) => key.seckey,
             OpaqueKey::BLS(key) => key.secret_key(),
@@ -394,7 +632,7 @@ impl IKey for OpaqueKey {
         }
     }
 
-    fn chaincode(&self) -> UInt256 {
+    fn chaincode(&self) -> [u8; 32] {
         match self {
             OpaqueKey::ECDSA(key) => key.chaincode(),
             OpaqueKey::BLS(key) => key.chaincode(),
@@ -442,15 +680,15 @@ impl IKey for OpaqueKey {
         }
     }
 
-    fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
+    fn serialized_private_key_for_script(&self, chain_prefix: u8) -> String {
         match self {
-            OpaqueKey::ECDSA(key) => key.serialized_private_key_for_script(script),
-            OpaqueKey::BLS(key) => key.serialized_private_key_for_script(script),
-            OpaqueKey::ED25519(key) => key.serialized_private_key_for_script(script),
+            OpaqueKey::ECDSA(key) => key.serialized_private_key_for_script(chain_prefix),
+            OpaqueKey::BLS(key) => key.serialized_private_key_for_script(chain_prefix),
+            OpaqueKey::ED25519(key) => key.serialized_private_key_for_script(chain_prefix),
         }
     }
 
-    fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
+    fn hmac_256_data(&self, data: &[u8]) -> [u8; 32] {
         match self {
             OpaqueKey::ECDSA(key) => key.hmac_256_data(data),
             OpaqueKey::BLS(key) => key.hmac_256_data(data),
@@ -467,7 +705,7 @@ impl IKey for OpaqueKey {
 
     }
 
-    fn sign_message_digest(&self, digest: UInt256) -> Vec<u8> {
+    fn sign_message_digest(&self, digest: [u8; 32]) -> Vec<u8> {
         match self {
             OpaqueKey::ECDSA(key) => key.sign_message_digest(digest),
             OpaqueKey::BLS(key) => key.sign_message_digest(digest),
@@ -489,4 +727,9 @@ impl IKey for OpaqueKey {
         self.public_key_data().eq(other)
     }
 
+}
+
+#[ferment_macro::export]
+pub fn key_kind_from_index(index: i16) -> KeyKind {
+    KeyKind::from(index)
 }

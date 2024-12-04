@@ -3,7 +3,7 @@ use std::ptr::null_mut;
 use std::sync::{Arc, RwLock};
 use dash_spv_crypto::network::{ChainType, LLMQType};
 use dash_spv_crypto::crypto::UInt256;
-use dash_spv_crypto::llmq::LLMQEntry;
+use dash_spv_crypto::llmq::entry::LLMQEntry;
 use dash_spv_masternode_processor::processing::MasternodeProcessor;
 use dash_spv_masternode_processor::test_helpers::load_message;
 use dash_spv_masternode_processor::tests::FFIContext;

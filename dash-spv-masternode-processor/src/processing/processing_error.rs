@@ -1,3 +1,4 @@
+use crate::processing::CoreProviderError;
 
 #[warn(non_camel_case_types)]
 #[repr(C)]
@@ -10,6 +11,8 @@ pub enum ProcessingError {
     ParseError = 3,
     HasNoBaseBlockHash = 4,
     UnknownBlockHash = 5,
+    InvalidResult = 6,
+    CoreProvider = 7,
 }
 impl std::fmt::Display for ProcessingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,6 +46,12 @@ impl From<hashes::hex::Error> for ProcessingError {
     }
 }
 
+impl From<CoreProviderError> for ProcessingError {
+    fn from(value: CoreProviderError) -> Self {
+        ProcessingError::CoreProvider
+    }
+}
+
 impl From<u8> for ProcessingError {
     fn from(orig: u8) -> Self {
         match orig {
@@ -52,6 +61,8 @@ impl From<u8> for ProcessingError {
             3 => ProcessingError::ParseError,
             4 => ProcessingError::HasNoBaseBlockHash,
             5 => ProcessingError::UnknownBlockHash,
+            6 => ProcessingError::InvalidResult,
+            7 => ProcessingError::CoreProvider,
             _ => ProcessingError::None,
         }
     }
@@ -66,7 +77,15 @@ impl From<ProcessingError> for u8 {
             ProcessingError::ParseError => 3,
             ProcessingError::HasNoBaseBlockHash => 4,
             ProcessingError::UnknownBlockHash => 5,
+            ProcessingError::InvalidResult => 6,
+            ProcessingError::CoreProvider => 7,
         }
     }
 }
 
+#[ferment_macro::export]
+impl ProcessingError {
+    pub fn index(&self) -> u8 {
+        u8::from(*self)
+    }
+}

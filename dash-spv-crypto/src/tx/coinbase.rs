@@ -1,6 +1,7 @@
 use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
+use hashes::{sha256d, Hash};
 use crate::consensus;
 use crate::consensus::encode::VarInt;
 use crate::consensus::{Encodable, encode};
@@ -17,10 +18,10 @@ pub struct CoinbaseTransaction {
     pub base: Transaction,
     pub coinbase_transaction_version: u16,
     pub height: u32,
-    pub merkle_root_mn_list: UInt256,
-    pub merkle_root_llmq_list: Option<UInt256>,
+    pub merkle_root_mn_list: [u8; 32],
+    pub merkle_root_llmq_list: Option<[u8; 32]>,
     pub best_cl_height_diff: u64,
-    pub best_cl_signature: Option<UInt768>,
+    pub best_cl_signature: Option<[u8; 96]>,
     pub credit_pool_balance: Option<i64>,
 }
 
@@ -31,17 +32,17 @@ impl consensus::Decodable for CoinbaseTransaction {
         let _extra_payload_size = VarInt::consensus_decode(&mut d)?;
         let coinbase_transaction_version = u16::consensus_decode(&mut d)?;
         let height = u32::consensus_decode(&mut d)?;
-        let merkle_root_mn_list = UInt256::consensus_decode(&mut d)?;
+        let merkle_root_mn_list = <[u8; 32]>::consensus_decode(&mut d)?;
 
         let merkle_root_llmq_list = if coinbase_transaction_version >= 2 {
-            Some(UInt256::consensus_decode(&mut d)?)
+            Some(<[u8; 32]>::consensus_decode(&mut d)?)
         } else {
             None
         };
         let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= 3 {
             (
                 VarInt::consensus_decode(&mut d)?.0,
-                UInt768::consensus_decode(&mut d).ok(),
+                <[u8; 96]>::consensus_decode(&mut d).ok(),
                 i64::consensus_decode(&mut d).ok())
         } else {
             (u64::MAX, None, None)
@@ -57,7 +58,7 @@ impl consensus::Decodable for CoinbaseTransaction {
             best_cl_signature,
             credit_pool_balance,
         };
-        tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()));
+        tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()).0);
         Ok(tx)
     }
 }
@@ -69,16 +70,16 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
         let _extra_payload_size = bytes.read_with::<VarInt>(offset, endian)?;
         let coinbase_transaction_version = bytes.read_with::<u16>(offset, endian)?;
         let height = bytes.read_with::<u32>(offset, endian)?;
-        let merkle_root_mn_list = bytes.read_with::<UInt256>(offset, endian)?;
+        let merkle_root_mn_list = bytes.read_with::<UInt256>(offset, endian)?.0;
         let merkle_root_llmq_list = if coinbase_transaction_version >= COINBASE_TX_CORE_19 {
-            let root = bytes.read_with::<UInt256>(offset, endian)?;
+            let root = bytes.read_with::<UInt256>(offset, endian)?.0;
             Some(root)
         } else {
             None
         };
         let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= COINBASE_TX_CORE_20 {
             (bytes.read_with::<VarInt>(offset, byte::LE)?.0,
-             bytes.read_with::<UInt768>(offset, byte::LE).ok(),
+             bytes.read_with::<UInt768>(offset, byte::LE).map(|x|x.0).ok(),
              bytes.read_with::<i64>(offset, byte::LE).ok())
 
         } else {
@@ -96,7 +97,7 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
             best_cl_signature,
             credit_pool_balance
         };
-        tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()));
+        tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()).0);
         Ok((tx, *offset))
     }
 }
@@ -143,19 +144,16 @@ impl CoinbaseTransaction {
         buffer
     }
 
-    pub fn has_found_coinbase(&mut self, hashes: &[UInt256]) -> bool {
-        let coinbase_hash = match self.base.tx_hash {
-            Some(hash) => hash,
-            None => {
-                let hash = UInt256::sha256d(self.to_data());
-                self.base.tx_hash = Some(hash);
-                hash
-            }
-        };
+    pub fn has_found_coinbase(&mut self, hashes: &[[u8; 32]]) -> bool {
+        let coinbase_hash = self.base.tx_hash.unwrap_or_else(|| {
+            let hash = sha256d::Hash::hash(&self.to_data()).into_inner();
+            self.base.tx_hash = Some(hash);
+            hash
+        });
         self.has_found_coinbase_internal(coinbase_hash, hashes)
     }
 
-    fn has_found_coinbase_internal(&self, coinbase_hash: UInt256, hashes: &[UInt256]) -> bool {
+    fn has_found_coinbase_internal(&self, coinbase_hash: [u8; 32], hashes: &[[u8; 32]]) -> bool {
         hashes.iter().any(|h| coinbase_hash == *h)
     }
 }

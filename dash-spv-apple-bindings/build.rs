@@ -6,6 +6,13 @@ use ferment_sys::Ferment;
 use ferment_sys::{Lang, ObjC, XCodeConfig};
 
 fn main() {
+    if let Ok(profile) = std::env::var("CARGO_PROFILE") {
+        if profile == "debug" {
+            println!("Skipping build.rs in debug mode");
+            return; // Exit early in debug mode
+        }
+    }
+
     match Ferment::with_crate_name("dash_spv_apple_bindings")
         .with_cbindgen_config_from_file("cbindgen.toml")
         .with_default_mod_name()

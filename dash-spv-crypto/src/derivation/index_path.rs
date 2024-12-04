@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::os::raw::c_ulong;
 use std::slice;
 use byte::{BytesExt, LE, TryRead};
@@ -20,12 +20,12 @@ impl Extremum for u32 {
     }
 }
 
-impl Extremum for UInt256 {
+impl Extremum for [u8; 32] {
     fn max() -> Self {
-        UInt256::MAX
+        [!0; 32]
     }
     fn min() -> Self {
-        UInt256::MIN
+        [0; 32]
     }
 }
 
@@ -51,16 +51,16 @@ impl IndexHardSoft for u32 {
     }
 }
 
-impl IndexHardSoft for UInt256 {
+impl IndexHardSoft for [u8; 32] {
     fn harden(&self) -> Self {
         let mut v = [0u8; 32];
         for i in 0..8 {
             let start = i << 2;
             let end = start + 4;
-            let hard = u32::from_le_bytes(clone_into_array(&self.0[start..end])) | BIP32_HARD;
+            let hard = u32::from_le_bytes(clone_into_array(&self[start..end])) | BIP32_HARD;
             v[start..end].copy_from_slice(&hard.to_le_bytes())
         }
-        UInt256(v)
+        v
     }
 
     fn soften(&self) -> Self {
@@ -68,23 +68,23 @@ impl IndexHardSoft for UInt256 {
         for i in 0..8 {
             let start = i << 2;
             let end = start + 4;
-            let hard = u32::from_le_bytes(clone_into_array(&self.0[start..end])) & !BIP32_HARD;
+            let hard = u32::from_le_bytes(clone_into_array(&self[start..end])) & !BIP32_HARD;
             v[start..end].copy_from_slice(&hard.to_le_bytes())
         }
-        UInt256(v)
+        v
     }
 
     fn hardened(&self) -> u64 {
-        self.u64_le() | BIP32_HARD as u64
+        u64::from_le_bytes(clone_into_array(&self[..8])) | BIP32_HARD as u64
     }
 
     fn softened(&self) -> u64 {
-        self.u64_le()
+        u64::from_le_bytes(clone_into_array(&self[..8]))
     }
 }
 
 pub trait IIndexPath: Sized {
-    type Item: Copy + Clone + Display + Debug + Encodable + IndexHardSoft + PartialEq + Extremum;
+    type Item: Copy + Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum;
 
     fn new(indexes: Vec<Self::Item>) -> Self;
     fn new_hardened(indexes: Vec<Self::Item>, hardened: Vec<bool>) -> Self;
@@ -141,13 +141,13 @@ pub trait IIndexPath: Sized {
     fn length(&self) -> usize {
         self.indexes().len()
     }
-    fn index_path_string(&self) -> String {
-        if self.is_empty() {
-            "".to_string()
-        } else {
-            self.indexes().into_iter().map(|index| index.to_string()).collect::<Vec<_>>().join(".")
-        }
-    }
+    // fn index_path_string(&self) -> String {
+    //     if self.is_empty() {
+    //         "".to_string()
+    //     } else {
+    //         self.indexes().into_iter().map(|index| index.to_string()).collect::<Vec<_>>().join(".")
+    //     }
+    // }
     fn index_path_enumerated_string(&self) -> String {
         (0..self.length())
             .map(|position| format!("_{}", self.index_u64_at_position(position)))
@@ -206,7 +206,7 @@ pub struct IndexPath<T> {
     pub hardened: Vec<bool>,
 }
 
-impl<T> IIndexPath for IndexPath<T> where T: Copy + Debug + Display + Encodable + IndexHardSoft + PartialEq + Extremum {
+impl<T> IIndexPath for IndexPath<T> where T: Copy + Debug + Encodable + IndexHardSoft + PartialEq + Extremum {
     type Item = T;
     // TODO: avoid hardened allocation for u32 index paths
     fn new(indexes: Vec<Self::Item>) -> Self {
@@ -233,7 +233,7 @@ impl IndexPath<u32> {
     }
 }
 
-impl<'a> TryRead<'a, usize> for IndexPath<UInt256> {
+impl<'a> TryRead<'a, usize> for IndexPath<[u8; 32]> {
     #[inline]
     fn try_read(bytes: &'a [u8], size: usize) -> byte::Result<(Self, usize)> {
 
@@ -242,7 +242,7 @@ impl<'a> TryRead<'a, usize> for IndexPath<UInt256> {
         let mut indexes = Vec::with_capacity(size);
         let mut hardened = Vec::with_capacity(size);
         for _i in 0..size {
-            indexes.push(bytes.read_with::<UInt256>(offset, LE)?);
+            indexes.push(bytes.read_with::<UInt256>(offset, LE)?.0);
             hardened.push(bytes.read_with::<bool>(offset, ())?);
         }
         Ok((Self::new_hardened(indexes, hardened), size))

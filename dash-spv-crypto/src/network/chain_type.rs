@@ -1,5 +1,5 @@
 use crate::network::LLMQType;
-use crate::crypto::byte_util::{Reversable, UInt256};
+use crate::crypto::byte_util::{Reversable, Reversed, UInt256};
 use crate::util::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::util::params::DUFFS;
 use hashes::hex::FromHex;
@@ -7,7 +7,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 #[ferment_macro::export]
 pub trait IHaveChainSettings {
-    fn genesis_hash(&self) -> UInt256;
+    fn genesis_hash(&self) -> [u8; 32];
     fn genesis_height(&self) -> u32;
     fn is_llmq_type(&self) -> LLMQType;
     fn isd_llmq_type(&self) -> LLMQType;
@@ -162,22 +162,25 @@ impl DevnetType {
     pub fn version(&self) -> u16 {
         1
     }
+    pub fn index(&self) -> u16 {
+        i16::from(*self) as u16
+    }
 }
 
 #[ferment_macro::export]
 impl IHaveChainSettings for ChainType {
-    fn genesis_hash(&self) -> UInt256 {
+    fn genesis_hash(&self) -> [u8; 32] {
         match self {
             ChainType::MainNet => UInt256::from_hex(
                 "00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6",
             )
             .unwrap()
-            .reverse(),
+            .reversed().0,
             ChainType::TestNet => UInt256::from_hex(
                 "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
             )
             .unwrap()
-            .reverse(),
+            .reversed().0,
             ChainType::DevNet(devnet_type) => devnet_type.genesis_hash(),
         }
     }
@@ -240,7 +243,7 @@ impl IHaveChainSettings for ChainType {
 
 #[ferment_macro::export]
 impl IHaveChainSettings for DevnetType {
-    fn genesis_hash(&self) -> UInt256 {
+    fn genesis_hash(&self) -> [u8; 32] {
         UInt256::from_hex(match self {
             DevnetType::JackDaniels => {
                 "79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26"
@@ -263,7 +266,7 @@ impl IHaveChainSettings for DevnetType {
             _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
         })
         .unwrap()
-        .reverse()
+        .reversed().0
     }
 
     fn genesis_height(&self) -> u32 {
@@ -316,6 +319,7 @@ impl ChainType {
         !self.is_mainnet() && !self.is_testnet()
     }
 
+
     pub fn user_agent(&self) -> String {
         format!(
             "/dash-spv-core:{}{}/",
@@ -358,6 +362,10 @@ impl ChainType {
             ChainType::TestNet => vec!["testnet-seed.dashdot.io".to_string()],
             ChainType::DevNet(_) => vec![],
         }
+    }
+
+    pub fn script_priv_key(&self) -> u8 {
+        self.script_map().privkey
     }
 
     pub fn script_map(&self) -> ScriptMap {
@@ -471,6 +479,13 @@ impl ChainType {
             _ => 50 * DUFFS,
         }
     }
+    pub fn magic_number(&self) -> u64 {
+        match self {
+            ChainType::MainNet => 0xbd6b0cbf,
+            ChainType::TestNet => 0xffcae2ce,
+            ChainType::DevNet(..) => 0xceffcae2,
+        }
+    }
 
     pub fn header_max_amount(&self) -> u64 {
         2000
@@ -546,5 +561,26 @@ impl ChainType {
             ChainType::DevNet(dev) => dev.identifier()
         }
     }
-}
 
+    pub fn index(&self) -> u16 {
+        match self {
+            ChainType::MainNet => 0,
+            ChainType::TestNet => 1,
+            ChainType::DevNet(..) => 2
+        }
+    }
+    pub fn devnet_type(&self) -> DevnetType {
+        match self {
+            ChainType::DevNet(devnet_type) => devnet_type.clone(),
+            _ => panic!("Can't get DevnetType from ChainType {:?}", self),
+        }
+    }
+}
+#[ferment_macro::export]
+pub fn chain_type_from_index(index: u16) -> ChainType {
+    ChainType::from(index as i16)
+}
+#[ferment_macro::export]
+pub fn devnet_type_from_index(index: u16) -> DevnetType {
+    DevnetType::from(index as i16)
+}

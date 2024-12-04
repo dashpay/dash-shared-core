@@ -1,12 +1,12 @@
 use hashes::hex::{FromHex, ToHex};
 use hashes::{sha256, Hash};
 
-use crate::chain::common::ChainType;
-use crate::crypto::UInt256;
-use crate::keys::{ECDSAKey, IKey};
-use crate::util::address::address::is_valid_dash_private_key;
-use crate::util::base58;
-use crate::util::data_append::DataAppend;
+use dash_spv_crypto::network::ChainType;
+use dash_spv_crypto::crypto::UInt256;
+use dash_spv_crypto::keys::{ECDSAKey, IKey};
+use dash_spv_crypto::util::address::address::is_valid_dash_private_key;
+use dash_spv_crypto::util::base58;
+use dash_spv_crypto::util::data_append::DataAppend;
 
 // TODO: impl bip38 and their tests
 
@@ -23,7 +23,7 @@ fn test_sign_key(secret: &str, message: &str, compressed: bool, test_signature: 
     }
 }
 
-fn test_compact_signature_recovery(signature: &[u8], md: UInt256, test_data: Vec<u8>) {
+fn test_compact_signature_recovery(signature: &[u8], md: [u8; 32], test_data: Vec<u8>) {
     match ECDSAKey::key_with_compact_sig(signature, md) {
         Ok(key) => assert_eq!(key.public_key_data(), test_data, "public key data doesn't match"),
         Err(err) => panic!("Key can't recovered: {}", err)
@@ -33,7 +33,7 @@ fn test_compact_signature_recovery(signature: &[u8], md: UInt256, test_data: Vec
 fn test_compact_signature_key(secret: &str, message: &str, compressed: bool) {
     match ECDSAKey::key_with_secret_hex(secret, compressed) {
         Ok(key) => {
-            let message_digest = UInt256::sha256_str(message);
+            let message_digest = UInt256::sha256_str(message).0;
             let sig = key.compact_sign(message_digest);
             test_compact_signature_recovery(&sig, message_digest, key.public_key_data());
         },
@@ -59,7 +59,7 @@ pub fn test_key_with_private_key() {
     assert!(is_valid_dash_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", &chain_type.script_map()), "invalid when valid");
     match ECDSAKey::key_with_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", chain_type) {
         Ok(key) => {
-            let addr = key.address_with_public_key_data(&chain_type.script_map());
+            let addr = key.address_with_public_key_data(chain_type);
             assert_eq!("Xj74g7h8pZTzqudPSzVEL7dFxNZY95Emcy", addr.as_str(), "addresses don't match");
         },
         Err(err) => assert!(false, "Key is invalid: {}", err)
@@ -68,10 +68,10 @@ pub fn test_key_with_private_key() {
     // compressed private key
     match ECDSAKey::key_with_private_key("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", chain_type) {
         Ok(key) => {
-            let addr = key.address_with_public_key_data(&chain_type.script_map());
+            let addr = key.address_with_public_key_data(chain_type);
             assert_eq!("XbKPGyV1BpzzxNAggx6Q9a6o7GaBWTLhJS", addr.as_str(), "addresses don't match");
             // compressed private key export
-            assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_script(&chain_type.script_map()).as_str(), "serialized_private_key_for_script");
+            assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_script(chain_type.script_priv_key()).as_str(), "serialized_private_key_for_script");
         },
         Err(err) => assert!(false, "Key is invalid: {}", err)
     };
@@ -192,11 +192,11 @@ fn private_key_with_non_base_string() {
     assert!(pk3.is_ok(), "pk3 is none");
     assert!(pk4.is_ok(), "pk4 is none");
     assert!(pk5.is_ok(), "pk5 is none");
-    let ia1 = pk1.unwrap().address_with_public_key_data(&script_map);
-    let ia2 = pk2.unwrap().address_with_public_key_data(&script_map);
-    let ia3 = pk3.unwrap().address_with_public_key_data(&script_map);
-    let ia4 = pk4.unwrap().address_with_public_key_data(&script_map);
-    let ia5 = pk5.unwrap().address_with_public_key_data(&script_map);
+    let ia1 = pk1.unwrap().address_with_public_key_data(chain_type);
+    let ia2 = pk2.unwrap().address_with_public_key_data(chain_type);
+    let ia3 = pk3.unwrap().address_with_public_key_data(chain_type);
+    let ia4 = pk4.unwrap().address_with_public_key_data(chain_type);
+    let ia5 = pk5.unwrap().address_with_public_key_data(chain_type);
     assert_eq!(ia1, "yaMmAV9Fmx4St7xPH9eHCLcYJZdGYd8vD8");
     assert_eq!(ia2, "yhf7gKjEimNd1uYatJBk3Xw88oKgE4Texj");
     assert_eq!(ia3, "yVLAtNKRZsX3nh8v4e9cVnk79xows2nYXX");

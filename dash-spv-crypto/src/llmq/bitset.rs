@@ -6,7 +6,7 @@ use log::warn;
 use crate::consensus::{Decodable, Encodable, encode, encode::VarInt, ReadExt, WriteExt};
 use crate::crypto::data_ops::Data;
 
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[ferment_macro::export]
 pub struct Bitset {
     pub count: usize,
