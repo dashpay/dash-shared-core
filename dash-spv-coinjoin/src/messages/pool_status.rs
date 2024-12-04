@@ -17,8 +17,8 @@ pub enum PoolStatus {
     ErrWalletLocked = 0x3103,
     ErrNotEnoughFunds = 0x3104,
     // Warnings
-    WarnNoMixingQueues = 0x2200,
-    WarnNoCompatibleMasternode = 0x2201,
+    WarnNoMixingQueues = 0x4200,
+    WarnNoCompatibleMasternode = 0x4201
 }
 
 impl PoolStatus {
@@ -40,7 +40,9 @@ impl PoolStatus {
     }
 
     pub fn should_stop(&self) -> bool {
-        (self.value() & Self::STOP) != 0
+        (self.value() & Self::STOP) != 0 ||
+            self == &PoolStatus::ErrNoInputs ||
+            self == &PoolStatus::ErrNotEnoughFunds
     }
 
     pub fn session_completed(&self) -> bool {
