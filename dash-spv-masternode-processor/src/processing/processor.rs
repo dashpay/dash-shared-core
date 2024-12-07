@@ -52,7 +52,7 @@ impl MasternodeProcessor {
 #[ferment_macro::export]
 impl MasternodeProcessor {
 
-    pub fn current_masternode_list(&self, is_rotated_quorums_presented: bool) -> Option<MasternodeList> {
+    pub fn current_masternode_list(&self, is_rotated_quorums_presented: bool) -> Option<Arc<MasternodeList>> {
         if is_rotated_quorums_presented {
             let last_mn_list_diff_list = self.cache.get_last_queried_mn_masternode_list();
             let last_qr_list_diff_list = self.cache.get_last_queried_qr_masternode_list_at_tip();
@@ -79,11 +79,14 @@ impl MasternodeProcessor {
             .map_err(ProcessingError::from)?;
         let block_hash = list_diff.block_hash.clone();
         let result = self.get_list_diff_result_with_base_lookup(list_diff, LLMQVerificationContext::MNListDiff);
+        println!("mn_list_diff_result_from_file: {}", result.block_hash.to_hex());
         if result.is_valid() {
-            self.cache.set_last_queried_mn_masternode_list(result.masternode_list.clone());
-            // self.provider.masternode_list_updated(result.masternode_list.clone());
-            self.provider.update_address_usage_of_masternodes(result.masternodes_changed());
-            self.provider.save_masternode_list_into_db(result.masternode_list, result.modified_masternodes)
+            let changed = result.masternodes_changed();
+            let list = Arc::new(result.masternode_list);
+            self.cache.masternode_list_loaded(block_hash, list.clone());
+            self.cache.set_last_queried_mn_masternode_list(list.clone());
+            self.provider.update_address_usage_of_masternodes(changed);
+            self.provider.save_masternode_list_into_db(list, result.modified_masternodes)
                 .map_err(ProcessingError::from)?;
             Ok(block_hash)
         } else {
@@ -96,6 +99,9 @@ impl MasternodeProcessor {
         message: &[u8],
         is_from_snapshot: bool,
         protocol_version: u32,
+        // #[cfg(test)]
+        allow_invalid_merkle_roots: bool,
+        peer: *const std::os::raw::c_void
         // cache: &Arc<RwLock<MasternodeProcessorCache>>,
         // cache: &mut MasternodeProcessorCache
     ) -> Result<([u8; 32], bool), ProcessingError> {
@@ -103,13 +109,13 @@ impl MasternodeProcessor {
             .map_err(ProcessingError::from)?;
         let block_hash = list_diff.block_hash.clone();
         if !is_from_snapshot {
-            self.provider.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash)?;
+            self.should_process_diff_with_range(false, list_diff.base_block_hash, list_diff.block_hash, peer)?;
         }
         let result = self.get_list_diff_result_with_base_lookup(list_diff, LLMQVerificationContext::MNListDiff);
 
-
-        let should_process = self.should_process_diff_result(&result, false);
+        let should_process = self.should_process_diff_result(&result, allow_invalid_merkle_roots, false);
         let raise_peer_issue = !should_process;
+        println!("mn_list_diff_result_from_message: {} = {}", result.block_hash.to_hex(), result.is_valid());
         let MNListDiffResult {
             block_hash,
             masternode_list,
@@ -121,14 +127,15 @@ impl MasternodeProcessor {
         if should_process {
             let needing_validation_lock = self.cache.list_needing_quorum_validation.read().unwrap();
             if needed_masternode_lists.is_empty() || !needing_validation_lock.contains(&block_hash) {
+                let list = Arc::new(masternode_list);
                 if self.cache.get_last_queried_block_hash().eq(&block_hash) {
-                    self.cache.set_last_queried_mn_masternode_list(masternode_list.clone());
-                    // self.provider.masternode_list_updated(masternode_list.clone());
+                    self.cache.set_last_queried_mn_masternode_list(list.clone());
                     let mut lock = self.cache.list_needing_quorum_validation.write().unwrap();
                     lock.remove(&block_hash);
                 }
-                self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                self.cache.masternode_list_loaded(block_hash, list.clone());
+                self.provider.save_masternode_list_into_db(list, modified_masternodes)
                     .map_err(ProcessingError::from)?;
             } else  {
                 let mut needed_lock = self.cache.needed_masternode_lists.write().unwrap();
@@ -139,8 +146,17 @@ impl MasternodeProcessor {
     }
 
 
-    pub fn qr_info_result_from_message(&mut self, message: &[u8], is_from_snapshot: bool, protocol_version: u32, is_rotated_quorums_presented: bool) -> Result<[u8; 32], ProcessingError> {
-        let qr_info = message.read_with::<QRInfo>(&mut 0, (self, is_from_snapshot, protocol_version, is_rotated_quorums_presented))
+    pub fn qr_info_result_from_message(
+        &self,
+        message: &[u8],
+        is_from_snapshot: bool,
+        protocol_version: u32,
+        is_rotated_quorums_presented: bool,
+        allow_invalid_merkle_roots: bool,
+        peer: *const std::os::raw::c_void
+    ) -> Result<[u8; 32], ProcessingError> {
+        println!("qr_info_result_from_message: [{}]: {} -- {} -- {}", message.len(), is_from_snapshot, protocol_version, is_rotated_quorums_presented);
+        let qr_info = message.read_with::<QRInfo>(&mut 0, (self, is_from_snapshot, protocol_version, is_rotated_quorums_presented, peer))
             .map_err(ProcessingError::from)?;
         let list_diff_processor = |list_diff, verification_context|
             self.get_list_diff_result_with_base_lookup(list_diff, verification_context);
@@ -150,40 +166,25 @@ impl MasternodeProcessor {
         let result_at_h_c = list_diff_processor(qr_info.diff_h_c, LLMQVerificationContext::None);
         let result_at_h = list_diff_processor(qr_info.diff_h, LLMQVerificationContext::QRInfo(is_rotated_quorums_presented));
         let result_at_tip = list_diff_processor(qr_info.diff_tip, LLMQVerificationContext::None);
-
+        println!("qr_info_result_from_message h-4c: {} = {}", result_at_h_4c.as_ref().map(|r| r.block_hash.to_hex()).unwrap_or_else(|| "None".to_string()), result_at_h_4c.as_ref().map(|r| r.is_valid().to_string()).unwrap_or_else(|| "None".to_string()));
+        println!("qr_info_result_from_message h-3c: {} = {}", result_at_h_3c.block_hash.to_hex(), result_at_h_3c.is_valid());
+        println!("qr_info_result_from_message h-2c: {} = {}", result_at_h_2c.block_hash.to_hex(), result_at_h_2c.is_valid());
+        println!("qr_info_result_from_message h-c: {} = {}", result_at_h_c.block_hash.to_hex(), result_at_h_c.is_valid());
+        println!("qr_info_result_from_message h: {} = {}", result_at_h.block_hash.to_hex(), result_at_h.is_valid());
+        println!("qr_info_result_from_message tip: {} = {}", result_at_tip.block_hash.to_hex(), result_at_tip.is_valid());
         let mut needed_lock = self.cache.needed_masternode_lists.write().unwrap();
         let needing_validation_lock = self.cache.list_needing_quorum_validation.read().unwrap();
 
         // if not present in retrieval queue -> should be treated as error
         let mut raise_peer_issue = false;
 
-        // let maybe_process_diff_result = |diff_result| {
-        //     let should_process = self.should_process_diff_result(&diff_result, true);
-        //     let changed_nodes = diff_result.masternodes_changed();
-        //     let MNListDiffResult {
-        //         block_hash,
-        //         masternode_list,
-        //         modified_masternodes,
-        //         needed_masternode_lists,
-        //         ..
-        //     } = diff_result;
-        //     if should_process {
-        //         if needed_masternode_lists.is_empty() || !needing_validation_lock.contains(&block_hash) {
-        //             self.provider.update_address_usage_of_masternodes(changed_nodes);
-        //
-        //             self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
-        //                 .map_err(ProcessingError::from)?;
-        //         }
-        //     }
-        //     Ok::<(bool, HashSet<[u8; 32]>), ProcessingError>((should_process, needed_masternode_lists))
-        // };
         let maybe_save_snapshot = |block_hash, snapshot|
             self.provider.save_llmq_snapshot_into_db(block_hash, snapshot)
                 .map_err(ProcessingError::from);
 
 
         if let Some(result) = result_at_h_4c {
-            let should_process = self.should_process_diff_result(&result, true);
+            let should_process = self.should_process_diff_result(&result, allow_invalid_merkle_roots, true);
             let changed_nodes = result.masternodes_changed();
             let MNListDiffResult {
                 block_hash,
@@ -194,10 +195,12 @@ impl MasternodeProcessor {
             } = result;
             if should_process {
                 if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
+                    let list = Arc::new(masternode_list);
                     self.provider.update_address_usage_of_masternodes(changed_nodes);
-                    self.cache.set_last_queried_qr_masternode_list_at_h_4c(masternode_list.clone());
-                    self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                    self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                    self.cache.set_last_queried_qr_masternode_list_at_h_4c(list.clone());
+                    self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                    self.cache.masternode_list_loaded(block_hash, list.clone());
+                    self.provider.save_masternode_list_into_db(list, modified_masternodes)
                         .map_err(ProcessingError::from)?;
                 }
             }
@@ -207,7 +210,7 @@ impl MasternodeProcessor {
             maybe_save_snapshot(block_hash, qr_info.snapshot_h_4c.unwrap())?;
         }
 
-        let should_process = self.should_process_diff_result(&result_at_h_3c, true);
+        let should_process = self.should_process_diff_result(&result_at_h_3c, allow_invalid_merkle_roots, true);
         let changed_nodes = result_at_h_3c.masternodes_changed();
         let MNListDiffResult {
             block_hash,
@@ -219,9 +222,11 @@ impl MasternodeProcessor {
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
                 self.provider.update_address_usage_of_masternodes(changed_nodes);
-                self.cache.set_last_queried_qr_masternode_list_at_h_3c(masternode_list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                let list = Arc::new(masternode_list);
+                self.cache.set_last_queried_qr_masternode_list_at_h_3c(list.clone());
+                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                self.cache.masternode_list_loaded(block_hash, list.clone());
+                self.provider.save_masternode_list_into_db(list, modified_masternodes)
                     .map_err(ProcessingError::from)?;
             }
         }
@@ -229,7 +234,7 @@ impl MasternodeProcessor {
         needed_lock.extend(missing);
         maybe_save_snapshot(block_hash, qr_info.snapshot_h_3c)?;
 
-        let should_process = self.should_process_diff_result(&result_at_h_2c, true);
+        let should_process = self.should_process_diff_result(&result_at_h_2c, allow_invalid_merkle_roots, true);
         let changed_nodes = result_at_h_2c.masternodes_changed();
         let MNListDiffResult {
             block_hash,
@@ -241,9 +246,11 @@ impl MasternodeProcessor {
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
                 self.provider.update_address_usage_of_masternodes(changed_nodes);
-                self.cache.set_last_queried_qr_masternode_list_at_h_2c(masternode_list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                let list = Arc::new(masternode_list);
+                self.cache.set_last_queried_qr_masternode_list_at_h_2c(list.clone());
+                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                self.cache.masternode_list_loaded(block_hash, list.clone());
+                self.provider.save_masternode_list_into_db(list, modified_masternodes)
                     .map_err(ProcessingError::from)?;
             }
         }
@@ -252,7 +259,7 @@ impl MasternodeProcessor {
         needed_lock.extend(missing);
         maybe_save_snapshot(block_hash, qr_info.snapshot_h_2c)?;
 
-        let should_process = self.should_process_diff_result(&result_at_h_c, true);
+        let should_process = self.should_process_diff_result(&result_at_h_c, allow_invalid_merkle_roots, true);
         let changed_nodes = result_at_h_c.masternodes_changed();
         let MNListDiffResult {
             block_hash,
@@ -264,9 +271,11 @@ impl MasternodeProcessor {
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
                 self.provider.update_address_usage_of_masternodes(changed_nodes);
-                self.cache.set_last_queried_qr_masternode_list_at_h_c(masternode_list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                let list = Arc::new(masternode_list);
+                self.cache.set_last_queried_qr_masternode_list_at_h_c(list.clone());
+                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                self.cache.masternode_list_loaded(block_hash, list.clone());
+                self.provider.save_masternode_list_into_db(list, modified_masternodes)
                     .map_err(ProcessingError::from)?;
             }
         }
@@ -275,7 +284,7 @@ impl MasternodeProcessor {
         maybe_save_snapshot(block_hash, qr_info.snapshot_h_c)?;
 
 
-        let should_process = self.should_process_diff_result(&result_at_h, true);
+        let should_process = self.should_process_diff_result(&result_at_h, allow_invalid_merkle_roots, true);
         let changed_nodes = result_at_h.masternodes_changed();
         let MNListDiffResult {
             block_hash,
@@ -287,16 +296,18 @@ impl MasternodeProcessor {
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
                 self.provider.update_address_usage_of_masternodes(changed_nodes);
-                self.cache.set_last_queried_qr_masternode_list_at_h(masternode_list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                let list = Arc::new(masternode_list);
+                self.cache.set_last_queried_qr_masternode_list_at_h(list.clone());
+                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                self.cache.masternode_list_loaded(block_hash, list.clone());
+                self.provider.save_masternode_list_into_db(list, modified_masternodes)
                     .map_err(ProcessingError::from)?;
             }
         }
         raise_peer_issue |= !should_process;
         needed_lock.extend(missing);
 
-        let should_process = self.should_process_diff_result(&result_at_tip, true);
+        let should_process = self.should_process_diff_result(&result_at_tip, allow_invalid_merkle_roots, true);
         raise_peer_issue |= !should_process;
         let changed_nodes = result_at_tip.masternodes_changed();
         let MNListDiffResult {
@@ -308,15 +319,16 @@ impl MasternodeProcessor {
         } = result_at_tip;
         if should_process {
             if needed_masternode_lists.is_empty() || !needing_validation_lock.contains(&block_hash) {
+                let list = Arc::new(masternode_list);
                 if self.cache.get_last_queried_block_hash().eq(&block_hash) {
-                    self.cache.set_last_queried_qr_masternode_list_at_tip(masternode_list.clone());
-                    // self.provider.masternode_list_updated(masternode_list.clone());
+                    self.cache.set_last_queried_qr_masternode_list_at_tip(list.clone());
                     let mut lock = self.cache.list_needing_quorum_validation.write().unwrap();
                     lock.remove(&block_hash);
                 }
                 self.provider.update_address_usage_of_masternodes(changed_nodes);
-                self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                self.cache.masternode_list_loaded(block_hash, list.clone());
+                self.provider.save_masternode_list_into_db(list, modified_masternodes)
                     .map_err(ProcessingError::from)?;
             } else  {
                 needed_lock.extend(needed_masternode_lists);
@@ -327,7 +339,7 @@ impl MasternodeProcessor {
             let diff_result = list_diff_processor(list_diff, LLMQVerificationContext::None);
             // let block_hash = diff_result.block_hash.clone();
             // maybe_process_diff_result(diff_result)?;
-            let should_process = self.should_process_diff_result(&diff_result, true);
+            let should_process = self.should_process_diff_result(&diff_result, allow_invalid_merkle_roots, true);
             let changed_nodes = diff_result.masternodes_changed();
             let MNListDiffResult {
                 block_hash,
@@ -338,14 +350,17 @@ impl MasternodeProcessor {
             } = diff_result;
             if should_process {
                 if needed_masternode_lists.is_empty() || !needing_validation_lock.contains(&block_hash) {
+                    let list = Arc::new(masternode_list);
                     self.provider.update_address_usage_of_masternodes(changed_nodes);
-                    self.cache.remove_from_awaiting_quorum_validation_list(masternode_list.block_hash);
-                    self.provider.save_masternode_list_into_db(masternode_list, modified_masternodes)
+                    self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
+                    self.cache.masternode_list_loaded(block_hash, list.clone());
+                    self.provider.save_masternode_list_into_db(list, modified_masternodes)
                         .map_err(ProcessingError::from)?;
                 }
             }
             maybe_save_snapshot(block_hash, snapshot)?;
         }
+        println!("qr_info_result_from_message: {}", raise_peer_issue);
         if raise_peer_issue {
             Err(ProcessingError::InvalidResult)
         } else {
@@ -371,20 +386,23 @@ impl MasternodeProcessor {
 
     // quorums
     pub fn quorum_entry_for_lock_request_id(&self, request_id: [u8; 32], llmq_type: LLMQType, block_hash: [u8; 32], block_height: u32, expiration_offset: u32) -> Option<LLMQEntry> {
+        if block_hash.is_zero() {
+            return None
+        }
         let active_quorum = self.cache.active_quorum_of_type(llmq_type, block_hash);
         if active_quorum.is_some() {
             return active_quorum;
         }
         match self.masternode_list_before_block_hash(block_hash) {
             None => {
-                info!("No masternode list found yet at {}", block_hash.to_hex());
+                println!("No masternode list found yet at {}", block_hash.to_hex());
                 None
             }
             Some(list) => {
                 let known_height = list.known_height;
                 let age = block_height - known_height;
                 if age > expiration_offset {
-                    info!("Masternode list for is too old (age: {age}, list: {known_height}, block: {block_height}");
+                    println!("Masternode list for is too old (age: {age}, list: {known_height}, block: {block_height}");
                     None
                 } else {
                     list.lock_llmq_request_id(request_id, llmq_type)
@@ -418,13 +436,13 @@ impl MasternodeProcessor {
             .or_else(|| self.masternode_list_before_block_hash(hash));
         match list {
             None => {
-                info!("No masternode list found yet {block}");
+                println!("No masternode list found yet {block}");
                 None
             }
-            Some(mut masternode_list) => {
-                if masternode_list.known_height == 0 || masternode_list.known_height == u32::MAX {
-                    masternode_list.known_height = self.provider.lookup_block_height_by_hash(masternode_list.block_hash);
-                }
+            Some(masternode_list) => {
+                // if masternode_list.known_height == 0 || masternode_list.known_height == u32::MAX {
+                //     masternode_list.known_height = self.height_for_block_hash(masternode_list.block_hash);
+                // }
                 if height - masternode_list.known_height > 32 {
                     warn!("Masternode list is too old {}", masternode_list.known_height);
                     return None;
@@ -444,11 +462,11 @@ impl MasternodeProcessor {
 
     // masternode list
 
-    pub fn load_masternode_list_at_block_hash(&self, block_hash: [u8; 32]) -> Result<MasternodeList, CoreProviderError> {
+    pub fn load_masternode_list_at_block_hash(&self, block_hash: [u8; 32]) -> Result<Arc<MasternodeList>, CoreProviderError> {
         self.provider.load_masternode_list_from_db(block_hash)
     }
 
-    pub fn masternode_list_for_block_hash(&self, block_hash: [u8; 32]) -> Option<MasternodeList> {
+    pub fn masternode_list_for_block_hash(&self, block_hash: [u8; 32]) -> Option<Arc<MasternodeList>> {
         let lock = self.cache.mn_lists.read().unwrap();
         if let Some(masternode_list) = lock.get(&block_hash) {
             return Some(masternode_list.clone());
@@ -460,7 +478,7 @@ impl MasternodeProcessor {
         }
         None
     }
-    pub fn masternode_list_before_block_hash(&self, block_hash: [u8; 32]) -> Option<MasternodeList> {
+    pub fn masternode_list_before_block_hash(&self, block_hash: [u8; 32]) -> Option<Arc<MasternodeList>> {
         let mut min_distance = u32::MAX;
         let block_height = self.height_for_block_hash(block_hash);
         let mut closest_masternode_list = None;
@@ -478,9 +496,9 @@ impl MasternodeProcessor {
         }
         if self.provider.chain_type().is_mainnet() {
             if let Some(ref mut closest_masternode_list) = closest_masternode_list {
-                if closest_masternode_list.known_height == 0 || closest_masternode_list.known_height == u32::MAX {
-                    closest_masternode_list.known_height = self.provider.lookup_block_height_by_hash(block_hash);
-                }
+                // if closest_masternode_list.known_height == 0 || closest_masternode_list.known_height == u32::MAX {
+                //     closest_masternode_list.known_height = self.height_for_block_hash(block_hash);
+                // }
                 if closest_masternode_list.known_height < CHAIN_LOCK_ACTIVATION_HEIGHT && block_height >= CHAIN_LOCK_ACTIVATION_HEIGHT {
                     return None; // special main net case
                 }
@@ -557,7 +575,7 @@ impl MasternodeProcessor {
         };
         let cached = self.cache.has_masternode_list_at(hash);
         if cached {
-            info!("Already have that masternode list (or in stub) {}", height);
+            println!("Already have that masternode list (or in stub) {}", height);
             return false;
         }
         self.cache.set_last_queried_block_hash(hash);
@@ -570,11 +588,11 @@ impl MasternodeProcessor {
         let mut height_to_delete = u32::MAX;
         if let Some(list) = self.cache.get_last_queried_mn_masternode_list() {
             height_to_delete = if list.known_height == 0 || list.known_height == u32::MAX {
-                self.provider.lookup_block_height_by_hash(list.block_hash)
+                self.height_for_block_hash(list.block_hash)
             } else {
                 list.known_height
             };
-            if let Some(oldest_hash_in_mn_diff_queue) = self.provider.first_in_mn_diff_queue() {
+            if let Some(oldest_hash_in_mn_diff_queue) = self.provider.first_in_retrieval_queue(false) {
                 let oldest_height = self.height_for_block_hash(oldest_hash_in_mn_diff_queue);
                 if height_to_delete > oldest_height {
                     height_to_delete = oldest_height;
@@ -587,14 +605,14 @@ impl MasternodeProcessor {
         if let Some(list) = self.cache.get_last_queried_qr_masternode_list_at_h_4c()
             .or_else(|| self.cache.get_last_queried_qr_masternode_list_at_h_3c()) {
             let h = if list.known_height == 0 || list.known_height == u32::MAX {
-                self.provider.lookup_block_height_by_hash(list.block_hash)
+                self.height_for_block_hash(list.block_hash)
             } else {
                 list.known_height
             };
             if height_to_delete > h {
                 height_to_delete = h;
             }
-            if let Some(oldest_hash_in_qr_info_queue) = self.provider.first_in_qr_info_queue() {
+            if let Some(oldest_hash_in_qr_info_queue) = self.provider.first_in_retrieval_queue(true) {
                 let oldest_height = self.height_for_block_hash(oldest_hash_in_qr_info_queue);
                 if height_to_delete > oldest_height {
                     height_to_delete = oldest_height;
@@ -609,8 +627,48 @@ impl MasternodeProcessor {
 }
 
 impl MasternodeProcessor {
-    fn should_process_diff_result(&self, result: &MNListDiffResult, skip_presence_in_retrieval: bool) -> bool {
-        (self.provider.persist_in_retrieval_queue(result.block_hash) || skip_presence_in_retrieval) && result.is_valid()
+
+    pub fn should_process_diff_with_range(
+        &self,
+        is_dip24: bool,
+        base_block_hash: [u8; 32],
+        block_hash: [u8; 32],
+        peer: *const std::os::raw::c_void
+    ) -> Result<u8, ProcessingError> {
+        let base_block_height = self.height_for_block_hash(base_block_hash);
+        let block_height = self.height_for_block_hash(block_hash);
+        if block_height == u32::MAX {
+            return Err(ProcessingError::UnknownBlockHash)
+        }
+        if !self.provider.remove_request_in_retrieval(is_dip24, base_block_hash, block_hash) {
+            println!("•••• shouldProcessDiffWithRange: persist in retrieval: {base_block_height}..{block_height} {}..{}", base_block_hash.to_hex(), block_hash.to_hex());
+            return Err(ProcessingError::PersistInRetrieval)
+        }
+        let list = self.masternode_list_for_block_hash(block_hash);
+        // if list.is_none() {
+        //     println!("•••• shouldProcessDiffWithRange: no list no stub: {block_height} {}", block_hash.to_hex());
+        //     return Err(ProcessingError::InvalidResult)
+        // }
+        let need_verify_rotated_quorums = is_dip24 && (self.cache.get_last_queried_qr_masternode_list_at_h().is_none() || self.cache.get_last_queried_qr_masternode_list_at_h().unwrap().has_unverified_rotated_quorums(self.provider.chain_type()));
+        let need_verify_regular_quorums = !is_dip24 && (list.is_none() || list.unwrap().has_unverified_regular_quorums(self.provider.chain_type()));
+        let no_need_to_verify_quorums = !(need_verify_rotated_quorums || need_verify_regular_quorums);
+        let has_locally_stored = self.cache.has_masternode_list_at(block_hash);
+        if has_locally_stored && no_need_to_verify_quorums {
+            println!("•••• shouldProcessDiffWithRange: already persist: {block_height}: {} needToVerifyRotatedQuorums: {need_verify_rotated_quorums} needToVerifyRegularQuorums: {need_verify_regular_quorums}", block_hash.reversed().to_hex());
+            self.provider.remove_from_retrieval_queue(is_dip24, block_hash);
+            return Err(ProcessingError::LocallyStored);
+        }
+        match self.masternode_list_for_block_hash(base_block_hash) {
+            None if !self.provider.chain_type().genesis_hash().eq(&base_block_hash) && !base_block_hash.is_zero() => {
+                self.provider.issue_with_masternode_list_from_peer(is_dip24, peer);
+                println!("•••• No base masternode list at: {base_block_height}: {}", base_block_hash.reversed().to_hex());
+                Err(ProcessingError::HasNoBaseBlockHash)
+            }
+            _ => Ok(0)
+        }
+    }
+    fn should_process_diff_result(&self, result: &MNListDiffResult, allow_invalid_merkle_roots: bool, is_dip24: bool) -> bool {
+        (self.provider.persist_in_retrieval_queue(result.block_hash, is_dip24) || is_dip24) && (allow_invalid_merkle_roots || result.is_valid())
     }
 
     fn llmq_modifier_type_for(&self, llmq_type: LLMQType, work_block_hash: [u8; 32], work_block_height: u32) -> LLMQModifierType {
@@ -651,7 +709,7 @@ impl MasternodeProcessor {
 
     pub fn get_list_diff_result(
         &self,
-        base_list: Option<MasternodeList>,
+        base_list: Option<Arc<MasternodeList>>,
         list_diff: MNListDiff,
         verification_context: LLMQVerificationContext,
         // cache: &mut MasternodeProcessorCache,
@@ -662,7 +720,7 @@ impl MasternodeProcessor {
         let block_height = list_diff.block_height;
         let quorums_cl_sigs = list_diff.quorums_cls_sigs;
         let (base_masternodes, base_quorums) = match base_list {
-            Some(list) => (list.masternodes, list.quorums),
+            Some(list) => (list.masternodes.clone(), list.quorums.clone()),
             None => (BTreeMap::new(), BTreeMap::new()),
         };
         let mut coinbase_transaction = list_diff.coinbase_transaction;
@@ -700,7 +758,7 @@ impl MasternodeProcessor {
         // It's good to cache lists to use it inside processing session
         // Here we use opaque-like pointer which we initiate on the C-side to sync its lifetime with runtime
         #[cfg(feature = "generate-dashj-tests")]
-        crate::util::java::save_masternode_list_to_json(&masternode_list, self.lookup_block_height_by_hash(block_hash));
+        crate::util::java::save_masternode_list_to_json(&masternode_list, self.height_for_block_hash(block_hash));
         // let mut cache_lock = cache.write().unwrap();
         // self.cache.add_masternode_list(block_hash, masternode_list.clone());
         let has_found_coinbase = coinbase_transaction.has_found_coinbase(&merkle_tree.hashes);
@@ -785,7 +843,7 @@ impl MasternodeProcessor {
                 .enumerate()
                 .for_each(|(index, quorum)| {
                     if let Some(signature) = find_cl_signature_at_index(quorums_cl_sigs, index as u16) {
-                        let llmq_height = self.provider.lookup_block_height_by_hash(quorum.llmq_hash);
+                        let llmq_height = self.height_for_block_hash(quorum.llmq_hash);
                         if llmq_height != u32::MAX {
                             let work_block_height = llmq_height - 8;
                             if let Ok(work_block_hash) = self.provider.lookup_block_hash_by_height(work_block_height) {
@@ -803,9 +861,11 @@ impl MasternodeProcessor {
                         match self.validate_quorum(quorum, skip_removed_masternodes) {
                             Ok(LLMQValidationStatus::Verified | LLMQValidationStatus::NoMasternodeList) |
                             Err(CoreProviderError::NoMasternodeList) => {
+                                println!("[Processor] NoMasternodeList");
                                 has_valid_quorums &= true;
                             },
                             Err(CoreProviderError::MissedMasternodeListAt(block_hash)) => {
+                                println!("[Processor] MissedMasternodeListAt: ({})", block_hash.to_hex());
                                 block_hashes_for_missed_lists.insert(block_hash);
                                 has_valid_quorums &= true;
                             }
@@ -857,7 +917,7 @@ impl MasternodeProcessor {
         quorum: &LLMQEntry,
         block_height: u32,
         skip_removed_masternodes: bool,
-        masternodes: BTreeMap<[u8; 32], MasternodeEntry>,
+        masternodes: &BTreeMap<[u8; 32], MasternodeEntry>,
     ) -> Result<Vec<MasternodeEntry>, CoreProviderError> {
         if quorum.index != u16::MAX {
             self.get_rotated_masternodes_for_quorum(quorum.llmq_type, quorum.llmq_hash, block_height, skip_removed_masternodes)
@@ -868,9 +928,9 @@ impl MasternodeProcessor {
 
     fn validate_quorum(&self, quorum: &mut LLMQEntry, skip_removed_masternodes: bool) -> Result<LLMQValidationStatus, CoreProviderError> {
         let llmq_block_hash = quorum.llmq_hash;
-        let MasternodeList { masternodes, .. } = self.provider.find_masternode_list(llmq_block_hash, &self.cache)?;
-        let block_height = self.provider.lookup_block_height_by_hash(llmq_block_hash);
-        let valid_masternodes = self.find_valid_masternodes_for_quorum(quorum, block_height, skip_removed_masternodes, masternodes)?;
+        let masternode_list = self.provider.find_masternode_list(llmq_block_hash, &self.cache)?;
+        let block_height = self.height_for_block_hash(llmq_block_hash);
+        let valid_masternodes = self.find_valid_masternodes_for_quorum(quorum, block_height, skip_removed_masternodes, &masternode_list.masternodes)?;
         llmq::verify(quorum, valid_masternodes, block_height)
     }
 
@@ -880,7 +940,7 @@ impl MasternodeProcessor {
         block_hash: [u8; 32],
         block_height: u32,
         quorum: &LLMQEntry,
-        masternodes: BTreeMap<[u8; 32], MasternodeEntry>,
+        masternodes: &BTreeMap<[u8; 32], MasternodeEntry>,
     ) -> Result<Vec<MasternodeEntry>, CoreProviderError> {
         Ok(llmq::valid_masternodes(quorum, self.provider.chain_type(), masternodes, block_height, self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8)))
     }
@@ -916,7 +976,7 @@ impl MasternodeProcessor {
 
                 if let Some(snapshot) = self.cache.maybe_snapshot(work_block_hash) {
                     let (used_at_h_masternodes, unused_at_h_masternodes) =
-                        usage_info_from_snapshot(masternode_list, &snapshot, quorum_modifier, work_block_height);
+                        usage_info_from_snapshot(&masternode_list.masternodes, &snapshot, quorum_modifier, work_block_height);
                     Ok(apply_skip_strategy_of_type(LLMQQuarterUsageType::Snapshot(snapshot), used_at_h_masternodes, unused_at_h_masternodes, work_block_height, quorum_modifier, quorum_count, quarter_size))
                 } else {
                     Err(CoreProviderError::NoSnapshot)
@@ -1164,8 +1224,8 @@ fn sort_scored_masternodes(scored_masternodes: BTreeMap<[u8; 32], MasternodeEntr
     v.sort_by(|(s1, _), (s2, _)| s2.reversed().cmp(&s1.reversed()));
     v.into_iter().map(|(s, node)| node).collect()
 }
-fn usage_info_from_snapshot(masternode_list: MasternodeList, snapshot: &LLMQSnapshot, quorum_modifier: [u8; 32], work_block_height: u32) -> (Vec<MasternodeEntry>, Vec<MasternodeEntry>) {
-    let scored_masternodes = score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height, false);
+fn usage_info_from_snapshot(masternodes: &BTreeMap<[u8; 32], MasternodeEntry>, snapshot: &LLMQSnapshot, quorum_modifier: [u8; 32], work_block_height: u32) -> (Vec<MasternodeEntry>, Vec<MasternodeEntry>) {
+    let scored_masternodes = score_masternodes_map(masternodes, quorum_modifier, work_block_height, false);
     let sorted_scored_masternodes = sort_scored_masternodes(scored_masternodes);
     let mut i = 0u32;
     sorted_scored_masternodes

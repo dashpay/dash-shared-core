@@ -8,12 +8,11 @@ use crate::models::masternode_list::MasternodeList;
 use crate::models::masternode_entry::MasternodeEntry;
 use crate::models::snapshot::LLMQSnapshot;
 use crate::processing::MasternodeProcessorCache;
-use crate::processing::processing_error::ProcessingError;
 
 #[ferment_macro::opaque]
 pub trait CoreProvider: std::fmt::Debug {
     fn chain_type(&self) -> ChainType;
-    fn find_masternode_list(&self, block_hash: [u8; 32], cache: &Arc<MasternodeProcessorCache>) -> Result<MasternodeList, CoreProviderError> {
+    fn find_masternode_list(&self, block_hash: [u8; 32], cache: &Arc<MasternodeProcessorCache>) -> Result<Arc<MasternodeList>, CoreProviderError> {
         let genesis_hash = self.chain_type().genesis_hash();
         if block_hash.is_zero() {
             // If it's a zero block we don't expect models list here
@@ -23,7 +22,7 @@ pub trait CoreProvider: std::fmt::Debug {
         if block_hash.eq(&genesis_hash) {
             // If it's a genesis block we don't expect models list here
             // println!("find {}: {} It's a genesis -> Ok(EMPTY MNL)", self.lookup_block_height_by_hash(block_hash), block_hash);
-            return Ok(MasternodeList::empty(block_hash, self.lookup_block_height_by_hash(block_hash), false))
+            return Ok(Arc::new(MasternodeList::empty(block_hash, self.lookup_block_height_by_hash(block_hash), false)))
         }
         let mn_lists_lock = cache.mn_lists.read().unwrap();
         let maybe_cached_list = mn_lists_lock.get(&block_hash).cloned();
@@ -90,18 +89,21 @@ pub trait CoreProvider: std::fmt::Debug {
     fn lookup_block_height_by_hash(&self, block_hash: [u8; 32]) -> u32;
     fn lookup_block_by_height_or_last_terminal(&self, block_height: u32) -> Result<Block, CoreProviderError>;
     fn add_insight(&self, block_hash: [u8; 32]);
-    fn should_process_diff_with_range(&self, base_block_hash: [u8; 32], block_hash: [u8; 32]) -> Result<u8, ProcessingError>;
-    fn persist_in_retrieval_queue(&self, block_hash: [u8; 32]) -> bool;
+    // fn should_process_diff_with_range(&self, is_dip24: bool, base_block_hash: [u8; 32], block_hash: [u8; 32]) -> Result<u8, ProcessingError>;
+    fn remove_request_in_retrieval(&self, is_dip24: bool, base_block_hash: [u8; 32], block_hash: [u8; 32]) -> bool;
+    fn remove_from_retrieval_queue(&self, is_dip24: bool, block_hash: [u8; 32]);
+    fn first_in_retrieval_queue(&self, is_dip24: bool) -> Option<[u8; 32]>;
 
-    fn load_masternode_list_from_db(&self, block_hash: [u8; 32]) -> Result<MasternodeList, CoreProviderError>;
-    fn save_masternode_list_into_db(&self, masternode_list: MasternodeList, modified_masternodes: BTreeMap<[u8; 32], MasternodeEntry>) -> Result<bool, CoreProviderError>;
+    fn persist_in_retrieval_queue(&self, block_hash: [u8; 32], is_dip24: bool) -> bool;
+    fn load_masternode_list_from_db(&self, block_hash: [u8; 32]) -> Result<Arc<MasternodeList>, CoreProviderError>;
+    fn save_masternode_list_into_db(&self, masternode_list: Arc<MasternodeList>, modified_masternodes: BTreeMap<[u8; 32], MasternodeEntry>) -> Result<bool, CoreProviderError>;
     fn load_llmq_snapshot_from_db(&self, block_hash: [u8; 32]) -> Result<LLMQSnapshot, CoreProviderError>;
     fn save_llmq_snapshot_into_db(&self, block_hash: [u8; 32], masternode_list: LLMQSnapshot) -> Result<bool, CoreProviderError>;
     fn update_address_usage_of_masternodes(&self, masternodes: Vec<MasternodeEntry>);
+    fn issue_with_masternode_list_from_peer(&self, is_dip24: bool, peer: *const std::os::raw::c_void);
     // fn masternode_list_updated(&self, list: MasternodeList);
 
-    fn first_in_mn_diff_queue(&self) -> Option<[u8; 32]>;
-    fn first_in_qr_info_queue(&self) -> Option<[u8; 32]>;
+    // fn first_in_qr_info_queue(&self) -> Option<[u8; 32]>;
     // fn save_snapshot(&self, block_hash: UInt256, snapshot: LLMQSnapshot) -> bool;
     // fn save_masternode_list(&self, block_hash: UInt256, masternode_list: &MasternodeList) -> bool;
 }

@@ -30,7 +30,7 @@ impl Validator<Option<Identity>> for IdentityMonitorValidator {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::opaque]
 pub struct IdentitiesManager {
     pub sdk: Arc<Sdk>,

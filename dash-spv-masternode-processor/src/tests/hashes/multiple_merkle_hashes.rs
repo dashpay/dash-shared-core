@@ -2,15 +2,15 @@ use std::collections::HashSet;
 use byte::{BytesExt, LE};
 use hashes::hex::{FromHex, ToHex};
 use secp256k1::rand::{Rng, thread_rng};
-use crate::chain::ScriptMap;
+
 use crate::common::merkle_tree::MerkleTree;
-use crate::consensus::encode::VarInt;
-use crate::crypto::byte_util::{AsBytes, UInt256};
-use crate::crypto::data_ops::Data;
-use crate::util::address::address;
-use crate::util::base58;
-use crate::util::data_append::DataAppend;
-use crate::util::script::ScriptElement;
+use dash_spv_crypto::consensus::encode::VarInt;
+use dash_spv_crypto::crypto::byte_util::{AsBytes, UInt256};
+use dash_spv_crypto::crypto::data_ops::Data;
+use dash_spv_crypto::util::address::address;
+use dash_spv_crypto::util::data_append::DataAppend;
+use dash_spv_crypto::util::script::ScriptElement;
+use dash_spv_crypto::util::{base58, ScriptMap};
 
 #[test]
 fn test_multiple_merkle_hashes() {
@@ -18,21 +18,21 @@ fn test_multiple_merkle_hashes() {
     let merkle_flags = Vec::from_hex("07").unwrap();
     let desired_merkle_root =
         UInt256::from_hex("bd6a344573ba1d6faf24f021324fa3360562404536246503c4cba372f94bfa4a")
-            .unwrap();
+            .unwrap().0;
     let tree_element_count = 4;
-    let flags = merkle_flags.as_slice();
-    let mut hashes = Vec::<UInt256>::new();
+    // let flags = merkle_flags.as_slice();
+    let mut hashes = Vec::<[u8; 32]>::new();
     let hashes_count = merkle_hashes.len() / 32;
     for i in 0..hashes_count {
         let mut off = i * 32;
-        if let Ok(hash) = merkle_hashes.read_with(&mut off, LE) {
-            hashes.push(hash);
+        if let Ok(hash) = merkle_hashes.read_with::<UInt256>(&mut off, LE) {
+            hashes.push(hash.0);
         }
     }
     let merkle_tree = MerkleTree {
         tree_element_count,
         hashes: hashes.clone(),
-        flags,
+        flags: merkle_flags.clone(),
     };
     let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
     println!(

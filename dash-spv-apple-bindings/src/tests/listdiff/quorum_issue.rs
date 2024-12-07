@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::tests::FFIContext;
 use crate::tests::common::load_masternode_lists_for_files;
@@ -38,13 +38,13 @@ fn test_quorum_issue() {
         "MNL_1098960_1098984.dat".to_string(),
         "MNL_1098984_1099008.dat".to_string(),
     ];
-    let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
-    let ctx = context.read().unwrap();
-    let success = load_masternode_lists_for_files(files, false, Arc::clone(&context), chain);
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
+    // let ctx = context.read().unwrap();
+    let success = load_masternode_lists_for_files(files, false, Arc::clone(&context), true, chain);
     assert!(success, "Unsuccessful");
-    let ctx = context.read().unwrap();
-    let cache_lock = ctx.cache.read().unwrap();
-    cache_lock.mn_lists.iter().for_each(|(hash, node)| {
-        println!("Testing quorum of models list at height {}", ctx.block_for_hash(*hash).unwrap().height);
-    });
+    // let ctx = context.read().unwrap();
+    // let cache_lock = ctx.cache.read().unwrap();
+    // cache_lock.mn_lists.iter().for_each(|(hash, node)| {
+    //     println!("Testing quorum of models list at height {}", ctx.block_for_hash(*hash).unwrap().height);
+    // });
 }

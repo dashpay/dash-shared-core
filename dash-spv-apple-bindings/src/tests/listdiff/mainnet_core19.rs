@@ -1,4 +1,5 @@
 use dash_spv_crypto::network::ChainType;
+use dash_spv_masternode_processor::block_store::init_mainnet_store;
 use crate::tests::common::assert_diff_chain;
 
 #[test]
@@ -37,7 +38,7 @@ fn test_verify_chained_rotation_1() {
         &[
             "QRINFO_0_1871755__70227.dat"
         ],
-        None);
+        Some(init_mainnet_store()), false);
 }
 
 #[test]
@@ -80,5 +81,5 @@ fn test_verify_chained_rotation_2() {
             "MNL_1872030_1872031__70227.dat",
         ],
     &["QRINFO_0_1872425__70227.dat"],
-        None);
+        Some(init_mainnet_store()), false);
 }

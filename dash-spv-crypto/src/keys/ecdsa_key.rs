@@ -14,7 +14,7 @@ use crate::crypto::byte_util::{AsBytes, clone_into_array, ECPoint, UInt160, UInt
 use crate::keys::{KeyKind, KeyError, IKey, DeriveKey, OpaqueKey};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::dip14::{secp256k1_point_from_bytes, IChildKeyDerivation};
-use crate::keys::key::{IndexPathU256, IndexPathU32};
+use crate::keys::key::IndexPathU256;
 use crate::util::address::address;
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
@@ -368,7 +368,7 @@ impl ECDSAKey {
         hash160::Hash::hash(&self.public_key_data()).into_inner()
     }
 
-    pub fn public_key_from_extended_public_key_data_at_u32_path(&self, index_path: IndexPathU32) -> Result<Self, KeyError> {
+    pub fn public_key_from_extended_public_key_data_at_u32_path(&self, index_path: Vec<u32>) -> Result<Self, KeyError> {
         let index_path = IndexPath::from(index_path);
         self.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, &index_path))
@@ -376,6 +376,11 @@ impl ECDSAKey {
     }
     pub fn serialized_extended_private_key_from_seed_at_u256_path(seed: &[u8], index_path: IndexPathU256, chain_type: ChainType) -> Result<String, KeyError> {
         Self::serialized_extended_private_key_from_seed(seed, IndexPath::from(index_path), chain_type)
+    }
+    pub fn serialized_private_master_key_from_seed(seed: &[u8], chain_type: ChainType) -> String {
+        let i = UInt512::bip32_seed_key(seed);
+        bip32::Key::new(0, 0, [0; 32], UInt256::from(&i.0[32..]).0, i.0[..32].to_vec(), false)
+            .serialize(chain_type)
     }
 
     pub fn public_key_unique_id_from_derived_key_data(derived_key_data: &[u8], chain_type: ChainType) -> u64 {
@@ -631,11 +636,6 @@ impl ECDSAKey {
         base58::check_encode_slice(&writer)
     }
 
-    pub fn serialized_private_master_key_from_seed(seed: &[u8], chain_type: ChainType) -> String {
-        let i = UInt512::bip32_seed_key(seed);
-        bip32::Key::new(0, 0, [0; 32], UInt256::from(&i.0[32..]).0, i.0[..32].to_vec(), false)
-            .serialize(chain_type)
-    }
 
     pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Result<Vec<u8>, KeyError>
         where PATH: IIndexPath<Item = u32> {

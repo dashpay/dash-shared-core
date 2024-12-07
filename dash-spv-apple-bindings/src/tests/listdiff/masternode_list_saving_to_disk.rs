@@ -7,5 +7,5 @@ fn test_mnl_saving_to_disk() {
         dash_spv_crypto::network::ChainType::TestNet,
         &["ML_at_122088__70221.dat"],
         &[],
-        None);
+        None, false);
 }

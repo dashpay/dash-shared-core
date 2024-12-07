@@ -1,6 +1,8 @@
-use std::sync::{Arc, RwLock};
+use std::ptr::null;
+use std::sync::Arc;
+use hashes::hex::ToHex;
 use dash_spv_crypto::network::ChainType;
-use dash_spv_crypto::crypto::byte_util::{Reversable, UInt256};
+use dash_spv_crypto::crypto::byte_util::{Reversed, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_crypto::util::data_ops::merkle_root_from_hashes;
 use dash_spv_masternode_processor::test_helpers::load_message;
@@ -344,50 +346,39 @@ fn init_hashes() -> Vec<UInt256> {
 #[test]
 fn testnet_test_retrieve_saved_hashes() {
     let chain = ChainType::TestNet;
-    let context = Arc::new(RwLock::new(FFIContext::create_default_context_and_cache(chain, false)));
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
     let bytes_122064 = load_message(chain.identifier(), "MNL_0_122064.dat");
     let bytes_122088 = load_message(chain.identifier(), "MNL_122064_122088.dat");
-    let processor = FFICoreProvider::default_processor(&context, chain);
+    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain);
 
 
-    let result_122064 = {
-        let mut ctx = context.write().unwrap();
-        let result = processor.mn_list_diff_result_from_message(&bytes_122064, true, 70221, &mut ctx.cache)
+    let (block_hash_122064, _) = processor.mn_list_diff_result_from_message(&bytes_122064, true, 70221, false, null())
             .expect("Result must be valid");
-        drop(ctx);
-        result
-    };
-    assert!(result_122064.is_valid(), "Result must be valid");
+    // assert!(result_122064.is_valid(), "Result must be valid");
 
-    let result_122088 = {
-        let mut ctx = context.write().unwrap();
-        let result = processor.mn_list_diff_result_from_message(&bytes_122088, true, 70221, &mut ctx.cache)
+    let (block_hash_122088, _) = processor.mn_list_diff_result_from_message(&bytes_122088, true, 70221, false, null())
             .expect("Result must be valid");
-        drop(ctx);
-        result
-    };
-    assert!(result_122088.is_valid(), "Result must be valid");
+    // assert!(result_122088.is_valid(), "Result must be valid");
 
-    let block_hash_122064 = result_122064.block_hash;
-    let block_hash_122088 = result_122088.block_hash;
-    let list_122064 = &result_122064.masternode_list;
-    let list_122088 = &result_122088.masternode_list;
-    let ctx = context.read().unwrap();
-    let cache_lock = ctx.cache.read().unwrap();
-    let reloaded_list_122064 = cache_lock.mn_lists.get(&block_hash_122064).unwrap();
-    let reloaded_list_122088 = cache_lock.mn_lists.get(&block_hash_122088).unwrap();
+    let list_122064 = processor.cache.masternode_list_by_block_hash(block_hash_122064).expect("MasternodeList");
+    let list_122088 = processor.cache.masternode_list_by_block_hash(block_hash_122088).expect("MasternodeList");
+    // let list_122088 = &result_122088.masternode_list;
+    // let ctx = context.read().unwrap();
+    // let cache_lock = ctx.cache.read().unwrap();
+    let reloaded_list_122064 = processor.masternode_list_for_block_hash(block_hash_122064).expect("MasternodeList");
+    let reloaded_list_122088 = processor.masternode_list_for_block_hash(block_hash_122088).expect("MasternodeList");
 
-    let entry_hash = UInt256::from_hex("1bde434d4f68064d3108a09443ea45b4a6c6ac1f537a533efc36878cef2eb10f").unwrap().reverse();
+    let entry_hash = UInt256::from_hex("1bde434d4f68064d3108a09443ea45b4a6c6ac1f537a533efc36878cef2eb10f").unwrap().reversed().0;
     let entry_122064 = list_122064.masternodes.get(&entry_hash).unwrap();
     let entry_122088 = list_122088.masternodes.get(&entry_hash).unwrap();
     assert_ne!(entry_122064, entry_122088, "These should NOT be the same object (unless we changed how this worked)");
 
     assert_eq!(
         Vec::from_iter(entry_122088.previous_entry_hashes.values().cloned()),
-        vec![UInt256::from_hex("14d8f2de996a2515815abeb8f111a3ffe8582443ce7a43a8399c1a1c86c65543").unwrap()], "This is what it used to be");
+        vec![UInt256::from_hex("14d8f2de996a2515815abeb8f111a3ffe8582443ce7a43a8399c1a1c86c65543").unwrap().0], "This is what it used to be");
 
-    assert_eq!(entry_122064.entry_hash, UInt256::from_hex("14d8f2de996a2515815abeb8f111a3ffe8582443ce7a43a8399c1a1c86c65543").unwrap(), "The hash of the sme should be this");
-    assert_eq!(entry_122088.entry_hash, UInt256::from_hex("e001033590361b172da9cb352f9736dbe9453c6a389068f7b76d71f9f3044d3b").unwrap(), "The hash changed to this");
+    assert_eq!(entry_122064.entry_hash, UInt256::from_hex("14d8f2de996a2515815abeb8f111a3ffe8582443ce7a43a8399c1a1c86c65543").unwrap().0, "The hash of the sme should be this");
+    assert_eq!(entry_122088.entry_hash, UInt256::from_hex("e001033590361b172da9cb352f9736dbe9453c6a389068f7b76d71f9f3044d3b").unwrap().0, "The hash changed to this");
 
     let local_hashes_122088 = list_122088.sorted_reversed_pro_reg_tx_hashes();
     let hashes_122088 = reloaded_list_122088.sorted_reversed_pro_reg_tx_hashes();
@@ -397,9 +388,9 @@ fn testnet_test_retrieve_saved_hashes() {
     let hashes_122064 = reloaded_list_122064.sorted_reversed_pro_reg_tx_hashes();
     assert_eq!(local_hashes_122064, hashes_122064, "Hashes for 122064 must be equal");
 
-    let mut entry_hashes = local_hashes_122064.iter().map(|hash| reloaded_list_122064.masternodes.get(hash).unwrap().entry_hash).collect::<Vec<UInt256>>();
+    let mut entry_hashes = local_hashes_122064.into_iter().map(|hash| reloaded_list_122064.masternodes.get(hash).unwrap().entry_hash).collect::<Vec<[u8; 32]>>();
     entry_hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
-    let mut reloaded_entry_hashes = hashes_122064.iter().map(|hash| reloaded_list_122064.masternodes.get(hash).unwrap().entry_hash).collect::<Vec<UInt256>>();
+    let mut reloaded_entry_hashes = hashes_122064.into_iter().map(|hash| reloaded_list_122064.masternodes.get(hash).unwrap().entry_hash).collect::<Vec<[u8; 32]>>();
     reloaded_entry_hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
 
     assert_eq!(reloaded_entry_hashes, entry_hashes, "Entry hashes must be equal");
@@ -409,11 +400,11 @@ fn testnet_test_retrieve_saved_hashes() {
     let hashes_from_122064 = list_122064.hashes_for_merkle_root(reloaded_list_122088.known_height).unwrap();
     println!("------ INITIALIZED ------");
     hashes_from_122064.iter().for_each(|h| {
-        println!("{}", h);
+        println!("{}", h.to_hex());
     });
     println!("------ RELOADED ------");
     reloaded_hashes_from_122064.iter().for_each(|h| {
-        println!("{}", h);
+        println!("{}", h.to_hex());
     });
     println!("------ ------- ------");
 
@@ -424,10 +415,10 @@ fn testnet_test_retrieve_saved_hashes() {
     let reloaded_merkle_root_122064 = merkle_root_from_hashes(reloaded_list_122064.hashes_for_merkle_root(reloaded_list_122064.known_height).unwrap());
     let merkle_root_122064 = merkle_root_from_hashes(list_122064.hashes_for_merkle_root(list_122064.known_height).unwrap());
 
-    let merkle_root_x = merkle_root_from_hashes(list_122064.hashes_for_merkle_root(list_122088.known_height).unwrap());
+    let merkle_root_x = merkle_root_from_hashes(list_122064.hashes_for_merkle_root(list_122088.known_height).unwrap()).expect("Merkle Root");
 
     assert_eq!(reloaded_merkle_root_122088, merkle_root_122088, "Merkle root for 122088 must be equal");
     assert_eq!(reloaded_merkle_root_122064, merkle_root_122064, "Merkle root for 122064 must be equal");
-    assert_eq!(merkle_root_x.unwrap(), UInt256::from_hex("86cfe9b759dfd012f8d00e980c560c5c1d9c487bfa8b59305e14c7fc60ef1150").unwrap(), "")
+    assert_eq!(merkle_root_x, UInt256::from_hex("86cfe9b759dfd012f8d00e980c560c5c1d9c487bfa8b59305e14c7fc60ef1150").unwrap().0, "")
 
 }

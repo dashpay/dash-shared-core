@@ -1,4 +1,4 @@
-use crate::crypto::UInt256;
+use dash_spv_crypto::crypto::UInt256;
 
 #[test]
 pub fn test_superior_and_equal_uint256() {

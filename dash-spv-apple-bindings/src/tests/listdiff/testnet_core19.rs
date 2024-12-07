@@ -8,7 +8,7 @@ fn test_core19rc10() {
         ChainType::TestNet,
         &["MNT530000.dat", "MNL_530000_867700__70227.dat"],
         &[],
-        None);
+        None, false);
 }
 
 // #[test]
@@ -17,7 +17,7 @@ fn test_core19_70227() {
         ChainType::TestNet,
         &["MNT530000.dat", "MNL_530000_868321__70227.dat"],
         &[],
-        None);
+        None, false);
 }
 
 // #[test]
@@ -67,7 +67,7 @@ fn test_mnlistdiff_and_qrinfo_core19() {
         &[
             "QRINFO_0_870235__70227.dat"
         ],
-        None);
+        None, false);
 }
 
 #[test]
@@ -76,5 +76,5 @@ fn test_core19_2() {
         ChainType::TestNet,
         &["MNL_0_530000__70228.dat", "MNL_530000_852596__70228.dat"],
         &[],
-        None);
+        None, false);
 }

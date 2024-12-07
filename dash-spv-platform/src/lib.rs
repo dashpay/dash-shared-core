@@ -22,6 +22,7 @@ use dash_sdk::platform::FetchUnproved;
 // use dash_sdk::platform::transition::put_document::PutDocument;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::{AddressList, Uri};
+use dash_spv_masternode_processor::processing::MasternodeProcessor;
 use dpp::data_contract::DataContract;
 use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0};
@@ -85,15 +86,16 @@ fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Uri>>(provide
         .unwrap()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::opaque]
 pub struct PlatformSDK {
-    pub runtime: *mut Runtime,
-    pub sdk: *const Sdk,
+    pub runtime: Arc<Runtime>,
+    pub sdk: Arc<Sdk>,
     pub callback_signer: CallbackSigner,
     pub identity_manager: IdentitiesManager,
     pub contract_manager: ContractsManager,
     pub doc_manager: DocumentsManager,
+    pub processor: Arc<MasternodeProcessor>,
 }
 #[macro_export]
 macro_rules! query_contract_docs {
@@ -107,11 +109,11 @@ macro_rules! query_contract_docs {
     }};
 }
 
-impl PlatformSDK {
-    pub fn sdk_ref(&self) -> &Sdk {
-        unsafe { &*self.sdk }
-    }
-}
+// impl PlatformSDK {
+//     pub fn sdk_ref(&self) -> &Sdk {
+//         unsafe { &*self.sdk }
+//     }
+// }
 #[ferment_macro::export]
 impl PlatformSDK {
     pub fn new<
@@ -127,6 +129,7 @@ impl PlatformSDK {
         callback_signer: CS,
         callback_can_sign: CCS,
         address_list: Option<Vec<&'static str>>,
+        processor: Arc<MasternodeProcessor>,
         context: *const std::os::raw::c_void,
     ) -> Self {
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
@@ -141,9 +144,10 @@ impl PlatformSDK {
             identity_manager: IdentitiesManager::new(&sdk_arc),
             contract_manager: ContractsManager::new(&sdk_arc),
             doc_manager: DocumentsManager::new(&sdk_arc),
-            runtime: ferment::boxed(Runtime::new().unwrap()),
+            runtime: Arc::new(Runtime::new().unwrap()),
             callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc),
-            sdk: Arc::into_raw(sdk_arc)
+            processor,
+            sdk: sdk_arc
         }
     }
 
@@ -152,7 +156,7 @@ impl PlatformSDK {
             .map_err(|e| Error::DashSDKError(e.to_string()))
             .map(Address::from)
             .map(EvoNode::new)?;
-        EvoNodeStatus::fetch_unproved(self.sdk_ref(), evo_node)
+        EvoNodeStatus::fetch_unproved(&self.sdk, evo_node)
             .await
             .map_err(Error::from)
             .map(|status| status.is_some())

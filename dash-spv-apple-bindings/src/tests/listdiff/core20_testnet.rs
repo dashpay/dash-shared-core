@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use dash_spv_crypto::network::ChainType;
+use dash_spv_masternode_processor::block_store::init_testnet_store;
 #[cfg(feature = "serde")]
 use dash_spv_masternode_processor::test_helpers::load_message;
 use crate::tests::common::assert_diff_chain;
@@ -11,7 +12,8 @@ pub fn test_core20_rc1_testnet() {
         ChainType::TestNet,
         &["MNL_0_530000__70228.dat", "MNL_530000_904382__70230.dat"],
         &["QRINFO_x3_y3__70230.dat"],
-        None);
+        Some(init_testnet_store()),
+        false);
 }
 
 #[test]
@@ -20,7 +22,8 @@ pub fn test_core20_activated_testnet() {
         ChainType::TestNet,
         &["MNL_0_530000__70228.dat", "MNL_530000_905465__70230.dat"],
         &["QRINFO_LAST__70230.dat"],
-        None);
+        Some(init_testnet_store()),
+        false);
 }
 
 #[cfg(feature = "serde")]
@@ -196,7 +199,8 @@ pub fn test_core20_rc2_testnet() {
             "MNL_905524_905525__70230.dat",
         ],
         &["QRINFO_x3_y3__70230.dat"],
-        None);
+        Some(init_testnet_store()),
+        false);
 }
 
 #[test]
@@ -205,7 +209,8 @@ pub fn test_core20_activated_testnet2() {
         ChainType::TestNet,
         &["MNL_0_530000__70228.dat", "MNL_530000_905465__70230.dat"],
         &["QRINFO_LAST_X__70230.dat"],
-        None);
+        Some(init_testnet_store()),
+        false);
 }
 
 #[test]
@@ -225,5 +230,6 @@ pub fn core20_quorum_signatures() {
         // "MNL_907272_907296__70230.dat",
     ],
     &[/*"QRINFO_0_907770__70230.dat"*/],
-        None);
+        Some(init_testnet_store()),
+        false);
 }

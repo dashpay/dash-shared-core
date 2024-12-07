@@ -300,7 +300,7 @@ pub fn validate_payload(entry: &LLMQEntry) -> LLMQPayloadValidationStatus {
 }
 
 
-pub fn valid_masternodes(entry: &LLMQEntry, chain_type: ChainType, masternodes: BTreeMap<[u8; 32], MasternodeEntry>, block_height: u32, llmq_modifier: LLMQModifierType) -> Vec<MasternodeEntry> {
+pub fn valid_masternodes(entry: &LLMQEntry, chain_type: ChainType, masternodes: &BTreeMap<[u8; 32], MasternodeEntry>, block_height: u32, llmq_modifier: LLMQModifierType) -> Vec<MasternodeEntry> {
     let llmq_type = entry.llmq_type;
     let hpmn_only = llmq_type == chain_type.platform_type() && !entry.version.use_bls_legacy();
     let quorum_modifier = llmq_modifier.build_llmq_hash();

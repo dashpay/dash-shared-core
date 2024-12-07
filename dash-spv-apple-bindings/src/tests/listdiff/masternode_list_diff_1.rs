@@ -209,5 +209,6 @@ fn test_masternode_list_diff1() {
         1,
         verify_string_hashes,
         verify_string_smle_hashes,
+        false
     );
 }

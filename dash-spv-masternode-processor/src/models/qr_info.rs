@@ -23,12 +23,12 @@ pub struct QRInfo {
 }
 
 
-pub type ReadContext<'a> = (&'a mut MasternodeProcessor, bool, u32, bool);
+pub type ReadContext<'a> = (&'a MasternodeProcessor, bool, u32, bool, *const std::os::raw::c_void);
 
 impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
     fn try_read(bytes: &'a [u8], ctx: ReadContext<'a>) -> byte::Result<(Self, usize)> {
         let mut offset = 0;
-        let (processor, is_from_snapshot, protocol_version, is_rotated_quorums_presented ) = ctx;
+        let (processor, is_from_snapshot, protocol_version, is_rotated_quorums_presented, peer ) = ctx;
         let block_height_lookup = |block_hash|
             processor.provider.lookup_block_height_by_hash(block_hash);
         let read_list_diff = |offset: &mut usize|
@@ -43,7 +43,7 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
         let snapshot_h_3c = read_snapshot(&mut offset)?;
         let diff_tip = read_list_diff(&mut offset)?;
         if !is_from_snapshot {
-            processor.provider.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash)
+            processor.should_process_diff_with_range(true, diff_tip.base_block_hash, diff_tip.block_hash, peer)
                 .map_err(|er| byte::Error::BadInput { err: "Should not process this diff" })?;
                 // .map_err(ProcessingError::from)?;
         }
@@ -87,8 +87,8 @@ impl<'a> TryRead<'a, ReadContext<'a>> for QRInfo {
         let mut active_quorums_lock = processor.cache.active_quorums.write().unwrap();
         for _i in 0..last_quorum_per_index_count {
             let q = bytes.read_with::<LLMQEntry>(&mut offset, byte::LE)?;
-            active_quorums_lock.insert(q);
-            last_quorum_per_index.push(bytes.read_with::<LLMQEntry>(&mut offset, byte::LE)?);
+            active_quorums_lock.insert(q.clone());
+            last_quorum_per_index.push(q);
         }
         drop(active_quorums_lock);
         let quorum_snapshot_list_count = read_var_int(&mut offset)?.0 as usize;

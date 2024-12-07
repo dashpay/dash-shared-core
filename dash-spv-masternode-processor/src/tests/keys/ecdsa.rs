@@ -17,7 +17,7 @@ fn test_sign_key(secret: &str, message: &str, compressed: bool, test_signature: 
             let sig = key.sign(&message_digest);
             let test_sig = Vec::from_hex(test_signature).unwrap();
             assert_eq!(sig, test_sig, "Signature don't match");
-            assert!(key.verify(&message_digest, &sig), "Can't verify signature");
+            assert!(key.verify(&message_digest, &sig).is_ok(), "Can't verify signature");
         },
         Err(err) => panic!("key_with_secret_hex: {}", err),
     }
@@ -44,7 +44,7 @@ fn test_compact_signature_key(secret: &str, message: &str, compressed: bool) {
 fn test_restore_compact_signatures_from_base58(signature: &str, message: &str, test_key: &str) {
     match (base58::from(signature),
            base58::from(test_key)) {
-        (Ok(sig), Ok(data)) => test_compact_signature_recovery(&sig, UInt256::sha256d_str(message), data),
+        (Ok(sig), Ok(data)) => test_compact_signature_recovery(&sig, UInt256::sha256d_str(message).0, data),
         _ => panic!("Bad base58")
     }
 }

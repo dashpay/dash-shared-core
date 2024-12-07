@@ -65,14 +65,9 @@ impl MasternodeList {
             llmq_merkle_root: None,
             masternodes,
         };
-        if let Some(hashes) = list.hashes_for_merkle_root(block_height) {
-            //println!("MasternodeList: {}:{}: hashes_for_merkle_root: {:#?} masternodes: {:#?}", block_height, block_hash, hashes, list.masternodes);
-            list.masternode_merkle_root = merkle_root_from_hashes(hashes);
-        }
+        list.masternode_merkle_root = list.calculate_masternodes_merkle_root(block_height);
         if quorums_active {
-            let hashes = list.hashes_for_quorum_merkle_root();
-            //println!("MasternodeList: {}:{}: hashes_for_quorum_merkle_root: {:#?} quorums: {:#?}", block_height, block_hash, hashes, list.quorums);
-            list.llmq_merkle_root = merkle_root_from_hashes(hashes);
+            list.llmq_merkle_root = list.calculate_llmq_merkle_root();
         }
         list
     }
@@ -204,6 +199,24 @@ impl MasternodeList {
 }
 #[ferment_macro::export]
 impl MasternodeList {
+
+    pub fn calculate_masternodes_merkle_root(&self, block_height: u32) -> Option<[u8; 32]> {
+        self.hashes_for_merkle_root(block_height).and_then(merkle_root_from_hashes)
+    }
+    pub fn calculate_llmq_merkle_root(&self) -> Option<[u8; 32]> {
+        merkle_root_from_hashes(self.hashes_for_quorum_merkle_root())
+    }
+
+    pub fn reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
+        self.masternodes.keys().cloned().collect()
+    }
+
+    pub fn sorted_reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
+        let mut hashes = self.reversed_pro_reg_tx_hashes_cloned();
+        hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
+        hashes
+    }
+
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<[u8; 32]>> {
         (block_height != u32::MAX).then_some({
             let mut pro_tx_hashes = self.reversed_pro_reg_tx_hashes();
@@ -389,12 +402,13 @@ pub fn from_entry_pool(
 }
 
 pub fn score_masternodes_map(
-    masternodes: BTreeMap<[u8; 32], MasternodeEntry>,
+    masternodes: &BTreeMap<[u8; 32], MasternodeEntry>,
     quorum_modifier: [u8; 32],
     block_height: u32,
     hpmn_only: bool,
 ) -> BTreeMap<[u8; 32], MasternodeEntry> {
     masternodes
+        .clone()
         .into_iter()
         .filter_map(|(_, entry)|
             if !hpmn_only || entry.mn_type == crate::common::MasternodeType::HighPerformance {

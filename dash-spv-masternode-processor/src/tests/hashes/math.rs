@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use hashes::hex::FromHex;
-use crate::crypto::byte_util::{Reversable, UInt256};
+use dash_spv_crypto::crypto::byte_util::{Reversed, UInt256};
 
 #[test]
 fn test_bytes_reverse_comparison() {

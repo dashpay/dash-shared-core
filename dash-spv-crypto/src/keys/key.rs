@@ -153,7 +153,7 @@ impl OpaqueKey {
         self.public_derive_to_path_with_offset(&IndexPath::from(path), offset)
     }
 
-    pub fn public_key_from_extended_public_key_data_at_index_path(&self, index_path: IndexPathU32) -> Result<Self, KeyError> {
+    pub fn public_key_from_extended_public_key_data_at_index_path(&self, index_path: Vec<u32>) -> Result<Self, KeyError> {
         let index_path = IndexPath::from(index_path);
         match self {
             OpaqueKey::ECDSA(key) =>
@@ -167,7 +167,7 @@ impl OpaqueKey {
                     .map(OpaqueKey::ED25519)
         }
     }
-    pub fn public_key_data_at_index_path(&self, index_path: IndexPathU32) -> Result<Vec<u8>, KeyError> {
+    pub fn public_key_data_at_index_path(&self, index_path: Vec<u32>) -> Result<Vec<u8>, KeyError> {
         let index_path = IndexPath::from(index_path);
         match self {
             OpaqueKey::ECDSA(key) =>
@@ -351,12 +351,12 @@ impl KeyKind {
 }
 
 /// TMP solution since ferment fails with expanding such a generic type
-#[ferment_macro::export]
-#[derive(Clone, Debug)]
-pub struct IndexPathU32 {
-    pub indexes: Vec<u32>,
-    pub hardened: Vec<bool>,
-}
+// #[ferment_macro::export]
+// #[derive(Clone, Debug)]
+// pub struct IndexPathU32 {
+//     pub indexes: Vec<u32>,
+//     pub hardened: Vec<bool>,
+// }
 #[ferment_macro::export]
 #[derive(Clone, Debug)]
 pub struct IndexPathU256 {
@@ -375,21 +375,21 @@ impl From<&IndexPathU256> for IndexPath<[u8; 32]> {
         IndexPath::from(value.clone())
     }
 }
-impl From<IndexPathU32> for IndexPath<u32> {
-    fn from(value: IndexPathU32) -> Self {
-        let IndexPathU32 { indexes, hardened } = value;
-        IndexPath::new_hardened(indexes, hardened)
+impl From<Vec<u32>> for IndexPath<u32> {
+    fn from(value: Vec<u32>) -> Self {
+        // let IndexPathU32 { indexes, hardened } = value;
+        IndexPath::new_hardened(value, vec![])
     }
 }
-impl From<&IndexPathU32> for IndexPath<u32> {
-    fn from(value: &IndexPathU32) -> Self {
+impl From<&Vec<u32>> for IndexPath<u32> {
+    fn from(value: &Vec<u32>) -> Self {
         IndexPath::from(value.clone())
     }
 }
 
 #[ferment_macro::export]
 impl KeyKind {
-    pub fn public_key_from_extended_public_key_data_at_index_path(&self, data: &[u8], index_path: &IndexPathU32) -> Result<Vec<u8>, KeyError> {
+    pub fn public_key_from_extended_public_key_data_at_index_path(&self, data: &[u8], index_path: &Vec<u32>) -> Result<Vec<u8>, KeyError> {
         let index_path = IndexPath::from(index_path);
         self.public_key_from_extended_public_key_data(data, &index_path)
     }
@@ -398,7 +398,7 @@ impl KeyKind {
         self.key_with_seed_data(data)
             .and_then(|seed_key| seed_key.private_derive_to_path(&index_path.base_index_path()))
     }
-    pub fn private_key_at_index_path_wrapped(&self, seed: &[u8], index_path: IndexPathU32, derivation_path: IndexPathU256) -> Result<OpaqueKey, KeyError> {
+    pub fn private_key_at_index_path_wrapped(&self, seed: &[u8], index_path: Vec<u32>, derivation_path: IndexPathU256) -> Result<OpaqueKey, KeyError> {
         self.derive_key_from_seed_wrapped(seed, derivation_path)
             .and_then(|key| key.private_derive_to_path(&IndexPath::from(index_path)))
     }
@@ -419,7 +419,7 @@ impl KeyKind {
     pub fn private_keys_at_index_paths_wrapped(
         &self,
         seed: &[u8],
-        index_paths: Vec<IndexPathU32>,
+        index_paths: Vec<Vec<u32>>,
         derivation_path: IndexPathU256
     ) -> Result<Vec<OpaqueKey>, KeyError> {
         self.derive_key_from_seed_wrapped(seed, derivation_path)
@@ -432,7 +432,7 @@ impl KeyKind {
     pub fn serialized_private_keys_at_index_paths_wrapper(
         &self,
         seed: &[u8],
-        index_paths: Vec<IndexPathU32>,
+        index_paths: Vec<Vec<u32>>,
         derivation_path: IndexPathU256,
         chain_type: ChainType,
     ) -> Result<Vec<String>, KeyError> {
@@ -511,7 +511,7 @@ impl KeyKind {
         }
     }
 
-    pub fn derive_key_from_extended_private_key_data_for_index_path(&self, data: &[u8], index_path: IndexPathU32) -> Result<OpaqueKey, KeyError> {
+    pub fn derive_key_from_extended_private_key_data_for_index_path(&self, data: &[u8], index_path: Vec<u32>) -> Result<OpaqueKey, KeyError> {
         let index_path = IndexPath::from(index_path);
         match self {
             KeyKind::ECDSA => ECDSAKey::key_with_extended_private_key_data(data)

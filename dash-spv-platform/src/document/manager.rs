@@ -15,7 +15,7 @@ use platform_version::version::PlatformVersion;
 use crate::error::Error;
 use crate::signer::CallbackSigner;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::opaque]
 pub struct DocumentsManager {
     pub sdk: Arc<Sdk>,

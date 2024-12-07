@@ -4,7 +4,7 @@ use dpp::data_contract::DataContract;
 use platform_value::Identifier;
 use crate::error::Error;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::opaque]
 pub struct ContractsManager {
     pub sdk: Arc<Sdk>,

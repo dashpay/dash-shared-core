@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::{Arc, RwLock};
+use hashes::hex::ToHex;
 use dash_spv_crypto::llmq::LLMQEntry;
 use dash_spv_crypto::network::LLMQType;
 use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
@@ -9,7 +10,6 @@ use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::Master
 pub struct MasternodeProcessorCache {
     pub llmq_members: Arc<RwLock<BTreeMap<LLMQType, BTreeMap<[u8; 32], Vec<MasternodeEntry>>>>>,
     pub llmq_indexed_members: Arc<RwLock<BTreeMap<LLMQType, BTreeMap<LLMQIndexedHash, Vec<MasternodeEntry>>>>>,
-    pub mn_lists: Arc<RwLock<BTreeMap<[u8; 32], MasternodeList>>>,
     pub mn_list_stubs: Arc<RwLock<HashSet<[u8; 32]>>>,
     pub llmq_snapshots: Arc<RwLock<BTreeMap<[u8; 32], LLMQSnapshot>>>,
     pub cl_signatures: Arc<RwLock<BTreeMap<[u8; 32], [u8; 96]>>>,
@@ -19,13 +19,15 @@ pub struct MasternodeProcessorCache {
     pub cached_block_hash_heights: Arc<RwLock<BTreeMap<[u8; 32], u32>>>,
     pub active_quorums: Arc<RwLock<HashSet<LLMQEntry>>>,
     pub last_queried_block_hash: Arc<RwLock<[u8; 32]>>,
-    pub last_qr_list_at_tip: Arc<RwLock<Option<MasternodeList>>>,
-    pub last_qr_list_at_h: Arc<RwLock<Option<MasternodeList>>>,
-    pub last_qr_list_at_h_c: Arc<RwLock<Option<MasternodeList>>>,
-    pub last_qr_list_at_h_2c: Arc<RwLock<Option<MasternodeList>>>,
-    pub last_qr_list_at_h_3c: Arc<RwLock<Option<MasternodeList>>>,
-    pub last_qr_list_at_h_4c: Arc<RwLock<Option<MasternodeList>>>,
-    pub last_mn_list: Arc<RwLock<Option<MasternodeList>>>,
+
+    pub mn_lists: Arc<RwLock<BTreeMap<[u8; 32], Arc<MasternodeList>>>>,
+    pub last_qr_list_at_tip: Arc<RwLock<Option<Arc<MasternodeList>>>>,
+    pub last_qr_list_at_h: Arc<RwLock<Option<Arc<MasternodeList>>>>,
+    pub last_qr_list_at_h_c: Arc<RwLock<Option<Arc<MasternodeList>>>>,
+    pub last_qr_list_at_h_2c: Arc<RwLock<Option<Arc<MasternodeList>>>>,
+    pub last_qr_list_at_h_3c: Arc<RwLock<Option<Arc<MasternodeList>>>>,
+    pub last_qr_list_at_h_4c: Arc<RwLock<Option<Arc<MasternodeList>>>>,
+    pub last_mn_list: Arc<RwLock<Option<Arc<MasternodeList>>>>,
 }
 
 impl std::fmt::Debug for MasternodeProcessorCache {
@@ -163,15 +165,19 @@ impl MasternodeProcessorCache {
 
     pub fn remove_from_awaiting_quorum_validation_list(&self, block_hash: [u8; 32]) {
         let mut lock = self.list_awaiting_quorum_validation.write().unwrap();
+        println!("[CACHE] remove_from_awaiting_quorum_validation_list: {}", block_hash.to_hex());
         lock.remove(&block_hash);
         // lock.retain(|h| h.eq(&block_hash));
     }
     pub fn has_in_awaiting_quorum_validation_list(&self, block_hash: [u8; 32]) -> bool {
         let lock = self.list_awaiting_quorum_validation.read().unwrap();
-        lock.contains(&block_hash)
+        let result = lock.contains(&block_hash);
+        println!("[CACHE] has_in_awaiting_quorum_validation_list: {} = {result}", block_hash.to_hex());
+        result
     }
     pub fn add_to_awaiting_quorum_validation_list(&self, hash: [u8; 32]) {
         let mut lock = self.list_awaiting_quorum_validation.write().unwrap();
+        println!("[CACHE] add_to_awaiting_quorum_validation_list: {}", hash.to_hex());
         lock.insert(hash);
     }
 
@@ -186,47 +192,64 @@ impl MasternodeProcessorCache {
 
     pub fn add_block_hash_for_list_needing_quorums_validated(&self, block_hash: [u8; 32]) {
         let mut lock = self.list_needing_quorum_validation.write().unwrap();
+        println!("[CACHE] add_block_hash_for_list_needing_quorums_validated: {}", block_hash.to_hex());
         lock.insert(block_hash);
     }
     pub fn remove_block_hash_for_list_needing_quorums_validated(&self, block_hash: [u8; 32]) {
         let mut lock = self.list_needing_quorum_validation.write().unwrap();
         // lock.retain(|h| block_hash.eq(&h));
+        println!("[CACHE] remove_block_hash_for_list_needing_quorums_validated: {}", block_hash.to_hex());
         lock.remove(&block_hash);
     }
 
     pub fn has_list_at_block_hash_needing_quorums_validated(&self, block_hash: [u8; 32]) -> bool {
         let lock = self.list_needing_quorum_validation.read().unwrap();
-        lock.contains(&block_hash)
+        let result = lock.contains(&block_hash);
+        println!("[CACHE] has_list_at_block_hash_needing_quorums_validated: {}", block_hash.to_hex());
+        result
     }
 
-    pub fn add_masternode_list(&mut self, block_hash: [u8; 32], list: MasternodeList) {
+    pub fn add_masternode_list(&self, block_hash: [u8; 32], list: Arc<MasternodeList>) {
         let mut lock = self.mn_lists.write().unwrap();
+        println!("[CACHE] add_masternode_list: {}", block_hash.to_hex());
         lock.insert(block_hash, list);
     }
 
-    pub fn masternode_list_by_block_hash(&self, block_hash: [u8; 32]) -> Option<MasternodeList> {
+    pub fn masternode_list_by_block_hash(&self, block_hash: [u8; 32]) -> Option<Arc<MasternodeList>> {
         let lock = self.mn_lists.read().unwrap();
+        let result = lock.get(&block_hash);
+        println!("[CACHE] masternode_list_by_block_hash: {}: {}", block_hash.to_hex(), result.as_ref().map(|b| b.block_hash.to_hex()).unwrap_or("None".to_string()));
         lock.get(&block_hash).cloned()
     }
     pub fn remove_masternode_list(&mut self, block_hash: [u8; 32]) {
         let mut lock = self.mn_lists.write().unwrap();
+        println!("[CACHE] remove_masternode_list: {}", block_hash.to_hex());
         lock.remove(&block_hash);
     }
     pub fn remove_masternode_lists_before_height(&mut self, height: u32) {
         let mut lock = self.mn_lists.write().unwrap();
+        println!("[CACHE] remove_masternode_lists_before_height: {}", height);
         lock.retain(|_, value| value.known_height >= height);
     }
 
     pub fn contains_block_hash_needing_masternode_list(&self, block_hash: [u8; 32]) -> bool {
         let lock = self.needed_masternode_lists.read().unwrap();
-        lock.iter().any(|h| block_hash.eq(h))
+        let result = lock.iter().any(|h| block_hash.eq(h));
+        println!("[CACHE] contains_block_hash_needing_masternode_list: {} = {result}", block_hash.to_hex());
+        result
     }
     pub fn has_block_hashes_needing_masternode_list(&self) -> bool {
         let lock = self.needed_masternode_lists.read().unwrap();
+        println!("[CACHE] has_block_hashes_needing_masternode_list: {}", lock.is_empty());
         !lock.is_empty()
     }
     pub fn all_needed_masternode_list(&self) -> HashSet<[u8; 32]> {
-        self.needed_masternode_lists.read().unwrap().clone()
+        let lock = self.needed_masternode_lists.read().unwrap();
+        println!("[CACHE] all_needed_masternode_list: {}", lock.iter().fold(String::new(), |mut acc, h| {
+            acc.push_str(format!("{}, ", h.to_hex()).as_str());
+            acc
+        }));
+        lock.clone()
     }
 
     pub fn clear_needed_masternode_lists(&mut self) {
@@ -234,9 +257,13 @@ impl MasternodeProcessorCache {
         lock.clear();
     }
 
-    pub fn recent_masternode_lists(&self) -> Vec<MasternodeList> {
+    pub fn recent_masternode_lists(&self) -> Vec<Arc<MasternodeList>> {
         let mut sorted = Vec::from_iter(self.mn_lists.read().unwrap().values().cloned());
         sorted.sort_by_key(|list| list.known_height);
+        println!("[CACHE] all_needed_masternode_list: {}", sorted.iter().fold(String::new(), |mut acc, h| {
+            acc.push_str(format!("{}, ", h.known_height).as_str());
+            acc
+        }));
         sorted
     }
 
@@ -245,6 +272,10 @@ impl MasternodeProcessorCache {
         let stubs = self.mn_list_stubs.read().unwrap();
         let mut set = HashSet::<[u8; 32]>::from_iter(lists.keys().cloned());
         set.extend(stubs.iter().cloned());
+        println!("[CACHE] all_needed_masternode_list: {}", set.iter().fold(String::new(), |mut acc, h| {
+            acc.push_str(format!("{}, ", h.to_hex()).as_str());
+            acc
+        }));
         set
     }
     pub fn known_masternode_lists_count(&self) -> usize {
@@ -252,47 +283,61 @@ impl MasternodeProcessorCache {
         let stubs = self.mn_list_stubs.read().unwrap();
         let mut set = HashSet::<&[u8; 32]>::from_iter(lists.keys());
         set.extend(stubs.iter());
+        println!("[CACHE] known_masternode_lists_count: {}", set.len());
         set.len()
     }
 
     pub fn stored_masternode_lists_count(&self) -> usize {
         let lists = self.mn_lists.read().unwrap();
+        println!("[CACHE] stored_masternode_lists_count: {}", lists.len());
         lists.len()
     }
 
     pub fn has_masternode_list_at(&self, block_hash: [u8; 32]) -> bool {
-        // let block_hash = UInt256(block_hash);
         let has_list = self.mn_lists.read().unwrap().contains_key(&block_hash);
         let has_stub = self.mn_list_stubs.read().unwrap().contains(&block_hash);
-        has_list || has_stub
+        let result = has_list || has_stub;
+        println!("[CACHE] has_masternode_list_at: {} {}", block_hash.to_hex(), result);
+        result
     }
 
-    pub fn masternode_list_loaded(&self, block_hash: [u8; 32], list: MasternodeList) -> usize {
+    pub fn masternode_list_loaded(&self, block_hash: [u8; 32], list: Arc<MasternodeList>) -> usize {
         let mut stubs_lock = self.mn_list_stubs.write().unwrap();
-        // let block_hash = UInt256(block_hash);
         stubs_lock.remove(&block_hash);
         let mut lists_lock = self.mn_lists.write().unwrap();
+        // if lists_lock.contains_key(&block_hash) {
+        //     println!("[CACHE] masternode_list at {} exist so -> merge", block_hash.to_hex());
+        //     list
+        // }
         lists_lock.insert(block_hash, list);
         let count = lists_lock.len();
+        println!("[CACHE] masternode_list_loaded: {} {}", block_hash.to_hex(), count);
         count
     }
     pub fn add_stub_for_masternode_list(&self, block_hash: [u8; 32]) {
         let mut lock = self.mn_list_stubs.write().unwrap();
+        println!("[CACHE] add_stub_for_masternode_list: {}", block_hash.to_hex());
         lock.insert(block_hash);
     }
 
     pub fn has_stub_for_masternode_list(&self, block_hash: [u8; 32]) -> bool {
-        // let block_hash = UInt256(block_hash);
-        self.mn_list_stubs.read().unwrap().contains(&block_hash)
+        let lock = self.mn_list_stubs.read().unwrap();
+        let result = lock.contains(&block_hash);
+        println!("[CACHE] has_stub_for_masternode_list: {} = {result}", block_hash.to_hex());
+        result
     }
 
     pub fn block_height_for_hash(&self, block_hash: [u8; 32]) -> Option<u32> {
-        self.cached_block_hash_heights.read().unwrap().get(&block_hash).cloned()
+        let lock = self.cached_block_hash_heights.read().unwrap();
+        let result = lock.get(&block_hash);
+
+        println!("[CACHE] block_height_for_hash: {} = {}", block_hash.to_hex(), result.map_or("Unknown".to_string(), |h| h.to_string()));
+        result.cloned()
     }
 
     pub fn cache_block_height_for_hash(&self, block_hash: [u8; 32], height: u32) {
-        // let block_hash = UInt256(block_hash);
         let mut lock = self.cached_block_hash_heights.write().unwrap();
+        println!("[CACHE] cache_block_height_for_hash: {} = {height}", block_hash.to_hex());
         lock.insert(block_hash, height);
     }
 
@@ -308,16 +353,19 @@ impl MasternodeProcessorCache {
     }
 
     pub fn get_last_queried_block_hash(&self) -> [u8; 32] {
-        self.last_queried_block_hash.read().unwrap().clone()
+        let lock = self.last_queried_block_hash.read().unwrap();
+        println!("[CACHE] get_last_queried_block_hash: {}", lock.to_hex());
+        lock.clone()
     }
     pub fn set_last_queried_block_hash(&self, block_hash: [u8; 32]) {
         let mut lock = self.last_queried_block_hash.write().unwrap();
+        println!("[CACHE] set_last_queried_block_hash: {}", block_hash.to_hex());
         *lock = block_hash;
     }
-    pub fn get_last_queried_qr_masternode_list_at_tip(&self) -> Option<MasternodeList> {
+    pub fn get_last_queried_qr_masternode_list_at_tip(&self) -> Option<Arc<MasternodeList>> {
         self.last_qr_list_at_tip.read().unwrap().clone()
     }
-    pub fn set_last_queried_qr_masternode_list_at_tip(&self, masternode_list: MasternodeList) {
+    pub fn set_last_queried_qr_masternode_list_at_tip(&self, masternode_list: Arc<MasternodeList>) {
         let mut lock = self.last_qr_list_at_tip.write().unwrap();
         *lock = Some(masternode_list);
     }
@@ -325,10 +373,10 @@ impl MasternodeProcessorCache {
         let mut lock = self.last_qr_list_at_tip.write().unwrap();
         *lock = None;
     }
-    pub fn get_last_queried_qr_masternode_list_at_h(&self) -> Option<MasternodeList> {
+    pub fn get_last_queried_qr_masternode_list_at_h(&self) -> Option<Arc<MasternodeList>> {
         self.last_qr_list_at_h.read().unwrap().clone()
     }
-    pub fn set_last_queried_qr_masternode_list_at_h(&self, masternode_list: MasternodeList) {
+    pub fn set_last_queried_qr_masternode_list_at_h(&self, masternode_list: Arc<MasternodeList>) {
         let mut lock = self.last_qr_list_at_h.write().unwrap();
         *lock = Some(masternode_list);
     }
@@ -336,10 +384,10 @@ impl MasternodeProcessorCache {
         let mut lock = self.last_qr_list_at_h.write().unwrap();
         *lock = None;
     }
-    pub fn get_last_queried_qr_masternode_list_at_h_c(&self) -> Option<MasternodeList> {
+    pub fn get_last_queried_qr_masternode_list_at_h_c(&self) -> Option<Arc<MasternodeList>> {
         self.last_qr_list_at_h_c.read().unwrap().clone()
     }
-    pub fn set_last_queried_qr_masternode_list_at_h_c(&self, masternode_list: MasternodeList) {
+    pub fn set_last_queried_qr_masternode_list_at_h_c(&self, masternode_list: Arc<MasternodeList>) {
         let mut lock = self.last_qr_list_at_h_c.write().unwrap();
         *lock = Some(masternode_list);
     }
@@ -347,10 +395,10 @@ impl MasternodeProcessorCache {
         let mut lock = self.last_qr_list_at_h_c.write().unwrap();
         *lock = None;
     }
-    pub fn get_last_queried_qr_masternode_list_at_h_2c(&self) -> Option<MasternodeList> {
+    pub fn get_last_queried_qr_masternode_list_at_h_2c(&self) -> Option<Arc<MasternodeList>> {
         self.last_qr_list_at_h_2c.read().unwrap().clone()
     }
-    pub fn set_last_queried_qr_masternode_list_at_h_2c(&self, masternode_list: MasternodeList) {
+    pub fn set_last_queried_qr_masternode_list_at_h_2c(&self, masternode_list: Arc<MasternodeList>) {
         let mut lock = self.last_qr_list_at_h_2c.write().unwrap();
         *lock = Some(masternode_list);
     }
@@ -358,10 +406,10 @@ impl MasternodeProcessorCache {
         let mut lock = self.last_qr_list_at_h_2c.write().unwrap();
         *lock = None;
     }
-    pub fn get_last_queried_qr_masternode_list_at_h_3c(&self) -> Option<MasternodeList> {
+    pub fn get_last_queried_qr_masternode_list_at_h_3c(&self) -> Option<Arc<MasternodeList>> {
         self.last_qr_list_at_h_3c.read().unwrap().clone()
     }
-    pub fn set_last_queried_qr_masternode_list_at_h_3c(&self, masternode_list: MasternodeList) {
+    pub fn set_last_queried_qr_masternode_list_at_h_3c(&self, masternode_list: Arc<MasternodeList>) {
         let mut lock = self.last_qr_list_at_h_3c.write().unwrap();
         *lock = Some(masternode_list);
     }
@@ -369,10 +417,10 @@ impl MasternodeProcessorCache {
         let mut lock = self.last_qr_list_at_h_3c.write().unwrap();
         *lock = None;
     }
-    pub fn get_last_queried_qr_masternode_list_at_h_4c(&self) -> Option<MasternodeList> {
+    pub fn get_last_queried_qr_masternode_list_at_h_4c(&self) -> Option<Arc<MasternodeList>> {
         self.last_qr_list_at_h_4c.read().unwrap().clone()
     }
-    pub fn set_last_queried_qr_masternode_list_at_h_4c(&self, masternode_list: MasternodeList) {
+    pub fn set_last_queried_qr_masternode_list_at_h_4c(&self, masternode_list: Arc<MasternodeList>) {
         let mut lock = self.last_qr_list_at_h_4c.write().unwrap();
         *lock = Some(masternode_list);
     }
@@ -380,10 +428,10 @@ impl MasternodeProcessorCache {
         let mut lock = self.last_qr_list_at_h_4c.write().unwrap();
         *lock = None;
     }
-    pub fn get_last_queried_mn_masternode_list(&self) -> Option<MasternodeList> {
+    pub fn get_last_queried_mn_masternode_list(&self) -> Option<Arc<MasternodeList>> {
         self.last_mn_list.read().unwrap().clone()
     }
-    pub fn set_last_queried_mn_masternode_list(&self, masternode_list: MasternodeList) {
+    pub fn set_last_queried_mn_masternode_list(&self, masternode_list: Arc<MasternodeList>) {
         let mut lock = self.last_mn_list.write().unwrap();
         *lock = Some(masternode_list);
     }

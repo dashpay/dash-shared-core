@@ -1,8 +1,9 @@
 use base64::{alphabet, Engine};
 use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use hashes::hex::{FromHex, ToHex};
-use crate::crypto::byte_util::{UInt160, UInt256, UInt512};
-use crate::util::base58;
+use dash_spv_crypto::crypto::byte_util::{UInt160, UInt256, UInt512};
+use dash_spv_crypto::util::base58;
+// use crate::util::base58;
 
 #[test]
 fn test_base64_hash_size() {

@@ -14,7 +14,6 @@ use crate::util::{address::address, base58, data_ops::hex_with_data, sec_vec::Se
 use crate::derivation::{IIndexPath, IndexPath};
 use crate::keys::{IKey, KeyKind, KeyError, DeriveKey};
 use crate::keys::crypto_data::{CryptoData, DHKey};
-use crate::keys::key::IndexPathU32;
 use crate::keys::KeyError::DHKeyExchange;
 use crate::network::ChainType;
 
@@ -253,8 +252,23 @@ impl DeriveKey<IndexPath<u32>> for BLSKey {
             .map_err(KeyError::from)
     }
 
-    fn public_derive_to_path_with_offset(&self, _path: &IndexPath<u32>, _offset: usize) -> Result<Self, KeyError> {
-        panic!("This method is not implemented for BLSKey")
+    fn public_derive_to_path_with_offset(&self, path: &IndexPath<u32>, _offset: usize) -> Result<Self, KeyError> {
+        if self.extended_public_key_data.is_empty() && self.extended_private_key_data.is_empty() {
+            Err(KeyError::UnableToDerive)
+        } else {
+            let ext_pub_key = extended_public_key_from_bytes(&self.extended_public_key_data, self.use_legacy)
+                .map_err(KeyError::from)?;
+            let bls_extended_public_key = Self::public_derive(ext_pub_key, path, self.use_legacy);
+            let bls_public_key = bls_extended_public_key.public_key();
+            Ok(Self {
+                extended_public_key_data: extended_public_key_serialized(&bls_extended_public_key, self.use_legacy).to_vec(),
+                chaincode: *bls_extended_public_key.chain_code().serialize(),
+                pubkey: g1_element_serialized(&bls_public_key, self.use_legacy),
+                use_legacy: self.use_legacy,
+                seckey: [0u8; 32],
+                extended_private_key_data: Default::default()
+            })
+        }
     }
 }
 
@@ -380,7 +394,7 @@ impl BLSKey {
         }
     }
 
-    pub fn bls_extended_public_key(&mut self) -> Result<ExtendedPublicKey, KeyError> {
+    pub fn bls_extended_public_key(&self) -> Result<ExtendedPublicKey, KeyError> {
         if let Ok(bytes) = self.extended_public_key_data() {
             extended_public_key_from_bytes(&bytes, self.use_legacy)
                 .map_err(KeyError::from)
@@ -536,7 +550,7 @@ impl BLSKey {
         (public_key, signature)
     }
 
-    pub fn public_key_from_extended_public_key_data_at_u32_path(&self, index_path: IndexPathU32) -> Result<Self, KeyError> {
+    pub fn public_key_from_extended_public_key_data_at_u32_path(&self, index_path: Vec<u32>) -> Result<Self, KeyError> {
         let index_path = IndexPath::from(index_path);
         self.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, &index_path, self.use_legacy))

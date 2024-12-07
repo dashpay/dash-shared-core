@@ -1,5 +1,6 @@
 use hashes::hex::FromHex;
-use dash_spv_crypto::crypto::byte_util::{Reversable, UInt256};
+use dash_spv_crypto::crypto::byte_util::{Reversable, Reversed, UInt256};
+use crate::common::Block;
 
 #[derive(Debug, Copy, Clone)]
 pub struct MerkleBlock {
@@ -15,14 +16,14 @@ impl MerkleBlock {
             merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
     }
 
-    pub fn hash(&self) -> UInt256 {
-        self.hash
+    pub fn hash(&self) -> [u8; 32] {
+        self.hash.0
     }
     pub fn height(&self) -> u32 {
         self.height
     }
-    pub fn merkle_root_reversed(&self) -> UInt256 {
-        self.merkleroot.reversed()
+    pub fn merkle_root_reversed(&self) -> [u8; 32] {
+        self.merkleroot.reversed().0
     }
 
     pub fn reversed(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
@@ -34,6 +35,15 @@ impl MerkleBlock {
     }
     pub fn reversed_hash(hash: &str, height: u32, merkle_root: &str) -> MerkleBlock {
         Self::reversed(height, hash, merkle_root)
+    }
+}
+
+impl From<&MerkleBlock> for Block {
+    fn from(value: &MerkleBlock) -> Self {
+        Block {
+            height: value.height,
+            hash: value.hash(),
+        }
     }
 }
 

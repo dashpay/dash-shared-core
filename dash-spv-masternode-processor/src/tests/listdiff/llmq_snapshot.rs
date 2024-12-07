@@ -1,7 +1,7 @@
 use byte::BytesExt;
 use hashes::hex::FromHex;
-use crate::crypto::byte_util::BytesDecodable;
-use crate::crypto::data_ops::Data;
+use dash_spv_crypto::crypto::byte_util::BytesDecodable;
+use dash_spv_crypto::crypto::data_ops::Data;
 use crate::{common, models};
 use crate::models::LLMQSnapshot;
 
