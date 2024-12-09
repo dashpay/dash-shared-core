@@ -68,6 +68,7 @@ pub enum DevnetType {
     Screwdriver = 8,
     Absinthe = 9,
     Bintang = 10,
+    DRA = 11,
 }
 
 impl From<DevnetType> for ChainType {
@@ -99,6 +100,7 @@ impl From<i16> for DevnetType {
             8 => DevnetType::Screwdriver,
             9 => DevnetType::Absinthe,
             10 => DevnetType::Bintang,
+            11 => DevnetType::DRA,
             _ => DevnetType::JackDaniels,
         }
     }
@@ -118,6 +120,7 @@ impl From<DevnetType> for i16 {
             DevnetType::Screwdriver => 8,
             DevnetType::Absinthe => 9,
             DevnetType::Bintang => 10,
+            DevnetType::DRA => 11,
         }
     }
 }
@@ -136,6 +139,7 @@ impl From<&str> for DevnetType {
             "devnet-screwdriver" => DevnetType::Screwdriver,
             "devnet-absinthe" => DevnetType::Absinthe,
             "devnet-bintang" => DevnetType::Bintang,
+            "devnet-DRA" => DevnetType::DRA,
             _ => panic!("Devnet with name: {} not supported", value),
         }
     }
@@ -156,6 +160,7 @@ impl DevnetType {
             DevnetType::Screwdriver => "devnet-screwdriver",
             DevnetType::Absinthe => "devnet-absinthe",
             DevnetType::Bintang => "devnet-bintang",
+            DevnetType::DRA => "devnet-DRA",
         }.to_string()
     }
 

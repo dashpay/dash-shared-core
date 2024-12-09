@@ -3,7 +3,9 @@ use hashes::{sha256, Hash};
 
 use dash_spv_crypto::network::ChainType;
 use dash_spv_crypto::crypto::UInt256;
+use dash_spv_crypto::derivation::{IIndexPath, IndexPath};
 use dash_spv_crypto::keys::{ECDSAKey, IKey};
+use dash_spv_crypto::keys::key::{IndexPathU256, KeyKind};
 use dash_spv_crypto::util::address::address::is_valid_dash_private_key;
 use dash_spv_crypto::util::base58;
 use dash_spv_crypto::util::data_append::DataAppend;
@@ -214,4 +216,30 @@ fn private_key_with_non_base_string() {
     assert_eq!(script3.to_hex(), "76a91462dc3919f49e95fe2e81af07d96149d0fd77353588ac");
     assert_eq!(script4.to_hex(), "76a914cb28bc5238bf5fcb97ddc7763ccc8c8a34fb38cd88ac");
     assert_eq!(script5.to_hex(), "76a9145ca1190f85fb51c702f6ee97e8871c7a6b14bc7788ac");
+}
+
+#[test]
+fn derivation() {
+    let seed = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+    let chain_type = ChainType::MainNet;
+    let index_paths = vec![vec![1, 2147483650]];
+    let derivation_path = IndexPathU256 { indexes: vec![[0u8; 32]], hardened: vec![true] };
+    let derivation = IndexPath::<[u8; 32]>::new_hardened(vec![[0u8; 32]], vec![true]);
+    let result = KeyKind::ECDSA.serialized_private_keys_at_index_paths_wrapper(
+        &seed,
+        index_paths,
+        derivation_path,
+        chain_type)
+        .expect("Der err");
+
+    assert_eq!(result, vec!["XJ7oW51NaNjnnQ5a2VitTSMhDEsuZLs3QMaWu6gU3LheqAQ6Edz7"]);
+
+    let result = KeyKind::ECDSA.serialized_private_keys_at_index_paths(
+        &seed,
+        vec![IndexPath::<u32>::new(vec![1, 2147483650])],
+        &derivation,
+        chain_type)
+        .expect("Der err");
+    assert_eq!(result, vec!["XJ7oW51NaNjnnQ5a2VitTSMhDEsuZLs3QMaWu6gU3LheqAQ6Edz7"]);
+
 }

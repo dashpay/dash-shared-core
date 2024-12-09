@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 use byte::BytesExt;
-use byte::ctx::Bytes;
-use hashes::hex::FromHex;
+use hashes::hex::{FromHex, ToHex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use dash_spv_crypto::consensus::encode::VarInt;
-use dash_spv_crypto::crypto::{UInt160, UInt256, UInt384, UInt768, VarArray};
+use dash_spv_crypto::crypto::{UInt160, UInt256, UInt384, UInt768};
 use dash_spv_crypto::crypto::byte_util::{BytesDecodable, Reversable, Reversed};
 use dash_spv_crypto::keys::OperatorPublicKey;
 use dash_spv_crypto::llmq::{Bitset, LLMQEntry, LLMQVersion};
@@ -15,7 +14,8 @@ use dash_spv_crypto::util::base58;
 use crate::block_store::MerkleBlock;
 use crate::common::{LLMQSnapshotSkipMode, MasternodeType, SocketAddress};
 use crate::models;
-use crate::test_helpers::{block_hash_to_block_hash, message_from_file};
+use crate::processing::MasternodeProcessor;
+use crate::test_helpers::block_hash_to_block_hash;
 
 #[derive(Serialize, Deserialize)]
 pub struct Block {
@@ -128,7 +128,7 @@ impl From<Llmq> for LLMQEntry {
             LLMQVersion::from(llmq.version as u16),
             LLMQType::from(llmq.llmq_type as u8),
             block_hash_to_block_hash(llmq.quorum_hash),
-            Some(llmq.quorum_index as u16),
+            llmq.quorum_index as u16,
             Bitset { count: llmq.signers_count, bitset: llmq.signers.as_bytes().to_vec() },
             Bitset { count: llmq.valid_members_count, bitset: llmq.valid_members.as_bytes().to_vec() },
             UInt384::from_hex(llmq.quorum_public_key.as_str()).unwrap().0,
@@ -204,24 +204,6 @@ pub struct MNList {
     pub new_quorums: Vec<Llmq>,
 }
 
-impl From<MNList> for models::MasternodeList {
-    fn from(value: MNList) -> Self {
-        let block_hash = block_hash_to_block_hash(value.block_hash);
-        let known_height = value.known_height;
-        let masternode_merkle_root = Some(block_hash_to_block_hash(value.masternode_merkle_root));
-        let llmq_merkle_root = Some(block_hash_to_block_hash(value.quorum_merkle_root));
-        let masternodes = nodes_to_masternodes(value.mn_list);
-        let quorums = quorums_to_quorums_map(value.new_quorums);
-        models::MasternodeList {
-            block_hash,
-            known_height,
-            masternode_merkle_root,
-            llmq_merkle_root,
-            masternodes,
-            quorums
-        }
-    }
-}
 
 pub fn bools_to_bytes(bools: Vec<bool>) -> Vec<u8> {
     let mut b = Vec::<u8>::with_capacity(bools.len() / 8);
@@ -318,8 +300,8 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<[u8; 32], models::Mast
     map
 }
 
-pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
-    diff: ListDiff, block_height_lookup: BHL, is_bls_basic: bool) -> models::MNListDiff {
+pub fn masternode_list_from_genesis_diff(
+    diff: ListDiff, processor: &MasternodeProcessor, is_bls_basic: bool) -> models::MNListDiff {
     let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reverse().0;
     let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reverse().0;
     let cb_tx_bytes = Vec::from_hex(diff.cb_tx.as_str()).unwrap();
@@ -330,10 +312,19 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
 
     let offset = &mut 0;
     let total_transactions = u32::from_bytes(tree_bytes, offset).unwrap();
-    let merkle_hashes = VarArray::<UInt256>::from_bytes(tree_bytes, offset).unwrap();
-    let merkle_flags_var_int: VarInt = VarInt::from_bytes(tree_bytes, offset).unwrap();
-    let merkle_flags_count = merkle_flags_var_int.0 as usize;
-    let merkle_flags: &[u8] = tree_bytes.read_with(offset, Bytes::Len(merkle_flags_count)).unwrap();
+
+    let num_merkle_hashes = VarInt::from_bytes(tree_bytes, offset).unwrap().0 as usize;
+    let mut merkle_hashes = Vec::with_capacity(num_merkle_hashes);
+    for _i  in 0..num_merkle_hashes {
+        let data = tree_bytes.read_with::<UInt256>(offset, byte::LE).unwrap().0;
+        merkle_hashes.push(data);
+    }
+
+
+    let merkle_flags_count = VarInt::from_bytes(tree_bytes, offset).unwrap().0 as usize;
+    let merkle_flags: &[u8] = tree_bytes.read_with(offset, byte::ctx::Bytes::Len(merkle_flags_count)).unwrap();
+
+
     let version = diff.version.unwrap_or(0);
 
     let deleted_masternode_hashes = diff.deleted_mns.iter().map(|s| UInt256::from_hex(s.as_str()).unwrap().0).collect();
@@ -341,29 +332,25 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums_vec(diff.new_quorums);
-    println!("block_hash_tip: {}", block_hash);
     models::MNListDiff {
         base_block_hash,
         block_hash,
         total_transactions,
-        merkle_hashes: merkle_hashes.1,
+        merkle_hashes,
         merkle_flags: merkle_flags.to_vec(),
         coinbase_transaction,
         deleted_masternode_hashes,
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        base_block_height: block_height_lookup(base_block_hash),
-        block_height: block_height_lookup(block_hash),
+        base_block_height: processor.height_for_block_hash(base_block_hash),
+        block_height: processor.height_for_block_hash(block_hash),
         version,
         // TODO: update json
         quorums_cls_sigs: BTreeMap::new(),
     }
 }
 
-pub fn masternode_list_from_json(filename: String) -> models::MasternodeList {
-    From::<MNList>::from(serde_json::from_slice(&message_from_file(filename.as_str())).unwrap())
-}
 
 impl From<Block> for MerkleBlock {
     fn from(block: Block) -> Self {

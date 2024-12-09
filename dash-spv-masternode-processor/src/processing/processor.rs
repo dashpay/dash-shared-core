@@ -81,12 +81,11 @@ impl MasternodeProcessor {
         let result = self.get_list_diff_result_with_base_lookup(list_diff, LLMQVerificationContext::MNListDiff);
         println!("mn_list_diff_result_from_file: {}", result.block_hash.to_hex());
         if result.is_valid() {
-            let changed = result.masternodes_changed();
-            let list = Arc::new(result.masternode_list);
-            self.cache.masternode_list_loaded(block_hash, list.clone());
-            self.cache.set_last_queried_mn_masternode_list(list.clone());
-            self.provider.update_address_usage_of_masternodes(changed);
-            self.provider.save_masternode_list_into_db(list, result.modified_masternodes)
+            self.masternode_list_processed(
+                result.masternode_list,
+                result.added_masternodes,
+                result.modified_masternodes,
+                |list| self.cache.set_last_queried_mn_masternode_list(list))
                 .map_err(ProcessingError::from)?;
             Ok(block_hash)
         } else {
@@ -119,6 +118,7 @@ impl MasternodeProcessor {
         let MNListDiffResult {
             block_hash,
             masternode_list,
+            added_masternodes,
             modified_masternodes,
             needed_masternode_lists,
             has_added_rotated_quorums,
@@ -127,19 +127,24 @@ impl MasternodeProcessor {
         if should_process {
             let needing_validation_lock = self.cache.list_needing_quorum_validation.read().unwrap();
             if needed_masternode_lists.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                let list = Arc::new(masternode_list);
-                if self.cache.get_last_queried_block_hash().eq(&block_hash) {
-                    self.cache.set_last_queried_mn_masternode_list(list.clone());
-                    let mut lock = self.cache.list_needing_quorum_validation.write().unwrap();
-                    lock.remove(&block_hash);
-                }
-                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                self.cache.masternode_list_loaded(block_hash, list.clone());
-                self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                self.masternode_list_processed(
+                    masternode_list,
+                    added_masternodes,
+                    modified_masternodes,
+                    |list| {
+                        if self.cache.get_last_queried_block_hash().eq(&block_hash) {
+                            self.cache.set_last_queried_mn_masternode_list(list.clone());
+                            let mut lock = self.cache.list_needing_quorum_validation.write().unwrap();
+                            lock.remove(&block_hash);
+                            drop(lock);
+                        }
+                    }
+                )
                     .map_err(ProcessingError::from)?;
             } else  {
                 let mut needed_lock = self.cache.needed_masternode_lists.write().unwrap();
                 needed_lock.extend(needed_masternode_lists);
+                drop(needed_lock);
             }
         }
         Ok((block_hash, has_added_rotated_quorums))
@@ -185,22 +190,22 @@ impl MasternodeProcessor {
 
         if let Some(result) = result_at_h_4c {
             let should_process = self.should_process_diff_result(&result, allow_invalid_merkle_roots, true);
-            let changed_nodes = result.masternodes_changed();
             let MNListDiffResult {
                 block_hash,
                 masternode_list,
+                added_masternodes,
                 modified_masternodes,
                 needed_masternode_lists: missing,
                 ..
             } = result;
             if should_process {
                 if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                    let list = Arc::new(masternode_list);
-                    self.provider.update_address_usage_of_masternodes(changed_nodes);
-                    self.cache.set_last_queried_qr_masternode_list_at_h_4c(list.clone());
-                    self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                    self.cache.masternode_list_loaded(block_hash, list.clone());
-                    self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                    self.masternode_list_processed(
+                        masternode_list,
+                        added_masternodes,
+                        modified_masternodes,
+                        |list| self.cache.set_last_queried_qr_masternode_list_at_h_4c(list)
+                    )
                         .map_err(ProcessingError::from)?;
                 }
             }
@@ -211,22 +216,22 @@ impl MasternodeProcessor {
         }
 
         let should_process = self.should_process_diff_result(&result_at_h_3c, allow_invalid_merkle_roots, true);
-        let changed_nodes = result_at_h_3c.masternodes_changed();
         let MNListDiffResult {
             block_hash,
             masternode_list,
+            added_masternodes,
             modified_masternodes,
             needed_masternode_lists: missing,
             ..
         } = result_at_h_3c;
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                self.provider.update_address_usage_of_masternodes(changed_nodes);
-                let list = Arc::new(masternode_list);
-                self.cache.set_last_queried_qr_masternode_list_at_h_3c(list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                self.cache.masternode_list_loaded(block_hash, list.clone());
-                self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                self.masternode_list_processed(
+                    masternode_list,
+                    added_masternodes,
+                    modified_masternodes,
+                    |list | self.cache.set_last_queried_qr_masternode_list_at_h_3c(list)
+                )
                     .map_err(ProcessingError::from)?;
             }
         }
@@ -235,22 +240,22 @@ impl MasternodeProcessor {
         maybe_save_snapshot(block_hash, qr_info.snapshot_h_3c)?;
 
         let should_process = self.should_process_diff_result(&result_at_h_2c, allow_invalid_merkle_roots, true);
-        let changed_nodes = result_at_h_2c.masternodes_changed();
         let MNListDiffResult {
             block_hash,
             masternode_list,
+            added_masternodes,
             modified_masternodes,
             needed_masternode_lists: missing,
             ..
         } = result_at_h_2c;
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                self.provider.update_address_usage_of_masternodes(changed_nodes);
-                let list = Arc::new(masternode_list);
-                self.cache.set_last_queried_qr_masternode_list_at_h_2c(list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                self.cache.masternode_list_loaded(block_hash, list.clone());
-                self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                self.masternode_list_processed(
+                    masternode_list,
+                    added_masternodes,
+                    modified_masternodes,
+                    |list | self.cache.set_last_queried_qr_masternode_list_at_h_2c(list)
+                )
                     .map_err(ProcessingError::from)?;
             }
         }
@@ -260,22 +265,22 @@ impl MasternodeProcessor {
         maybe_save_snapshot(block_hash, qr_info.snapshot_h_2c)?;
 
         let should_process = self.should_process_diff_result(&result_at_h_c, allow_invalid_merkle_roots, true);
-        let changed_nodes = result_at_h_c.masternodes_changed();
         let MNListDiffResult {
             block_hash,
             masternode_list,
+            added_masternodes,
             modified_masternodes,
             needed_masternode_lists: missing,
             ..
         } = result_at_h_c;
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                self.provider.update_address_usage_of_masternodes(changed_nodes);
-                let list = Arc::new(masternode_list);
-                self.cache.set_last_queried_qr_masternode_list_at_h_c(list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                self.cache.masternode_list_loaded(block_hash, list.clone());
-                self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                self.masternode_list_processed(
+                    masternode_list,
+                    added_masternodes,
+                    modified_masternodes,
+                    |list | self.cache.set_last_queried_qr_masternode_list_at_h_c(list)
+                )
                     .map_err(ProcessingError::from)?;
             }
         }
@@ -285,22 +290,22 @@ impl MasternodeProcessor {
 
 
         let should_process = self.should_process_diff_result(&result_at_h, allow_invalid_merkle_roots, true);
-        let changed_nodes = result_at_h.masternodes_changed();
         let MNListDiffResult {
             block_hash,
             masternode_list,
+            added_masternodes,
             modified_masternodes,
             needed_masternode_lists: missing,
             ..
         } = result_at_h;
         if should_process {
             if missing.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                self.provider.update_address_usage_of_masternodes(changed_nodes);
-                let list = Arc::new(masternode_list);
-                self.cache.set_last_queried_qr_masternode_list_at_h(list.clone());
-                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                self.cache.masternode_list_loaded(block_hash, list.clone());
-                self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                self.masternode_list_processed(
+                    masternode_list,
+                    added_masternodes,
+                    modified_masternodes,
+                    |list | self.cache.set_last_queried_qr_masternode_list_at_h(list)
+                )
                     .map_err(ProcessingError::from)?;
             }
         }
@@ -309,26 +314,29 @@ impl MasternodeProcessor {
 
         let should_process = self.should_process_diff_result(&result_at_tip, allow_invalid_merkle_roots, true);
         raise_peer_issue |= !should_process;
-        let changed_nodes = result_at_tip.masternodes_changed();
         let MNListDiffResult {
             block_hash,
             masternode_list,
+            added_masternodes,
             modified_masternodes,
             needed_masternode_lists,
             ..
         } = result_at_tip;
         if should_process {
             if needed_masternode_lists.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                let list = Arc::new(masternode_list);
-                if self.cache.get_last_queried_block_hash().eq(&block_hash) {
-                    self.cache.set_last_queried_qr_masternode_list_at_tip(list.clone());
-                    let mut lock = self.cache.list_needing_quorum_validation.write().unwrap();
-                    lock.remove(&block_hash);
-                }
-                self.provider.update_address_usage_of_masternodes(changed_nodes);
-                self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                self.cache.masternode_list_loaded(block_hash, list.clone());
-                self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                self.masternode_list_processed(
+                    masternode_list,
+                    added_masternodes,
+                    modified_masternodes,
+                    |list | {
+                        if self.cache.get_last_queried_block_hash().eq(&block_hash) {
+                            self.cache.set_last_queried_qr_masternode_list_at_tip(list);
+                            let mut lock = self.cache.list_needing_quorum_validation.write().unwrap();
+                            lock.remove(&block_hash);
+                            drop(lock);
+                        }
+                    }
+                )
                     .map_err(ProcessingError::from)?;
             } else  {
                 needed_lock.extend(needed_masternode_lists);
@@ -340,26 +348,28 @@ impl MasternodeProcessor {
             // let block_hash = diff_result.block_hash.clone();
             // maybe_process_diff_result(diff_result)?;
             let should_process = self.should_process_diff_result(&diff_result, allow_invalid_merkle_roots, true);
-            let changed_nodes = diff_result.masternodes_changed();
             let MNListDiffResult {
                 block_hash,
                 masternode_list,
+                added_masternodes,
                 modified_masternodes,
                 needed_masternode_lists,
                 ..
             } = diff_result;
             if should_process {
                 if needed_masternode_lists.is_empty() || !needing_validation_lock.contains(&block_hash) {
-                    let list = Arc::new(masternode_list);
-                    self.provider.update_address_usage_of_masternodes(changed_nodes);
-                    self.cache.remove_from_awaiting_quorum_validation_list(list.block_hash);
-                    self.cache.masternode_list_loaded(block_hash, list.clone());
-                    self.provider.save_masternode_list_into_db(list, modified_masternodes)
+                    self.masternode_list_processed(
+                        masternode_list,
+                        added_masternodes,
+                        modified_masternodes,
+                        |list | {}
+                    )
                         .map_err(ProcessingError::from)?;
                 }
             }
             maybe_save_snapshot(block_hash, snapshot)?;
         }
+        drop(needed_lock);
         println!("qr_info_result_from_message: {}", raise_peer_issue);
         if raise_peer_issue {
             Err(ProcessingError::InvalidResult)
@@ -667,6 +677,27 @@ impl MasternodeProcessor {
             _ => Ok(0)
         }
     }
+    pub fn masternode_list_processed<T>(
+        &self,
+        masternode_list: MasternodeList,
+        added_masternodes: BTreeMap<[u8; 32], MasternodeEntry>,
+        modified_masternodes: BTreeMap<[u8; 32], MasternodeEntry>,
+        query_handler: T
+    ) -> Result<bool, CoreProviderError> where T: Fn(Arc<MasternodeList>) {
+        let block_hash = masternode_list.block_hash;
+        let known_height = masternode_list.known_height;
+        let mut changed = Vec::from_iter(added_masternodes.values().cloned());
+        changed.extend(modified_masternodes.values().cloned());
+
+        // masternode_list.merged_with_old_list(lock.get(&block_hash), known_height);
+        let list = Arc::new(masternode_list);
+        query_handler(list.clone());
+        self.provider.update_address_usage_of_masternodes(changed);
+        self.cache.remove_from_awaiting_quorum_validation_list(block_hash);
+        self.cache.masternode_list_loaded(block_hash, list.clone());
+        self.provider.save_masternode_list_into_db(list, modified_masternodes)
+    }
+
     fn should_process_diff_result(&self, result: &MNListDiffResult, allow_invalid_merkle_roots: bool, is_dip24: bool) -> bool {
         (self.provider.persist_in_retrieval_queue(result.block_hash, is_dip24) || is_dip24) && (allow_invalid_merkle_roots || result.is_valid())
     }
@@ -1083,6 +1114,7 @@ impl MasternodeProcessor {
                 .enumerate()
                 .map(|(index, members)|
                     (LLMQIndexedHash::from((cycle_base_hash, index)), members)));
+        drop(llmq_members_lock);
         drop(llmq_indexed_members_lock);
         result
     }
@@ -1090,6 +1122,7 @@ impl MasternodeProcessor {
     pub fn read_list_diff_from_message(&self, message: &[u8], offset: &mut usize, protocol_version: u32) -> Result<MNListDiff, byte::Error> {
         MNListDiff::new(message, offset, &*self.provider, protocol_version)
     }
+
 
 }
 fn add_quorum_members_from_quarter(

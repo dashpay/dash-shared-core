@@ -13,7 +13,7 @@ use dash_spv_masternode_processor::block_store::MerkleBlock;
 // use dash_spv_masternode_processor::test_helpers::Block;
 use dash_spv_masternode_processor::test_helpers::load_message;
 // #[cfg(test)]
-use dash_spv_masternode_processor::tests::FFIContext;
+pub use dash_spv_masternode_processor::tests::FFIContext;
 // use crate::common::{processor_create_cache, register_processor};
 // use crate::ffi::{from::FromFFI, to::ToFFI};
 use crate::ffi_core_provider::FFICoreProvider;
@@ -463,6 +463,11 @@ pub fn perform_mnlist_diff_test_for_message(
         .map(|h| UInt256::from_hex(h).unwrap().0.reversed())
         .collect();
     verify_hashes.sort();
+
+    pro_tx_hashes.iter().zip(verify_hashes.iter()).for_each(|(h1, h2)| {
+        println!("{} == {}", h1.to_hex(), h2.to_hex());
+    });
+
     assert_eq!(verify_hashes, pro_tx_hashes, "Provider transaction hashes");
     let mut masternode_list_hashes: Vec<[u8; 32]> = pro_tx_hashes
         .clone()

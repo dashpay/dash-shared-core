@@ -389,6 +389,14 @@ impl From<&Vec<u32>> for IndexPath<u32> {
 
 #[ferment_macro::export]
 impl KeyKind {
+    pub fn index(&self) -> i16 {
+        match self {
+            KeyKind::ECDSA => 0,
+            KeyKind::BLS => 1,
+            KeyKind::BLSBasic => 2,
+            KeyKind::ED25519 => 3
+        }
+    }
     pub fn public_key_from_extended_public_key_data_at_index_path(&self, data: &[u8], index_path: &Vec<u32>) -> Result<Vec<u8>, KeyError> {
         let index_path = IndexPath::from(index_path);
         self.public_key_from_extended_public_key_data(data, &index_path)
@@ -396,7 +404,7 @@ impl KeyKind {
     pub fn public_key_from_extended_public_key_data_at_index_path_256(&self, data: &[u8], index_path: &IndexPathU256) -> Result<OpaqueKey, KeyError> {
         let index_path = IndexPath::from(index_path);
         self.key_with_seed_data(data)
-            .and_then(|seed_key| seed_key.private_derive_to_path(&index_path.base_index_path()))
+            .and_then(|seed_key| seed_key.private_derive_to_path(&index_path))
     }
     pub fn private_key_at_index_path_wrapped(&self, seed: &[u8], index_path: Vec<u32>, derivation_path: IndexPathU256) -> Result<OpaqueKey, KeyError> {
         self.derive_key_from_seed_wrapped(seed, derivation_path)
@@ -436,7 +444,7 @@ impl KeyKind {
         derivation_path: IndexPathU256,
         chain_type: ChainType,
     ) -> Result<Vec<String>, KeyError> {
-        self.derive_key_from_seed_wrapped(seed, derivation_path)
+        let result = self.derive_key_from_seed_wrapped(seed, derivation_path)
             .map(|derivation_path_extended_key| {
                 let script = chain_type.script_map().privkey;
                 index_paths.into_iter()
@@ -444,7 +452,8 @@ impl KeyKind {
                         .map(|private_key| private_key.serialized_private_key_for_script(script)))
                     .flatten()
                     .collect()
-            })
+            });
+        result
     }
 
 
@@ -495,11 +504,18 @@ impl KeyKind {
         }
     }
 
-    pub fn key_with_extended_public_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
+    pub fn key_init_with_extended_public_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_public_key_data(data).map(OpaqueKey::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_public_key_data(data).map(OpaqueKey::ED25519),
             _ => BLSKey::init_with_extended_public_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
+        }
+    }
+    pub fn key_with_extended_public_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
+        match self {
+            KeyKind::ECDSA => ECDSAKey::key_with_extended_public_key_data(data).map(OpaqueKey::ECDSA),
+            KeyKind::ED25519 => ED25519Key::key_with_extended_public_key_data(data).map(OpaqueKey::ED25519),
+            _ => BLSKey::key_with_extended_public_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
         }
     }
 

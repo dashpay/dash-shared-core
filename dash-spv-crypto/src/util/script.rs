@@ -52,9 +52,9 @@ pub fn op_len(data: &[u8]) -> u8 {
 #[cfg(test)]
 mod tests {
     use hashes::hex::{FromHex, ToHex};
-    use crate::chain::params::ScriptMap;
+
     use crate::util::address::address;
-    use crate::util::base58;
+    use crate::util::{base58, ScriptMap};
     use crate::util::data_append::DataAppend;
     use crate::util::script::ScriptElement;
 

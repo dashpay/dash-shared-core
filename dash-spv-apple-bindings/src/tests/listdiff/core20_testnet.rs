@@ -4,6 +4,8 @@ use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::block_store::init_testnet_store;
 #[cfg(feature = "serde")]
 use dash_spv_masternode_processor::test_helpers::load_message;
+#[cfg(feature = "serde")]
+use dash_spv_masternode_processor::tests::serde_helper::Snapshot;
 use crate::tests::common::assert_diff_chain;
 
 #[test]
@@ -82,11 +84,11 @@ struct QRInfoV20 {
     #[serde(rename = "extraShare")]
     pub extra_share: bool,
     #[serde(rename = "quorumSnapshotAtHMinusC")]
-    pub quorum_snapshot_at_hminus_c: dash_spv_masternode_processor::test_helpers::Snapshot,
+    pub quorum_snapshot_at_hminus_c: Snapshot,
     #[serde(rename = "quorumSnapshotAtHMinus2C")]
-    pub quorum_snapshot_at_hminus2c: dash_spv_masternode_processor::test_helpers::Snapshot,
+    pub quorum_snapshot_at_hminus2c: Snapshot,
     #[serde(rename = "quorumSnapshotAtHMinus3C")]
-    pub quorum_snapshot_at_hminus3c: dash_spv_masternode_processor::test_helpers::Snapshot,
+    pub quorum_snapshot_at_hminus3c: Snapshot,
     #[serde(rename = "mnListDiffTip")]
     pub mn_list_diff_tip: ListDiff_70230,
     #[serde(rename = "mnListDiffH")]
@@ -100,7 +102,7 @@ struct QRInfoV20 {
     #[serde(rename = "lastCommitmentPerIndex")]
     pub last_commitment_per_index: Vec<LLMQ>,
     #[serde(rename = "quorumSnapshotList")]
-    pub quorum_snapshot_list: Vec<dash_spv_masternode_processor::test_helpers::Snapshot>,
+    pub quorum_snapshot_list: Vec<Snapshot>,
     #[serde(rename = "mnListDiffList")]
     pub mn_list_diff_list: Vec<ListDiff_70230>,
 }

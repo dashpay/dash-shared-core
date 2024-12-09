@@ -434,9 +434,6 @@ impl MasternodeEntry {
         address::address::from_hash160_for_script_map(&self.platform_node_id, &script_map)
     }
 
-    pub fn merged_with_entry(&self, entry: &MasternodeEntry, block_height: u32) {
-
-    }
 }
 
 pub fn calculate_entry_hash(

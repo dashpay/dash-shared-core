@@ -84,10 +84,5 @@ impl MNListDiffResult {
     //     self.added_quorums.iter().any(|q| q.llmq_type == chain_type.isd_llmq_type())
     // }
 
-    pub fn masternodes_changed(&self) -> Vec<MasternodeEntry> {
-        let mut result = Vec::from_iter(self.added_masternodes.values().cloned());
-        result.extend(self.modified_masternodes.values().cloned());
-        result
-    }
 }
 

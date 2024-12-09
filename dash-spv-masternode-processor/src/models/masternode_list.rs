@@ -1,5 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::sync::Arc;
+use hashes::hex::ToHex;
 use dash_spv_crypto::blake3;
 use dash_spv_crypto::crypto::byte_util::{sup, Reversed};
 use dash_spv_crypto::llmq::entry::LLMQEntry;
@@ -112,8 +114,8 @@ impl MasternodeList {
             warn!("LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
                      tx.height,
                      tx.base.version,
-                     tx.merkle_root_llmq_list,
-                     self.llmq_merkle_root);
+                     tx.merkle_root_llmq_list.map(|q| q.to_hex()).unwrap_or("None".to_string()),
+                     self.llmq_merkle_root.map(|q| q.to_hex()).unwrap_or("None".to_string()));
         }
         has_valid_quorum_list_root
     }
@@ -196,6 +198,15 @@ impl MasternodeList {
         (used_at_h_masternodes, unused_at_h_masternodes, used_at_h_indexed_masternodes)
 
     }
+    pub fn merged_with_old_list(&self, masternode_list: Option<&Arc<MasternodeList>>, height: u32) {
+        if let Some(old_list) = masternode_list {
+            self.masternodes.iter().for_each(|(pro_tx_hash, node)| {
+                if let Some(old_entry) = old_list.masternodes.get(pro_tx_hash) {
+                    println!("MN merge?: {:?} -- {:?}", node, old_entry);
+                }
+            });
+        }
+    }
 }
 #[ferment_macro::export]
 impl MasternodeList {
@@ -207,15 +218,15 @@ impl MasternodeList {
         merkle_root_from_hashes(self.hashes_for_quorum_merkle_root())
     }
 
-    pub fn reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
-        self.masternodes.keys().cloned().collect()
-    }
-
-    pub fn sorted_reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
-        let mut hashes = self.reversed_pro_reg_tx_hashes_cloned();
-        hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
-        hashes
-    }
+    // pub fn reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
+    //     self.masternodes.keys().cloned().collect()
+    // }
+    //
+    // pub fn sorted_reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
+    //     let mut hashes = self.reversed_pro_reg_tx_hashes_cloned();
+    //     hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
+    //     hashes
+    // }
 
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<[u8; 32]>> {
         (block_height != u32::MAX).then_some({
@@ -337,23 +348,17 @@ impl MasternodeList {
         vec.sort_by(|hash1, hash2| if sup(*hash1, hash2) { Ordering::Less } else { Ordering::Greater });
         vec
     }
+    pub fn reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
+        let mut vec = Vec::from_iter(self.masternodes.keys().cloned());
+        vec.sort();
+        vec
+    }
 
     pub fn compare_provider_tx_ordered_hashes(&self, list: MasternodeList) -> bool {
         let list_hashes = list.provider_tx_ordered_hashes();
         self.provider_tx_ordered_hashes().eq(&list_hashes)
     }
 
-    // pub fn merged_with(&self, masternode_list: MasternodeList, height: u32) -> MasternodeList {
-    //     let mut list = self.clone();
-    //     // list.masternodes.entry()
-    //     self.masternodes.iter().for_each(|(pro_tx_hash, entry)| {
-    //         if let Some(new_entry) = masternode_list.masternodes.get(pro_tx_hash) {
-    //             entry.merged_with_entry(new_entry, height);
-    //         }
-    //     });
-    //
-    //
-    // }
     //     self.masternodes.iter_mut().for_each(|(hash, node)| {
     //         if let Some(new_entry) = masternode_list.masternodes.get(hash) {
     //             node.merge_with_entry(new_entry, height);
@@ -424,10 +429,12 @@ pub fn score_masternodes_map(
 #[cfg(all(test,feature = "serde"))]
 impl From<crate::tests::serde_helper::MNList> for MasternodeList {
     fn from(value: crate::tests::serde_helper::MNList) -> Self {
-        let block_hash = crate::tests::serde_helper::block_hash_to_block_hash(value.block_hash);
+        use dash_spv_crypto::crypto::byte_util::UInt256;
+        use hashes::hex::FromHex;
+        let block_hash = UInt256::from_hex(value.block_hash.as_str()).unwrap().0;
         let known_height = value.known_height;
-        let masternode_merkle_root = Some(crate::tests::serde_helper::block_hash_to_block_hash(value.masternode_merkle_root));
-        let llmq_merkle_root = Some(crate::tests::serde_helper::block_hash_to_block_hash(value.quorum_merkle_root));
+        let masternode_merkle_root = Some(UInt256::from_hex(value.masternode_merkle_root.as_str()).unwrap().0);
+        let llmq_merkle_root = Some(UInt256::from_hex(value.quorum_merkle_root.as_str()).unwrap().0);
         let masternodes = crate::tests::serde_helper::nodes_to_masternodes(value.mn_list);
         let quorums = crate::tests::serde_helper::quorums_to_quorums_map(value.new_quorums);
         Self {

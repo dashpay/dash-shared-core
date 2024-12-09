@@ -5,7 +5,9 @@ use std::sync::Arc;
 #[cfg(feature = "test-helpers")]
 use hashes::hex::FromHex;
 #[cfg(feature = "test-helpers")]
-use dash_spv_crypto::crypto::byte_util::{BytesDecodable, Reversable};
+use dash_spv_crypto::crypto::byte_util::BytesDecodable;
+#[cfg(feature = "test-helpers")]
+use dash_spv_crypto::crypto::byte_util::Reversed;
 #[cfg(feature = "test-helpers")]
 use dash_spv_crypto::crypto::UInt256;
 #[cfg(feature = "test-helpers")]
@@ -26,7 +28,7 @@ pub fn perform_mnlist_diff_test_for_message_with_provider<T>(
     verify_string_hashes: Vec<&str>,
     verify_string_smle_hashes: Vec<&str>,
     provider: T,
-) where T: CoreProvider {
+) where T: CoreProvider + 'static {
     let bytes = Vec::from_hex(hex_string).unwrap();
     let length = bytes.len();
     let c_array = bytes.as_ptr();
@@ -47,7 +49,7 @@ pub fn perform_mnlist_diff_test_for_message_with_provider<T>(
     // let processor = register_default_processor(&mut context);
 
     let base_masternode_list_hash: *const u8 = null_mut();
-    let mut context = FFIContext::create_default_context_and_cache(chain, false);
+    let context = FFIContext::create_default_context_and_cache(chain, false);
 
     // chain_type: ChainType,
     // use_insight_as_backup: bool,
@@ -75,11 +77,11 @@ pub fn perform_mnlist_diff_test_for_message_with_provider<T>(
     // )};
     println!("result: {:?}", result);
     // let masternode_list = unsafe { (*result.masternode_list).decode() };
-    let mut pro_tx_hashes: Vec<[u8; 32]> = masternodes.keys().clone().collect();
+    let mut pro_tx_hashes: Vec<[u8; 32]> = masternodes.keys().cloned().collect();
     pro_tx_hashes.sort();
-    let mut verify_hashes: Vec<UInt256> = verify_string_hashes
+    let mut verify_hashes: Vec<[u8; 32]> = verify_string_hashes
         .into_iter()
-        .map(|h| UInt256::from_hex(h).unwrap().reverse())
+        .map(|h| UInt256::from_hex(h).unwrap().0.reversed())
         .collect();
     verify_hashes.sort();
     assert_eq!(verify_hashes, pro_tx_hashes, "Provider transaction hashes");

@@ -737,9 +737,9 @@ pub fn test_bls_sign() {
     let keypair1 = BLSKey::key_with_seed_data(&seed1, true);
     let keypair2 = BLSKey::key_with_seed_data(&seed2, true);
     let message1: Vec<u8> = vec![7,8,9];
-    let message2: Vec<u8> = vec![1,2,3];
-    let message3: Vec<u8> = vec![1,2,3,4];
-    let message4: Vec<u8> = vec![1,2];
+    let _message2: Vec<u8> = vec![1,2,3];
+    let _message3: Vec<u8> = vec![1,2,3,4];
+    let _message4: Vec<u8> = vec![1,2];
     let fingerprint1 = keypair1.public_key_fingerprint();
     let fingerprint2 = keypair2.public_key_fingerprint();
     assert_eq!(fingerprint1, 0x26d53247, "Testing BLS private child public key fingerprint");
@@ -760,7 +760,7 @@ fn test_bls_verify() {
     assert_eq!(key_pair1.private_key_data().unwrap().to_hex(), "022fb42c08c12de3a6af053880199806532e79515f94e83461612101f9412f9e");
     let signature1 = key_pair1.sign_data(&message1);
     assert_eq!(signature1.to_hex(), "023f5c750f402c69dab304e5042a7419722536a38d58ce46ba045be23e99d4f9ceeffbbc6796ebbdab6e9813c411c78f07167a3b76bef2262775a1e9f95ff1a80c5fa9fe8daa220d4d9da049a96e8932d5071aaf48fbff27a920bc4aa7511fd4");
-    assert!(key_pair1.verify(&sha256d::Hash::hash(&message1).into_inner().to_vec(), &signature1), "Testing BLS signature verification");
+    assert!(key_pair1.verify(&sha256d::Hash::hash(&message1).into_inner().to_vec(), &signature1).is_ok(), "Testing BLS signature verification");
 }
 
 #[test]
