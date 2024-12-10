@@ -6,6 +6,7 @@ use hashes::hex::ToHex;
 use crate::blockdata::opcodes::all::OP_RETURN;
 use crate::consensus::encode::{VarInt, self};
 use crate::consensus::{Encodable, Decodable};
+use crate::crypto::byte_util::{Reversable, Zeroable};
 use crate::crypto::{UInt256, VarBytes};
 use crate::util::data_append::DataAppend;
 use crate::util::script::{ScriptType, ScriptElement};
@@ -116,7 +117,7 @@ impl Decodable for TransactionInput {
 impl std::fmt::Debug for TransactionInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransactionInput")
-            .field("input_hash", &self.input_hash)
+            .field("input_hash", &self.input_hash.reversed())
             .field("index", &self.index)
             .field(
                 "script",

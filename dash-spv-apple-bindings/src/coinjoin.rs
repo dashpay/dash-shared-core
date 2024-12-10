@@ -62,7 +62,7 @@ pub unsafe extern "C" fn register_client_manager(
     add_pending_masternode: AddPendingMasternode,
     start_manager_async: StartManagerAsync,
     session_lifecycle_listener: SessionLifecycleListener,
-    mixing_complete_listener: MixingLivecycleListener,
+    mixing_lifecycle_listener: MixingLivecycleListener,
     get_coinjoin_keys: GetCoinJoinKeys,
     destroy_coinjoin_keys: DestroyCoinJoinKeys
 ) -> *mut CoinJoinClientManager {
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn register_client_manager(
         update_success_block,
         is_waiting_for_new_block,
         session_lifecycle_listener,
-        mixing_complete_listener,
+        mixing_lifecycle_listener,
         context
     );
     log_info!(target: "CoinJoin", "register_client_manager");
@@ -206,6 +206,14 @@ pub unsafe extern "C" fn is_collateral_amount(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn has_collateral_inputs(
+    client_manager: *mut CoinJoinClientManager,
+    only_confirmed: bool
+) -> bool {
+    return (*client_manager).wallet_ex.borrow_mut().has_collateral_inputs(only_confirmed);
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn is_fully_mixed_with_manager(
     client_manager: *mut CoinJoinClientManager,
     prevout_hash: *mut [u8; 32],
@@ -230,6 +238,23 @@ pub unsafe extern "C" fn is_locked_coin(
     index: u32,
 ) -> bool {
     return (*wallet_ex).locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn has_locked_coins(
+    client_manager: *mut CoinJoinClientManager,
+) -> u32 {
+    return (*client_manager).wallet_ex.borrow().locked_coins_set.len() as u32;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn print_locked_coins(
+    client_manager: *mut CoinJoinClientManager
+) {
+    println!("[RUST] CoinJoin: print_locked_coins");
+    for outpoint in (*client_manager).wallet_ex.borrow().locked_coins_set.iter() {
+        println!("[RUST] CoinJoin: {:?}", outpoint);
+    }
 }
 
 #[no_mangle]
@@ -463,6 +488,11 @@ pub unsafe extern "C" fn get_real_outpoint_coinjoin_rounds(
 #[no_mangle]
 pub unsafe extern "C" fn get_collateral_amount() -> u64 {
     return CoinJoin::get_collateral_amount();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn get_max_collateral_amount() -> u64 {
+    return CoinJoin::get_max_collateral_amount();
 }
 
 #[no_mangle]
