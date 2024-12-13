@@ -26,6 +26,9 @@ use tracing_subscriber::fmt::writer::BoxMakeWriter;
 use tracing_subscriber::fmt::{MakeWriter, SubscriberBuilder};
 
 #[cfg(target_os = "ios")]
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
+
+#[cfg(target_os = "ios")]
 static INIT: Once = Once::new();
 
 // Function to initialize logging
@@ -89,23 +92,17 @@ pub fn init_logging() {
             std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
         }
 
-        // Create the log file inside the cache directory.
-        let log_file_path = log_dir.join("processor.log");
-        println!("Log file created: {:?}", log_file_path);
-
-        let file = OpenOptions::new()
-            .write(true)      // Open for writing
-            .create(true)     // Create the file if it doesn't exist
-            .append(true)     // Append to the file if it exists
-            .open(&log_file_path)
-            .expect("Unable to open or create log file");
-
-        // Create the MutexMakeWriter
-        let make_writer = MutexMakeWriter::new(file);
+        let file_appender = RollingFileAppender::builder()
+            .rotation(Rotation::DAILY)
+            .filename_prefix("processor")
+            .filename_suffix("log")
+            .max_log_files(5)
+            .build(log_dir)
+            .expect("Failed to create file appender");
 
         // Initialize the subscriber with file-based logging
         let subscriber = SubscriberBuilder::default()
-            .with_writer(make_writer)
+            .with_writer(file_appender)
             .with_ansi(false) // Disable ANSI colors
             .with_max_level(if cfg!(debug_assertions) {
                 tracing::Level::DEBUG
@@ -119,6 +116,7 @@ pub fn init_logging() {
         println!("logger initialized");
     });
 }
+
 #[cfg(not(target_os = "ios"))]
 pub fn init_logging() {
     // No-op for non-iOS platforms
