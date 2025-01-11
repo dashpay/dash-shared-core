@@ -1,4 +1,4 @@
-use dash_spv_masternode_processor::tx::Transaction;
+use dash_spv_masternode_processor::{crypto::byte_util::Reversable, tx::Transaction};
 
 use crate::coinjoin::CoinJoin;
 

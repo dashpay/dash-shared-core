@@ -60,7 +60,7 @@ impl<'a> TransactionBuilder {
         // Generate a feerate which will be used to consider if the remainder is dust and will go into fees or not
         coin_control.discard_fee_rate = REFERENCE_DEFAULT_MIN_TX_FEE;
         // Generate a feerate which will be used by calculations of this class and also by CWallet::CreateTransaction
-        coin_control.fee_rate = REFERENCE_DEFAULT_MIN_TX_FEE;
+        coin_control.fee_rate = REFERENCE_DEFAULT_MIN_TX_FEE / 1000;
         // Change always goes back to origin
         coin_control.dest_change = tally_item.tx_destination.clone();
         // Only allow tallyItems inputs for tx creation
@@ -143,7 +143,8 @@ impl<'a> TransactionBuilder {
     pub fn amount_left(&self) -> u64 {
         let initial = self.get_amount_initial();
         let used = self.get_amount_used();
-        let fee = self.get_fee(self.get_bytes_total() as u64);
+        let bytes_total = self.get_bytes_total();
+        let fee = self.get_fee(bytes_total as u64);
 
         return initial.saturating_sub(used).saturating_sub(fee);
     }
@@ -262,6 +263,7 @@ impl<'a> TransactionBuilder {
         if required_fee > fee_calc {
             fee_calc = required_fee;
         }
+
         if fee_calc > REFERENCE_DEFAULT_MIN_TX_FEE * 10 {
             fee_calc = REFERENCE_DEFAULT_MIN_TX_FEE;
         }

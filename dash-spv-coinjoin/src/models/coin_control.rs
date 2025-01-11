@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use dash_spv_masternode_processor::ffi::boxer::{boxed, boxed_vec};
+use dash_spv_masternode_processor::ffi::{boxer::{boxed, boxed_vec}, ByteArray};
 
 use crate::ffi as ffi;
 
@@ -73,6 +73,11 @@ impl CoinControl {
                 )
             },
             set_selected_size: self.set_selected.len(),
+            dest_change: if self.dest_change.is_none() {
+                std::ptr::null_mut()
+            } else {
+                boxed(ByteArray::from(self.dest_change.as_ref().unwrap().to_vec()))
+            }
         }
     }
 }
