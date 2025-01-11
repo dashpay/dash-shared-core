@@ -25,7 +25,8 @@ fn main() {
             "platform-version",
             "dpp",
             "drive-proof-verifier",
-            "rs-dapi-client"
+            "rs-dapi-client",
+            "versioned-feature-core",
         ])
         .with_languages(vec![
             #[cfg(feature = "objc")]

@@ -8,32 +8,33 @@ use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::models::llmq;
 use dash_spv_masternode_processor::models::llmq::validate_payload;
+use dash_spv_masternode_processor::processing::CoreProviderError;
 use dash_spv_masternode_processor::test_helpers::{block_hash_to_block_hash, load_message};
-// use dash_spv_masternode_processor::test_helpers::block_hash_to_block_hash;
 use dash_spv_masternode_processor::tests::serde_helper::{ListDiff, masternode_list_from_genesis_diff, QRInfo};
 use crate::ffi_core_provider::FFICoreProvider;
 use crate::tests::common::FFIContext;
 #[test]
 fn mainnet_quorum_quarters() {
     let chain = ChainType::MainNet;
+    let chain_identifier = chain.identifier();
     let block_height_8792 = 1738792;
     let block_height_8840 = 1738840;
     let block_height_8888 = 1738888;
     let chain = ChainType::MainNet;
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, true));
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), true));
     // let provider = FFICoreProvider::register_default(Arc::clone(&context), Arc::new(MasternodeProcessorCache::default()));
     // let cache = context.write().unwrap();
-    let processor = FFICoreProvider::default_processor(context, chain);
+    let processor = FFICoreProvider::default_processor(context, chain.clone());
     // processor.cache.cache_block_height_for_hash(UInt256::from_hex("0000000000000000000").unwrap().0, block_height_8792);
 
-    let qrinfo_8792: QRInfo = serde_json::from_slice(&load_message(chain.identifier(),"1738792.txt")).unwrap();
-    let qrinfo_8840: QRInfo = serde_json::from_slice(&load_message(chain.identifier(),"1738840.txt")).unwrap();
-    let qrinfo_8888: QRInfo = serde_json::from_slice(&load_message(chain.identifier(),"1738888.txt")).unwrap();
-    let qrinfo_8936: QRInfo = serde_json::from_slice(&load_message(chain.identifier(),"1738936.txt")).unwrap();
+    let qrinfo_8792: QRInfo = serde_json::from_slice(&load_message(chain_identifier.clone(),"1738792.txt")).unwrap();
+    let qrinfo_8840: QRInfo = serde_json::from_slice(&load_message(chain_identifier.clone(),"1738840.txt")).unwrap();
+    let qrinfo_8888: QRInfo = serde_json::from_slice(&load_message(chain_identifier.clone(),"1738888.txt")).unwrap();
+    let qrinfo_8936: QRInfo = serde_json::from_slice(&load_message(chain_identifier.clone(),"1738936.txt")).unwrap();
 
-    let diff_8792: ListDiff = serde_json::from_slice(&load_message(chain.identifier(),"1738792_diff.txt")).unwrap();
-    let diff_8840: ListDiff = serde_json::from_slice(&load_message(chain.identifier(),"1738840_diff.txt")).unwrap();
-    let diff_8888: ListDiff = serde_json::from_slice(&load_message(chain.identifier(),"1738888_diff.txt")).unwrap();
+    let diff_8792: ListDiff = serde_json::from_slice(&load_message(chain_identifier.clone(),"1738792_diff.txt")).unwrap();
+    let diff_8840: ListDiff = serde_json::from_slice(&load_message(chain_identifier.clone(),"1738840_diff.txt")).unwrap();
+    let diff_8888: ListDiff = serde_json::from_slice(&load_message(chain_identifier.clone(),"1738888_diff.txt")).unwrap();
 
     let list_diff_8792 = masternode_list_from_genesis_diff(diff_8792, &processor, false);
     let list_diff_8840 = masternode_list_from_genesis_diff(diff_8840, &processor, false);
@@ -50,21 +51,21 @@ fn mainnet_quorum_quarters() {
     println!("block_hash_8888: {}", block_hash_8888.to_hex());
     let added_quorums_8792 = list_diff_8792.added_quorums.iter()
         .fold(BTreeMap::new(), |mut acc, entry| {
-            acc.entry(entry.llmq_type)
+            acc.entry(entry.llmq_type.clone())
                 .or_insert_with(BTreeMap::new)
                 .insert(entry.llmq_hash, entry.clone());
             acc
         });
     let added_quorums_8840 = list_diff_8840.added_quorums.iter()
         .fold(BTreeMap::new(), |mut acc, entry| {
-            acc.entry(entry.llmq_type)
+            acc.entry(entry.llmq_type.clone())
                 .or_insert_with(BTreeMap::new)
                 .insert(entry.llmq_hash, entry.clone());
             acc
         });
     let added_quorums_8888 = list_diff_8888.added_quorums.iter()
         .fold(BTreeMap::new(), |mut acc, entry| {
-            acc.entry(entry.llmq_type)
+            acc.entry(entry.llmq_type.clone())
                 .or_insert_with(BTreeMap::new)
                 .insert(entry.llmq_hash, entry.clone());
             acc
@@ -74,9 +75,9 @@ fn mainnet_quorum_quarters() {
     let masternode_list_8888 = models::MasternodeList::new(list_diff_8888.added_or_modified_masternodes, added_quorums_8888, block_hash_8888, block_height_8888, true);
 
 
-    let bytes = load_message(chain.identifier(),"QRINFO_0_1739226.dat");
-    let old_bytes = load_message(chain.identifier(),"QRINFO_0_1740902.dat");
-    let old_bytes2 = load_message(chain.identifier(),"QRINFO_0_1740910.dat");
+    let bytes = load_message(chain_identifier.clone(),"QRINFO_0_1739226.dat");
+    let old_bytes = load_message(chain_identifier.clone(),"QRINFO_0_1740902.dat");
+    let old_bytes2 = load_message(chain_identifier.clone(),"QRINFO_0_1740910.dat");
     processor.cache.add_masternode_list(block_hash_8792, Arc::new(masternode_list_8792));
     processor.cache.add_masternode_list(block_hash_8840, Arc::new(masternode_list_8840));
     processor.cache.add_masternode_list(block_hash_8888, Arc::new(masternode_list_8888));
@@ -306,6 +307,6 @@ fn mainnet_quorum_quarters() {
 
     let payload_validation_status = validate_payload(&target_quorum);
     assert!(payload_validation_status.is_ok(), "Invalid payload");
-    let signature_validation_status = llmq::validate(&mut target_quorum, nodes, block_height);
-    assert!(signature_validation_status.is_not_critical(), "Invalid signature");
+    let result = llmq::validate(&mut target_quorum, nodes, block_height);
+    assert!(matches!(result, Ok(()) | Err(CoreProviderError::MissedMasternodeListAt(..))), "Invalid signature");
 }

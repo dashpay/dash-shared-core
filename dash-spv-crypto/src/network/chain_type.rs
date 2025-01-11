@@ -2,7 +2,7 @@ use crate::network::LLMQType;
 use crate::crypto::byte_util::{Reversable, Reversed, UInt256};
 use crate::util::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::util::params::DUFFS;
-use hashes::hex::FromHex;
+use hashes::hex::{FromHex, ToHex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 #[ferment_macro::export]
@@ -24,7 +24,7 @@ pub trait IHaveChainSettings {
     fn name(&self) -> String;
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Hash)]
 #[ferment_macro::export]
 pub enum ChainType {
     #[default]
@@ -53,7 +53,7 @@ impl From<ChainType> for i16 {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Hash)]
 #[ferment_macro::export]
 pub enum DevnetType {
     JackDaniels = 0,
@@ -168,7 +168,20 @@ impl DevnetType {
         1
     }
     pub fn index(&self) -> u16 {
-        i16::from(*self) as u16
+        match self {
+            DevnetType::JackDaniels => 0,
+            DevnetType::Devnet333 => 1,
+            DevnetType::Chacha => 2,
+            DevnetType::Mojito => 3,
+            DevnetType::WhiteRussian => 4,
+            DevnetType::MiningTest => 5,
+            DevnetType::Mobile2 => 6,
+            DevnetType::Zero => 7,
+            DevnetType::Screwdriver => 8,
+            DevnetType::Absinthe => 9,
+            DevnetType::Bintang => 10,
+            DevnetType::DRA => 11,
+        }
     }
 }
 
@@ -324,7 +337,13 @@ impl ChainType {
         !self.is_mainnet() && !self.is_testnet()
     }
 
-
+    pub fn insight_url(&self) -> Option<String> {
+        match self {
+            ChainType::MainNet => Some("https://insight.dash.org/insight-api".to_string()),
+            ChainType::TestNet => Some("https://insight.testnet.networks.dash.org:3002/insight-api-dash".to_string()),
+            ChainType::DevNet(_) => None
+        }
+    }
     pub fn user_agent(&self) -> String {
         format!(
             "/dash-spv-core:{}{}/",
@@ -458,6 +477,13 @@ impl ChainType {
         }
     }
 
+    pub fn platform_port(&self) -> u16 {
+        match self {
+            ChainType::MainNet => 443,
+            _ => 1443,
+        }
+    }
+
     pub fn standard_dapi_grpc_port(&self) -> u16 {
         3010
     }
@@ -580,6 +606,13 @@ impl ChainType {
             _ => panic!("Can't get DevnetType from ChainType {:?}", self),
         }
     }
+
+    pub fn unique_id(&self) -> String {
+        let genesis = self.genesis_hash();
+        let slice = &genesis[..8];
+        slice.to_hex()
+    }
+
 }
 #[ferment_macro::export]
 pub fn chain_type_from_index(index: u16) -> ChainType {

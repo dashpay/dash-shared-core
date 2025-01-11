@@ -1,9 +1,10 @@
 use dash_spv_crypto::network::ChainType;
+use dash_spv_masternode_processor::block_store::{init_mainnet_store, init_testnet_store};
 use crate::tests::common::assert_diff_chain;
 
 #[test]
 fn testnet_checkpoint_530000() {
-    assert_diff_chain(ChainType::TestNet, &["MNT530000.dat"], &[], None, false);
+    assert_diff_chain(ChainType::TestNet, &["MNT530000.dat"], &[], Some(init_testnet_store()), false);
 }
 
 #[test]
@@ -17,5 +18,5 @@ fn mainnet_checkpoint_1720000() {
         "67c6348c35bc42aa4cabd25e29560f5d22c6a9fba274bf0c52fe73021d0e8d5e",
         "000000000000000000000000000000000000000000007715a9ae4dd7ff1d3902"
     }*/
-    assert_diff_chain(ChainType::MainNet, &["ML1720000.dat"], &[], None, false);
+    assert_diff_chain(ChainType::MainNet, &["ML1720000.dat"], &[], Some(init_mainnet_store()), false);
 }

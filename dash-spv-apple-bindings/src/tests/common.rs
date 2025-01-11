@@ -23,18 +23,18 @@ use crate::ffi_core_provider::FFICoreProvider;
 extern crate libc;
 extern crate reqwest;
 
-#[cfg(feature = "test-helpers")]
+#[cfg(all(feature = "test-helpers", feature = "use_serde"))]
 pub fn get_block_from_insight_by_hash(hash: [u8; 32]) -> Option<MerkleBlock> {
     let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", hash.reversed().to_hex().as_str());
     request_block(path)
 }
-#[cfg(feature = "test-helpers")]
+#[cfg(all(feature = "test-helpers", feature = "use_serde"))]
 pub fn get_block_from_insight_by_height(height: u32) -> Option<MerkleBlock> {
     let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", height);
     request_block(path)
 }
 
-#[cfg(all(feature = "test-helpers", feature = "serde"))]
+#[cfg(all(feature = "test-helpers", feature = "use_serde"))]
 pub fn request_block(path: String) -> Option<MerkleBlock> {
     println!("request_block: {}", path.as_str());
     match reqwest::blocking::get(path.as_str()) {
@@ -445,10 +445,11 @@ pub fn perform_mnlist_diff_test_for_message(
     assert!(length - *offset >= 4);
     let total_transactions = u32::from_bytes(message, offset).unwrap();
     assert_eq!(total_transactions, should_be_total_transactions, "Invalid transaction count");
+
     let use_insight_as_backup = false;
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
     let processor = FFICoreProvider::default_processor(context, chain);
-    let (block_hash, has_added_rotated_quorums) = processor.mn_list_diff_result_from_message(&bytes, true, 70221, allow_invalid_merkle_roots, null())
+    let (base_block_hash, block_hash, has_added_rotated_quorums) = processor.mn_list_diff_result_from_message(&bytes, true, 70221, allow_invalid_merkle_roots, null())
         .expect("Failed to process mnlistdiff");
 
     let masternode_list = processor.cache.masternode_list_by_block_hash(block_hash)
@@ -493,35 +494,13 @@ pub fn load_masternode_lists_for_files(
     allow_invalid_merkle_roots: bool,
     chain_type: ChainType
 ) -> bool {
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain_type);
-    // let ctx = context.read().unwrap();
+    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain_type.clone());
     for file in files {
         let bytes = load_message(chain_type.identifier(), file.as_str());
         let result = processor.mn_list_diff_result_from_message(&bytes, true, 70221, allow_invalid_merkle_roots, null())
             .expect("Failed to process mnlistdiff");
-        // let result = unsafe { process_mnlistdiff_from_message(
-        //     bytes.as_ptr(),
-        //     bytes.len(),
-        //     context.chain,
-        //     false,
-        //     false,
-        //     70221,
-        //     processor,
-        //     context.cache,
-        //     context as *mut _ as *mut std::ffi::c_void,
-        // )};
-        // let result = unsafe { &*result };
-        // if assert_validity {
-        //     assert_diff_result(&context, &result);
-        // }
-        // let block_hash = UInt256(unsafe { *result.block_hash });
-        // let masternode_list = unsafe { &*result.masternode_list };
-        // let masternode_list_decoded = unsafe { masternode_list.decode() };
     }
     true
-    // lctx.cache.read().unwrap();
-    // let lists = ctx.cache.mn_lists.clone();
-    // (true, lists)
 }
 pub fn extract_protocol_version_from_filename(filename: &str) -> Option<u32> {
     filename.split("__")
@@ -532,13 +511,14 @@ pub fn extract_protocol_version_from_filename(filename: &str) -> Option<u32> {
 
 pub fn assert_diff_chain(chain: ChainType, diff_files: &[&'static str], qrinfo_files: &[&'static str], block_store: Option<Vec<MerkleBlock>>, allow_invalid_merkle_roots: bool) {
     register_logger();
-    let context = Arc::new(FFIContext::chain_default(chain, false, block_store.unwrap_or_default()));
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain);
+    let context = Arc::new(FFIContext::chain_default(chain.clone(), false, block_store.unwrap_or_default()));
+    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     diff_files.iter().for_each(|filename| {
         let protocol_version = extract_protocol_version_from_filename(filename).unwrap_or(70219);
         let message = load_message(chain.identifier(), filename);
         let result = processor.mn_list_diff_result_from_message(&message, true, protocol_version, allow_invalid_merkle_roots, null())
             .expect("Failed to process mnlistdiff");
+        // println!("Diff is ok at {}", result.block_hash);
         // assert_diff_result(&ctx, &result);
         // let mut cache = ctx.cache.write().unwrap();
         // cache.mn_lists.insert(result.block_hash, result.masternode_list);

@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use hashes::{sha256d, Hash};
+use hashes::{sha256, sha256d, Hash};
 use crate::derivation::{IIndexPath, IndexPath, index_path::{Extremum, IndexHardSoft}};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{clone_into_array, Reversed, UInt256, UInt384, UInt768};
@@ -102,6 +102,7 @@ impl From<&KeyKind> for u8 {
     }
 }
 
+
 #[ferment_macro::export]
 impl OpaqueKey {
     pub fn hash160(&self) -> [u8; 20] {
@@ -147,6 +148,11 @@ impl OpaqueKey {
         let version_bits = version << 28;
         // this is the account ref
         version_bits | (account_secret_key28 ^ shortened_account_bits)
+    }
+
+    pub fn create_identifier(&self) -> Result<[u8; 32], KeyError> {
+        self.extended_public_key_data()
+            .map(|ext_pubkey_data| sha256::Hash::hash(&ext_pubkey_data).into_inner())
     }
 
     pub fn public_derive_to_256_path_with_offset(&mut self, path: &IndexPathU256, offset: usize) -> Result<Self, KeyError> {
@@ -411,6 +417,7 @@ impl KeyKind {
             .and_then(|key| key.private_derive_to_path(&IndexPath::from(index_path)))
     }
     pub fn derive_key_from_seed_wrapped(&self, seed: &[u8], derivation_path: IndexPathU256) -> Result<OpaqueKey, KeyError> {
+        // println!("derive_key_from_seed_wrapped: {} --- {}", seed.to_hex(), derivation_path);
         self.key_with_seed_data(seed)
             .and_then(|top_key| top_key.private_derive_to_path(&IndexPath::from(derivation_path)))
     }
@@ -573,7 +580,7 @@ impl KeyKind {
 }
 
 impl<U> DeriveKey<IndexPath<U>> for OpaqueKey
-where U: Copy + Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum,
+where U: Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum,
       ECDSAKey: DeriveKey<IndexPath<U>>,
       BLSKey: DeriveKey<IndexPath<U>>,
       ED25519Key: DeriveKey<IndexPath<U>> {

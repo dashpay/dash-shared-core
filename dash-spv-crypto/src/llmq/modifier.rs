@@ -11,13 +11,13 @@ pub enum LLMQModifierType {
 impl LLMQModifierType {
     pub fn build_llmq_hash(&self) -> [u8; 32] {
         let mut writer = vec![];
-        match *self {
+        match self {
             LLMQModifierType::PreCoreV20(llmq_type, block_hash) => {
-                VarInt(llmq_type as u64).enc(&mut writer);
+                VarInt(llmq_type.clone() as u64).enc(&mut writer);
                 block_hash.enc(&mut writer);
             },
             LLMQModifierType::CoreV20(llmq_type, block_height, cl_signature) => {
-                VarInt(llmq_type as u64).enc(&mut writer);
+                VarInt(llmq_type.clone() as u64).enc(&mut writer);
                 block_height.enc(&mut writer);
                 cl_signature.enc(&mut writer);
             }

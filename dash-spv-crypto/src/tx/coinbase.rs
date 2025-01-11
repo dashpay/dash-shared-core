@@ -134,7 +134,7 @@ impl CoinbaseTransaction {
         let mut buffer = Transaction::data_with_subscript_index_static(
             subscript_index,
             self.base.version,
-            self.base.tx_type,
+            self.base.tx_type.clone(),
             &self.base.inputs,
             &self.base.outputs,
             self.base.lock_time,

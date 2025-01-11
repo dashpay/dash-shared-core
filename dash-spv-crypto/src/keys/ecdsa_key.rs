@@ -53,7 +53,7 @@ impl ECDSAKey {
     }
     fn update_extended_params(mut key: Self, data: &[u8]) -> Self {
         key.fingerprint = data.read_with::<u32>(&mut 0, byte::LE).unwrap();
-        key.chaincode = data.read_with::<UInt256>(&mut 0, byte::LE).unwrap().0;
+        key.chaincode = data.read_with::<UInt256>(&mut 4, byte::LE).unwrap().0;
         key.is_extended = true;
         key
     }
@@ -678,7 +678,6 @@ impl ECDSAKey {
     }
 }
 
-
 impl DeriveKey<IndexPath<u32>> for ECDSAKey {
     fn private_derive_to_path(&self, path: &IndexPath<u32>) -> Result<Self, KeyError> {
         let mut seckey = self.seckey.clone();
@@ -694,7 +693,7 @@ impl DeriveKey<IndexPath<u32>> for ECDSAKey {
                         .map(|pk| UInt160::hash160u32le(&pk.serialize()))
                         .unwrap_or(0);
                 }
-                Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
+                Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position);
             });
         Ok(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
     }
@@ -838,4 +837,24 @@ fn test_ecdsa_encryption_and_decryption() {
     let decrypted = decrypted.unwrap();
     let decrypted_str = String::from_utf8(decrypted).unwrap();
     assert_eq!(secret, decrypted_str.as_str(), "they should be the same string");
+}
+
+#[test]
+fn derive_key_at_index_path() {
+    let extended_private_key_data_str = Vec::from_hex("5f70ad115eeaf19db00e31f0a7704afdca5c1548e9923c3fa21ebd74293fc6b0befdc3745699f5d010021c6af63e9fb1522c5a9d0bcf8dba87a174ca5c2cb5f28df5e6bd").unwrap();
+    let key = ECDSAKey::key_with_extended_private_key_data(&extended_private_key_data_str).expect("Key");
+    // let indexes[] = {(unusedIndex + i) | BIP32_HARD, 0 | BIP32_HARD};
+
+    let index_path = IndexPath::new(vec![0 | BIP32_HARD, 0 | BIP32_HARD]);
+    let result = key.private_derive_to_path(&index_path).expect("Derived key");
+    println!("prv: {}", key.private_key_data().map_or("".to_string(), |data| data.to_hex()));
+    println!("pub: {}", key.public_key_data().to_hex());
+    println!("chain: {}", key.chaincode.to_hex());
+    println!("child prv: {}", result.private_key_data().map_or("".to_string(), |data| data.to_hex()));
+    println!("child pub: {}", result.public_key_data().to_hex());
+    println!("child chain: {}", result.chaincode.to_hex());
+
+    // childKey prv: 8f2aa37d18d2619f553f9ff18830dafacc062a1fee109c9924ed111eb5491c8e
+    // childKey pub: 027735f24c8d9d581c2c77072d420bdd96d5bf2868087d33d4550f45ddf5182a21
+
 }

@@ -10,8 +10,8 @@ use crate::ffi_core_provider::FFICoreProvider;
 pub fn test_from_snapshot() {
     let chain = ChainType::TestNet;
     let qrinfo: QRInfo = serde_json::from_slice(&load_message(chain.identifier(), "snapshot_0000021715c8575620382ceee42cc7556bac5ed395eaf9c75e2119aa2876a1e0.json")).unwrap();
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, true));
-    let processor = FFICoreProvider::default_processor(context, chain);
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), true));
+    let processor = FFICoreProvider::default_processor(context, chain.clone());
     // let mut context = create_default_context_and_cache(chain, true);
     // let processor = unsafe { &mut *register_default_processor(&mut context) };
     // let block_height_lookup = |hash: [u8; 32]| context.block_for_hash(hash).unwrap().height;
@@ -36,7 +36,7 @@ pub fn test_from_snapshot() {
         // let llmq_block_height = get_height(entry.llmq_hash);
         // println!("rotated_quorum: ({}: {})\n {:#?}", llmq_block_height, entry.llmq_hash, entry);
         let masternodes = processor.get_rotated_masternodes_for_quorum(
-            entry.llmq_type,
+            entry.llmq_type.clone(),
             entry.llmq_hash,
             llmq_block_height,
             false,

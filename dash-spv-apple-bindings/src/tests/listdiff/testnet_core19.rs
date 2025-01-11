@@ -1,26 +1,29 @@
 use dash_spv_crypto::network::ChainType;
+use dash_spv_masternode_processor::block_store::init_testnet_store;
 use crate::tests::common::assert_diff_chain;
 
 // #[test]
-fn test_core19rc10() {
-    // 85.209.243.24 (/Dash Core:18.2.1/ protocol 70227)
-    assert_diff_chain(
-        ChainType::TestNet,
-        &["MNT530000.dat", "MNL_530000_867700__70227.dat"],
-        &[],
-        None, false);
-}
+// fn test_core19rc10() {
+//     // 85.209.243.24 (/Dash Core:18.2.1/ protocol 70227)
+//     assert_diff_chain(
+//         ChainType::TestNet,
+//         &["MN530000.dat", "MNL_530000_867700__70227.dat"],
+//         // &["MNT530000.dat", "MNL_530000_867700__70227.dat"],
+//         &[],
+//         None, false);
+// }
 
-// #[test]
+#[test]
 fn test_core19_70227() {
     assert_diff_chain(
         ChainType::TestNet,
         &["MNT530000.dat", "MNL_530000_868321__70227.dat"],
         &[],
-        None, false);
+        Some(init_testnet_store()),
+        false);
 }
 
-// #[test]
+#[test]
 fn test_mnlistdiff_and_qrinfo_core19() {
     assert_diff_chain(
         ChainType::TestNet,
@@ -76,5 +79,5 @@ fn test_core19_2() {
         ChainType::TestNet,
         &["MNL_0_530000__70228.dat", "MNL_530000_852596__70228.dat"],
         &[],
-        None, false);
+        Some(init_testnet_store()), false);
 }

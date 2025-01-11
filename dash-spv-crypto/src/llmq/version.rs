@@ -9,7 +9,7 @@ use crate::crypto::byte_util::BytesDecodable;
 
 #[warn(non_camel_case_types)]
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub enum LLMQVersion {
     Default = 1,
@@ -21,7 +21,7 @@ pub enum LLMQVersion {
 #[cfg(feature = "generate-dashj-tests")]
 impl Serialize for LLMQVersion {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_u16(u16::from(*self))
+        serializer.serialize_u16(u16::from(self.clone()))
     }
 }
 
@@ -35,7 +35,7 @@ impl LLMQVersion {
     }
 
     pub fn index(&self) -> u16 {
-        u16::from(*self)
+        u16::from(self.clone())
     }
 }
 
@@ -64,7 +64,7 @@ impl From<LLMQVersion> for u16 {
 
 impl Encodable for LLMQVersion {
     fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
-        u16::consensus_encode(&(*self).into(), &mut writer)
+        u16::consensus_encode(&u16::from(self.clone()), &mut writer)
     }
 }
 

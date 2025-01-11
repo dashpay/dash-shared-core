@@ -1,5 +1,6 @@
 use byte::{BytesExt, TryRead};
 use std::collections::BTreeMap;
+use std::fmt::{Display, Formatter};
 use hashes::hex::ToHex;
 use hashes::{sha256, sha256d, Hash};
 #[cfg(feature = "generate-dashj-tests")]
@@ -37,6 +38,55 @@ pub struct MasternodeEntry {
     pub platform_http_port: u16,
     pub platform_node_id: [u8; 20],
     pub entry_hash: [u8; 32],
+}
+
+pub fn previous_operator_public_keys_to_string(map: &BTreeMap<Block, OperatorPublicKey>) -> String {
+    let prev_keys_count = map.len();
+    let prev_pk = if prev_keys_count == 0 { String::new() } else { format!("pk: {}", map.iter().fold(String::new(), |mut acc, (k, v)| {
+        acc.push_str(format!("\t\t{}/{}: v{} {}\n", k.height, k.hash.to_hex(), v.version, v.data.to_hex()).as_str());
+        acc
+    })) };
+    prev_pk
+}
+pub fn previous_entry_hashes_to_string(map: &BTreeMap<Block, [u8; 32]>) -> String {
+    let prev_eh_count = map.len();
+    let prev_eh = if prev_eh_count == 0 { String::new() } else { format!("entry_hashes: {}", map.iter().fold(String::new(), |mut acc, (k, v)| {
+        acc.push_str(format!("\t\t{}/{}: {}\n", k.height, k.hash.to_hex(), v.to_hex()).as_str());
+        acc
+    }))};
+    prev_eh
+}
+pub fn previous_validity_to_string(map: &BTreeMap<Block, bool>) -> String {
+    let prev_val_count = map.len();
+    let prev_val = if prev_val_count == 0 { String::new() } else { format!("validity: {}", map.iter().fold(String::new(), |mut acc, (k, v)| {
+        acc.push_str(format!("\t\t{}/{}: {}\n", k.height, k.hash.to_hex(), if *v { "valid" } else { "invalid" }).as_str());
+        acc
+    }))};
+    prev_val
+}
+
+impl Display for MasternodeEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let prev_pk = previous_operator_public_keys_to_string(&self.previous_operator_public_keys);
+        let prev_eh = previous_entry_hashes_to_string(&self.previous_entry_hashes);
+        let prev_val = previous_validity_to_string(&self.previous_validity);
+        let has_no_prev = prev_pk.is_empty() && prev_eh.is_empty() && prev_val.is_empty();
+        let prev = if has_no_prev { String::new() } else { format!("prev: {prev_pk}{prev_eh}{prev_val}") };
+        let desc = format!("{} [{}:{}({})]: ({}) at [{}/{}]: pro_reg_tx: {}, pk: v{} {}, key_id: {}, evo_node_id: {}, confirmed_hash: {}, entry_hash: {} {prev}",
+            self.mn_type,
+            self.socket_address.ip_address.to_hex(), self.socket_address.port, self.platform_http_port,
+            if self.is_valid { "valid" } else { "invalid" },
+            self.update_height, self.known_confirmed_at_height.unwrap_or(0),
+            self.provider_registration_transaction_hash.to_hex(),
+            self.operator_public_key.version, self.operator_public_key.data.to_hex(),
+            self.key_id_voting.to_hex(),
+            self.platform_node_id.to_hex(),
+            self.confirmed_hash.to_hex(),
+            self.entry_hash.to_hex(),
+        );
+        write!(f, "{}", desc)
+
+    }
 }
 
 #[cfg(feature = "generate-dashj-tests")]
@@ -185,11 +235,11 @@ impl MasternodeEntry {
             version,
             provider_registration_transaction_hash,
             confirmed_hash,
-            socket_address,
-            operator_public_key,
+            &socket_address,
+            &operator_public_key,
             key_id_voting,
             is_valid,
-            mn_type,
+            &mn_type,
             platform_http_port,
             platform_node_id,
             protocol_version,
@@ -271,7 +321,7 @@ impl MasternodeEntry {
 
 
     pub fn update_with_previous_entry(&mut self, entry: &mut MasternodeEntry, block_height: u32, block_hash: [u8; 32]) {
-        let block = crate::common::Block::new(block_height, block_hash);
+        let block = Block::new(block_height, block_hash);
         self.previous_validity = entry
             .previous_validity
             .clone()
@@ -279,7 +329,7 @@ impl MasternodeEntry {
             .filter(|(block, _)| block.height < self.update_height)
             .collect();
         if entry.is_valid_at(self.update_height) != self.is_valid {
-            self.previous_validity.insert(block, entry.is_valid);
+            self.previous_validity.insert(block.clone(), entry.is_valid);
         }
         self.previous_operator_public_keys = entry
             .previous_operator_public_keys
@@ -288,7 +338,7 @@ impl MasternodeEntry {
             .filter(|(block, _)| block.height < self.update_height)
             .collect();
         if entry.operator_public_key_at(self.update_height) != self.operator_public_key {
-            self.previous_operator_public_keys.insert(block, entry.operator_public_key);
+            self.previous_operator_public_keys.insert(block.clone(), entry.operator_public_key.clone());
         }
         let old_prev_mn_entry_hashes = entry
             .previous_entry_hashes
@@ -311,7 +361,7 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut used_hash = self.entry_hash;
-        for (&crate::common::Block { height, .. }, &hash) in &self.previous_entry_hashes {
+        for (&Block { height, .. }, &hash) in &self.previous_entry_hashes {
             if height <= block_height {
                 continue;
             }
@@ -326,11 +376,11 @@ impl MasternodeEntry {
     }
     pub fn operator_public_key_at(&self, block_height: u32) -> OperatorPublicKey {
         if self.previous_operator_public_keys.is_empty() {
-            return self.operator_public_key;
+            return self.operator_public_key.clone();
         }
         let mut min_distance = u32::MAX;
-        let mut used_previous_operator_public_key_at_block_hash = self.operator_public_key;
-        for (&Block { height, .. }, &key) in &self.previous_operator_public_keys {
+        let mut used_previous_operator_public_key_at_block_hash = self.operator_public_key.clone();
+        for (&Block { height, .. }, key) in &self.previous_operator_public_keys {
             if height <= block_height {
                 continue;
             }
@@ -338,7 +388,7 @@ impl MasternodeEntry {
             if distance < min_distance {
                 min_distance = distance;
                 info!("SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
-                used_previous_operator_public_key_at_block_hash = key;
+                used_previous_operator_public_key_at_block_hash = key.clone();
             }
         }
         used_previous_operator_public_key_at_block_hash
@@ -419,7 +469,7 @@ impl MasternodeEntry {
         MasternodeType::from(mn_type).eq(&self.mn_type)
     }
     pub fn type_uint(&self) -> u16 {
-        self.mn_type.into()
+        self.mn_type.index()
     }
 
     pub fn operator_public_key_address(&self, chain_type: ChainType) -> String {
@@ -434,17 +484,24 @@ impl MasternodeEntry {
         address::address::from_hash160_for_script_map(&self.platform_node_id, &script_map)
     }
 
+//     pub fn merged_with_old_entry(&mut self, entry: &MasternodeEntry, block_height: u32) {
+//
+//     }
+//
+//     pub fn merge_previous_fields(&self, ) {
+//
+//     }
 }
 
 pub fn calculate_entry_hash(
     version: u16,
     provider_registration_transaction_hash: [u8; 32],
     confirmed_hash: [u8; 32],
-    socket_address: SocketAddress,
-    operator_public_key: OperatorPublicKey,
+    socket_address: &SocketAddress,
+    operator_public_key: &OperatorPublicKey,
     key_id_voting: [u8; 20],
     is_valid: u8,
-    mn_type: MasternodeType,
+    mn_type: &MasternodeType,
     platform_http_port: u16,
     platform_node_id: [u8; 20],
     protocol_version: u32,
@@ -458,7 +515,7 @@ pub fn calculate_entry_hash(
     is_valid.enc(&mut writer);
     if version >= 2 {
         u16::from(mn_type).enc(&mut writer);
-        if mn_type == MasternodeType::HighPerformance {
+        if mn_type.is_hpmn() {
             platform_http_port.swap_bytes().enc(&mut writer);
             platform_node_id.enc(&mut writer);
         }

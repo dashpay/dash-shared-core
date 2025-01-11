@@ -2,6 +2,7 @@
 members = [
     "dash-spv-apple-bindings",
     "dash-spv-crypto",
+    "dash-spv-event-bus",
     "dash-spv-example-app",
     "dash-spv-masternode-processor",
     "dash-spv-platform",
@@ -21,3 +22,5 @@ keywords = ["crypto", "dash", "spv"]
 lto = "thin"
 opt-level = 3
 #debug = true
+#[profile.test]
+#default = ["use_serde", "test-helpers"]

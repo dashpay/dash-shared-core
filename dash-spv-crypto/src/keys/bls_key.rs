@@ -89,6 +89,7 @@ impl BLSKey {
     }
 
     pub fn migrate_from_legacy_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
+        //ExtendedPubKey::fr
         ExtendedPublicKey::from_bytes_legacy(bytes)
             .map_err(KeyError::from)
             .map(|extended_public_key| Self {
@@ -137,6 +138,7 @@ impl BLSKey {
     }
 
     pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
+        // dashcore::blsful::SecretKey
         ExtendedPrivateKey::from_seed(seed)
             .and_then(|bls_extended_private_key| Self::init_with_bls_extended_private_key(&bls_extended_private_key, use_legacy))
             .map_err(KeyError::from)
@@ -482,12 +484,21 @@ impl BLSKey {
 
     /// Verification
 
-    fn verify_message(public_key: &G1Element, message: &[u8], signature: [u8; 96], use_legacy: bool) -> bool {
+    pub fn verify_message(public_key: &G1Element, message: &[u8], signature: [u8; 96], use_legacy: bool) -> bool {
         match g2_element_from_bytes(use_legacy, signature.as_slice()) {
             Ok(signature) if use_legacy =>
                 LegacySchemeMPL::new().verify(public_key, message, &signature),
             Ok(signature) =>
                 BasicSchemeMPL::new().verify(public_key, message, &signature),
+            _ => false
+        }
+    }
+    pub fn verify_message_with_pub_key(pub_key: &[u8; 48], message: &[u8], signature: &[u8; 96], use_legacy: bool) -> bool {
+        match (g1_element_from_bytes(use_legacy, pub_key), g2_element_from_bytes(use_legacy, signature)) {
+            (Ok(g1), Ok(g2)) if use_legacy =>
+                LegacySchemeMPL::new().verify(&g1, message, &g2),
+            (Ok(g1), Ok(g2)) =>
+                BasicSchemeMPL::new().verify(&g1, message, &g2),
             _ => false
         }
     }
@@ -641,7 +652,7 @@ fn extended_public_key_from_bytes(bytes: &[u8], use_legacy: bool) -> Result<Exte
     }
 }
 
-fn g1_element_from_bytes(use_legacy: bool, bytes: &[u8]) -> Result<G1Element, BlsError> {
+pub(crate) fn g1_element_from_bytes(use_legacy: bool, bytes: &[u8]) -> Result<G1Element, BlsError> {
     if use_legacy {
         G1Element::from_bytes_legacy(bytes)
     } else {
@@ -978,3 +989,6 @@ fn test_bls_llmq_50_60() {
     assert!(all_commitment_aggregated_signature_validated);
 }
 
+// impl BlsModule
+
+// BlsModule

@@ -2,10 +2,9 @@ use crate::processing::CoreProviderError;
 
 #[warn(non_camel_case_types)]
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub enum ProcessingError {
-    None = 0,
     PersistInRetrieval = 1,
     LocallyStored = 2,
     ParseError = 3,
@@ -13,6 +12,7 @@ pub enum ProcessingError {
     UnknownBlockHash = 5,
     InvalidResult = 6,
     CoreProvider = 7,
+    MissingLists = 8,
 }
 impl std::fmt::Display for ProcessingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -55,7 +55,7 @@ impl From<CoreProviderError> for ProcessingError {
 impl From<u8> for ProcessingError {
     fn from(orig: u8) -> Self {
         match orig {
-            0 => ProcessingError::None,
+            // 0 => ProcessingError::None,
             1 => ProcessingError::PersistInRetrieval,
             2 => ProcessingError::LocallyStored,
             3 => ProcessingError::ParseError,
@@ -63,15 +63,17 @@ impl From<u8> for ProcessingError {
             5 => ProcessingError::UnknownBlockHash,
             6 => ProcessingError::InvalidResult,
             7 => ProcessingError::CoreProvider,
-            _ => ProcessingError::None,
+            8 => ProcessingError::MissingLists,
+            _ => panic!("unknown error type")
+            // _ => ProcessingError::None,
         }
     }
 }
 
-impl From<ProcessingError> for u8 {
-    fn from(error: ProcessingError) -> Self {
+impl From<&ProcessingError> for u8 {
+    fn from(error: &ProcessingError) -> Self {
         match error {
-            ProcessingError::None => 0,
+            // ProcessingError::None => 0,
             ProcessingError::PersistInRetrieval => 1,
             ProcessingError::LocallyStored => 2,
             ProcessingError::ParseError => 3,
@@ -79,6 +81,7 @@ impl From<ProcessingError> for u8 {
             ProcessingError::UnknownBlockHash => 5,
             ProcessingError::InvalidResult => 6,
             ProcessingError::CoreProvider => 7,
+            ProcessingError::MissingLists => 8,
         }
     }
 }
@@ -86,6 +89,6 @@ impl From<ProcessingError> for u8 {
 #[ferment_macro::export]
 impl ProcessingError {
     pub fn index(&self) -> u8 {
-        u8::from(*self)
+        u8::from(self)
     }
 }

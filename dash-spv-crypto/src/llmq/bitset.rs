@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::io;
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, TryRead};
@@ -11,6 +12,12 @@ use crate::crypto::data_ops::Data;
 pub struct Bitset {
     pub count: usize,
     pub bitset: Vec<u8>
+}
+
+impl Display for Bitset {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", self.count, self.bitset.to_hex())
+    }
 }
 
 impl Bitset {
@@ -49,7 +56,7 @@ impl Encodable for Bitset {
     fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
         let mut len = 0;
         len += VarInt(self.count as u64).enc(&mut writer);
-        writer.emit_slice(&self.bitset).unwrap();
+        writer.emit_slice(&self.bitset)?;
         len += self.bitset.len();
         Ok(len)
     }

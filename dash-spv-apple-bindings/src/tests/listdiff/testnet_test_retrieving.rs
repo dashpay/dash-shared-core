@@ -346,17 +346,18 @@ fn init_hashes() -> Vec<UInt256> {
 #[test]
 fn testnet_test_retrieve_saved_hashes() {
     let chain = ChainType::TestNet;
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
-    let bytes_122064 = load_message(chain.identifier(), "MNL_0_122064.dat");
-    let bytes_122088 = load_message(chain.identifier(), "MNL_122064_122088.dat");
+    let identifier = chain.identifier();
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
+    let bytes_122064 = load_message(identifier.clone(), "MNL_0_122064.dat");
+    let bytes_122088 = load_message(identifier, "MNL_122064_122088.dat");
     let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain);
 
 
-    let (block_hash_122064, _) = processor.mn_list_diff_result_from_message(&bytes_122064, true, 70221, false, null())
+    let (_, block_hash_122064, _) = processor.mn_list_diff_result_from_message(&bytes_122064, true, 70221, false, null())
             .expect("Result must be valid");
     // assert!(result_122064.is_valid(), "Result must be valid");
 
-    let (block_hash_122088, _) = processor.mn_list_diff_result_from_message(&bytes_122088, true, 70221, false, null())
+    let (_, block_hash_122088, _) = processor.mn_list_diff_result_from_message(&bytes_122088, true, 70221, false, null())
             .expect("Result must be valid");
     // assert!(result_122088.is_valid(), "Result must be valid");
 

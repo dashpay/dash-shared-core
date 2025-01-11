@@ -1,6 +1,7 @@
 use hashes::hex::FromHex;
 use dash_spv_crypto::crypto::byte_util::{Reversable, Reversed, UInt256};
 use crate::common::Block;
+use crate::common::block::MBlock;
 
 #[derive(Debug, Copy, Clone)]
 pub struct MerkleBlock {
@@ -43,6 +44,15 @@ impl From<&MerkleBlock> for Block {
         Block {
             height: value.height,
             hash: value.hash(),
+        }
+    }
+}
+impl From<&MerkleBlock> for MBlock {
+    fn from(value: &MerkleBlock) -> Self {
+        MBlock {
+            height: value.height,
+            hash: value.hash(),
+            merkle_root: value.merkle_root_reversed()
         }
     }
 }
@@ -2479,5 +2489,9 @@ pub fn init_testnet_store() -> Vec<MerkleBlock> {
         MerkleBlock::reversed(908399, "000000851db71dc993e40de31e21d4175cf0419986f5e1fb3784745579ba698b", "86ed80fb550f7237524b549b9c8212867c6cbebc49bd2fa0410d4f5d965b4e70"),
         MerkleBlock::reversed(908400, "00000000d90be6f2dbcbbd9c6fb6060f2ac7f55ad77b2746811149b6a25a8df0", "dbb39caba54df6ddfbd069b1919fc306befbf1c7686c997d2da6aab0b76d1c6d"),
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ]
+        MerkleBlock::reversed(1156656, "000000fb1d38dafcac5fa4b41c2b7218320f2f1c4caeaac6bff4b7818d7dc829", "c8ba8be34cac5ebe81a52d1a49d6fb7eccc05e82ad98a00b38b8780a8004c804"),
+        MerkleBlock::reversed(1156680, "0000002cc4d33ab924b4a75cdc2a3da8542978dcc40bd70fb6c7cb86f3547d8f", "eed36d8c23a439fbd0f159968f4ac332d44c81395feb0d3d1a2387c79a575729"),
+        MerkleBlock::reversed(1156704, "000000ba55c204cab0f30ad4744e0dea6eb12cd59283f50f8d1acfcf9cf40dee", "286a1bb206a728a142f29e139981c9ab72a3f370f08d1823ab606060b354129a"),
+        MerkleBlock::reversed(1157239, "000000a59ce25bbc90de4ccedfa36d1dc0c15c60574f6608585ea829f807df5c", "cd98549ee669d58fad415e7b67ff6ffa4c466cc1eff0f5799bb87dbf2cded177"),
+    ]
 }

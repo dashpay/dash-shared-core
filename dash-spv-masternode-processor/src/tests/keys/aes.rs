@@ -16,7 +16,7 @@ fn test_bls_encryption_and_decryption() {
     let alice_key_pair = BLSKey::key_with_seed_data(&alice_seed, true);
     let alice_public_key_data = alice_key_pair.public_key_data();
     let alice_private_key_data = alice_key_pair.private_key_data().unwrap();
-    let alice_address = address::with_public_key_data(&alice_public_key_data, chain);
+    let alice_address = address::with_public_key_data(&alice_public_key_data, chain.clone());
     assert_eq!(alice_public_key_data.to_hex(), "1790635de8740e9a6a6b15fb6b72f3a16afa0973d971979b6ba54761d6e2502c50db76f4d26143f05459a42cfd520d44", "BLS publicKeyData is incorrect");
     assert_eq!(base64_engine.encode(alice_public_key_data), "F5BjXeh0DppqaxX7a3LzoWr6CXPZcZeba6VHYdbiUCxQ23b00mFD8FRZpCz9Ug1E", "BLS publicKeyData is incorrect");
     assert_eq!(alice_private_key_data.to_hex(), "46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd", "BLS privateKeyData is incorrect");

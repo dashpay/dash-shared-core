@@ -84,7 +84,7 @@ impl IndexHardSoft for [u8; 32] {
 }
 
 pub trait IIndexPath: Sized {
-    type Item: Copy + Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum;
+    type Item: Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum;
 
     fn new(indexes: Vec<Self::Item>) -> Self;
     fn new_hardened(indexes: Vec<Self::Item>, hardened: Vec<bool>) -> Self;
@@ -113,7 +113,7 @@ pub trait IIndexPath: Sized {
         if position >= self.length() {
             Self::Item::max()
         } else {
-            self.indexes()[position]
+            self.indexes()[position].clone()
         }
     }
     fn hardened_at_position(&self, position: usize) -> bool {
@@ -206,7 +206,7 @@ pub struct IndexPath<T> {
     pub hardened: Vec<bool>,
 }
 
-impl<T> IIndexPath for IndexPath<T> where T: Copy + Debug + Encodable + IndexHardSoft + PartialEq + Extremum {
+impl<T> IIndexPath for IndexPath<T> where T: Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum {
     type Item = T;
     // TODO: avoid hardened allocation for u32 index paths
     fn new(indexes: Vec<Self::Item>) -> Self {

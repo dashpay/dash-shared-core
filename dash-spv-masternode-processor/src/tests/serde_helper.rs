@@ -18,6 +18,7 @@ use crate::processing::MasternodeProcessor;
 use crate::test_helpers::block_hash_to_block_hash;
 
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 pub struct Block {
     pub hash: String,
     pub size: i64,
@@ -40,9 +41,11 @@ pub struct Block {
     pub pool_info: PoolInfo,
 }
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 pub struct PoolInfo {}
 
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 struct Masternode {
     #[serde(rename = "proTxHash")]
     pub pro_tx_hash: String,
@@ -59,6 +62,7 @@ struct Masternode {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 pub struct QRInfo {
     #[serde(rename = "extraShare")]
     pub extra_share: bool,
@@ -86,6 +90,7 @@ pub struct QRInfo {
     pub mn_list_diff_list: Vec<ListDiff>,
 }
 
+#[cfg(feature = "serde")]
 #[derive(Serialize, Deserialize)]
 pub struct Snapshot {
     #[serde(rename = "activeQuorumMembers")]
@@ -97,6 +102,7 @@ pub struct Snapshot {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 pub struct Llmq {
     pub version: i64,
     #[serde(rename = "llmqType")]
@@ -122,6 +128,7 @@ pub struct Llmq {
     pub members_sig: String,
 }
 
+#[cfg(feature = "serde")]
 impl From<Llmq> for LLMQEntry {
     fn from(llmq: Llmq) -> Self {
         LLMQEntry::new(
@@ -140,6 +147,7 @@ impl From<Llmq> for LLMQEntry {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 pub struct Node {
     #[serde(rename = "proRegTxHash")]
     pub pro_reg_tx_hash: String,
@@ -163,6 +171,7 @@ pub struct Node {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 pub struct ListDiff {
     #[serde(rename = "baseBlockHash")]
     pub base_block_hash: String,
@@ -189,6 +198,7 @@ pub struct ListDiff {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg(feature = "serde")]
 pub struct MNList {
     #[serde(rename = "blockHash")]
     pub block_hash: String,
@@ -204,6 +214,24 @@ pub struct MNList {
     pub new_quorums: Vec<Llmq>,
 }
 
+// impl From<MNList> for models::MasternodeList {
+//     fn from(value: MNList) -> Self {
+//         let block_hash = block_hash_to_block_hash(value.block_hash);
+//         let known_height = value.known_height;
+//         let masternode_merkle_root = Some(block_hash_to_block_hash(value.masternode_merkle_root));
+//         let llmq_merkle_root = Some(block_hash_to_block_hash(value.quorum_merkle_root));
+//         let masternodes = nodes_to_masternodes(value.mn_list);
+//         let quorums = quorums_to_quorums_map(value.new_quorums);
+//         models::MasternodeList {
+//             block_hash,
+//             known_height,
+//             masternode_merkle_root,
+//             llmq_merkle_root,
+//             masternodes,
+//             quorums
+//         }
+//     }
+// }
 
 pub fn bools_to_bytes(bools: Vec<bool>) -> Vec<u8> {
     let mut b = Vec::<u8>::with_capacity(bools.len() / 8);
@@ -221,6 +249,7 @@ pub fn bools_to_bytes(bools: Vec<bool>) -> Vec<u8> {
     b
 }
 
+#[cfg(feature = "serde")]
 impl From<Snapshot> for models::LLMQSnapshot {
     fn from(snapshot: Snapshot) -> Self {
         let member_list = bools_to_bytes(snapshot.active_quorum_members);
@@ -229,6 +258,7 @@ impl From<Snapshot> for models::LLMQSnapshot {
         models::LLMQSnapshot::new(member_list, skip_list, skip_list_mode)
     }
 }
+#[cfg(feature = "serde")]
 impl From<&serde_json::Value> for models::LLMQSnapshot {
     fn from(value: &Value) -> Self {
         let snapshot: Snapshot = serde_json::from_value(value.clone()).unwrap();
@@ -238,6 +268,7 @@ impl From<&serde_json::Value> for models::LLMQSnapshot {
         models::LLMQSnapshot::new(member_list, skip_list, skip_list_mode)
     }
 }
+#[cfg(feature = "serde")]
 impl From<&serde_json::Value> for models::MasternodeList {
     fn from(value: &Value) -> Self {
         let nodes: Vec<Node> = serde_json::from_value(value.clone()).unwrap();
@@ -253,16 +284,18 @@ impl From<&serde_json::Value> for models::MasternodeList {
     }
 }
 
+#[cfg(feature = "serde")]
 pub fn quorums_to_quorums_vec(value: Vec<Llmq>) -> Vec<LLMQEntry> {
     value.into_iter().map(LLMQEntry::from).collect()
 }
 
+#[cfg(feature = "serde")]
 pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>> {
     let mut quorums: BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>> = BTreeMap::new();
     value.into_iter().for_each(|llmq| {
         let entry = LLMQEntry::from(llmq);
         quorums
-            .entry(entry.llmq_type)
+            .entry(entry.llmq_type.clone())
             .or_insert_with(BTreeMap::new)
             .insert(entry.llmq_hash, entry);
 
@@ -270,6 +303,7 @@ pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<[
     quorums
 }
 
+#[cfg(feature = "serde")]
 pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<[u8; 32], models::MasternodeEntry> {
     let map: BTreeMap<[u8; 32], models::MasternodeEntry> = value
         .into_iter()
@@ -300,6 +334,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<[u8; 32], models::Mast
     map
 }
 
+#[cfg(feature = "serde")]
 pub fn masternode_list_from_genesis_diff(
     diff: ListDiff, processor: &MasternodeProcessor, is_bls_basic: bool) -> models::MNListDiff {
     let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reverse().0;
@@ -312,8 +347,14 @@ pub fn masternode_list_from_genesis_diff(
 
     let offset = &mut 0;
     let total_transactions = u32::from_bytes(tree_bytes, offset).unwrap();
+    // let merkle_hashes = VarArray::<UInt256>::from_bytes(tree_bytes, offset).unwrap();
+    //
+    // let merkle_flags_var_int: VarInt = VarInt::from_bytes(tree_bytes, offset).unwrap();
+    // let merkle_flags_count = merkle_flags_var_int.0 as usize;
+    // let merkle_flags: &[u8] = tree_bytes.read_with(offset, Bytes::Len(merkle_flags_count)).unwrap();
 
     let num_merkle_hashes = VarInt::from_bytes(tree_bytes, offset).unwrap().0 as usize;
+    // let arr_len = var_int.0 as usize;
     let mut merkle_hashes = Vec::with_capacity(num_merkle_hashes);
     for _i  in 0..num_merkle_hashes {
         let data = tree_bytes.read_with::<UInt256>(offset, byte::LE).unwrap().0;
@@ -321,6 +362,7 @@ pub fn masternode_list_from_genesis_diff(
     }
 
 
+    // let merkle_hashes = VarArray::<[u8; 32]>::from_bytes(message, offset)?;
     let merkle_flags_count = VarInt::from_bytes(tree_bytes, offset).unwrap().0 as usize;
     let merkle_flags: &[u8] = tree_bytes.read_with(offset, byte::ctx::Bytes::Len(merkle_flags_count)).unwrap();
 
@@ -332,6 +374,8 @@ pub fn masternode_list_from_genesis_diff(
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums_vec(diff.new_quorums);
+    println!("block_hash_tip: {}", base_block_hash.to_hex());
+    println!("block_hash_tip: {}", block_hash.to_hex());
     models::MNListDiff {
         base_block_hash,
         block_hash,
@@ -351,7 +395,11 @@ pub fn masternode_list_from_genesis_diff(
     }
 }
 
+// pub fn masternode_list_from_json(filename: String) -> models::MasternodeList {
+//     From::<MNList>::from(serde_json::from_slice(&message_from_file(filename.as_str())).unwrap())
+// }
 
+#[cfg(feature = "serde")]
 impl From<Block> for MerkleBlock {
     fn from(block: Block) -> Self {
         MerkleBlock {

@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 
@@ -5,7 +6,7 @@ use byte::{BytesExt, TryRead, LE};
 use serde::{Serialize, Serializer};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash)]
 #[ferment_macro::export]
 pub enum LLMQSnapshotSkipMode {
     // No skipping. The skip list is empty.
@@ -23,11 +24,20 @@ pub enum LLMQSnapshotSkipMode {
     // Every node was skipped. The skip list is empty. DKG sessions were not attempted.
     SkipAll = 3,
 }
-
+impl std::fmt::Display for LLMQSnapshotSkipMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            LLMQSnapshotSkipMode::NoSkipping => "0_NoSkipping",
+            LLMQSnapshotSkipMode::SkipFirst => "1_SkipFirst",
+            LLMQSnapshotSkipMode::SkipExcept => "2_SkipExcept",
+            LLMQSnapshotSkipMode::SkipAll => "3_SkipAll"
+        })
+    }
+}
 #[cfg(feature = "generate-dashj-tests")]
 impl Serialize for LLMQSnapshotSkipMode {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_u32(u32::from(*self))
+        serializer.serialize_u32(self.index())
     }
 }
 
@@ -65,7 +75,7 @@ impl<'a> TryRead<'a, Endian> for LLMQSnapshotSkipMode {
 #[ferment_macro::export]
 impl LLMQSnapshotSkipMode {
     pub fn index(&self) -> u32 {
-        u32::from(*self)
+        u32::from(self.clone())
     }
 }
 

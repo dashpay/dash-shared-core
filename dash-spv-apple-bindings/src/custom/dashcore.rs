@@ -84,22 +84,29 @@ impl Drop for Transaction {
 
 #[allow(non_camel_case_types)]
 #[ferment_macro::register(dashcore::consensus::encode::Error)]
-pub struct dashcore_consensus_encode_Error {
+pub struct dashcore_consensus_Error {
     pub raw: *mut dashcore::consensus::encode::Error,
 }
-impl ferment::FFIConversionFrom<dashcore::consensus::encode::Error> for dashcore_consensus_encode_Error {
+
+impl ferment::FFIConversionFrom<dashcore::consensus::encode::Error> for dashcore_consensus_Error {
     unsafe fn ffi_from_const(ffi: *const Self) -> dashcore::consensus::encode::Error {
-        ferment::FFIConversionFrom::ffi_from(ffi as *mut Self)
-    }
-    unsafe fn ffi_from(ffi: *mut Self) -> dashcore::consensus::encode::Error {
         *ferment::unbox_any((&*ffi).raw)
     }
 }
-impl ferment::FFIConversionTo<dashcore::consensus::encode::Error> for dashcore_consensus_encode_Error {
+impl ferment::FFIConversionTo<dashcore::consensus::encode::Error> for dashcore_consensus_Error {
     unsafe fn ffi_to_const(obj: dashcore::consensus::encode::Error) -> *const Self {
-        ferment::boxed(Self { raw: ferment::boxed(obj) })
+        ferment::boxed(Self { raw: ferment::boxed(obj.into()) })
     }
 }
+
+impl Drop for dashcore_consensus_Error {
+    fn drop(&mut self) {
+        unsafe {
+            ferment::unbox_any(self.raw);
+        }
+    }
+}
+
 
 #[allow(non_camel_case_types)]
 #[ferment_macro::register(dashcore::Txid)]

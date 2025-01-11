@@ -1,7 +1,5 @@
-use std::io::Read;
 use hashes::{sha256d, Hash};
-use dash_spv_crypto::consensus::{Decodable, Encodable};
-use dash_spv_crypto::consensus::encode::Error;
+use dash_spv_crypto::consensus::Encodable;
 
 #[inline]
 fn ceil_log2(mut x: i32) -> i32 {
@@ -17,19 +15,20 @@ fn ceil_log2(mut x: i32) -> i32 {
 }
 
 #[derive(Clone, Debug)]
-pub struct MerkleTree {
+pub struct MerkleTree<'a> {
     pub tree_element_count: u32,
     pub hashes: Vec<[u8; 32]>,
-    pub flags: Vec<u8>,
+    pub flags: &'a [u8],
 }
 
-impl MerkleTree {
+impl<'a> MerkleTree<'a> {
 
     pub fn has_root(&self, desired_merkle_root: [u8; 32]) -> bool {
         if self.tree_element_count == 0 {
             return true;
         }
         if let Some(root) = self.merkle_root() {
+            let eq = root == desired_merkle_root;
             if root == desired_merkle_root {
                 return true;
             }
@@ -103,22 +102,22 @@ impl MerkleTree {
 //         Ok((tree, *offset))
 //     }
 // }
-impl<'a> Decodable for MerkleTree {
-    #[inline]
-    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, Error> {
-        // let data = <[u8; 48]>::consensus_decode(&mut d)?;
-        let total_transactions = u32::consensus_decode(&mut d)?;
-        let merkle_hashes = <Vec<[u8; 32]>>::consensus_decode(&mut d)?;
-        let merkle_flags = <Vec<u8>>::consensus_decode(&mut d)?;
-        // let merkle_hashes = VarArray::<[u8; 32]>::from_bytes(bytes, offset)?;
-        // let merkle_flags_var_bytes = VarBytes::from_bytes(bytes, offset)?;
-        let tree = MerkleTree {
-            tree_element_count: total_transactions,
-            hashes: merkle_hashes,
-            flags: merkle_flags
-        };
-
-        Ok(tree)
-    }
-}
-
+// impl<'a> Decodable for MerkleTree<'a> {
+//     #[inline]
+//     fn consensus_decode<D: Read>(mut d: D) -> Result<Self, Error> {
+//         // let data = <[u8; 48]>::consensus_decode(&mut d)?;
+//         let total_transactions = u32::consensus_decode(&mut d)?;
+//         let merkle_hashes = <Vec<[u8; 32]>>::consensus_decode(&mut d)?;
+//         let merkle_flags = <Vec<u8>>::consensus_decode(&mut d)?;
+//         // let merkle_hashes = VarArray::<[u8; 32]>::from_bytes(bytes, offset)?;
+//         // let merkle_flags_var_bytes = VarBytes::from_bytes(bytes, offset)?;
+//         let tree = MerkleTree {
+//             tree_element_count: total_transactions,
+//             hashes: merkle_hashes,
+//             flags: merkle_flags.as_slice()
+//         };
+//
+//         Ok(tree)
+//     }
+// }
+//

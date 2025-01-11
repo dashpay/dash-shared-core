@@ -1,22 +1,8 @@
-use crate::processing::core_provider::CoreProviderError;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum LLMQValidationStatus {
-    Verified,
+pub enum LLMQValidationError {
     InvalidPayload(LLMQPayloadValidationStatus),
     InvalidAggregatedSignature,
     InvalidQuorumSignature,
-    ProviderError(CoreProviderError),
-    NoMasternodeList
-}
-
-impl LLMQValidationStatus {
-    pub fn is_not_critical(&self) -> bool {
-        match self {
-            Self::Verified | Self::NoMasternodeList => true,
-            _ => false
-        }
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]

@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
@@ -28,6 +29,16 @@ impl Default for LLMQSnapshot {
             skip_list: vec![],
             skip_list_mode: LLMQSnapshotSkipMode::NoSkipping,
         }
+    }
+}
+
+impl Display for LLMQSnapshot {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let skip_list = self.skip_list.iter().fold(String::new(), |mut acc, i| {
+            acc.push_str(format!("{},", *i).as_str());
+            acc
+        });
+        write!(f, "members: {} {} {}", self.member_list.to_hex(), self.skip_list_mode, skip_list)
     }
 }
 

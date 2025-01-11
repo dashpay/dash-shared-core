@@ -225,6 +225,10 @@ pub const TESTNET_PARAMS: Params = Params {
 };
 
 pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
+    let minimum_difficulty_blocks = match &r#type {
+        DevnetType::JackDaniels => 4032,
+        _ => 1000000,
+    };
     Params {
         chain_type: ChainType::DevNet(r#type),
         max_proof_of_work: "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -259,10 +263,7 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
         platform_protocol_version: 1,
         dpns_contract_id: "",
         dashpay_contract_id: "",
-        minimum_difficulty_blocks: match r#type {
-            DevnetType::JackDaniels => 4032,
-            _ => 1000000,
-        },
+        minimum_difficulty_blocks,
         standard_dapi_jrpc_port: 3000,
         // script_map: ScriptMap::TESTNET,
         // bip32_script_map: BIP32ScriptMap::TESTNET,

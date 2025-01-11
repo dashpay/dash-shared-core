@@ -38,6 +38,10 @@ pub enum QueryKind<'a> {
         document_type: &'a str,
         usernames: &'a [&'a str],
     },
+    IncomingContactRequests {
+        contract: DataContract,
+        document_type: &'a str,
+    },
     OutgoingContactRequests {
         contract: DataContract,
         document_type: &'a str,
@@ -110,6 +114,9 @@ impl<'a> Into<Result<DocumentQuery, Error>> for QueryKind<'a> {
                         query.with_where(WhereKind::Usernames(usernames).into())
                             .with_order_by(OrderKind::LabelAsc.into())
                     }),
+            QueryKind::IncomingContactRequests { contract, document_type } =>
+                DocumentQuery::new(contract, document_type)
+                    .map(|query| query.into()),
             QueryKind::OutgoingContactRequests { contract, document_type } =>
                 DocumentQuery::new(contract, document_type)
                     .map(|query| query.into())

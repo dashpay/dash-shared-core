@@ -38,9 +38,9 @@ fn test_quorum_issue() {
         "MNL_1098960_1098984.dat".to_string(),
         "MNL_1098984_1099008.dat".to_string(),
     ];
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
     // let ctx = context.read().unwrap();
-    let success = load_masternode_lists_for_files(files, false, Arc::clone(&context), true, chain);
+    let success = load_masternode_lists_for_files(files, false, Arc::clone(&context), false, chain);
     assert!(success, "Unsuccessful");
     // let ctx = context.read().unwrap();
     // let cache_lock = ctx.cache.read().unwrap();

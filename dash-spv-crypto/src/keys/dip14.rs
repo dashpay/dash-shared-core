@@ -210,3 +210,23 @@ impl<T> IChildKeyDerivation<T, SigningKey, [u8; 32]> for ED25519Key where Self: 
     }
 }
 
+// #[test]
+// pub fn test_identity_key() {
+//     // get_identities_for_wallets -> wallet_id: e1049d4399c689f4: index: 0: key: ECDSA(ECDSAKey { seckey: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], pubkey: [2, 63, 137, 159, 254, 152, 58, 243, 60, 149, 56, 138, 170, 139, 57, 131, 111, 6, 201, 51, 226, 108, 213, 101, 243, 23, 230, 50, 134, 44, 223, 38, 130], compressed: true, chaincode: [3, 209, 66, 1, 182, 0, 244, 102, 103, 196, 92, 56, 17, 157, 182, 98, 231, 68, 6, 220, 168, 235, 114, 138, 112, 27, 246, 174, 167, 252, 162, 168], fingerprint: 627235130, is_extended: true })
+//     let pub_key: [u8; 33] = [2, 63, 137, 159, 254, 152, 58, 243, 60, 149, 56, 138, 170, 139, 57, 131, 111, 6, 201, 51, 226, 108, 213, 101, 243, 23, 230, 50, 134, 44, 223, 38, 130];
+//     let key = ECDSAKey {
+//         seckey: [0; 32],
+//         pubkey: pub_key.to_vec(),
+//         compressed: true,
+//         chaincode: [3, 209, 66, 1, 182, 0, 244, 102, 103, 196, 92, 56, 17, 157, 182, 98, 231, 68, 6, 220, 168, 235, 114, 138, 112, 27, 246, 174, 167, 252, 162, 168],
+//         fingerprint: 627235130,
+//         is_extended: true,
+//     };
+//
+//
+//     let index_path = IndexPath::new(vec![0 | BIP32_HARD, 0 | BIP32_HARD]);
+//
+//     let public_key = key.public_key_from_extended_public_key_data_at_index_path(&index_path);
+//     assert!(public_key.is_ok());
+// }
+//

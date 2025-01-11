@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
 #[cfg(feature = "generate-dashj-tests")]
@@ -5,20 +6,27 @@ use serde::{Serialize, Serializer};
 use dash_spv_crypto::crypto::byte_util::BytesDecodable;
 
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub enum MasternodeType {
     Regular = 0,
     HighPerformance = 1,
 }
 
-#[cfg(feature = "generate-dashj-tests")]
-impl Serialize for MasternodeType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_u16(u16::from(*self))
+impl Display for MasternodeType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.is_hpmn() { "HPMN" } else { "MN" })
     }
 }
 
+#[cfg(feature = "generate-dashj-tests")]
+impl Serialize for MasternodeType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_u16(u16::from(self.clone()))
+    }
+}
+
+#[ferment_macro::export]
 impl MasternodeType {
     pub fn voting_weight(&self) -> i32 {
         match self {
@@ -32,6 +40,16 @@ impl MasternodeType {
             MasternodeType::HighPerformance => 4000,
         }
     }
+    pub fn is_hpmn(&self) -> bool {
+        match self {
+            MasternodeType::Regular => false,
+            MasternodeType::HighPerformance => true
+        }
+    }
+    pub fn index(&self) -> u16 {
+        u16::from(self)
+    }
+
 }
 
 impl From<u16> for MasternodeType {
@@ -45,6 +63,14 @@ impl From<u16> for MasternodeType {
 }
 impl From<MasternodeType> for u16 {
     fn from(orig: MasternodeType) -> Self {
+        match orig {
+            MasternodeType::Regular => 0,
+            MasternodeType::HighPerformance => 1,
+        }
+    }
+}
+impl From<&MasternodeType> for u16 {
+    fn from(orig: &MasternodeType) -> Self {
         match orig {
             MasternodeType::Regular => 0,
             MasternodeType::HighPerformance => 1,

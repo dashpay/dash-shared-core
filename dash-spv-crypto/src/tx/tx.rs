@@ -1,6 +1,7 @@
 use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
+use hashes::{sha256d, Hash};
 use crate::consensus::{Decodable, Encodable, encode, encode::VarInt};
 use crate::crypto::byte_util::UInt256;
 use crate::network::protocol::SIGHASH_ALL;
@@ -8,7 +9,7 @@ use crate::tx::{TransactionInput, TransactionOutput};
 use crate::util::params::TX_UNCONFIRMED;
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[ferment_macro::export]
 pub enum TransactionType {
     Classic = 0,
@@ -62,10 +63,18 @@ impl From<TransactionType> for u16 {
 
 impl TransactionType {
     fn raw_value(&self) -> u16 {
-        *self as u16
+        u16::from(self.clone())
     }
     pub fn requires_inputs(&self) -> bool {
         true
+    }
+
+    pub fn is_classic(&self) -> bool {
+        if &TransactionType::Classic == self {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -105,7 +114,7 @@ impl Transaction {
         Self::data_with_subscript_index_static(
             subscript_index,
             self.version,
-            self.tx_type,
+            self.tx_type.clone(),
             &self.inputs,
             &self.outputs,
             self.lock_time,
@@ -199,7 +208,7 @@ impl Transaction {
     }
 
     pub fn tx_type(&self) -> TransactionType {
-        self.tx_type
+        self.tx_type.clone()
     }
 }
 
@@ -208,6 +217,7 @@ impl Decodable for Transaction {
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
         let version = u16::consensus_decode(&mut d)?;
         let tx_type = TransactionType::consensus_decode(&mut d)?;
+        let is_classic = tx_type.is_classic();
         let inputs: Vec<TransactionInput> = Vec::consensus_decode(&mut d)?;
         let outputs: Vec<TransactionOutput> = Vec::consensus_decode(&mut d)?;
         let lock_time = u32::consensus_decode(&mut d)?;
@@ -221,7 +231,7 @@ impl Decodable for Transaction {
             tx_hash: None,
             payload_offset: 0,
         };
-        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()).0);
+        tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(&tx.to_data()).into_inner());
         Ok(tx)
     }
 }
@@ -232,6 +242,7 @@ impl<'a> TryRead<'a, Endian> for Transaction {
         let version = bytes.read_with::<u16>(offset, endian)?;
         let tx_type_uint = bytes.read_with::<u16>(offset, endian)?;
         let tx_type = TransactionType::from(tx_type_uint);
+        let is_classic = tx_type.is_classic();
         let count_var = bytes.read_with::<VarInt>(offset, endian)?;
         let count = count_var.0;
         // at least one input is required
@@ -259,7 +270,8 @@ impl<'a> TryRead<'a, Endian> for Transaction {
             tx_hash: None,
             block_height: TX_UNCONFIRMED as u32,
         };
-        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()).0);
+        tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(tx.to_data().as_ref()).into_inner());
         Ok((tx, *offset))
     }
 }
+

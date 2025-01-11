@@ -1,3 +1,4 @@
+use dash_sdk::dapi_client::AddressListError;
 use dash_spv_crypto::keys::KeyError;
 use dpp::errors::ProtocolError;
 use http::uri::InvalidUri;
@@ -23,9 +24,19 @@ impl From<ProtocolError> for Error {
         Error::DashSDKError(e.to_string())
     }
 }
+impl From<anyhow::Error> for Error {
+    fn from(e: anyhow::Error) -> Self {
+        Error::DashSDKError(e.to_string())
+    }
+}
 impl From<InvalidUri> for Error {
     fn from(e: InvalidUri) -> Self {
         Error::DashSDKError(e.to_string())
+    }
+}
+impl From<AddressListError> for Error {
+    fn from(value: AddressListError) -> Self {
+        Error::DashSDKError(value.to_string())
     }
 }
 

@@ -40,7 +40,7 @@ fn test_mainnet_reload_with_processor() {
         .map(Into::into)
         .to_vec();
 
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
     let success = load_masternode_lists_for_files(files, true, Arc::clone(&context), false, chain);
     assert!(success, "Unsuccessful");
     // let context_lock = context.read().unwrap();

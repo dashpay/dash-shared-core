@@ -1,42 +1,39 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use dash_spv_crypto::network::ChainType;
-#[cfg(test)]
-use dash_spv_masternode_processor::block_store::MerkleBlock;
-use dash_spv_masternode_processor::common::block::Block;
+use dash_spv_masternode_processor::common::block::{Block, MBlock};
 use dash_spv_masternode_processor::models::{masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 use dash_spv_masternode_processor::processing::core_provider::{CoreProvider, CoreProviderError};
 #[cfg(test)]
-use dash_spv_masternode_processor::processing::MasternodeProcessor;
-#[cfg(test)]
-use dash_spv_masternode_processor::processing::MasternodeProcessorCache;
-#[cfg(test)]
-use dash_spv_masternode_processor::tests::FFIContext;
+use dash_spv_masternode_processor::{processing::{MasternodeProcessor, MasternodeProcessorCache}, tests::FFIContext};
+use dash_spv_masternode_processor::models::sync_state::SyncState;
 
 #[ferment_macro::opaque]
 pub struct FFICoreProvider {
-    /// External Masternode Manager Diff Message Context
     pub context: *const std::ffi::c_void,
     // pub context: Arc<FFIThreadSafeContext>,
     pub chain_type: ChainType,
+
     pub get_block_height_by_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> u32>,
-    pub get_merkle_root_by_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 32], CoreProviderError>>,
-    pub get_block_hash_by_height: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> Result<[u8; 32], CoreProviderError>>,
+    pub block_by_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError>>,
+    pub last_block_for_block_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError>>,
+    pub get_block_hash_by_height: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> [u8; 32]>,
     pub get_block_by_height_or_last_terminal: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError>>,
     pub add_insight: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32])>,
-    pub persist_in_retrieval_queue: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], bool) -> bool>,
-
+    pub get_cl_signature_by_block_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 96], CoreProviderError>>,
     pub load_masternode_list_from_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<Arc<MasternodeList>, CoreProviderError>>,
     pub save_masternode_list_into_db: Arc<dyn Fn(*const std::os::raw::c_void, Arc<MasternodeList>, BTreeMap<[u8; 32], MasternodeEntry>) -> Result<bool, CoreProviderError>>,
-
     pub load_llmq_snapshot_from_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<LLMQSnapshot, CoreProviderError>>,
     pub save_llmq_snapshot_into_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], LLMQSnapshot) -> Result<bool, CoreProviderError>>,
     pub update_address_usage_of_masternodes: Arc<dyn Fn(*const std::os::raw::c_void, Vec<MasternodeEntry>)>,
-    pub first_in_retrieval_queue: Arc<dyn Fn(*const std::os::raw::c_void, bool) -> Option<[u8; 32]>>,
     pub remove_request_in_retrieval: Arc<dyn Fn(*const std::os::raw::c_void, bool, [u8; 32], [u8; 32]) -> bool>,
-    pub remove_from_retrieval_queue: Arc<dyn Fn(*const std::os::raw::c_void, bool, [u8; 32])>,
-    pub issue_with_masternode_list_from_peer: Arc<dyn Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void)>
+    pub issue_with_masternode_list_from_peer: Arc<dyn Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void)>,
+    pub notify_sync_state: Arc<dyn Fn(*const std::os::raw::c_void, SyncState)>,
+    pub dequeue_masternode_list: Arc<dyn Fn(*const std::os::raw::c_void, bool)>
 }
+
+unsafe impl Send for FFICoreProvider {}
+unsafe impl Sync for FFICoreProvider {}
 
 impl std::fmt::Debug for FFICoreProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -49,14 +46,9 @@ impl std::fmt::Debug for FFICoreProvider {
 
 impl CoreProvider for FFICoreProvider {
     fn chain_type(&self) -> ChainType {
-        self.chain_type
+        self.chain_type.clone()
     }
-
-    fn lookup_merkle_root_by_hash(&self, block_hash: [u8; 32]) -> Result<[u8; 32], CoreProviderError> {
-        (self.get_merkle_root_by_hash)(self.context, block_hash)
-    }
-
-    fn lookup_block_hash_by_height(&self, block_height: u32) -> Result<[u8; 32], CoreProviderError> {
+    fn lookup_block_hash_by_height(&self, block_height: u32) -> [u8; 32] {
         (self.get_block_hash_by_height)(self.context, block_height)
     }
 
@@ -74,16 +66,6 @@ impl CoreProvider for FFICoreProvider {
 
     fn remove_request_in_retrieval(&self, is_dip24: bool, base_block_hash: [u8; 32], block_hash: [u8; 32]) -> bool {
         (self.remove_request_in_retrieval)(self.context, is_dip24, base_block_hash, block_hash)
-    }
-
-    fn remove_from_retrieval_queue(&self, is_dip24: bool, block_hash: [u8; 32]) {
-        (self.remove_from_retrieval_queue)(self.context, is_dip24, block_hash)
-    }
-    fn first_in_retrieval_queue(&self, is_dip24: bool) -> Option<[u8; 32]> {
-        (self.first_in_retrieval_queue)(self.context, is_dip24)
-    }
-    fn persist_in_retrieval_queue(&self, block_hash: [u8; 32], is_dip24: bool) -> bool {
-        (self.persist_in_retrieval_queue)(self.context, block_hash, is_dip24)
     }
     fn load_masternode_list_from_db(&self, block_hash: [u8; 32]) -> Result<Arc<MasternodeList>, CoreProviderError> {
         (self.load_masternode_list_from_db)(self.context, block_hash)
@@ -106,43 +88,63 @@ impl CoreProvider for FFICoreProvider {
     fn issue_with_masternode_list_from_peer(&self, is_dip24: bool, peer: *const std::os::raw::c_void) {
         (self.issue_with_masternode_list_from_peer)(self.context, is_dip24, peer)
     }
+
+    fn block_by_hash(&self, block_hash: [u8; 32]) -> Result<MBlock, CoreProviderError> {
+        (self.block_by_hash)(self.context, block_hash)
+    }
+
+    fn last_block_for_block_hash(&self, block_hash: [u8; 32], peer: *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> {
+        (self.last_block_for_block_hash)(self.context, block_hash, peer)
+    }
+
+    fn lookup_cl_signature_by_block_hash(&self, block_hash: [u8; 32]) -> Result<[u8; 96], CoreProviderError> {
+        (self.get_cl_signature_by_block_hash)(self.context, block_hash)
+    }
+    fn notify_sync_state(&self, state: SyncState) {
+        (self.notify_sync_state)(self.context, state)
+    }
+    fn dequeue_masternode_list(&self, is_dip24: bool) {
+        (self.dequeue_masternode_list)(self.context, is_dip24)
+    }
 }
 
 #[ferment_macro::export]
 impl FFICoreProvider  {
     pub fn new<
         BHT: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32 + Send + Sync + 'static,
-        BHH: Fn(*const std::os::raw::c_void, u32) -> Result<[u8; 32], CoreProviderError> + Send + Sync + 'static,
+        BHH: Fn(*const std::os::raw::c_void, u32) -> [u8; 32] + Send + Sync + 'static,
         BORLT: Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError> + Send + Sync + 'static,
-        MR: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 32], CoreProviderError> + Send + Sync + 'static,
+        BBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
+        LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         INS: Fn(*const std::os::raw::c_void, [u8; 32]) + Send + Sync + 'static,
-        PIRQ: Fn(*const std::os::raw::c_void, [u8; 32], bool) -> bool + Send + Sync + 'static,
+        CLSBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 96], CoreProviderError> + Send + Sync + 'static,
         SML: Fn(*const std::os::raw::c_void, Arc<MasternodeList>, BTreeMap<[u8; 32], MasternodeEntry>) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
         LML: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<Arc<MasternodeList>, CoreProviderError> + Send + Sync + 'static,
         SLS: Fn(*const std::os::raw::c_void, [u8; 32], LLMQSnapshot) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
         LLS: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<LLMQSnapshot, CoreProviderError> + Send + Sync + 'static,
         UMU: Fn(*const std::os::raw::c_void, Vec<MasternodeEntry>) + Send + Sync + 'static,
-        MDQ: Fn(*const std::os::raw::c_void, bool) -> Option<[u8; 32]> + Send + Sync + 'static,
         RRIR: Fn(*const std::os::raw::c_void, bool, [u8; 32], [u8; 32]) -> bool + Send + Sync + 'static,
-        RFRQ: Fn(*const std::os::raw::c_void, bool, [u8; 32]) + Send + Sync + 'static,
         IWMLFP: Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void) + Send + Sync + 'static,
+        NSS: Fn(*const std::os::raw::c_void, SyncState) + Send + Sync + 'static,
+        DML: Fn(*const std::os::raw::c_void, bool) + Send + Sync + 'static,
     >(
         chain_type: ChainType,
         get_block_height_by_hash: BHT,
         get_block_hash_by_height: BHH,
         get_block_by_height_or_last_terminal: BORLT,
-        get_merkle_root_by_hash: MR,
+        block_by_hash: BBH,
+        last_block_for_block_hash: LBBBH,
         add_insight: INS,
+        get_cl_signature_by_block_hash: CLSBH,
         load_masternode_list_from_db: LML,
         save_masternode_list_into_db: SML,
         load_llmq_snapshot_from_db: LLS,
         save_llmq_snapshot_into_db: SLS,
         update_address_usage_of_masternodes: UMU,
-        persist_in_retrieval_queue: PIRQ,
-        first_in_retrieval_queue: MDQ,
-        remove_from_retrieval_queue: RFRQ,
         remove_request_in_retrieval: RRIR,
         issue_with_masternode_list_from_peer: IWMLFP,
+        notify_sync_state: NSS,
+        dequeue_masternode_list: DML,
         context: *const std::os::raw::c_void,
     ) -> Self {
         Self {
@@ -151,18 +153,19 @@ impl FFICoreProvider  {
             get_block_height_by_hash: Arc::new(get_block_height_by_hash),
             get_block_hash_by_height: Arc::new(get_block_hash_by_height),
             get_block_by_height_or_last_terminal: Arc::new(get_block_by_height_or_last_terminal),
-            get_merkle_root_by_hash: Arc::new(get_merkle_root_by_hash),
+            block_by_hash: Arc::new(block_by_hash),
+            last_block_for_block_hash: Arc::new(last_block_for_block_hash),
             add_insight: Arc::new(add_insight),
-            persist_in_retrieval_queue: Arc::new(persist_in_retrieval_queue),
+            get_cl_signature_by_block_hash: Arc::new(get_cl_signature_by_block_hash),
             load_masternode_list_from_db: Arc::new(load_masternode_list_from_db),
             save_masternode_list_into_db: Arc::new(save_masternode_list_into_db),
             load_llmq_snapshot_from_db: Arc::new(load_llmq_snapshot_from_db),
             save_llmq_snapshot_into_db: Arc::new(save_llmq_snapshot_into_db),
             update_address_usage_of_masternodes: Arc::new(update_address_usage_of_masternodes),
-            first_in_retrieval_queue: Arc::new(first_in_retrieval_queue),
             remove_request_in_retrieval: Arc::new(remove_request_in_retrieval),
-            remove_from_retrieval_queue: Arc::new(remove_from_retrieval_queue),
             issue_with_masternode_list_from_peer: Arc::new(issue_with_masternode_list_from_peer),
+            notify_sync_state: Arc::new(notify_sync_state),
+            dequeue_masternode_list: Arc::new(dequeue_masternode_list),
         }
     }
 }
@@ -170,55 +173,119 @@ impl FFICoreProvider  {
 #[cfg(test)]
 impl FFICoreProvider {
     pub fn register_default(context: Arc<FFIContext>, chain_type: ChainType) -> Self {
+        #[cfg(feature = "use_serde")]
+        use dash_spv_masternode_processor::util::insight::{insight_block_by_block_hash, insight_block_by_block_height};
+        use dash_spv_crypto::crypto::byte_util::Reversed;
         let context_raw = Arc::into_raw(context.clone()) as *const std::ffi::c_void;
         Self {
             context: context_raw,
-            chain_type,
-            get_merkle_root_by_hash: {
+            chain_type: chain_type.clone(),
+            block_by_hash: {
+                let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_hash| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let result = context.block_for_hash(block_hash)
-                        .map(MerkleBlock::merkle_root_reversed)
-                        .unwrap_or([0u8; 32]);
+                    let mut result = context.block_for_hash(block_hash)
+                        .map(MBlock::from)
+                        .ok_or(CoreProviderError::NullResult);
+                    if result.is_err() && cfg!(feature = "use_serde") {
+                        if let Some(insight_url) = clone_chain.insight_url() {
+                            result = insight_block_by_block_hash(insight_url, &block_hash.reversed())
+                                .map(MBlock::from)
+                                .map_err(|e| CoreProviderError::NullResult);
+                        }
+                    }
+
                     std::mem::forget(context);
-                    Ok(result)
+                    result
+                })
+            },
+            last_block_for_block_hash: {
+                let clone_chain = chain_type.clone();
+                Arc::new(move |context, block_hash, peer| unsafe {
+                    let context = Arc::from_raw(context as *const FFIContext);
+                    let mut result = context.block_for_hash(block_hash)
+                        .map(MBlock::from)
+                        .ok_or(CoreProviderError::NullResult);
+                    if result.is_err() && cfg!(feature = "use_serde") {
+                        if let Some(insight_url) = clone_chain.insight_url() {
+                            result = insight_block_by_block_hash(insight_url, &block_hash.reversed())
+                                .map(MBlock::from)
+                                .map_err(|e| CoreProviderError::NullResult);
+                        }
+                    }
+                    std::mem::forget(context);
+                    result
                 })
             },
             get_block_height_by_hash: {
+                let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_hash| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let result = context.block_height_for_hash(block_hash);
+                    let mut result = context.block_height_for_hash(block_hash);
+                    if result == u32::MAX && cfg!(feature = "use_serde") {
+                        if let Some(insight_url) = clone_chain.insight_url() {
+                            result = insight_block_by_block_hash(insight_url, &block_hash.reversed())
+                                .map(|b| MBlock::from(b).height)
+                                .unwrap_or(u32::MAX)
+                        }
+                    }
                     std::mem::forget(context);
                     result
                 })
             },
             get_block_hash_by_height: {
+                let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_height| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let result = context.block_hash_for_height(block_height);
+                    let mut result = context.block_hash_for_height(block_height);
+                    if result.is_err() && cfg!(feature = "use_serde") {
+                        if let Some(insight_url) = clone_chain.insight_url() {
+                            result = insight_block_by_block_height(insight_url, block_height)
+                                .map(|b| MBlock::from(b).hash)
+                                .map_err(|e| CoreProviderError::NullResult);
+                        }
+                    }
+
+                    std::mem::forget(context);
+                    result.unwrap_or([0u8; 32])
+                })
+            },
+            get_block_by_height_or_last_terminal: {
+                let clone_chain = chain_type.clone();
+                Arc::new(move |context, block_height| unsafe {
+                    let context = Arc::from_raw(context as *const FFIContext);
+                    let mut result = context.block_for_height(block_height)
+                        .map(Block::from)
+                        .ok_or(CoreProviderError::NullResult);
+                    if result.is_err() && cfg!(feature = "use_serde") {
+                        if let Some(insight_url) = clone_chain.insight_url() {
+                            result = insight_block_by_block_height(insight_url, block_height)
+                                .map(|b| Block::from(b))
+                                .map_err(|e| CoreProviderError::NullResult);
+                        }
+                    }
                     std::mem::forget(context);
                     result
                 })
             },
-            get_block_by_height_or_last_terminal: Arc::new(move |context, block_height| unsafe {
+            get_cl_signature_by_block_hash: Arc::new(move |context, block_hash| unsafe {
                 let context = Arc::from_raw(context as *const FFIContext);
-                let result = context.block_for_height(block_height)
-                    .map(Block::from)
+                let result = context.cl_signature_by_block_hash(&block_hash)
+                    .cloned()
                     .ok_or(CoreProviderError::NullResult);
                 std::mem::forget(context);
                 result
             }),
             add_insight: Arc::new(|context, block_hash| {}),
-            persist_in_retrieval_queue: Arc::new(|context, block_hash, is_dip24| true),
-            load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::NoMasternodeList)),
+            load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
             save_masternode_list_into_db: Arc::new(|context, list, modified_masternodes| Ok(true)),
-            load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::NoMasternodeList)),
+            load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
             save_llmq_snapshot_into_db: Arc::new(|context, block_hash, snapshot| Ok(true)),
             update_address_usage_of_masternodes: Arc::new(|context, modified_masternodes| {}),
-            first_in_retrieval_queue: Arc::new(|context, is_dip24| None),
             remove_request_in_retrieval: Arc::new(|context, is_dip24, base_block_hash, block_hash| true),
-            remove_from_retrieval_queue: Arc::new(|context, is_dip24, block_hash| {}),
             issue_with_masternode_list_from_peer: Arc::new(|context, is_dip24, peer| {}),
+            notify_sync_state: Arc::new(|context, state| {}),
+            dequeue_masternode_list: Arc::new(|context, is_dip24| {}),
         }
     }
     pub fn default_processor(context: Arc<FFIContext>, chain_type: ChainType) -> MasternodeProcessor {

@@ -92,13 +92,13 @@ mod tests {
     }
 
     fn check_address_with_script_pubkey(data: &[u8], script_map: &ScriptMap, address: Option<String>) {
-        let elem = data.to_vec().script_elements();
+        // let elem = data.to_vec().script_elements();
         let addr = address::with_script_pub_key(&data.to_vec(), script_map);
         assert_eq!(addr, address, "Address with script pubkey don't match")
     }
 
     fn check_address_with_script_signature(data: &[u8], script_map: &ScriptMap, address: Option<String>) {
-        let elem = data.to_vec().script_elements();
+        // let elem = data.to_vec().script_elements();
         let addr = address::with_script_sig(&data.to_vec(), script_map);
         println!("check_address_with_script_signature: {:?} => {:?}", data.to_hex(), address);
         assert_eq!(addr, address, "Address with script signature don't match")

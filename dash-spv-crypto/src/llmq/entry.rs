@@ -1,9 +1,11 @@
+use std::fmt::{Display, Formatter};
 use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
-use hashes::{sha256d, Hash};
+use hashes::{sha256, sha256d, Hash};
 use hashes::hex::ToHex;
 use log::{info, warn};
+use secp256k1::ThirtyTwoByteHash;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
@@ -12,9 +14,9 @@ use crate::consensus::{Decodable, encode, encode::VarInt, Encodable};
 use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::Reversed;
 use crate::impl_bytes_decodable;
-use crate::keys::{BLSKey, IKey};
+use crate::keys::BLSKey;
 use crate::llmq::{Bitset, LLMQVersion};
-use crate::network::{ChainType, IHaveChainSettings, LLMQType};
+use crate::network::LLMQType;
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq, Hash)]
 #[ferment_macro::export]
@@ -53,6 +55,29 @@ impl Serialize for LLMQEntry {
         state.serialize_field("signers", &self.signers)?;
         state.serialize_field("valid_members", &self.valid_members)?;
         state.end()
+    }
+}
+impl Display for LLMQEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let q_index = if self.index == u16::MAX { "no".to_string() } else { format!("{}", self.index) };
+        let desc = format!("{} v{} [{}] [{}/{}] llmq_hash: {}, pk: {}, ts: {}, vv: {}, asig: {}, signers: {}::{}, members: {}::{}, entry_hash: {}, commitment_hash: {}",
+            self.llmq_type,
+            self.version.index(),
+            q_index,
+            if self.verified { "yes" } else { "no" },
+            if self.saved { "yes" } else { "no" },
+            self.llmq_hash.to_hex(),
+            self.public_key.to_hex(),
+            self.threshold_signature.to_hex(),
+            self.verification_vector_hash.to_hex(),
+            self.all_commitment_aggregated_signature.to_hex(),
+            self.signers.count, self.signers.bitset.to_hex(),
+            self.valid_members.count, self.valid_members.bitset.to_hex(),
+            self.entry_hash.to_hex(),
+            self.commitment_hash.map(|h|h.to_hex()).unwrap_or("None".to_string())
+        );
+        write!(f, "{}", desc)
+
     }
 }
 
@@ -177,8 +202,8 @@ impl LLMQEntry {
         all_commitment_aggregated_signature: [u8; 96],
     ) -> Self {
         let q_data = generate_data(
-            version,
-            llmq_type,
+            u16::from(version.clone()),
+            u8::from(llmq_type.clone()),
             llmq_hash,
             index,
             &signers,
@@ -270,14 +295,15 @@ impl LLMQEntry {
     //     LLMQPayloadValidationStatus::Ok
     // }
 
+    // fn
 }
 
 #[ferment_macro::export]
 impl LLMQEntry {
     pub fn to_data(&self) -> Vec<u8> {
         generate_data(
-            self.version,
-            self.llmq_type,
+            u16::from(self.version.clone()),
+            u8::from(self.llmq_type.clone()),
             self.llmq_hash,
             self.index,
             &self.signers,
@@ -291,7 +317,7 @@ impl LLMQEntry {
     pub fn commitment_data(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
-        let llmq_type = VarInt(self.llmq_type as u64);
+        let llmq_type = VarInt(self.llmq_type.clone() as u64);
         *offset += llmq_type.enc(&mut buffer);
         *offset += self.llmq_hash.enc(&mut buffer);
         *offset += self.valid_members.enc(&mut buffer);
@@ -300,62 +326,70 @@ impl LLMQEntry {
         buffer
     }
 
-    pub fn ordering_hash_for_request_id(
-        &self,
-        request_id: [u8; 32],
-        llmq_type: LLMQType,
-    ) -> [u8; 32] {
-        let llmq_type = VarInt(llmq_type as u64);
+    pub fn ordering_hash_for_request_id(&self, request_id: [u8; 32]) -> [u8; 32] {
+        let llmq_type = VarInt(u64::from(&self.llmq_type));
         let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
         llmq_type.enc(&mut writer);
         self.llmq_hash.enc(&mut writer);
         request_id.enc(&mut writer);
-        UInt256::sha256d(writer).0
-    }
-
-    pub fn is_lock_sign_id(&self, request_id: [u8; 32], tx_hash: [u8; 32], chain_type: ChainType) -> [u8; 32] {
-        let llmq_type = VarInt(chain_type.is_llmq_type() as u64);
-        let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
-        llmq_type.enc(&mut writer);
-        self.llmq_hash.enc(&mut writer);
-        request_id.enc(&mut writer);
-        tx_hash.enc(&mut writer);
-        sha256d::Hash::hash(&writer).into_inner()
-    }
-    pub fn chain_lock_sign_id(&self, request_id: [u8; 32], block_hash: [u8; 32], chain_type: ChainType) -> [u8; 32] {
-        let llmq_type = VarInt(chain_type.chain_locks_type() as u64);
-        let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
-        llmq_type.enc(&mut writer);
-        self.llmq_hash.enc(&mut writer);
-        request_id.enc(&mut writer);
-        block_hash.enc(&mut writer);
         sha256d::Hash::hash(&writer).into_inner()
     }
 
-    pub fn platform_sign_id(&self, height: u32, state_msg_hash: [u8; 32], llmq_type: LLMQType) -> [u8; 32] {
+    // pub fn is_lock_sign_id(&self, request_id: [u8; 32], tx_hash: [u8; 32]) -> [u8; 32] {
+    //     // let llmq_type = VarInt(chain_type.is_llmq_type() as u64);
+    //     // let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
+    //     // llmq_type.enc(&mut writer);
+    //     // self.llmq_hash.enc(&mut writer);
+    //     // request_id.enc(&mut writer);
+    //     // tx_hash.enc(&mut writer);
+    //     // sha256d::Hash::hash(&writer).into_inner()
+    //     self.sign_id(request_id, tx_hash)
+    //
+    // }
+    // pub fn chain_lock_sign_id(&self, request_id: [u8; 32], block_hash: [u8; 32]) -> [u8; 32] {
+    //     // let llmq_type = VarInt(chain_type.chain_locks_type() as u64);
+    //     // let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
+    //     // llmq_type.enc(&mut writer);
+    //     // self.llmq_hash.enc(&mut writer);
+    //     // request_id.enc(&mut writer);
+    //     // block_hash.enc(&mut writer);
+    //     // sha256d::Hash::hash(&writer).into_inner()
+    //     self.sign_id(request_id, block_hash)
+    // }
+
+    pub fn sign_id(&self, request_id: [u8; 32], payload: [u8; 32]) -> [u8; 32] {
+        let llmq_type = VarInt(u64::from(&self.llmq_type));
+        let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
+        llmq_type.enc(&mut writer);
+        self.llmq_hash.enc(&mut writer);
+        request_id.enc(&mut writer);
+        payload.enc(&mut writer);
+        sha256d::Hash::hash(&writer).into_inner()
+    }
+
+    pub fn platform_sign_id(&self, height: u32, state_msg_hash: [u8; 32]) -> [u8; 32] {
         let mut request_id_writer = Vec::new();
         "dpsvote".to_string().enc(&mut request_id_writer);
         (height as u64).enc(&mut request_id_writer);
-        let request_id = UInt256::sha256(&request_id_writer);
-        let llmq_type = VarInt(llmq_type as u64);
-        let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
-        llmq_type.enc(&mut writer);
-        self.llmq_hash.enc(&mut writer);
-        request_id.reversed().enc(&mut writer);
-        UInt256(state_msg_hash).reversed().enc(&mut writer);
-        sha256d::Hash::hash(&writer).into_inner()
+        let request_id = sha256::Hash::hash(&request_id_writer).into_32().reversed();
+        // let llmq_type = VarInt(self.llmq_type.index() as u64);
+        self.sign_id(request_id, state_msg_hash.reversed())
+        // let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
+        // llmq_type.enc(&mut writer);
+        // self.llmq_hash.enc(&mut writer);
+        // request_id.reversed().enc(&mut writer);
+        // state_msg_hash.reversed().enc(&mut writer);
+        // sha256d::Hash::hash(&writer).into_inner()
     }
 
 
-    pub fn verify_signature(&self, sign_id: [u8; 32], signature: [u8; 96], chain_type: ChainType) -> bool {
+    pub fn verify_signature(&self, sign_id: [u8; 32], signature: [u8; 96]) -> bool {
         let sig = cfg!(debug_assertions).then(|| signature.to_hex()).unwrap_or("<REDACTED>".to_string());
         let verified = BLSKey::verify_signature(self.public_key.clone(), self.version.use_bls_legacy(), &sign_id, signature);
         let sign_id = cfg!(debug_assertions).then(|| sign_id.to_hex()).unwrap_or("<REDACTED>".to_string());
-        let llmq_type_index: u8 = self.llmq_type.into();
-        info!("[{}] verifySignatureAgainstQuorum ({}): {}: {}: {}: {}: {}: {}",
-            chain_type.name(),
+        info!("llmq::verify_signature ({}): {:?}: {}: {}: {}: {}: {}",
             verified,
-            llmq_type_index,
+            self.llmq_type,
             self.verified,
             sign_id,
             self.public_key.to_hex(),
@@ -364,12 +398,15 @@ impl LLMQEntry {
         verified
     }
 
-    pub fn verify_is_lock_signature_with_offset(&self, request_id: [u8; 32], tx_hash: [u8; 32], signature: [u8; 96], chain_type: ChainType) -> bool {
-        let sign_id = self.is_lock_sign_id(request_id, tx_hash, chain_type);
-        BLSKey::key_with_public_key(self.public_key.clone(), self.version.use_bls_legacy())
-            .verify(&sign_id, &signature)
-            .unwrap_or(false)
+    pub fn verify_cl_signature(&self, request_id: [u8; 32], block_hash: [u8; 32], signature: [u8; 96]) -> bool {
+        let sign_id = self.sign_id(request_id, block_hash);
+        BLSKey::verify_message_with_pub_key(&self.public_key, &sign_id, &signature, self.version.use_bls_legacy())
     }
+
+    // pub fn verify_is_lock_signature_with_offset(&self, request_id: [u8; 32], tx_hash: [u8; 32], signature: [u8; 96]) -> bool {
+    //     let sign_id = self.sign_id(request_id, tx_hash);
+    //     BLSKey::verify_message_with_pub_key(&self.public_key, &sign_id, &signature, self.version.use_bls_legacy())
+    // }
 
     pub fn llmq_hash_hex(&self) -> String {
         self.llmq_hash.to_hex()
@@ -402,11 +439,62 @@ pub fn new(
         all_commitment_aggregated_signature,
     )
 }
+#[ferment_macro::export]
+pub fn from_entity(
+    version: u16,
+    llmq_type: u8,
+    llmq_hash: [u8; 32],
+    index: u16,
+    signers: Vec<u8>,
+    signers_count: usize,
+    valid_members: Vec<u8>,
+    valid_members_count: usize,
+    public_key: [u8; 48],
+    verification_vector_hash: [u8; 32],
+    threshold_signature: [u8; 96],
+    all_commitment_aggregated_signature: [u8; 96],
+    verified: bool,
+    entry_hash: Option<[u8; 32]>
+) -> LLMQEntry {
+    let signers = Bitset { count: signers_count, bitset: signers };
+    let valid_members = Bitset { count: valid_members_count, bitset: valid_members };
+    let entry_hash = entry_hash.unwrap_or_else(|| {
+        let q_data = generate_data(
+            version,
+            llmq_type,
+            llmq_hash,
+            index,
+            &signers,
+            &valid_members,
+            public_key,
+            verification_vector_hash,
+            threshold_signature,
+            all_commitment_aggregated_signature,
+        );
+        sha256d::Hash::hash(q_data.as_ref()).into_inner()
+    });
+    LLMQEntry {
+        version: LLMQVersion::from(version),
+        llmq_hash,
+        index,
+        public_key,
+        threshold_signature,
+        verification_vector_hash,
+        all_commitment_aggregated_signature,
+        llmq_type: LLMQType::from(llmq_type),
+        signers,
+        valid_members,
+        entry_hash,
+        verified,
+        saved: true,
+        commitment_hash: None,
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn generate_data(
-    version: LLMQVersion,
-    llmq_type: LLMQType,
+    version: u16,
+    llmq_type: u8,
     llmq_hash: [u8; 32],
     index: u16,
     signers: &Bitset,
@@ -418,10 +506,8 @@ pub fn generate_data(
 ) -> Vec<u8> {
     let mut buffer: Vec<u8> = Vec::new();
     let offset = &mut 0;
-    let llmq_u8: u8 = llmq_type.into();
-    let llmq_v: u16 = version.into();
-    *offset += llmq_v.enc(&mut buffer);
-    *offset += llmq_u8.enc(&mut buffer);
+    *offset += version.enc(&mut buffer);
+    *offset += llmq_type.enc(&mut buffer);
     *offset += llmq_hash.enc(&mut buffer);
     if index != u16::MAX {
         *offset += index.enc(&mut buffer);

@@ -2,10 +2,10 @@ use std::ptr::null;
 use std::sync::Arc;
 use hashes::hex::ToHex;
 use dash_spv_crypto::network::{ChainType, DevnetType};
-use dash_spv_crypto::crypto::byte_util::{Reversed, UInt256};
+use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_masternode_processor::block_store::MerkleBlock;
 use dash_spv_masternode_processor::common::Block;
-use dash_spv_masternode_processor::hashes::hex::FromHex;
+use dash_spv_masternode_processor::common::block::MBlock;
 use dash_spv_masternode_processor::processing::{core_provider::CoreProviderError, MasternodeProcessor, MasternodeProcessorCache};
 use dash_spv_masternode_processor::test_helpers::load_message;
 use dash_spv_masternode_processor::tests::FFIContext;
@@ -259,7 +259,13 @@ fn init_devnet_333_block_store() -> Vec<MerkleBlock> {
 
 #[test]
 fn processor_devnet_333() {
-    assert_diff_chain(ChainType::DevNet(DevnetType::Devnet333), &[], &["QRINFO_1_21976__70221.dat"], Some(init_devnet_333_block_store()), false);
+    assert_diff_chain(
+        ChainType::DevNet(DevnetType::Devnet333),
+        &[],
+        &["QRINFO_1_21976__70221.dat"],
+        Some(init_devnet_333_block_store()),
+        false
+    );
 }
 // #[test]
 // fn processor_devnet_333_2() {
@@ -498,72 +504,51 @@ fn devnet_333_height(hash: &str) -> u32 {
 #[test]
 fn test_processor_devnet_333_2() {
     let chain = ChainType::DevNet(DevnetType::Devnet333);
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
     let provider = FFICoreProvider {
         context: Arc::into_raw(context.clone()) as *const std::ffi::c_void,
-        chain_type: chain,
+        chain_type: chain.clone(),
         get_block_height_by_hash: Arc::new(|context, block_hash| {
             devnet_333_height(block_hash.reversed().to_hex().as_str())
         }),
-        get_merkle_root_by_hash: Arc::new(|context, block_hash| {
-            UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf")
-                .map_err(CoreProviderError::HexError)
-                .map(|h| h.reversed().0)
+        block_by_hash: Arc::new(move |context, block_hash| unsafe {
+            let context = Arc::from_raw(context as *const FFIContext);
+            let result = context.block_for_hash(block_hash)
+                .map(MBlock::from)
+                .ok_or(CoreProviderError::NullResult);
+            std::mem::forget(context);
+            result
         }),
-        get_block_hash_by_height: Arc::new(|context, h| Err(CoreProviderError::BlockHashNotFoundAt(h))),
-        // get_llmq_snapshot_by_block_hash: Arc::new(|h| Err(CoreProviderError::BadBlockHash(h))),
-        // get_cl_signature_by_block_hash: {
-        //     let context_clone = Arc::clone(&context);
-        //     Arc::new(move |block_hash| {
-        //         let ctx = context_clone.read().unwrap();
-        //         let cache = ctx.cache.read().unwrap();
-        //         cache
-        //             .cl_signatures
-        //             .get(&block_hash)
-        //             .map(|c| Ok(c.clone()))
-        //             .unwrap_or(Err(CoreProviderError::BadBlockHash(block_hash)))
-        //     })
-        // },
-        // save_llmq_snapshot: {
-        //     let context_clone = Arc::clone(&context);
-        //     Arc::new(move |block_hash, snapshot| {
-        //         let ctx = context_clone.write().unwrap();
-        //         let mut cache = ctx.cache.write().unwrap();
-        //         cache.add_snapshot(block_hash, snapshot);
-        //         true
-        //     })
-        // },
-        // save_cl_signature: {
-        //     let context_clone = Arc::clone(&context);
-        //     Arc::new(move |block_hash, sig| {
-        //         let ctx = context_clone.write().unwrap();
-        //         let mut cache = ctx.cache.write().unwrap();
-        //         cache.add_cl_signature(block_hash, sig);
-        //         true
-        //     })
-        // },
-        // get_masternode_list_by_block_hash: {
-        //     let context_clone = Arc::clone(&context);
-        //     Arc::new(move |block_hash| {
-        //         let ctx = context_clone.read().unwrap();
-        //         let cache = ctx.cache.read().unwrap();
-        //         cache
-        //             .mn_lists
-        //             .get(&block_hash)
-        //             .cloned()
-        //             .ok_or(CoreProviderError::NoMasternodeList)
-        //     })
-        // },
-        // save_masternode_list: {
-        //     let context_clone = Arc::clone(&context);
-        //     Arc::new(move |block_hash, list| {
-        //         let ctx = context_clone.write().unwrap();
-        //         let mut cache = ctx.cache.write().unwrap();
-        //         cache.mn_lists.insert(block_hash, list);
-        //         true
-        //     })
-        // },
+        last_block_for_block_hash: Arc::new(move |context, block_hash, peer| unsafe {
+            let context = Arc::from_raw(context as *const FFIContext);
+            let result = context.block_for_hash(block_hash)
+                .map(MBlock::from)
+                .ok_or(CoreProviderError::NullResult);
+
+
+            std::mem::forget(context);
+            result
+        }),
+        get_block_hash_by_height: Arc::new(move |context, h| unsafe {
+            let context = Arc::from_raw(context as *const FFIContext);
+            let result = context.block_for_height(h)
+                .map(MBlock::from)
+                .map(|b| b.hash)
+                .ok_or(CoreProviderError::NullResult);
+
+
+            std::mem::forget(context);
+            result.unwrap_or([0u8; 32])
+        }),
         add_insight: Arc::new(|context, block_hash| {}),
+        get_cl_signature_by_block_hash: Arc::new(move |context, block_hash| unsafe {
+            let context = Arc::from_raw(context as *const FFIContext);
+            let result = context.cl_signature_by_block_hash(&block_hash)
+                .cloned()
+                .ok_or(CoreProviderError::NullResult);
+            std::mem::forget(context);
+            result
+        }),
         get_block_by_height_or_last_terminal: Arc::new(move |context, block_height| unsafe {
             let context = Arc::from_raw(context as *const FFIContext);
             let result = context.block_for_height(block_height)
@@ -572,27 +557,20 @@ fn test_processor_devnet_333_2() {
             std::mem::forget(context);
             result
         }),
-        persist_in_retrieval_queue: Arc::new(|context, block_hash, is_dip24| true),
-        load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::NoMasternodeList)),
+        load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
         save_masternode_list_into_db: Arc::new(|context, list, modified_masternodes| Ok(true)),
-        load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::NoMasternodeList)),
+        load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
         save_llmq_snapshot_into_db: Arc::new(|context, block_hash, snapshot| Ok(true)),
         update_address_usage_of_masternodes: Arc::new(|context, modified_masternodes| {}),
-        first_in_retrieval_queue: Arc::new(|context, is_dip24| None),
         remove_request_in_retrieval: Arc::new(|context, is_dip24, base_block_hash, block_hash| true),
-        remove_from_retrieval_queue: Arc::new(|context, is_dip24, block_hash| {}),
         issue_with_masternode_list_from_peer: Arc::new(|context, is_dip24, peer| {}),
+        notify_sync_state: Arc::new(|context, state| {}),
+        dequeue_masternode_list: Arc::new(|context, is_dip24| {}),
     };
     let cache = Arc::new(MasternodeProcessorCache::default());
     let processor = Arc::new(MasternodeProcessor::new(Arc::new(provider), Arc::clone(&cache)));
-
-    // let processor = MasternodeProcessor::new(Box::new(provider));
     let message = load_message(chain.identifier(), "mnlistdiff--1-25480.dat");
-    // let mut ctx = context.write().unwrap();
-
     let result = processor.mn_list_diff_result_from_message(&message, false, 70221, false, null());
-    // let result = process_mnlist_diff(&processor, &message, false, 70221, context.cache).unwrap();
-    // ctx.is_dip_0024 = true;
     let message = load_message(chain.identifier(), "qrinfo--1-24868.dat");
     let result = processor.qr_info_result_from_message(&message, false, 70221, true, false, null());
         // .expect("Failed to process qr info");

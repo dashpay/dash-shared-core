@@ -1,5 +1,9 @@
 use std::future::Future;
 use std::time::Duration;
+use dash_sdk::platform::{Fetch, Query};
+use dash_sdk::Sdk;
+use platform_value::Identifier;
+use crate::error::Error;
 
 pub const NONE_ERROR: &str = "Platform returned none while some was expected";
 
@@ -40,7 +44,7 @@ pub enum RetryStrategy {
     SlowingDown20Percent(u32),
     SlowingDown50Percent(u32),
 }
-// #[derive(Clone)]
+
 pub struct StreamSettings<SPEC> where SPEC: StreamSpec {
     pub delay: u64,
     pub limit: u64,
@@ -59,7 +63,13 @@ impl<SPEC> Default for StreamSettings<SPEC> where SPEC: StreamSpec {
     }
 }
 
-// #[derive(Clone)]
+impl<SPEC> StreamSettings<SPEC> where SPEC: StreamSpec {
+    pub fn with_delay(mut self, delay: u64) -> Self {
+        self.delay = delay;
+        self
+    }
+}
+
 pub struct StreamStrategy<SPEC> where SPEC: StreamSpec {
     pub settings: StreamSettings<SPEC>,
     pub retry: Option<RetryStrategy>,
@@ -108,8 +118,26 @@ impl<SPEC> StreamStrategy<SPEC> where SPEC: StreamSpec {
             retry: Some(retry),
         }
     }
+    pub fn with_retry_and_settings(retry: RetryStrategy, settings: StreamSettings<SPEC>) -> Self {
+        Self {
+            settings,
+            retry: Some(retry),
+        }
+    }
     pub fn with_validator(mut self, composer: SPEC::Validator) -> Self {
         self.settings.validator = Some(composer);
+        self
+    }
+    pub fn with_delay(mut self, delay: u64) -> Self {
+        self.settings.delay = delay;
+        self
+    }
+    pub fn with_limit(mut self, limit: u64) -> Self {
+        self.settings.limit = limit;
+        self
+    }
+    pub fn with_settings(mut self, settings: StreamSettings<SPEC>) -> Self {
+        self.settings = settings;
         self
     }
 
@@ -183,6 +211,73 @@ where SPEC: StreamSpec {
         Self {
             settings: StreamSettings::default(),
             retry: None,
+        }
+    }
+}
+
+pub trait StreamManager {
+    fn sdk_ref(&self) -> &Sdk;
+
+    fn stream<SPEC, Item>(
+        &self,
+        unique_id: Identifier,
+        retry: RetryStrategy,
+        validator: SPEC::Validator,
+    ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
+    where
+        SPEC: StreamSpec<Result = Option<Item>, Error = dash_sdk::Error>,
+        SPEC::Validator: Send,
+        Item: Fetch + Send,
+        Identifier: Query<<Item as Fetch>::Request>,
+        Self: Send + Sync,
+    {
+        async move {
+            let strategy = StreamStrategy::<SPEC>::with_retry(retry)
+                .with_validator(validator)
+                .on_max_retries_reached(dash_sdk::Error::Generic("Max retry reached".to_string()));
+            self.stream_with_strategy(unique_id, strategy).await
+        }
+    }
+
+    fn stream_with_settings<SPEC, Item>(
+        &self,
+        unique_id: Identifier,
+        retry: RetryStrategy,
+        stream_settings: StreamSettings<SPEC>,
+        validator: SPEC::Validator,
+    ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
+    where
+        SPEC: StreamSpec<Result = Option<Item>, Error = dash_sdk::Error>,
+        SPEC::Validator: Send,
+        Item: Fetch + Send,
+        Identifier: Query<<Item as Fetch>::Request>,
+        Self: Send + Sync,
+    {
+        async move {
+            let strategy = StreamStrategy::<SPEC>::with_retry_and_settings(retry, stream_settings)
+                .with_validator(validator)
+                .on_max_retries_reached(dash_sdk::Error::Generic("Max retry reached".to_string()));
+            self.stream_with_strategy(unique_id, strategy).await
+        }
+    }
+
+    fn stream_with_strategy<SPEC, Item>(
+        &self,
+        unique_id: Identifier,
+        strategy: StreamStrategy<SPEC>,
+    ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
+    where
+        SPEC: StreamSpec<Result = Option<Item>, Error = dash_sdk::Error>,
+        SPEC::Validator: Send,
+        Item: Fetch + Send,
+        Identifier: Query<<Item as Fetch>::Request>,
+        Self: Send + Sync,
+    {
+        async move {
+            strategy
+                .stream(|| async { Item::fetch_by_identifier(self.sdk_ref(), unique_id).await })
+                .await
+                .map_err(Error::from)
         }
     }
 }

@@ -2,6 +2,7 @@ pub mod input;
 pub mod output;
 pub mod tx;
 pub mod coinbase;
+pub mod credit_funding;
 
 use crate::impl_bytes_decodable;
 pub use self::input::TransactionInput;

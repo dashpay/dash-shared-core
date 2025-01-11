@@ -2,6 +2,7 @@ use std::io;
 use std::io::{Error, Write};
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
+use dashcore::{ScriptBuf, TxOut};
 use hashes::hex::ToHex;
 use crate::consensus::{encode, Decodable, Encodable};
 use crate::crypto::VarBytes;
@@ -14,6 +15,14 @@ pub struct TransactionOutput {
     pub address: Option<Vec<u8>>,
 }
 
+impl From<TransactionOutput> for TxOut {
+    fn from(value: TransactionOutput) -> Self {
+        TxOut {
+            value: value.amount,
+            script_pubkey: ScriptBuf(value.script.unwrap_or_default()),
+        }
+    }
+}
 
 impl std::fmt::Debug for TransactionOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

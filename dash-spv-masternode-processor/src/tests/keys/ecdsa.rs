@@ -56,21 +56,21 @@ pub fn test_key_with_private_key() {
     let chain_type = ChainType::MainNet;
     // wrong private key
     assert!(!is_valid_dash_private_key("7s18Ypj1scza76SPf56Jm9zraxSrv58TgzmxwuDXoauvV84ud61", &chain_type.script_map()), "valid when invalid");
-    assert!(ECDSAKey::key_with_private_key("hello", chain_type).is_err(), "valid when totally invalid");
+    assert!(ECDSAKey::key_with_private_key("hello", chain_type.clone()).is_err(), "valid when totally invalid");
     // uncompressed private key
     assert!(is_valid_dash_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", &chain_type.script_map()), "invalid when valid");
-    match ECDSAKey::key_with_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", chain_type) {
+    match ECDSAKey::key_with_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", chain_type.clone()) {
         Ok(key) => {
-            let addr = key.address_with_public_key_data(chain_type);
+            let addr = key.address_with_public_key_data(chain_type.clone());
             assert_eq!("Xj74g7h8pZTzqudPSzVEL7dFxNZY95Emcy", addr.as_str(), "addresses don't match");
         },
         Err(err) => assert!(false, "Key is invalid: {}", err)
     }
 
     // compressed private key
-    match ECDSAKey::key_with_private_key("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", chain_type) {
+    match ECDSAKey::key_with_private_key("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", chain_type.clone()) {
         Ok(key) => {
-            let addr = key.address_with_public_key_data(chain_type);
+            let addr = key.address_with_public_key_data(chain_type.clone());
             assert_eq!("XbKPGyV1BpzzxNAggx6Q9a6o7GaBWTLhJS", addr.as_str(), "addresses don't match");
             // compressed private key export
             assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_script(chain_type.script_priv_key()).as_str(), "serialized_private_key_for_script");
@@ -184,20 +184,20 @@ fn private_key_with_non_base_string() {
     let ipk3 = "eee3e42d35d1c75ea4cf3dbc902de9619faf0cd6ba1ab178a873d80c3f7dc90c";
     let ipk4 = "19d6aba7a9fcdb627ad39a2176689c2dcca13db68415411d88b1c37c2103794a";
     let ipk5 = "b4788261554d2f74647e547ef34018c228b7869191c0dc0086d91901c515c370";
-    let pk1 = ECDSAKey::key_with_private_key(ipk1, chain_type);
-    let pk2 = ECDSAKey::key_with_private_key(ipk2, chain_type);
-    let pk3 = ECDSAKey::key_with_private_key(ipk3, chain_type);
-    let pk4 = ECDSAKey::key_with_private_key(ipk4, chain_type);
-    let pk5 = ECDSAKey::key_with_private_key(ipk5, chain_type);
+    let pk1 = ECDSAKey::key_with_private_key(ipk1, chain_type.clone());
+    let pk2 = ECDSAKey::key_with_private_key(ipk2, chain_type.clone());
+    let pk3 = ECDSAKey::key_with_private_key(ipk3, chain_type.clone());
+    let pk4 = ECDSAKey::key_with_private_key(ipk4, chain_type.clone());
+    let pk5 = ECDSAKey::key_with_private_key(ipk5, chain_type.clone());
     assert!(pk1.is_ok(), "pk1 is none");
     assert!(pk2.is_ok(), "pk2 is none");
     assert!(pk3.is_ok(), "pk3 is none");
     assert!(pk4.is_ok(), "pk4 is none");
     assert!(pk5.is_ok(), "pk5 is none");
-    let ia1 = pk1.unwrap().address_with_public_key_data(chain_type);
-    let ia2 = pk2.unwrap().address_with_public_key_data(chain_type);
-    let ia3 = pk3.unwrap().address_with_public_key_data(chain_type);
-    let ia4 = pk4.unwrap().address_with_public_key_data(chain_type);
+    let ia1 = pk1.unwrap().address_with_public_key_data(chain_type.clone());
+    let ia2 = pk2.unwrap().address_with_public_key_data(chain_type.clone());
+    let ia3 = pk3.unwrap().address_with_public_key_data(chain_type.clone());
+    let ia4 = pk4.unwrap().address_with_public_key_data(chain_type.clone());
     let ia5 = pk5.unwrap().address_with_public_key_data(chain_type);
     assert_eq!(ia1, "yaMmAV9Fmx4St7xPH9eHCLcYJZdGYd8vD8");
     assert_eq!(ia2, "yhf7gKjEimNd1uYatJBk3Xw88oKgE4Texj");
@@ -221,6 +221,8 @@ fn private_key_with_non_base_string() {
 #[test]
 fn derivation() {
     let seed = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+    // let index_path = IndexPath::<u32>::new(vec![1, 2147483650]);
+    // let index_paths = vec![index_path];
     let chain_type = ChainType::MainNet;
     let index_paths = vec![vec![1, 2147483650]];
     let derivation_path = IndexPathU256 { indexes: vec![[0u8; 32]], hardened: vec![true] };
@@ -229,7 +231,7 @@ fn derivation() {
         &seed,
         index_paths,
         derivation_path,
-        chain_type)
+        chain_type.clone())
         .expect("Der err");
 
     assert_eq!(result, vec!["XJ7oW51NaNjnnQ5a2VitTSMhDEsuZLs3QMaWu6gU3LheqAQ6Edz7"]);

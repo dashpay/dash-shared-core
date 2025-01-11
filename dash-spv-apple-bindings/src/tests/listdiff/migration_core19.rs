@@ -14,7 +14,7 @@ fn test_verify_chained_rotation() {
     let chain = ChainType::DevNet(DevnetType::Screwdriver);
     let context = Arc::new(
             FFIContext::chain_default(
-                chain,
+                chain.clone(),
                 false,
                 vec![
                     MerkleBlock::reversed(4840, "0000012768da68f985b294c80ee5f8077d29aa418fc66f68589069c8c21c0b33", "1debef742e21db3326716c265ffee6fe0883020d4b7d04986c8003affe5e7e8e"),
@@ -42,7 +42,7 @@ fn test_verify_chained_rotation() {
                     MerkleBlock::reversed(5140, "000001321487a80eefd7f6137da9bb9b06f19143cbdaa15cfda63753bd8eee46", "c344d520890dc4e1f16be687e359b13578e74ae14d01183ca417650d7498eb81"),
                 ]));
 
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain);
+    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     let listdiffs = [
         "MNL_1_4968.dat",
         "MNL_4968_4992.dat",

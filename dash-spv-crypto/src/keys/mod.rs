@@ -25,7 +25,7 @@ use crate::network::protocol::SIGHASH_ALL;
 use crate::util::{base58, data_append::DataAppend, script::ScriptElement, sec_vec::SecVec};
 
 pub trait DeriveKey<T>: Sized
-    where T: IIndexPath<Item: Copy + Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum> {
+    where T: IIndexPath<Item: Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum> {
     fn private_derive_to_path(&self, path: &T) -> Result<Self, KeyError>;
     fn public_derive_to_path_with_offset(&self, path: &T, offset: usize) -> Result<Self, KeyError>;
     fn public_derive_to_path(&self, path: &T) -> Result<Self, KeyError> {

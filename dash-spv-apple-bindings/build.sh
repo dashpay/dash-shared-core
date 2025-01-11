@@ -85,6 +85,7 @@ fi
 xcodebuild -create-xcframework \
 	-library target/lib/ios/lib${LIB_NAME}_ios.a -headers target/include \
 	-library target/lib/ios-simulator/lib${LIB_NAME}_ios.a -headers target/include \
-	-output target/framework/${FRAMEWORK}.xcframework
+	-output target/framework/${FRAMEWORK}.xcframework \
+#	IPHONEOS_DEPLOYMENT_TARGET=15.6
 
 echo "Done building Dash Shared Core"

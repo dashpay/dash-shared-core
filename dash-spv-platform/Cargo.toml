@@ -7,6 +7,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+anyhow = "1.0.95"
 #ferment = { path = "../../ferment/ferment" }
 #ferment-macro = { path = "../../ferment/ferment-macro" }
 #dapi-grpc = { path = "../../platform/packages/dapi-grpc" }
@@ -15,14 +16,24 @@ publish = false
 #drive-proof-verifier = { path = "../../platform/packages/rs-drive-proof-verifier" }
 #platform-value = { path = "../../platform/packages/rs-platform-value" }
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
+bitcoin_hashes = { version = "0.11.0", default-features = false }
 dapi-grpc = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dapi-grpc" }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
+    "std",
+    "secp-recovery",
+    "rand",
+    "signer",
+    "serde",
+], default-features = false, tag = "0.34.0" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
 dash-spv-crypto = { path = "../dash-spv-crypto" }
+dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
-dispatch = "0.2.0"
-dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp", features = ["state-transitions"] }
+#dispatch = "0.2.0"
+dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }
 drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
 drive-proof-verifier = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive-proof-verifier" }
+indexmap = "2.7.0"
 platform-value = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-value" }
 platform-version = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-version" }
 ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment" }
@@ -30,6 +41,13 @@ ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/reo
 http = { version = "0.2.12" }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 tokio-util = { version = "0.7.10" }
+bitflags = "2.6.0"
+base64 = "0.22.1"
+[dev-dependencies]
+base64 = "0.22.1"
+[features]
+default = ["state-transitions"]
+state-transitions = ["dpp/state-transitions"]
 
 [lib]
 name = "dash_spv_platform"

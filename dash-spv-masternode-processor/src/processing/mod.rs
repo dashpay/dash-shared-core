@@ -8,7 +8,7 @@ pub mod core_provider;
 pub mod llmq_validation_status;
 
 pub use self::core_provider::{CoreProvider, CoreProviderError};
-pub use self::llmq_validation_status::LLMQValidationStatus;
+pub use self::llmq_validation_status::LLMQValidationError;
 pub use self::mn_listdiff_result::MNListDiffResult;
 pub use self::processing_error::ProcessingError;
 pub use self::processor::MasternodeProcessor;

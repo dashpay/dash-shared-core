@@ -1,4 +1,6 @@
 #[cfg(feature = "test-helpers")]
+use std::collections::BTreeMap;
+#[cfg(feature = "test-helpers")]
 use dash_spv_crypto::network::{ChainType, DevnetType, IHaveChainSettings};
 #[cfg(feature = "test-helpers")]
 use crate::block_store::{init_mainnet_store, init_testnet_store, MerkleBlock};
@@ -24,6 +26,7 @@ pub struct FFIContext {
     //pub cache: Arc<MasternodeProcessorCache>,
     // TODO:: make it initialized from json file with blocks
     pub blocks: Vec<MerkleBlock>,
+    pub cl_signatures: BTreeMap<[u8; 32], [u8; 96]>,
 }
 #[cfg(feature = "test-helpers")]
 impl Drop for FFIContext {
@@ -52,13 +55,15 @@ impl FFIContext {
         self.blocks.iter().find(|block| block.height == height)
     }
 
-
+    pub fn cl_signature_by_block_hash(&self, block_hash: &[u8; 32]) -> Option<&[u8; 96]> {
+        self.cl_signatures.get(block_hash)
+    }
     pub fn genesis_as_ptr(&self) -> *const u8 {
         self.chain.genesis_hash().as_ptr()
     }
 
     pub fn chain_default(chain: ChainType, is_dip_0024: bool, blocks: Vec<MerkleBlock>) -> Self {
-        Self { chain, is_dip_0024, blocks }
+        Self { chain, is_dip_0024, blocks, cl_signatures: BTreeMap::new() }
     }
     pub fn create_default_context(chain: ChainType, is_dip_0024: bool) -> Self {
         let blocks = match chain {
@@ -66,7 +71,7 @@ impl FFIContext {
             ChainType::TestNet => init_testnet_store(),
             _ => vec![],
         };
-        Self { chain, is_dip_0024, blocks }
+        Self { chain, is_dip_0024, blocks, cl_signatures: BTreeMap::new()  }
     }
     pub fn create_default_context_and_cache(chain: ChainType, is_dip_0024: bool) -> Self {
         let blocks = match chain {

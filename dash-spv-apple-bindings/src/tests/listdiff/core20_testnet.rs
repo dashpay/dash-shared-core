@@ -4,7 +4,7 @@ use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::block_store::init_testnet_store;
 #[cfg(feature = "serde")]
 use dash_spv_masternode_processor::test_helpers::load_message;
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "use_serde", feature = "serde"))]
 use dash_spv_masternode_processor::tests::serde_helper::Snapshot;
 use crate::tests::common::assert_diff_chain;
 

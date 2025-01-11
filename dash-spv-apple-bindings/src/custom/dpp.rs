@@ -24,3 +24,30 @@ impl Drop for CoreScriptFFI {
         }
     }
 }
+
+#[allow(non_camel_case_types)]
+#[derive(Clone)]
+#[ferment_macro::register(dpp::identity::errors::asset_lock_transaction_is_not_found_error::AssetLockTransactionIsNotFoundError)]
+pub struct AssetLockTransactionIsNotFoundErrorFFI {
+    pub raw: *mut dpp::identity::errors::asset_lock_transaction_is_not_found_error::AssetLockTransactionIsNotFoundError,
+}
+impl ferment::FFIConversionFrom<dpp::identity::errors::asset_lock_transaction_is_not_found_error::AssetLockTransactionIsNotFoundError> for AssetLockTransactionIsNotFoundErrorFFI {
+    unsafe fn ffi_from_const(ffi: *const Self) -> dpp::identity::errors::asset_lock_transaction_is_not_found_error::AssetLockTransactionIsNotFoundError {
+        let ffi = &*ffi;
+        let raw = &*ffi.raw;
+        raw.clone()
+    }
+}
+impl ferment::FFIConversionTo<dpp::identity::errors::asset_lock_transaction_is_not_found_error::AssetLockTransactionIsNotFoundError> for AssetLockTransactionIsNotFoundErrorFFI {
+    unsafe fn ffi_to_const(obj: dpp::identity::errors::asset_lock_transaction_is_not_found_error::AssetLockTransactionIsNotFoundError) -> *const Self {
+        ferment::boxed(Self { raw: ferment::boxed(obj) })
+    }
+}
+
+impl Drop for AssetLockTransactionIsNotFoundErrorFFI {
+    fn drop(&mut self) {
+        unsafe {
+            ferment::unbox_any(self.raw);
+        }
+    }
+}

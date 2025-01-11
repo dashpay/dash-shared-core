@@ -5,7 +5,7 @@ use crate::consensus::{Decodable, Encodable, encode};
 use crate::crypto::byte_util::UInt384;
 use crate::keys::BLSKey;
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
 pub struct OperatorPublicKey {
     pub data: [u8; 48],

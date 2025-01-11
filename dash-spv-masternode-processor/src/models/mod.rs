@@ -6,6 +6,7 @@ pub mod masternode_list;
 pub mod mn_list_diff;
 pub mod snapshot;
 pub mod qr_info;
+pub mod sync_state;
 
 pub use self::llmq::LLMQVerificationContext;
 pub use self::llmq_indexed_hash::LLMQIndexedHash;

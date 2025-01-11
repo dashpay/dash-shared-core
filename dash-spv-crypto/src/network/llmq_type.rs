@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
@@ -8,7 +9,7 @@ use crate::crypto::byte_util::BytesDecodable;
 use crate::network::ChainType;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub struct DKGParams {
     pub interval: u32, // one DKG per hour
@@ -289,7 +290,7 @@ pub const LLMQ_DEV_PLATFORM: LLMQParams = LLMQParams {
 
 #[warn(non_camel_case_types)]
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub enum LLMQType {
     LlmqtypeUnknown = 0,    // other kind of
@@ -314,7 +315,29 @@ pub enum LLMQType {
 #[cfg(feature = "generate-dashj-tests")]
 impl Serialize for LLMQType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        serializer.serialize_u8(u8::from(*self))
+        serializer.serialize_u8(self.index())
+    }
+}
+
+impl Display for LLMQType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            LLMQType::LlmqtypeUnknown => "0_Unknown",
+            LLMQType::Llmqtype50_60 => "1_50/60",
+            LLMQType::Llmqtype400_60 => "2_400/60",
+            LLMQType::Llmqtype400_85 => "3_400/85",
+            LLMQType::Llmqtype100_67 => "4_100/67",
+            LLMQType::Llmqtype60_75 => "5_60/75",
+            LLMQType::Llmqtype25_67 => "6_25/67",
+            LLMQType::LlmqtypeTest => "100_Test",
+            LLMQType::LlmqtypeDevnet => "101_Dev",
+            LLMQType::LlmqtypeTestV17 => "102_Test-v17",
+            LLMQType::LlmqtypeTestDIP0024 => "103_Test-dip-24",
+            LLMQType::LlmqtypeTestInstantSend => "104_Test-IS",
+            LLMQType::LlmqtypeDevnetDIP0024 => "105_Dev-dip-24",
+            LLMQType::LlmqtypeTestnetPlatform => "106_Test-Platform",
+            LLMQType::LlmqtypeDevnetPlatform => "107_Dev-Platform",
+        })
     }
 }
 
@@ -393,6 +416,27 @@ impl From<LLMQType> for u8 {
         }
     }
 }
+impl From<&LLMQType> for u64 {
+    fn from(value: &LLMQType) -> Self {
+        match value {
+            LLMQType::LlmqtypeUnknown => 0,
+            LLMQType::Llmqtype50_60 => 1,
+            LLMQType::Llmqtype400_60 => 2,
+            LLMQType::Llmqtype400_85 => 3,
+            LLMQType::Llmqtype100_67 => 4,
+            LLMQType::Llmqtype60_75 => 5,
+            LLMQType::Llmqtype25_67 => 6,
+            LLMQType::LlmqtypeTest => 100,
+            LLMQType::LlmqtypeDevnet => 101,
+            LLMQType::LlmqtypeTestV17 => 102,
+            LLMQType::LlmqtypeTestDIP0024 => 103,
+            LLMQType::LlmqtypeTestInstantSend => 104,
+            LLMQType::LlmqtypeDevnetDIP0024 => 105,
+            LLMQType::LlmqtypeTestnetPlatform => 106,
+            LLMQType::LlmqtypeDevnetPlatform => 107,
+        }
+    }
+}
 
 impl<'a> TryRead<'a, Endian> for LLMQType {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
@@ -416,7 +460,7 @@ impl<'a> BytesDecodable<'a, LLMQType> for LLMQType {
 
 impl Encodable for LLMQType {
     fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
-        u8::consensus_encode(&(*self).into(), &mut writer)
+        u8::consensus_encode(&self.index(), &mut writer)
     }
 }
 
@@ -438,7 +482,7 @@ pub fn dkg_rotation_params(chain_type: ChainType) -> DKGParams {
 #[ferment_macro::export]
 impl LLMQType {
     pub fn index(&self) -> u8 {
-        u8::from(*self)
+        u8::from(self.clone())
     }
     pub fn from_u16(index: u16) -> LLMQType {
         LLMQType::from(index as u8)

@@ -32,7 +32,7 @@ fn test_multiple_merkle_hashes() {
     let merkle_tree = MerkleTree {
         tree_element_count,
         hashes: hashes.clone(),
-        flags: merkle_flags.clone(),
+        flags: merkle_flags.as_slice(),
     };
     let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
     println!(

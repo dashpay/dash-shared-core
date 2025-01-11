@@ -1,6 +1,9 @@
 use std::ptr::{null, null_mut};
 use std::sync::Arc;
+use hashes::hex::FromHex;
+use dash_spv_crypto::crypto::UInt256;
 use dash_spv_crypto::network::ChainType;
+use dash_spv_masternode_processor::block_store::init_testnet_store;
 use dash_spv_masternode_processor::test_helpers::load_message;
 use dash_spv_masternode_processor::tests::FFIContext;
 use crate::ffi_core_provider::FFICoreProvider;
@@ -12,7 +15,7 @@ fn testnet_llmq_verificationx() {
         ChainType::TestNet,
         &["MNL_0_122928__70221.dat", "MNL_122928_123000__70221.dat"],
         &[],
-        None, false);
+        Some(init_testnet_store()), false);
 }
 
 #[test]
@@ -22,8 +25,8 @@ fn testnet_llmq_verification() {
     let bytes = load_message(chain.identifier().as_str(), "MNL_0_122928__70221.dat");
     let use_insight_as_backup = false;
     let base_masternode_list_hash: *const u8 = null_mut();
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain);
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
+    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     // let mut ctx = context.write().unwrap();
     // let processor = MasternodeProcessor::new(Arc::new(provider));
     let result_119064 = processor.mn_list_diff_result_from_message(&bytes, true, 70221, false, null())
@@ -67,24 +70,17 @@ fn testnet_llmq_verification() {
 fn testnet_llmq_verification_using_processor_and_cache() {
     //testTestnetQuorumVerification
     let chain = ChainType::TestNet;
-    let context = Arc::new(FFIContext::create_default_context_and_cache(chain, false));
-    // let mut cache = context.cache.write().unwrap();
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain);
-    // let mut ctx = context.write().unwrap();
-    // let mut context = create_default_context_and_cache(chain, false);
-    // let processor = register_default_processor(&mut context);
+    let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
+    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     let use_insight_as_backup = false;
-
     let bytes = load_message(chain.identifier(), "MNL_0_122928__70221.dat");
-
     let result_119064 = processor.mn_list_diff_result_from_message(&bytes, false, 70221, false, null())
         .expect("Unable to process mn_list_diff");
-
-    // let result = process_mnlistdiff(bytes, processor, &mut context, 70221, use_insight_as_backup, false);
-    // let result_119064 = unsafe { &*result };
-    // assert_diff_result(&ctx, &result_119064);
-
     let block_hash_119064 = result_119064.0;
+    let bb1 = UInt256::from_hex("23b8cd5303c892c0b140152f256c7ff27645890e04f93dc7df75d90100000000").unwrap().0;
+    // let hash_119024 = UInt256::from_hex("2cbcf83b62913d56f605c0e581a48872839428c92e5eb76cd7ad94bcaf0b0000").unwrap().0;
+    let list_119064 = processor.masternode_list_for_block_hash(bb1).unwrap();
+    processor.cache.add_masternode_list(block_hash_119064, list_119064);
     let masternode_list_119064 = processor.masternode_list_for_block_hash(block_hash_119064)
         .expect("MasternodeList");
     // let masternode_list_119064 = result_119064.masternode_list;

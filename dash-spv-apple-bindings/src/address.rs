@@ -1,3 +1,4 @@
+
 pub mod addresses {
     use dash_spv_crypto::network::ChainType;
     use dash_spv_crypto::util::address::address;
@@ -29,3 +30,10 @@ pub mod addresses {
         address.map_or(false, |address| address::is_valid_dash_address_for_script_map(address.as_str(), &chain_type.script_map()))
     }
 }
+
+// #[cfg(test)]
+// pub fn test_cb() {
+//     let script = Vec::from_hex("21038df098a36af5f1b7271e32ad52947f64c1ad70c16a8a1a987105eaab5daa7ad2ac")
+//         .expect("Script");
+//     let chain_type = ChainType::DevNet(DevnetType::DRA);
+// }

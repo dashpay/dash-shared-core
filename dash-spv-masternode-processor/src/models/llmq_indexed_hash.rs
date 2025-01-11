@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
 pub struct LLMQIndexedHash {
     pub index: u32,

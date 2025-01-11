@@ -6,7 +6,7 @@ use dash_spv_crypto::crypto::byte_util::clone_into_array;
 use dash_spv_crypto::crypto::UInt128;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
 pub struct SocketAddress {
     pub ip_address: [u8; 16], //v6, but only v4 supported

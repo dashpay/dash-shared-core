@@ -2,6 +2,8 @@ use std::io;
 use std::io::{Error, Write};
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
+use dashcore::{OutPoint, ScriptBuf, TxIn, Txid};
+use dashcore::hashes::Hash;
 use hashes::hex::ToHex;
 use crate::consensus::{encode, Decodable, Encodable};
 use crate::crypto::{UInt256, VarBytes};
@@ -9,14 +11,23 @@ use crate::crypto::{UInt256, VarBytes};
 #[derive(Clone)]
 #[ferment_macro::export]
 pub struct TransactionInput {
-    pub input_hash: UInt256,
+    pub input_hash: [u8; 32],
     pub index: u32,
     pub script: Option<Vec<u8>>,
     pub signature: Option<Vec<u8>>,
     pub sequence: u32,
 }
 
-
+impl From<TransactionInput> for TxIn {
+    fn from(value: TransactionInput) -> Self {
+        TxIn {
+            previous_output: OutPoint { txid: Txid::from_byte_array(value.input_hash), vout: value.index },
+            script_sig: ScriptBuf(value.script.unwrap_or_default()),
+            sequence: value.sequence,
+            witness: Default::default(),
+        }
+    }
+}
 
 impl std::fmt::Debug for TransactionInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -58,7 +69,7 @@ impl Encodable for TransactionInput {
 impl Decodable for TransactionInput {
     #[inline]
     fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let input_hash = UInt256::consensus_decode(&mut d)?;
+        let input_hash = <[u8; 32]>::consensus_decode(&mut d)?;
         let index = u32::consensus_decode(&mut d)?;
         let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
         let sequence = u32::consensus_decode(&mut d)?;
@@ -70,7 +81,7 @@ impl Decodable for TransactionInput {
 impl<'a> TryRead<'a, Endian> for TransactionInput {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
-        let input_hash = bytes.read_with::<UInt256>(offset, LE)?;
+        let input_hash = bytes.read_with::<UInt256>(offset, LE)?.0;
         let index = bytes.read_with::<u32>(offset, LE)?;
         let signature = match bytes.read_with::<VarBytes>(offset, LE) {
             Ok(data) => Some(data.1.to_vec()),

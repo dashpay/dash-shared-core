@@ -8,7 +8,7 @@ documentation_style = "c"
 #style = "tag"
 #swift_enum_macro = "CF_ENUM"
 include_guard = "dash_shared_core_h"
-
+trailer = "typedef struct Runtime Runtime;"
 [parse]
 parse_deps = true
 #expand = ["dash-spv-masternode-processor", ]
@@ -24,7 +24,9 @@ include = [
 #    "dpp",
     "drive-proof-verifier",
     "rs-dapi-client",
-    "rs-merk-verify-c-binding"
+    "rs-merk-verify-c-binding",
+    "tokio",
+    "versioned-feature-core"
 ]
 extra_bindings = [
     "ferment",
@@ -37,7 +39,9 @@ extra_bindings = [
     "dpp",
     "drive-proof-verifier",
     "rs-dapi-client",
-    "rs-merk-verify-c-binding"
+    "rs-merk-verify-c-binding",
+    "tokio",
+    "versioned-feature-core"
 ]
 
 [enum]
@@ -45,6 +49,7 @@ prefix_with_name = true
 
 [defines]
 "test" = "TEST"
+"feature = bls-signatures" = "DPP_BLS_SIGNATURES"
 "feature = cbor" = "CBOR_AND_CBORIUM"
 "feature = core-types" = "DS_CORE_TYPES"
 "feature = data-contract-cbor-conversion" = "DPP_DATA_CONTRACT_CBOR_CONVERSION"
