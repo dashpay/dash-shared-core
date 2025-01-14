@@ -4,6 +4,7 @@ members = [
     "dash-spv-crypto",
     "dash-spv-event-bus",
     "dash-spv-example-app",
+    "dash-spv-macro",
     "dash-spv-masternode-processor",
     "dash-spv-platform",
     "reachability",

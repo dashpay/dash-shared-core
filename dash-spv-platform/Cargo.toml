@@ -28,6 +28,8 @@ dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
 dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
+dash-spv-macro = { path = "../dash-spv-macro" }
+
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
 #dispatch = "0.2.0"
 dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }

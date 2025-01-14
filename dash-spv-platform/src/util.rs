@@ -2,7 +2,10 @@ use std::future::Future;
 use std::time::Duration;
 use dash_sdk::platform::{Fetch, Query};
 use dash_sdk::Sdk;
+use dpp::data_contract::DataContract;
+use dpp::data_contracts::SystemDataContract;
 use platform_value::Identifier;
+use dash_spv_crypto::network::ChainType;
 use crate::error::Error;
 
 pub const NONE_ERROR: &str = "Platform returned none while some was expected";
@@ -217,20 +220,20 @@ where SPEC: StreamSpec {
 
 pub trait StreamManager {
     fn sdk_ref(&self) -> &Sdk;
+    fn chain_type(&self) -> &ChainType;
 
-    fn stream<SPEC, Item>(
+    fn stream<SPEC, ITEM>(
         &self,
         unique_id: Identifier,
         retry: RetryStrategy,
         validator: SPEC::Validator,
     ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
     where
-        SPEC: StreamSpec<Result = Option<Item>, Error = dash_sdk::Error>,
+        SPEC: StreamSpec<Result = Option<ITEM>, Error = dash_sdk::Error>,
         SPEC::Validator: Send,
-        Item: Fetch + Send,
-        Identifier: Query<<Item as Fetch>::Request>,
-        Self: Send + Sync,
-    {
+        ITEM: Fetch + Send,
+        Identifier: Query<<ITEM as Fetch>::Request>,
+        Self: Send + Sync {
         async move {
             let strategy = StreamStrategy::<SPEC>::with_retry(retry)
                 .with_validator(validator)
@@ -239,7 +242,7 @@ pub trait StreamManager {
         }
     }
 
-    fn stream_with_settings<SPEC, Item>(
+    fn stream_with_settings<SPEC, ITEM>(
         &self,
         unique_id: Identifier,
         retry: RetryStrategy,
@@ -247,12 +250,11 @@ pub trait StreamManager {
         validator: SPEC::Validator,
     ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
     where
-        SPEC: StreamSpec<Result = Option<Item>, Error = dash_sdk::Error>,
+        SPEC: StreamSpec<Result = Option<ITEM>, Error = dash_sdk::Error>,
         SPEC::Validator: Send,
-        Item: Fetch + Send,
-        Identifier: Query<<Item as Fetch>::Request>,
-        Self: Send + Sync,
-    {
+        ITEM: Fetch + Send,
+        Identifier: Query<<ITEM as Fetch>::Request>,
+        Self: Send + Sync {
         async move {
             let strategy = StreamStrategy::<SPEC>::with_retry_and_settings(retry, stream_settings)
                 .with_validator(validator)
@@ -261,23 +263,41 @@ pub trait StreamManager {
         }
     }
 
-    fn stream_with_strategy<SPEC, Item>(
+    fn stream_with_strategy<SPEC, ITEM>(
         &self,
         unique_id: Identifier,
         strategy: StreamStrategy<SPEC>,
     ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
     where
-        SPEC: StreamSpec<Result = Option<Item>, Error = dash_sdk::Error>,
+        SPEC: StreamSpec<Result = Option<ITEM>, Error = dash_sdk::Error>,
         SPEC::Validator: Send,
-        Item: Fetch + Send,
-        Identifier: Query<<Item as Fetch>::Request>,
-        Self: Send + Sync,
-    {
+        ITEM: Fetch + Send,
+        Identifier: Query<<ITEM as Fetch>::Request>,
+        Self: Send + Sync {
         async move {
-            strategy
-                .stream(|| async { Item::fetch_by_identifier(self.sdk_ref(), unique_id).await })
+            strategy.stream(|| async { ITEM::fetch_by_identifier(self.sdk_ref(), unique_id).await })
                 .await
                 .map_err(Error::from)
+        }
+    }
+
+    fn with_contract<F, Fut, R, Args>(
+        &self,
+        system_contract: SystemDataContract,
+        args: Args,
+        callback: F,
+    ) -> impl Future<Output = Result<R, Error>> + Send
+    where
+        F: FnOnce(DataContract, Args) -> Fut + Send,
+        Fut: Future<Output = Result<R, Error>> + Send,
+        Args: Send,
+        Self: Send + Sync {
+        async move {
+            match DataContract::fetch(self.sdk_ref(), system_contract.id()).await {
+                Ok(Some(contract)) => callback(contract, args).await,
+                Ok(None) => Err(Error::DashSDKError(format!("Contract {:?} not found", system_contract))),
+                Err(e) => Err(Error::from(e)),
+            }
         }
     }
 }

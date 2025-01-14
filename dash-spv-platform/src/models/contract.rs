@@ -11,6 +11,13 @@ pub enum ContractState {
 }
 
 #[derive(Clone, Debug)]
+#[ferment_macro::opaque]
+pub struct ContractContext {
+    pub wallet_id: String,
+}
+
+
+#[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub struct ContractModel {
     pub chain_type: ChainType,

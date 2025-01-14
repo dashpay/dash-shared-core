@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::{platform::{DocumentQuery, FetchMany}, Sdk};
 use dash_sdk::platform::Fetch;
 use dpp::data_contract::DataContract;
@@ -12,29 +11,43 @@ use dpp::errors::ProtocolError;
 use dpp::identity::identity_public_key::IdentityPublicKey;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::util::entropy_generator::{DefaultEntropyGenerator, EntropyGenerator};
-use drive::query::{OrderClause, WhereClause, WhereOperator};
 use indexmap::IndexMap;
-use platform_value::{Identifier, Value};
+use platform_value::Identifier;
 use platform_version::version::PlatformVersion;
 use dash_spv_crypto::network::ChainType;
-#[cfg(test)]
-use crate::create_test_sdk;
+use dash_spv_macro::StreamManager;
 use crate::error::Error;
+use crate::query::{order_by_asc_normalized_label, order_by_asc_owner_id, where_domain_is_dash, where_normalized_label_equal_to, where_normalized_label_starts_with, where_owner_in, where_owner_is, where_records_identity_is};
 use crate::signer::CallbackSigner;
+use crate::util::{StreamManager, Validator};
 
-#[derive(Clone, Debug)]
+
+
+#[derive(Clone, Debug, StreamManager)]
 #[ferment_macro::opaque]
 pub struct DocumentsManager {
     pub sdk: Arc<Sdk>,
     pub chain_type: ChainType,
 }
-// #[ferment_macro::export]
-// impl DocumentsManager {
-//     pub async fn get_dpns_documents_for_usernames(&self, domain: String) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
-//
-//     }
-//
-// }
+
+#[ferment_macro::export]
+pub enum DocumentValidator {
+    None = 0,
+    AcceptNotFoundAsNotAnError = 1,
+}
+impl DocumentValidator {
+    pub fn accept_not_found(&self) -> bool {
+        match self {
+            DocumentValidator::None => false,
+            DocumentValidator::AcceptNotFoundAsNotAnError => true
+        }
+    }
+}
+impl Validator<Option<Document>> for DocumentValidator {
+    fn validate(&self, value: &Option<Document>) -> bool {
+        value.is_some() || value.is_none() && self.accept_not_found()
+    }
+}
 
 impl DocumentsManager {
     pub fn new(sdk: &Arc<Sdk>, chain_type: ChainType) -> Self {
@@ -70,79 +83,120 @@ impl DocumentsManager {
 
     }
 
-    // pub async fn profiles(&self, document: Document) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
-    //     self.documents_with_query()
-    // }
+    pub fn query_dpns_documents_for_identity_with_user_id(&self, contract: DataContract, user_id: [u8; 32]) -> Result<DocumentQuery, Error> {
+        let mut query = DocumentQuery::new(Arc::new(contract), "domain").map_err(Error::from)?;
+        query.limit = 100;
+        query.where_clauses = vec![where_records_identity_is(user_id)];
+        Ok(query)
+    }
+    pub fn query_dashpay_profile_for_user_id(&self, contract: DataContract, user_id: [u8; 32]) -> Result<DocumentQuery, Error> {
+        let mut query = DocumentQuery::new(Arc::new(contract), "profile").map_err(Error::from)?;
+        query.limit = 1;
+        query.where_clauses = vec![where_owner_is(user_id)];
+        Ok(query)
+    }
+    pub fn query_dashpay_profiles_for_user_ids(&self, contract: DataContract, user_ids: Vec<[u8; 32]>) -> Result<DocumentQuery, Error> {
+        let mut query = DocumentQuery::new(Arc::new(contract), "profile").map_err(Error::from)?;
+        query.limit = user_ids.len() as u32;
+        query.where_clauses = vec![where_owner_in(user_ids)];
+        query.order_by_clauses = vec![order_by_asc_owner_id()];
+        Ok(query)
+    }
+
+    pub fn query_dpns_documents_for_username(&self, contract: DataContract, username: String) -> Result<DocumentQuery, Error> {
+        let mut query = DocumentQuery::new(Arc::new(contract), "domain").map_err(Error::from)?;
+        query.limit = 100;
+        query.where_clauses = vec![
+            where_domain_is_dash(),
+            where_normalized_label_equal_to(username),
+        ];
+        query.order_by_clauses = vec![order_by_asc_normalized_label()];
+        Ok(query)
+    }
+
+    pub fn query_dpns_documents_for_username_prefix(&self, contract: DataContract, username_prefix: String) -> Result<DocumentQuery, Error> {
+        let mut query = DocumentQuery::new(Arc::new(contract), "domain").map_err(Error::from)?;
+        query.limit = 100;
+        query.where_clauses = vec![
+            where_domain_is_dash(),
+            where_normalized_label_starts_with(username_prefix),
+        ];
+        query.order_by_clauses = vec![order_by_asc_normalized_label()];
+        Ok(query)
+    }
+
 }
 
 #[ferment_macro::export]
 impl DocumentsManager {
-    pub async fn search_identity_by_name(&self, _name: String) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        // let chain = ChainType::TestNet;
-        // let sdk = create_test_sdk(&chain);
-        let contract_id = SystemDataContract::DPNS.id();
-        // let sdk_arc = Arc::new(sdk);
-        let query = DocumentQuery::new_with_data_contract_id(&self.sdk, contract_id, "domain").await?;
 
-        // let domain = "dash";
-        // let name = "asdtwotwooct";
-
-        // let doc_manager = DocumentsManager::new(&sdk_arc, chain);
-
-        Document::fetch_many(&self.sdk, query).await.map_err(Error::from)
-
-        // match self.documents_with_query(query.await.unwrap()).await {
-        //     Ok(result) => {
-        //         println!("Ok: {:?}", result);
-        //     }
-        //     Err(err) => {
-        //         println!("Error: {:?}", err);
-        //     }
-        // }
-
+    pub async fn dpns_documents_for_identity_with_user_id(&self, user_id: [u8; 32]) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        self.with_contract(
+            SystemDataContract::DPNS,
+            user_id,
+            |contract, user_id|
+                self.dpns_documents_for_identity_with_user_id_using_contract(user_id, contract)).await
+    }
+    pub async fn dpns_documents_for_username(&self, username: String) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        self.with_contract(
+            SystemDataContract::DPNS,
+            username,
+            |contract, username|
+                self.dpns_documents_for_username_using_contract(username, contract)).await
+    }
+    pub async fn dpns_documents_for_username_prefix(&self, username_prefix: String) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        self.with_contract(
+            SystemDataContract::DPNS,
+            username_prefix,
+            |contract, username|
+                self.dpns_documents_for_username_prefix_using_contract(username, contract)).await
+    }
+    pub async fn dashpay_profile_for_user_id(&self, user_id: [u8; 32]) -> Result<Option<Document>, Error> {
+        self.with_contract(
+            SystemDataContract::Dashpay,
+            user_id,
+            |contract, user_id|
+                self.dashpay_profile_for_user_id_using_contract(user_id, contract)).await
+    }
+    pub async fn dashpay_profiles_for_user_ids(&self, user_ids: Vec<[u8; 32]>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        self.with_contract(
+            SystemDataContract::Dashpay,
+            user_ids,
+            |contract, user_ids|
+                self.dashpay_profiles_for_user_ids_using_contract(user_ids, contract)).await
     }
 
 
-    pub async fn incoming_contact_requests(&self, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        match DataContract::fetch(&self.sdk, SystemDataContract::Dashpay.id()).await {
-            Ok(Some(contract)) => self.incoming_contact_requests_using_contract(contract, user_id, since, start_after).await,
-            Ok(None) => Err(Error::DashSDKError("Contract not found".to_string())),
-            Err(e) => Err(Error::from(e))
-        }
+
+
+    pub async fn dpns_documents_for_identity_with_user_id_using_contract(&self, user_id: [u8; 32], contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        let query = self.query_dpns_documents_for_identity_with_user_id(contract, user_id)?;
+        Document::fetch_many(self.sdk_ref(), query).await
+            .map_err(Error::from)
     }
-    pub async fn outgoing_contact_requests(&self, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        match DataContract::fetch(&self.sdk, SystemDataContract::Dashpay.id()).await {
-            Ok(Some(contract)) => self.outgoing_contact_requests_using_contract(contract, user_id, since, start_after).await,
-            Ok(None) => Err(Error::DashSDKError("Contract not found".to_string())),
-            Err(e) => Err(Error::from(e))
-        }
+
+    pub async fn dashpay_profile_for_user_id_using_contract(&self, user_id: [u8; 32], contract: DataContract) -> Result<Option<Document>, Error> {
+        let query = self.query_dashpay_profile_for_user_id(contract, user_id)?;
+        Document::fetch(self.sdk_ref(), query).await
+            .map_err(Error::from)
+            // .map(|doc| doc.map(TransientDashPayUser::with_profile_document))
     }
-    pub async fn incoming_contact_requests_using_contract(&self, contract: DataContract, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        let mut query = DocumentQuery::new(Arc::new(contract), "contactRequest").map_err(Error::from)?;
-        query.limit = 100;
-        query.start = start_after.map(Start::StartAfter);
-        query.where_clauses = vec![
-            WhereClause { field: "toUserId".to_string(), operator: WhereOperator::Equal, value: Value::Identifier(user_id) },
-            WhereClause { field: "$createdAt".to_string(), operator: WhereOperator::GreaterThanOrEquals, value: Value::U64(since) }
-        ];
-        query.order_by_clauses = vec![OrderClause {
-            field: "$createdAt".to_string(),
-            ascending: true,
-        }];
-        Document::fetch_many(&self.sdk, query).await.map_err(Error::from)
+    pub async fn dashpay_profiles_for_user_ids_using_contract(&self, user_ids: Vec<[u8; 32]>, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        let query = self.query_dashpay_profiles_for_user_ids(contract, user_ids)?;
+        Document::fetch_many(self.sdk_ref(), query).await
+            .map_err(Error::from)
+            // .map(|docs| Vec::from_iter(docs.into_values().filter_map(|doc| doc.map(TransientDashPayUser::with_profile_document))))
     }
-    pub async fn outgoing_contact_requests_using_contract(&self, contract: DataContract, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        let mut query = DocumentQuery::new(Arc::new(contract), "contactRequest").map_err(Error::from)?;
-        query.limit = 100;
-        query.start = start_after.map(Start::StartAfter);
-        query.where_clauses = vec![
-            WhereClause { field: "$ownerId".to_string(), operator: WhereOperator::Equal, value: Value::Identifier(user_id) },
-            WhereClause { field: "$createdAt".to_string(), operator: WhereOperator::GreaterThanOrEquals, value: Value::U64(since) }
-        ];
-        query.order_by_clauses = vec![OrderClause {
-            field: "$createdAt".to_string(),
-            ascending: true,
-        }];
-        Document::fetch_many(&self.sdk, query).await.map_err(Error::from)
+    pub async fn dpns_documents_for_username_using_contract(&self, username: String, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        let query = self.query_dpns_documents_for_username(contract, username)?;
+        Document::fetch_many(self.sdk_ref(), query).await
+            .map_err(Error::from)
     }
+    pub async fn dpns_documents_for_username_prefix_using_contract(&self, username_prefix: String, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        let query = self.query_dpns_documents_for_username_prefix(contract, username_prefix)?;
+        Document::fetch_many(self.sdk_ref(), query).await
+            .map_err(Error::from)
+    }
+
 }
+

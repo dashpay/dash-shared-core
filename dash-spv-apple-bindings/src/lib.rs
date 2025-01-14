@@ -45,6 +45,7 @@ use dash_spv_platform::PlatformSDK;
 use platform_value::{BinaryData, Identifier};
 use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_masternode_processor::models::sync_state::SyncState;
+use dash_spv_platform::cache::PlatformCache;
 use crate::ffi_core_provider::FFICoreProvider;
 
 #[ferment_macro::opaque]
@@ -142,6 +143,7 @@ impl DashSPVCore {
             maybe_llmq_public_key.ok_or(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {} ({})", llmq_type, llmq_hash.to_hex(), llmq_hash.reversed().to_hex())))
         });
         let platform = Arc::new(PlatformSDK::new(
+            Arc::new(PlatformCache::default()),
             get_quorum_public_key,
             get_data_contract,
             get_platform_activation_height,
@@ -163,6 +165,9 @@ impl DashSPVCore {
 
     pub fn cache(&self) -> Arc<MasternodeProcessorCache> {
         Arc::clone(&self.processor.cache)
+    }
+    pub fn platform_cache(&self) -> Arc<PlatformCache> {
+        Arc::clone(&self.platform.cache)
     }
     pub fn processor(&self) -> Arc<MasternodeProcessor> {
         Arc::clone(&self.processor)

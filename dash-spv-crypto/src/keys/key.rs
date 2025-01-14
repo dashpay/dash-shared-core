@@ -210,6 +210,9 @@ impl OpaqueKey {
             _ => Err(KeyError::DHKeyExchange)
         }
     }
+    pub fn encrypt_data_vec(&self, public_key: OpaqueKey, data: Vec<u8>) -> Result<Vec<u8>, KeyError> {
+        self.encrypt_data(public_key, &data)
+    }
     pub fn encrypt_data_using_iv(&self, public_key: OpaqueKey, data: &[u8], iv: Vec<u8>) -> Result<Vec<u8>, KeyError> {
         match (self, public_key) {
             (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
@@ -248,6 +251,9 @@ impl OpaqueKey {
             }
             _ => Err(KeyError::DHKeyExchange)
         }
+    }
+    pub fn decrypt_data_vec(&self, public_key: OpaqueKey, data: Vec<u8>) -> Result<Vec<u8>, KeyError> {
+        self.decrypt_data(public_key, &data)
     }
 
     pub fn decrypt_data_using_iv_size(&self, public_key: OpaqueKey, data: &[u8], iv_size: usize) -> Result<Vec<u8>, KeyError> {

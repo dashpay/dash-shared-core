@@ -5,6 +5,7 @@ use dpp::identity::{Identity, IdentityPublicKey, KeyType};
 use dash_sdk::platform::Fetch;
 use dash_sdk::platform::types::identity::PublicKeyHash;
 use dash_sdk::{RequestSettings, Sdk};
+use dash_spv_macro::StreamManager;
 use dpp::identity::accessors::IdentityGettersV0;
 use dpp::identity::identity_public_key::accessors::v0::IdentityPublicKeyGettersV0;
 use indexmap::IndexMap;
@@ -16,6 +17,20 @@ use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use dash_spv_crypto::network::ChainType;
 use crate::error::Error;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
+const KEYS_TO_CHECK: u32 = 5;
+const DEFAULT_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: Some(Duration::from_millis(20000)),
+    timeout: Some(Duration::from_secs(0)),
+    retries: Some(3),
+    ban_failed_address: None,
+};
+
+#[derive(Clone)]
+#[ferment_macro::export]
+pub struct IndexedKey {
+    pub index: u32,
+    pub key: OpaqueKey
+}
 
 #[ferment_macro::export]
 pub enum IdentityValidator {
@@ -35,8 +50,14 @@ impl Validator<Option<Identity>> for IdentityValidator {
         value.is_some() || value.is_none() && self.accept_not_found()
     }
 }
+impl StreamSpec for IdentityValidator {
+    type Validator = IdentityValidator;
+    type Error = dash_sdk::Error;
+    type Result = Option<Identity>;
+}
 
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, StreamManager)]
 #[ferment_macro::opaque]
 pub struct IdentitiesManager {
     pub sdk: Arc<Sdk>,
@@ -46,41 +67,15 @@ pub struct IdentitiesManager {
     pub has_recent_identities_sync: bool,
     // key is wallet_unique_id
     pub all_identities: Arc<RwLock<BTreeMap<String, BTreeMap<[u8; 20], Identity>>>>,
-
-    // pub identities: HashMap<I>
 }
 
-impl StreamSpec for IdentityValidator {
-    type Validator = IdentityValidator;
-    type Error = dash_sdk::Error;
-    type Result = Option<Identity>;
-}
-
-const KEYS_TO_CHECK: u32 = 5;
-const DEFAULT_SETTINGS: RequestSettings = RequestSettings {
-    connect_timeout: Some(Duration::from_millis(20000)),
-    timeout: Some(Duration::from_secs(0)),
-    retries: Some(3),
-    ban_failed_address: None,
-};
-
-#[derive(Clone)]
-#[ferment_macro::export]
-pub struct IndexedKey {
-    pub index: u32,
-    pub key: OpaqueKey
+impl IdentitiesManager {
+    pub fn new(sdk: &Arc<Sdk>, chain_type: ChainType) -> Self {
+        Self { chain_type, foreign_identities: HashMap::new(), all_identities: Arc::new(RwLock::new(BTreeMap::new())), sdk: Arc::clone(sdk), last_synced_identities_timestamp: 0, has_recent_identities_sync: false }
+    }
 }
 #[ferment_macro::export]
 impl IdentitiesManager {
-
-    // pub async fn fetch_by_name(&self, username: String, domain: String, contract_id: Identifier) -> Result<Option<Identity>, Error> {
-    //     // platformDocumentsRequest.pathPredicate = [NSPredicate predicateWithFormat:@"normalizedParentDomainName == %@", [domain lowercaseString]];
-    //     // platformDocumentsRequest.predicate = [NSPredicate predicateWithFormat:@"normalizedLabel == %@", [username lowercaseString]];
-    //     match DataContract::fetch_by_identifier(&self.sdk, contract_id).await? {
-    //         Some(contract) => {},
-    //         None => Ok(None)
-    //     }
-    // }
     pub async fn fetch_by_id_bytes(&self, id_bytes: [u8; 32]) -> Result<Option<Identity>, Error> {
         self.fetch_by_id(Identifier::from(id_bytes)).await
     }
@@ -98,7 +93,6 @@ impl IdentitiesManager {
     }
     pub async fn get_identities_for_wallets_public_keys(&self, wallets: BTreeMap<String, Vec<[u8; 20]>>) -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
         let mut all_identities = BTreeMap::new();
-
         for (wallet_id, key_hashes) in wallets.into_iter() {
             println!("get_identities_for_wallets_public_keys -> {} -- {:?}", wallet_id, key_hashes);
             let mut identities = BTreeMap::new();
@@ -162,7 +156,6 @@ impl IdentitiesManager {
         Ok(identities)
     }
 
-
     pub async fn monitor(&self, unique_id: Identifier, retry: RetryStrategy, options: IdentityValidator) -> Result<Option<Identity>, Error> {
         self.stream::<IdentityValidator, Identity>(unique_id, retry, options).await
     }
@@ -173,17 +166,6 @@ impl IdentitiesManager {
         self.stream_with_settings::<IdentityValidator, Identity>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
     }
 
-}
-impl IdentitiesManager {
-    pub fn new(sdk: &Arc<Sdk>, chain_type: ChainType) -> Self {
-        Self { chain_type, foreign_identities: HashMap::new(), all_identities: Arc::new(RwLock::new(BTreeMap::new())), sdk: Arc::clone(sdk), last_synced_identities_timestamp: 0, has_recent_identities_sync: false }
-    }
-}
-
-impl StreamManager for IdentitiesManager {
-    fn sdk_ref(&self) -> &Sdk {
-        &self.sdk
-    }
 }
 
 #[ferment_macro::export]
@@ -202,12 +184,3 @@ pub fn opaque_key_from_identity_public_key(public_key: IdentityPublicKey) -> Res
         key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
     }
 }
-
-// pub fn identity_public_key_from_opaque_key(key: OpaqueKey) -> Result<IdentityPublicKey, KeyError> {
-//     match key.kind() {
-//         KeyKind::ECDSA => IdentityPublicKey::from
-//         KeyKind::BLS => {}
-//         KeyKind::BLSBasic => {}
-//         KeyKind::ED25519 => {}
-//     }
-// }

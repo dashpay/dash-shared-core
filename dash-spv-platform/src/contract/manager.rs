@@ -11,10 +11,11 @@ use platform_value::Identifier;
 #[cfg(feature = "state-transitions")]
 use platform_version::TryFromPlatformVersioned;
 use dash_spv_crypto::network::ChainType;
+use dash_spv_macro::StreamManager;
 use crate::error::Error;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, StreamManager)]
 #[ferment_macro::opaque]
 pub struct ContractsManager {
     pub sdk: Arc<Sdk>,
@@ -24,16 +25,9 @@ pub struct ContractsManager {
 }
 impl ContractsManager {
     pub fn new(sdk: &Arc<Sdk>, chain_type: ChainType) -> Self {
-        // let version = sdk.version();
-        Self {
-            sdk: Arc::clone(sdk),
-            // dashpay_contract: ContractModel::system(SystemDataContract::Dashpay, version, chain_type.clone()).unwrap(),
-            // dpns_contract: ContractModel::system(SystemDataContract::DPNS, version, chain_type.clone()).unwrap(),
-            chain_type,
-        }
+        Self { sdk: Arc::clone(sdk), chain_type }
     }
 }
-
 #[ferment_macro::export]
 impl ContractsManager {
     pub fn load_dashpay_contract(&self) -> DataContract {
@@ -119,12 +113,6 @@ impl StreamSpec for ContractValidator {
     type Result = Option<DataContract>;
 }
 
-
-impl StreamManager for ContractsManager {
-    fn sdk_ref(&self) -> &Sdk {
-        &self.sdk
-    }
-}
 
 #[ferment_macro::export]
 pub fn is_document_defined_for_type(contract: DataContract, ty: &str) -> bool {

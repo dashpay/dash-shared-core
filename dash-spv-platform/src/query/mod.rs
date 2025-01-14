@@ -145,3 +145,49 @@ impl<'a> QueryKind<'a> {
         QueryKind::OutgoingContactRequests { contract, document_type }.into()
     }
 }
+
+
+pub fn order_by_asc_normalized_label() -> OrderClause {
+    OrderClause { field: "normalizedLabel".to_string(), ascending: true }
+}
+pub fn order_by_asc_created_at() -> OrderClause {
+    OrderClause { field: "$createdAt".to_string(), ascending: true }
+}
+pub fn order_by_asc_owner_id() -> OrderClause {
+    OrderClause { field: "$ownerId".to_string(), ascending: true }
+}
+pub fn order_by_asc_salted_domain_hash() -> OrderClause {
+    OrderClause { field: "saltedDomainHash".to_string(), ascending: true }
+}
+
+
+pub fn where_owner_is(user_id: [u8; 32]) -> WhereClause {
+    WhereClause { field: "$ownerId".to_string(), operator: WhereOperator::Equal, value: Value::Identifier(user_id) }
+}
+pub fn where_owner_in(user_ids: Vec<[u8; 32]>) -> WhereClause {
+    WhereClause { field: "$ownerId".to_string(), operator: WhereOperator::In, value: Value::Array(Vec::from_iter(user_ids.into_iter().map(|user_id| Value::Identifier(user_id)))) }
+}
+pub fn where_created_since(time: u64) -> WhereClause {
+    WhereClause { field: "$createdAt".to_string(), operator: WhereOperator::GreaterThanOrEquals, value: Value::U64(time) }
+}
+pub fn where_normalized_label_equal_to(username: String) -> WhereClause {
+    WhereClause { field: "normalizedLabel".to_string(), operator: WhereOperator::Equal, value: Value::Text(username) }
+}
+pub fn where_normalized_label_starts_with(prefix: String) -> WhereClause {
+    WhereClause { field: "normalizedLabel".to_string(), operator: WhereOperator::StartsWith, value: Value::Text(prefix) }
+}
+pub fn where_domain_is_dash() -> WhereClause {
+    WhereClause { field: "normalizedParentDomainName".to_string(), operator: WhereOperator::Equal, value: Value::Text("dash".to_string()) }
+}
+pub fn where_recipient_is(user_id: [u8; 32]) -> WhereClause {
+    WhereClause { field: "toUserId".to_string(), operator: WhereOperator::Equal, value: Value::Identifier(user_id) }
+}
+pub fn where_records_identity_is(user_id: [u8; 32]) -> WhereClause {
+    WhereClause { field: "records.identity".to_string(), operator: WhereOperator::Equal, value: Value::Identifier(user_id) }
+}
+pub fn where_salted_domain_hash_is(hash: Vec<u8>) -> WhereClause {
+    WhereClause { field: "saltedDomainHash".to_string(), operator: WhereOperator::Equal, value: Value::Bytes(hash) }
+}
+pub fn where_salted_domain_hash_in(hashes: Vec<Vec<u8>>) -> WhereClause {
+    WhereClause { field: "saltedDomainHash".to_string(), operator: WhereOperator::In, value: Value::Array(hashes.into_iter().map(|hash| Value::Bytes(hash)).collect()) }
+}

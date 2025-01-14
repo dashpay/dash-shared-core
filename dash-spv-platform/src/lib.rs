@@ -9,7 +9,7 @@ pub mod document;
 pub mod models;
 pub mod query;
 pub mod transition;
-mod proof;
+pub mod cache;
 
 use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -47,18 +47,20 @@ use indexmap::IndexMap;
 use platform_version::version::LATEST_PLATFORM_VERSION;
 use platform_value::{BinaryData, Identifier, Value};
 use tokio::runtime::Runtime;
-use dash_spv_crypto::keys::{ECDSAKey, IKey, OpaqueKey};
+use dash_spv_crypto::keys::{IKey, OpaqueKey};
 use dash_spv_crypto::network::ChainType;
 use dash_spv_event_bus::DAPIAddressHandler;
+use crate::cache::PlatformCache;
 use crate::contract::manager::ContractsManager;
+use crate::document::contact_request::ContactRequestManager;
 use crate::document::manager::DocumentsManager;
+use crate::document::salted_domain_hashes::SaltedDomainHashesManager;
 use crate::error::Error;
 use crate::identity::manager::IdentitiesManager;
 use crate::provider::PlatformProvider;
 use crate::query::QueryKind;
 use crate::signer::CallbackSigner;
 use crate::thread_safe_context::FFIThreadSafeContext;
-// #[no_mangle]
 
 const DEFAULT_TESTNET_ADDRESS_LIST: [&str; 19] = [
     "34.214.48.68",
@@ -111,9 +113,12 @@ pub struct PlatformSDK {
     pub runtime: Arc<Runtime>,
     pub chain_type: ChainType,
     pub sdk: Arc<Sdk>,
+    pub cache: Arc<PlatformCache>,
     pub callback_signer: CallbackSigner,
     pub identity_manager: Arc<IdentitiesManager>,
     pub contract_manager: Arc<ContractsManager>,
+    pub contact_requests: Arc<ContactRequestManager>,
+    pub salted_domain_hashes: Arc<SaltedDomainHashesManager>,
     pub doc_manager: Arc<DocumentsManager>,
 
     pub identities: IdentityFacade,
@@ -184,6 +189,12 @@ impl PlatformSDK {
     pub fn doc_manager(&self) -> Arc<DocumentsManager> {
         Arc::clone(&self.doc_manager)
     }
+    pub fn contact_requests(&self) -> Arc<ContactRequestManager> {
+        Arc::clone(&self.contact_requests)
+    }
+    pub fn salted_domain_hashes(&self) -> Arc<SaltedDomainHashesManager> {
+        Arc::clone(&self.salted_domain_hashes)
+    }
 
     pub async fn get_status(&self, address: &str) -> Result<bool, Error> {
         let evo_node = Address::from_str(address)
@@ -216,7 +227,6 @@ impl PlatformSDK {
     pub async fn dpns_domain_by_id(&self, contract_id: Identifier, document_type: &str, unique_id: Identifier) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         query_contract_docs!(self, contract_id, document_type, records_identity, unique_id)
     }
-    // pub async fn dpns_usernames(&self, contract_id: Identifier, document_type: &str, usernames: &'static [&'static str]) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
     pub async fn dpns_usernames(&self, contract_id: Identifier, document_type: &str, usernames: Vec<String>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let usernames_ref = &usernames.iter().map(|s| s.as_str()).collect::<Vec<_>>();
         // TODO: ferment fails with ['a ['a str]]
@@ -224,20 +234,6 @@ impl PlatformSDK {
     }
     pub async fn find_username(&self, contract_id: Identifier, document_type: &str, starts_with: &str) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         query_contract_docs!(self, contract_id, document_type, dpns_domain, starts_with)
-    }
-    // pub async fn profile_for_user_id(&self, user_id: Identifier) -> Result<BTreeMap<Identifier, Option<Document>>, Error> {
-    //
-    //
-    // }
-
-    pub async fn fetch_identities_by_key_hashes(&self, ext_pub_key: &ECDSAKey, unused_index: u32) -> Result<IndexMap<u32, Identity>, Error> {
-        self.identity_manager.get_identities_by_pub_key_hashes_at_index_range(ext_pub_key, unused_index).await
-    }
-
-    pub async fn outgoing_contact_requests(&self, contract_id: Identifier, document_type: &str, _since: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        let contract = self.contract_manager.fetch_contract_by_id_error_if_none(contract_id).await?;
-        let query = QueryKind::outgoing_contact_requests(contract, document_type)?;
-        self.doc_manager.documents_with_query(query).await
     }
 
     pub async fn publish_contract(&self, contract: DataContract, identity_public_key: IdentityPublicKey) -> Result<DataContract, Error> {
@@ -386,16 +382,6 @@ impl PlatformSDK {
     //
 
 
-    // pub async fn broadcast_state_transition(&self) -> Result<Get> {
-
-
-
-        // let request = BroadcastStateTransitionRequest {
-        //
-        // };
-        // self.sdk.execute(BroadcastStateTransitionRequest::default(), )
-    // }
-
     // pub async fn check_ping_times(&self, masternodes: Vec<MasternodeEntry>) -> Result<GetStatusResponse, Error> {
     //     self.sdk_ref()
     //         .execute(GetStatusRequest::default(), RequestSettings::default())
@@ -410,6 +396,7 @@ impl PlatformSDK {
         CS: Fn(*const std::os::raw::c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
         CCS: Fn(*const std::os::raw::c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
     >(
+        cache: Arc<PlatformCache>,
         get_quorum_public_key: Arc<QP>,
         get_data_contract: DC,
         get_platform_activation_height: AH,
@@ -432,9 +419,12 @@ impl PlatformSDK {
         let protocol_version = sdk.version().protocol_version;
         let sdk_arc = Arc::new(sdk);
         Self {
+            cache,
             identity_manager: Arc::new(IdentitiesManager::new(&sdk_arc, chain_type.clone())),
             contract_manager: Arc::new(ContractsManager::new(&sdk_arc, chain_type.clone())),
             doc_manager: Arc::new(DocumentsManager::new(&sdk_arc, chain_type.clone())),
+            contact_requests: Arc::new(ContactRequestManager::new(&sdk_arc, chain_type.clone())),
+            salted_domain_hashes: Arc::new(SaltedDomainHashesManager::new(&sdk_arc, chain_type.clone())),
             runtime: Arc::new(Runtime::new().unwrap()),
             callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc),
             identities: IdentityFacade::new(protocol_version),
