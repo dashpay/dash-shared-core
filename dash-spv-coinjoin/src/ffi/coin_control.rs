@@ -1,5 +1,5 @@
+use dash_spv_masternode_processor::ffi::ByteArray;
 use crate::models::coin_control::CoinType;
-
 use super::tx_outpoint::TxOutPoint;
 
 #[repr(C)]
@@ -11,4 +11,5 @@ pub struct CoinControl {
     pub allow_other_inputs: bool,
     pub set_selected: *mut *mut TxOutPoint,
     pub set_selected_size: usize,
+    pub dest_change: *mut ByteArray
 }
