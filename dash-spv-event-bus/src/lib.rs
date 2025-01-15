@@ -38,7 +38,7 @@ pub trait Linkable<Link> {
     fn link(&mut self, parent: &Link);
 }
 
-pub trait DAPIAddressHandler: Send + Sync {
+pub trait DAPIAddressHandler {
     fn add_node(&self, address: [u8; 16]);
     fn remove_node(&self, address: [u8; 16]);
     fn add_nodes(&self, addresses: Vec<[u8; 16]>);

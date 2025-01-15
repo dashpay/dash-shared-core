@@ -16,9 +16,10 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 use std::sync::Arc;
 use bitcoin_hashes::hex::ToHex;
+use dapi_grpc::core::v0::GetTransactionRequest;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
-use dash_sdk::{dpp, Sdk, SdkBuilder};
-use dash_sdk::dapi_client::{Address, AddressListError};
+use dash_sdk::{dpp, RequestSettings, Sdk, SdkBuilder};
+use dash_sdk::dapi_client::{Address, AddressListError, DapiRequestExecutor};
 use dash_sdk::dpp::dashcore::secp256k1::rand;
 use dash_sdk::dpp::dashcore::secp256k1::rand::SeedableRng;
 use dash_sdk::platform::FetchUnproved;
@@ -28,13 +29,16 @@ use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dpp::data_contract::{DataContract, DataContractFacade};
+use dpp::data_contract::document_type::DocumentTypeRef;
 use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0, IdentityFacade, KeyID};
 use dpp::document::Document;
+use dpp::document::document_factory::DocumentFactory;
 use dpp::identity::core_script::CoreScript;
 use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
+use dpp::state_transition::document::documents_batch_transition::document_transition::action_type::DocumentTransitionActionType;
 use dpp::state_transition::state_transition_factory::StateTransitionFactory;
 use dpp::state_transition::StateTransition;
 use dpp::state_transition::state_transitions::identity::public_key_in_creation::IdentityPublicKeyInCreation;
@@ -45,10 +49,13 @@ use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use drive_proof_verifier::types::EvoNodeStatus;
 use indexmap::IndexMap;
 use platform_version::version::LATEST_PLATFORM_VERSION;
-use platform_value::{BinaryData, Identifier, Value};
+use platform_value::{BinaryData, Bytes32, Identifier, Value};
 use tokio::runtime::Runtime;
+use dash_spv_crypto::consensus::Decodable;
+use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_crypto::keys::{IKey, OpaqueKey};
 use dash_spv_crypto::network::ChainType;
+use dash_spv_crypto::tx::Transaction;
 use dash_spv_event_bus::DAPIAddressHandler;
 use crate::cache::PlatformCache;
 use crate::contract::manager::ContractsManager;
@@ -123,6 +130,7 @@ pub struct PlatformSDK {
 
     pub identities: IdentityFacade,
     pub contracts: DataContractFacade,
+    pub documents: DocumentFactory,
     pub state_transition: StateTransitionFactory,
 
     // pub platform_client: PlatformGrpcClient
@@ -206,6 +214,14 @@ impl PlatformSDK {
             .map(|status| status.is_some())
     }
 
+    pub async fn get_transaction_with_hash(&self, hash: [u8; 32]) -> Result<Transaction, Error> {
+        let client = self.sdk.maybe_dapi_client().unwrap();
+        let request = GetTransactionRequest { id: hash.reversed().to_hex() };
+        client.execute(request, RequestSettings::default()).await
+            .map_err(Error::from)
+            .map(|response| Transaction::consensus_decode(&*response.inner.transaction).map_err(Error::from))?
+    }
+
     pub async fn check_ping_times_for_current_masternode_list(&self) {
 
     }
@@ -248,11 +264,7 @@ impl PlatformSDK {
         let transition = self.identities.create_identity_create_transition(&identity, proof)
             .map_err(Error::from)?;
         println!("transition register created: {:?}", transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition register signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition register signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::IdentityCreate(transition), signature.to_vec()).await
     }
     pub async fn identity_register_using_public_keys(&self, public_keys: BTreeMap<u32, IdentityPublicKey>, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
@@ -260,11 +272,7 @@ impl PlatformSDK {
         let (identity, transition) = self.identities.create_identity_create_transition_using_public_keys(public_keys, proof)
             .map_err(Error::from)?;
         println!("transition register created: {:?} -- {:?}", identity, transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition register signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition register signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::IdentityCreate(transition), signature.to_vec()).await
     }
     pub async fn identity_register_using_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
@@ -273,11 +281,7 @@ impl PlatformSDK {
         let (identity, transition) = self.identities.create_identity_create_transition_using_public_keys(public_keys, proof)
             .map_err(Error::from)?;
         println!("transition register created: {:?} -- {:?}", identity, transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition register signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition register signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::IdentityCreate(transition), signature.to_vec()).await
     }
     pub async fn identity_topup(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
@@ -285,11 +289,7 @@ impl PlatformSDK {
         let transition = self.identities.create_identity_topup_transition(Identifier::from(identity_id), proof)
             .map_err(Error::from)?;
         println!("transition topup created: {:?} ", transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition topup signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition topup signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::IdentityTopUp(transition), signature.to_vec()).await
     }
     pub async fn identity_withdraw(&self, identity_id: [u8; 32], amount: u64, fee: u32, proof: AssetLockProof, pooling: Pooling, private_key: OpaqueKey, script: Option<Vec<u8>>, nonce: u64) -> Result<StateTransitionProofResult, Error> {
@@ -297,11 +297,7 @@ impl PlatformSDK {
         let transition = self.identities.create_identity_credit_withdrawal_transition(Identifier::from(identity_id), amount, fee, pooling, script.map(CoreScript::from), nonce)
             .map_err(Error::from)?;
         println!("transition credit withdrawal created: {:?}", transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition credit withdrawal signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition credit withdrawal signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::IdentityCreditWithdrawal(transition), signature.to_vec()).await
     }
 
@@ -310,11 +306,7 @@ impl PlatformSDK {
         let transition = self.identities.create_identity_update_transition(identity, nonce, add_public_keys, disable_key_ids)
             .map_err(Error::from)?;
         println!("transition update created: {:?}", transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition update signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition update signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::IdentityUpdate(transition), signature.to_vec()).await
     }
     pub async fn identity_transfer(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
@@ -322,11 +314,7 @@ impl PlatformSDK {
         let transition = self.identities.create_identity_credit_transfer_transition(&identity, Identifier::from(recipient_id), amount, nonce)
             .map_err(Error::from)?;
         println!("transition credit transfer created: {:?}", transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition credit transfer signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition credit transfer signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::IdentityCreditTransfer(transition), signature.to_vec()).await
     }
 
@@ -336,12 +324,7 @@ impl PlatformSDK {
         println!("transition create contract created.1: {:?}", created);
         let transition = self.contracts.create_data_contract_create_transition(created)
             .map_err(Error::from)?;
-        println!("transition create contract created.2: {:?}", transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition create contract signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition create contract signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::DataContractCreate(transition), signature.to_vec()).await
     }
     pub async fn data_contract_update(&self, data_contract: DataContract, nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
@@ -349,14 +332,24 @@ impl PlatformSDK {
         let transition = self.contracts.create_data_contract_update_transition(data_contract, nonce)
             .map_err(Error::from)?;
         println!("transition update contract created: {:?}", transition);
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition update contract signable bytes: {}", data.to_hex());
-        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition update contract signature: {}", signature.to_hex());
+        let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::DataContractUpdate(transition), signature.to_vec()).await
     }
 
+    // pub async fn document_batch<'a>(
+    //     &self,
+    //     data_contract: DataContract,
+    //     documents: BTreeMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>,
+    //     private_key: OpaqueKey,
+    // ) -> Result<StateTransitionProofResult, Error> {
+    //     println!("transition document batch call: {:?} -- {:?}", data_contract, documents);
+    //     let mut nonces: BTreeMap<(Identifier, Identifier), u64> = BTreeMap::new();
+    //     let transition = self.documents.create_state_transition(documents, &mut nonces)
+    //         .map_err(Error::from)?;
+    //     println!("transition document nonces: {:?}", nonces);
+    //     let signature = self.create_transition_signature(&transition, private_key)?;
+    //     self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+    // }
 
     // #[cfg(feature = "state-transitions")]
     // pub async fn contract_create(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<Option<DataContract>, Error> {
@@ -430,10 +423,13 @@ impl PlatformSDK {
             identities: IdentityFacade::new(protocol_version),
             contracts: DataContractFacade::new(protocol_version).unwrap(),
             state_transition: StateTransitionFactory {},
+            documents: DocumentFactory::new(protocol_version).unwrap(),
             chain_type,
             sdk: sdk_arc
         }
     }
+
+
 
     pub async fn fetch_documents(
         &self,
@@ -447,6 +443,15 @@ impl PlatformSDK {
         let contract = self.contract_manager.fetch_contract_by_id_error_if_none(contract_id).await?;
         let query = QueryKind::generic(contract, document_type, where_clauses, order_clauses, limit, start)?;
         self.doc_manager.documents_with_query(query).await
+    }
+
+    fn create_transition_signature<T: Signable>(&self, transition: &T, private_key: OpaqueKey) -> Result<[u8; 65], Error> {
+        let data = transition.signable_bytes().map_err(Error::from)?;
+        println!("transition signable bytes: {}", data.to_hex());
+        let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
+        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
+        println!("transition signature: {}", signature.to_hex());
+        Ok(signature)
     }
 
     async fn sign_and_publish_transition(&self, mut transition: StateTransition, signature: Vec<u8>) -> Result<StateTransitionProofResult, Error> {

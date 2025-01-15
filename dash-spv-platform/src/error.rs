@@ -1,7 +1,8 @@
-use dash_sdk::dapi_client::AddressListError;
+use dash_sdk::dapi_client::{AddressListError, DapiClientError, ExecutionError};
 use dash_spv_crypto::keys::KeyError;
 use dpp::errors::ProtocolError;
 use http::uri::InvalidUri;
+use dash_spv_crypto::consensus::encode;
 use crate::util::{MaxRetryError, ValidationError};
 
 #[derive(Clone, Debug)]
@@ -36,6 +37,17 @@ impl From<InvalidUri> for Error {
 }
 impl From<AddressListError> for Error {
     fn from(value: AddressListError) -> Self {
+        Error::DashSDKError(value.to_string())
+    }
+}
+
+impl From<ExecutionError<DapiClientError>> for Error {
+    fn from(value: ExecutionError<DapiClientError>) -> Self {
+        Error::DashSDKError(value.to_string())
+    }
+}
+impl From<encode::Error> for Error {
+    fn from(value: encode::Error) -> Self {
         Error::DashSDKError(value.to_string())
     }
 }
