@@ -638,9 +638,9 @@ checksum = "3eeab4423108c5d7c744f4d234de88d18d636100093ae04caf4825134b9c3a32"
 
 [[package]]
 name = "borsh"
-version = "1.5.4"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fb65153674e51d3a42c8f27b05b9508cea85edfaade8aa46bc8fc18cecdfef3"
+checksum = "5430e3be710b68d984d1391c854eb431a9d548640711faa54eecb1df93db91cc"
 dependencies = [
  "borsh-derive",
  "cfg_aliases",
@@ -648,9 +648,9 @@ dependencies = [
 
 [[package]]
 name = "borsh-derive"
-version = "1.5.4"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a396e17ad94059c650db3d253bb6e25927f1eb462eede7e7a153bb6e75dce0a7"
+checksum = "f8b668d39970baad5356d7c83a86fee3a539e6f93bf6764c97368243e17a0487"
 dependencies = [
  "once_cell",
  "proc-macro-crate 3.2.0",
@@ -799,7 +799,7 @@ checksum = "3fce8dd7fcfcbf3a0a87d8f515194b49d6135acab73e18bd380d1d93bb1a15eb"
 dependencies = [
  "clap 4.5.26",
  "heck 0.4.1",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "log",
  "proc-macro2",
  "quote",
@@ -812,9 +812,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.9"
+version = "1.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8293772165d9345bdaaa39b45b2109591e63fe5e6fbc23c6ff930a048aa310b"
+checksum = "13208fcbb66eaeffe09b99fffbe1af420f00a7b35aa99ad683dfc1aa76145229"
 dependencies = [
  "jobserver",
  "libc",
@@ -1132,7 +1132,7 @@ dependencies = [
 [[package]]
 name = "dapi-grpc"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "dapi-grpc-macros",
  "futures-core",
@@ -1149,7 +1149,7 @@ dependencies = [
 [[package]]
 name = "dapi-grpc-macros"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "heck 0.5.0",
  "quote",
@@ -1194,7 +1194,7 @@ dependencies = [
 [[package]]
 name = "dash-sdk"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -1211,8 +1211,8 @@ dependencies = [
  "drive",
  "drive-proof-verifier",
  "envy",
- "ferment",
- "ferment-macro",
+ "ferment 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
  "futures",
  "hex",
  "http 1.2.0",
@@ -1245,8 +1245,8 @@ dependencies = [
  "dashcore 0.34.0",
  "dirs-next",
  "ed25519-dalek",
- "ferment",
- "ferment-macro",
+ "ferment 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
  "libc",
  "log",
  "reqwest 0.11.27",
@@ -1291,9 +1291,9 @@ dependencies = [
  "dash-spv-event-bus",
  "dirs-next",
  "ed25519-dalek",
- "ferment",
- "ferment-macro",
- "indexmap 2.7.0",
+ "ferment 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
+ "indexmap 2.7.1",
  "libc",
  "log",
  "reqwest 0.12.12",
@@ -1324,10 +1324,10 @@ dependencies = [
  "dpp",
  "drive",
  "drive-proof-verifier",
- "ferment",
- "ferment-macro",
+ "ferment 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
  "http 0.2.12",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "platform-value",
  "platform-version",
  "tokio",
@@ -1354,11 +1354,11 @@ dependencies = [
  "drive",
  "drive-proof-verifier",
  "fancy-regex",
- "ferment",
- "ferment-macro",
+ "ferment 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
  "ferment-sys",
  "grovedb-version",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "jsonschema 0.22.3",
  "libc",
  "platform-value",
@@ -1509,7 +1509,7 @@ dependencies = [
 [[package]]
 name = "dashpay-contract"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1521,7 +1521,7 @@ dependencies = [
 [[package]]
 name = "data-contracts"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "dashpay-contract",
  "dpns-contract",
@@ -1649,7 +1649,7 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 [[package]]
 name = "dpns-contract"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1661,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "dpp"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1675,11 +1675,11 @@ dependencies = [
  "data-contracts",
  "derive_more",
  "env_logger 0.11.6",
- "ferment",
- "ferment-macro",
+ "ferment 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
  "getrandom",
  "hex",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "integer-encoding",
  "itertools 0.13.0",
  "json-schema-compatibility-validator",
@@ -1710,7 +1710,7 @@ dependencies = [
 [[package]]
 name = "drive"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "arc-swap",
  "base64 0.22.1",
@@ -1729,7 +1729,7 @@ dependencies = [
  "grovedb-storage",
  "grovedb-version",
  "hex",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "integer-encoding",
  "intmap",
  "itertools 0.13.0",
@@ -1750,17 +1750,17 @@ dependencies = [
 [[package]]
 name = "drive-proof-verifier"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "bincode",
  "dapi-grpc",
  "derive_more",
  "dpp",
  "drive",
- "ferment",
- "ferment-macro",
+ "ferment 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
  "hex",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "platform-serialization",
  "platform-serialization-derive",
  "platform-value",
@@ -2021,7 +2021,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 [[package]]
 name = "feature-flags-contract"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -2033,9 +2033,27 @@ dependencies = [
 [[package]]
 name = "ferment"
 version = "0.1.4"
+source = "git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support#37a2aba1c6dfb8b860d684b9f03093cdd476b740"
+dependencies = [
+ "indexmap 2.7.1",
+ "serde_json",
+]
+
+[[package]]
+name = "ferment"
+version = "0.1.4"
 source = "git+https://github.com/dashpay/ferment?branch=feat%2Freorg#37a915da938a4cf0f777d5906b307cb5519473ca"
 dependencies = [
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
+]
+
+[[package]]
+name = "ferment-macro"
+version = "0.1.4"
+source = "git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support#37a2aba1c6dfb8b860d684b9f03093cdd476b740"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2050,13 +2068,13 @@ dependencies = [
 [[package]]
 name = "ferment-sys"
 version = "0.1.4"
-source = "git+https://github.com/dashpay/ferment?branch=feat%2Freorg#37a915da938a4cf0f777d5906b307cb5519473ca"
+source = "git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support#37a2aba1c6dfb8b860d684b9f03093cdd476b740"
 dependencies = [
  "ansi_term",
  "cargo_metadata",
  "cbindgen 0.27.0",
  "env_logger 0.11.6",
- "ferment-macro",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Flifetime-support)",
  "log",
  "proc-macro2",
  "quote",
@@ -2363,7 +2381,7 @@ dependencies = [
  "grovedb-visualize",
  "hex",
  "hex-literal",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "integer-encoding",
  "intmap",
  "itertools 0.14.0",
@@ -2413,7 +2431,7 @@ dependencies = [
  "grovedb-version",
  "grovedb-visualize",
  "hex",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "integer-encoding",
  "num_cpus",
  "rand",
@@ -2478,7 +2496,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http 0.2.12",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "slab",
  "tokio",
  "tokio-util",
@@ -2497,7 +2515,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http 1.2.0",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "slab",
  "tokio",
  "tokio-util",
@@ -3046,9 +3064,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.7.0"
+version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
+checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.2",
@@ -3081,9 +3099,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.10.1"
+version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddc24109865250148c2e0f3d25d4f0f479571723792d3802153c60922a4fb708"
+checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
 
 [[package]]
 name = "is-terminal"
@@ -3177,7 +3195,7 @@ dependencies = [
 [[package]]
 name = "json-schema-compatibility-validator"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "json-patch",
  "once_cell",
@@ -3400,7 +3418,7 @@ dependencies = [
 [[package]]
 name = "masternode-reward-shares-contract"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -3880,7 +3898,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
  "fixedbitset",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
 ]
 
 [[package]]
@@ -3934,7 +3952,7 @@ checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 [[package]]
 name = "platform-serialization"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "bincode",
  "platform-version",
@@ -3943,7 +3961,7 @@ dependencies = [
 [[package]]
 name = "platform-serialization-derive"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3954,15 +3972,15 @@ dependencies = [
 [[package]]
 name = "platform-value"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "base64 0.22.1",
  "bincode",
  "bs58 0.5.1",
  "ciborium",
- "ferment-macro",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
  "hex",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "lazy_static",
  "platform-serialization",
  "platform-version",
@@ -3977,10 +3995,10 @@ dependencies = [
 [[package]]
 name = "platform-version"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "bincode",
- "ferment-macro",
+ "ferment-macro 0.1.4 (git+https://github.com/dashpay/ferment?branch=feat%2Freorg)",
  "grovedb-version",
  "once_cell",
  "thiserror 1.0.69",
@@ -3990,7 +4008,7 @@ dependencies = [
 [[package]]
 name = "platform-versioning"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4454,7 +4472,7 @@ dependencies = [
 [[package]]
 name = "rs-dapi-client"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "backon",
  "chrono",
@@ -4775,9 +4793,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.24"
+version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cb6eb87a131f756572d7fb904f6e7b68633f09cca868c5df1c4b8d1a694bbba"
+checksum = "f79dfe2d285b0488816f30e700a7438c5a73d816b5b7d3ac72fbc48b0d185e03"
 dependencies = [
  "serde",
 ]
@@ -4822,11 +4840,11 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.135"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b0d7ba2887406110130a978386c4e1befb98c674b4fba677954e4db976630d9"
+checksum = "930cfb6e6abf99298aaad7d29abbef7a9999a9a8806a40088f55f0dcec03146b"
 dependencies = [
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "itoa",
  "memchr",
  "ryu",
@@ -5520,7 +5538,7 @@ version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "toml_datetime",
  "winnow 0.5.40",
 ]
@@ -5531,7 +5549,7 @@ version = "0.22.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ae48d6208a266e853d946088ed816055e556cc6028c5e8e2b84d9fa5dd7c7f5"
 dependencies = [
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -5827,9 +5845,9 @@ dependencies = [
 
 [[package]]
 name = "valuable"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
+checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 
 [[package]]
 name = "vcpkg"
@@ -5910,7 +5928,7 @@ dependencies = [
 [[package]]
 name = "wallet-utils-contract"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -6330,7 +6348,7 @@ dependencies = [
 [[package]]
 name = "withdrawals-contract"
 version = "1.8.0-dev.2"
-source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#a4715607e4aec59f4bee09520340fce6da0a5944"
+source = "git+https://github.com/pankcuf/platform?branch=test%2Fferment#3645fcf6c5aed65e75d1058d3a9c8af369476759"
 dependencies = [
  "num_enum 0.5.11",
  "platform-value",
@@ -6483,7 +6501,7 @@ dependencies = [
  "crossbeam-utils",
  "displaydoc",
  "flate2",
- "indexmap 2.7.0",
+ "indexmap 2.7.1",
  "memchr",
  "thiserror 2.0.11",
  "zopfli",

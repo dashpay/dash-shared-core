@@ -41,8 +41,8 @@ ed25519-dalek = "2.0.0-rc.3"
 indexmap = "2.7.0"
 libc = "0.2.158"
 log = { version = "0.4.*", features = ["std"] }
-ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment" }
-ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-macro" }
+ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment" }
+ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment-macro" }
 #ferment = { path = "../../ferment/ferment" }
 #ferment-macro = { path = "../../ferment/ferment-macro" }
 

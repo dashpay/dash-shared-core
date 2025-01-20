@@ -39,8 +39,8 @@ rs-dapi-client = { git = "https://github.com/pankcuf/platform", branch = "test/f
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
 #rs-dapi-client = { path = "../../platform/packages/rs-dapi-client" }
 fancy-regex = "0.13.0"
-ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment" }
-ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-macro" }
+ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment" }
+ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment-macro" }
 #ferment = { path = "../../ferment/ferment" }
 #ferment-macro = { path = "../../ferment/ferment-macro" }
 grovedb-version = "2.1.0"
@@ -65,13 +65,14 @@ serde = { version = "1.0.209", features = ["derive"] }
 [build-dependencies]
 cbindgen = "0.27.0"
 #ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["cbindgen_only"] }
-ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys" }
+ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment-sys" }
 #ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["objc"] }
 #ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }
 
 [features]
 default = ["state-transitions"]
 bls-signatures = ["dpp/bls-signatures"]
+blsful = ["dashcore/blsful"]
 cbor = ["platform-value/cbor", "dpp/cbor", "dpp/ciborium"]
 core-types = ["dpp/core-types"]
 data-contract-cbor-conversion = ["dpp/data-contract-cbor-conversion"]

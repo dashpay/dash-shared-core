@@ -11,7 +11,7 @@ pub mod query;
 pub mod transition;
 pub mod cache;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dpp::data_contract::{DataContract, DataContractFacade};
-use dpp::data_contract::document_type::DocumentTypeRef;
+use dpp::data_contract::document_type::{DocumentType, DocumentTypeRef};
 use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0, IdentityFacade, KeyID};
 use dpp::document::Document;
@@ -38,7 +38,7 @@ use dpp::identity::core_script::CoreScript;
 use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
-use dpp::state_transition::document::documents_batch_transition::document_transition::action_type::DocumentTransitionActionType;
+use dpp::state_transition::state_transitions::document::documents_batch_transition::document_transition::action_type::DocumentTransitionActionType;
 use dpp::state_transition::state_transition_factory::StateTransitionFactory;
 use dpp::state_transition::StateTransition;
 use dpp::state_transition::state_transitions::identity::public_key_in_creation::IdentityPublicKeyInCreation;
@@ -114,7 +114,6 @@ fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Address>>(pro
         .unwrap()
 }
 
-// #[derive(Clone)]
 #[ferment_macro::opaque]
 pub struct PlatformSDK {
     pub runtime: Arc<Runtime>,
@@ -336,20 +335,31 @@ impl PlatformSDK {
         self.sign_and_publish_transition(StateTransition::DataContractUpdate(transition), signature.to_vec()).await
     }
 
-    // pub async fn document_batch<'a>(
-    //     &self,
-    //     data_contract: DataContract,
-    //     documents: BTreeMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>,
-    //     private_key: OpaqueKey,
-    // ) -> Result<StateTransitionProofResult, Error> {
-    //     println!("transition document batch call: {:?} -- {:?}", data_contract, documents);
-    //     let mut nonces: BTreeMap<(Identifier, Identifier), u64> = BTreeMap::new();
-    //     let transition = self.documents.create_state_transition(documents, &mut nonces)
-    //         .map_err(Error::from)?;
-    //     println!("transition document nonces: {:?}", nonces);
-    //     let signature = self.create_transition_signature(&transition, private_key)?;
-    //     self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
-    // }
+    pub async fn document_single(&self, action_type: DocumentTransitionActionType, document_type: DocumentType, document: Document, entropy: [u8; 32], private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("transition document call: {:?} -- {:?} -- {:?} -- {} -- {:?}", action_type, document_type, document, entropy.to_hex(), private_key);
+        let doc_type_ref = document_type.as_ref();
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, doc_type_ref, Bytes32(entropy))])]);
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
+            .map_err(Error::from)?;
+        println!("transition document created: {:?} {:?}", transition, nonce_counter);
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+    }
+    pub async fn document_batch<'a>(
+        &self,
+        data_contract: DataContract,
+        documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>,
+        private_key: OpaqueKey,
+    ) -> Result<StateTransitionProofResult, Error> {
+        println!("transition document batch call: {:?} -- {:?}", data_contract, documents);
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
+            .map_err(Error::from)?;
+        println!("transition document batch created: {:?} {:?}", transition, nonce_counter);
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+    }
 
     // #[cfg(feature = "state-transitions")]
     // pub async fn contract_create(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<Option<DataContract>, Error> {
@@ -360,19 +370,6 @@ impl PlatformSDK {
 
 
 
-    // pub async fn contract_create(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<Option<Identity>, Error> {
-    //     let mut transition = self.identities.create_identity_topup_transition(Identifier::from(identity_id), proof)
-    //         .map_err(Error::from)?;
-    //     println!("transition topup created: {} -- {}", identity_id.to_hex(), proof);
-    //     let data = transition.signable_bytes().map_err(Error::from)?;
-    //     println!("transition topup signable bytes: {}", data.to_hex());
-    //     let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-    //     let signature = dashcore::signer::sign(&data, &private_key_data)?;
-    //     println!("transition topup signature: {}", signature.to_hex());
-    //     transition.set_signature(signature.to_vec().into());
-    //     StateTransition::IdentityTopUp(transition).broadcast_and_wait(&self.sdk, None)
-    // }
-    //
 
 
     // pub async fn check_ping_times(&self, masternodes: Vec<MasternodeEntry>) -> Result<GetStatusResponse, Error> {
@@ -380,6 +377,7 @@ impl PlatformSDK {
     //         .execute(GetStatusRequest::default(), RequestSettings::default())
     // }
 }
+
 
 impl PlatformSDK {
     pub fn new<
