@@ -811,6 +811,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbindgen"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eadd868a2ce9ca38de7eeafdcec9c7065ef89b42b32f0839278d55f35c54d1ff"
+dependencies = [
+ "clap 4.5.26",
+ "heck 0.4.1",
+ "indexmap 2.7.1",
+ "log",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 2.0.96",
+ "tempfile",
+ "toml 0.8.19",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1342,7 +1361,7 @@ dependencies = [
  "bitcoin_hashes 0.11.0",
  "blake3 1.5.5",
  "byte",
- "cbindgen 0.27.0",
+ "cbindgen 0.28.0",
  "dash-sdk",
  "dash-spv-crypto",
  "dash-spv-event-bus",
