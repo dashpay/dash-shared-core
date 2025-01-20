@@ -335,6 +335,7 @@ impl PlatformSDK {
         self.sign_and_publish_transition(StateTransition::DataContractUpdate(transition), signature.to_vec()).await
     }
 
+    #[cfg(feature = "state-transitions")]
     pub async fn document_single(&self, action_type: DocumentTransitionActionType, document_type: DocumentType, document: Document, entropy: [u8; 32], private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
         println!("transition document call: {:?} -- {:?} -- {:?} -- {} -- {:?}", action_type, document_type, document, entropy.to_hex(), private_key);
         let doc_type_ref = document_type.as_ref();
@@ -346,6 +347,9 @@ impl PlatformSDK {
         let signature = self.create_transition_signature(&transition, private_key)?;
         self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
     }
+
+
+    #[cfg(feature = "state-transitions")]
     pub async fn document_batch<'a>(
         &self,
         data_contract: DataContract,
