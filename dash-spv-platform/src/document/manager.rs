@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use dash_sdk::{platform::{DocumentQuery, FetchMany}, Sdk};
-use dash_sdk::platform::Fetch;
 use dpp::data_contract::DataContract;
 use dpp::data_contract::accessors::v0::DataContractV0Getters;
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
@@ -171,31 +170,24 @@ impl DocumentsManager {
 
     pub async fn dpns_documents_for_identity_with_user_id_using_contract(&self, user_id: [u8; 32], contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_dpns_documents_for_identity_with_user_id(contract, user_id)?;
-        Document::fetch_many(self.sdk_ref(), query).await
-            .map_err(Error::from)
+        self.many_documents_with_query(query).await
     }
 
     pub async fn dashpay_profile_for_user_id_using_contract(&self, user_id: [u8; 32], contract: DataContract) -> Result<Option<Document>, Error> {
         let query = self.query_dashpay_profile_for_user_id(contract, user_id)?;
-        Document::fetch(self.sdk_ref(), query).await
-            .map_err(Error::from)
-            // .map(|doc| doc.map(TransientDashPayUser::with_profile_document))
+        self.document_with_query(query).await
     }
     pub async fn dashpay_profiles_for_user_ids_using_contract(&self, user_ids: Vec<[u8; 32]>, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_dashpay_profiles_for_user_ids(contract, user_ids)?;
-        Document::fetch_many(self.sdk_ref(), query).await
-            .map_err(Error::from)
-            // .map(|docs| Vec::from_iter(docs.into_values().filter_map(|doc| doc.map(TransientDashPayUser::with_profile_document))))
+        self.many_documents_with_query(query).await
     }
     pub async fn dpns_documents_for_username_using_contract(&self, username: String, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_dpns_documents_for_username(contract, username)?;
-        Document::fetch_many(self.sdk_ref(), query).await
-            .map_err(Error::from)
+        self.many_documents_with_query(query).await
     }
     pub async fn dpns_documents_for_username_prefix_using_contract(&self, username_prefix: String, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_dpns_documents_for_username_prefix(contract, username_prefix)?;
-        Document::fetch_many(self.sdk_ref(), query).await
-            .map_err(Error::from)
+        self.many_documents_with_query(query).await
     }
 
 }

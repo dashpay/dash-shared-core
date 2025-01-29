@@ -1,9 +1,14 @@
 use std::future::Future;
 use std::time::Duration;
-use dash_sdk::platform::{Fetch, Query};
+use dash_sdk::dapi_client::transport::TransportRequest;
+use dash_sdk::mock::MockResponse;
+use dash_sdk::platform::{DocumentQuery, Fetch, FetchMany, Query};
 use dash_sdk::Sdk;
 use dpp::data_contract::DataContract;
 use dpp::data_contracts::SystemDataContract;
+use dpp::document::Document;
+use drive_proof_verifier::FromProof;
+use indexmap::IndexMap;
 use platform_value::Identifier;
 use dash_spv_crypto::network::ChainType;
 use crate::error::Error;
@@ -16,9 +21,10 @@ pub trait Validator<T> {
 }
 
 pub trait StreamSpec {
-    type Validator: Validator<Self::Result>;
+    type Validator: Validator<Self::Result> + Validator<Self::ResultMany>;
     type Error: MaxRetryError + ValidationError;
     type Result;
+    type ResultMany;
 }
 pub trait Pagination {
     type Item;
@@ -170,6 +176,28 @@ impl<SPEC> StreamStrategy<SPEC> where SPEC: StreamSpec {
         }
 
     }
+    pub async fn stream_many<F, Fut>(self, f: F) -> Result<SPEC::ResultMany, SPEC::Error>
+    where F: Fn() -> Fut,
+          Fut: Future<Output = Result<SPEC::ResultMany, SPEC::Error>> {
+        let mut retry_count = 0u32;
+        loop {
+            match f().await {
+                Ok(result) => {
+                    if let Some(ref validator) = self.settings.validator {
+                        if !validator.validate(&result) {
+                            return Err(SPEC::Error::validation_error());
+                        }
+                    }
+                    return Ok(result);
+                },
+                Err(_err) if self.has_retries_after(&mut retry_count) =>
+                    tokio::time::sleep(self.delay()).await,
+                Err(err) =>
+                    return Err(err)
+            }
+        }
+
+    }
     pub async fn paginated_stream<F, Fut, BN>(
         self,
         f: F,
@@ -218,13 +246,13 @@ where SPEC: StreamSpec {
     }
 }
 
-pub trait StreamManager {
+pub trait StreamManager: Send + Sync {
     fn sdk_ref(&self) -> &Sdk;
     fn chain_type(&self) -> &ChainType;
 
-    fn stream<SPEC, ITEM>(
+    fn stream<SPEC, ITEM, Q>(
         &self,
-        unique_id: Identifier,
+        query: Q,
         retry: RetryStrategy,
         validator: SPEC::Validator,
     ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
@@ -232,19 +260,18 @@ pub trait StreamManager {
         SPEC: StreamSpec<Result = Option<ITEM>, Error = dash_sdk::Error>,
         SPEC::Validator: Send,
         ITEM: Fetch + Send,
-        Identifier: Query<<ITEM as Fetch>::Request>,
-        Self: Send + Sync {
+        Q: Query<<ITEM as Fetch>::Request> + Clone + Sync {
         async move {
             let strategy = StreamStrategy::<SPEC>::with_retry(retry)
                 .with_validator(validator)
                 .on_max_retries_reached(dash_sdk::Error::Generic("Max retry reached".to_string()));
-            self.stream_with_strategy(unique_id, strategy).await
+            self.stream_with_strategy(query, strategy).await
         }
     }
 
-    fn stream_with_settings<SPEC, ITEM>(
+    fn stream_with_settings<SPEC, ITEM, Q>(
         &self,
-        unique_id: Identifier,
+        query: Q,
         retry: RetryStrategy,
         stream_settings: StreamSettings<SPEC>,
         validator: SPEC::Validator,
@@ -253,31 +280,128 @@ pub trait StreamManager {
         SPEC: StreamSpec<Result = Option<ITEM>, Error = dash_sdk::Error>,
         SPEC::Validator: Send,
         ITEM: Fetch + Send,
-        Identifier: Query<<ITEM as Fetch>::Request>,
-        Self: Send + Sync {
+        Q: Query<<ITEM as Fetch>::Request> + Clone + Sync {
         async move {
             let strategy = StreamStrategy::<SPEC>::with_retry_and_settings(retry, stream_settings)
                 .with_validator(validator)
                 .on_max_retries_reached(dash_sdk::Error::Generic("Max retry reached".to_string()));
-            self.stream_with_strategy(unique_id, strategy).await
+            self.stream_with_strategy(query, strategy).await
         }
     }
 
-    fn stream_with_strategy<SPEC, ITEM>(
+    fn stream_with_strategy<SPEC, ITEM, Q>(
         &self,
-        unique_id: Identifier,
+        query: Q,
         strategy: StreamStrategy<SPEC>,
     ) -> impl Future<Output = Result<SPEC::Result, Error>> + Send
     where
         SPEC: StreamSpec<Result = Option<ITEM>, Error = dash_sdk::Error>,
         SPEC::Validator: Send,
         ITEM: Fetch + Send,
-        Identifier: Query<<ITEM as Fetch>::Request>,
-        Self: Send + Sync {
+        Q: Query<<ITEM as Fetch>::Request> + Clone + Sync {
         async move {
-            strategy.stream(|| async { ITEM::fetch_by_identifier(self.sdk_ref(), unique_id).await })
+            strategy.stream(|| {
+                let query = query.clone();
+                async { ITEM::fetch(self.sdk_ref(), query).await }
+            })
                 .await
                 .map_err(Error::from)
+        }
+    }
+
+    fn stream_many<SPEC, ITEM, Q>(
+        &self,
+        query: Q,
+        retry: RetryStrategy,
+        validator: SPEC::Validator,
+    ) -> impl Future<Output = Result<SPEC::ResultMany, Error>> + Send
+    where
+        SPEC: StreamSpec<Error = dash_sdk::Error>,
+        SPEC::Validator: Send,
+        SPEC::ResultMany: MockResponse
+            + FromIterator<(Identifier, Option<ITEM>)>
+            + FromProof<ITEM::Request, Request=ITEM::Request, Response=<ITEM::Request as TransportRequest>::Response>
+            + Send
+            + Default,
+        ITEM: FetchMany<Identifier, SPEC::ResultMany>
+            + Send,
+        Q: Query<ITEM::Request>
+            + Clone
+            + Sync,
+        // O: MockResponse
+        //     + FromIterator<(Identifier, Option<ITEM>)>
+        //     + FromProof<ITEM::Request, Request=ITEM::Request, Response=<ITEM::Request as TransportRequest>::Response>
+        //     + Send
+        //     + Default
+    {
+        async move {
+            let strategy = StreamStrategy::<SPEC>::with_retry(retry)
+                .with_validator(validator)
+                .on_max_retries_reached(dash_sdk::Error::Generic("Max retry reached".to_string()));
+            self.stream_many_with_strategy(query, strategy).await
+        }
+    }
+
+    fn stream_many_with_strategy<SPEC, ITEM, Q>(
+        &self,
+        query: Q,
+        strategy: StreamStrategy<SPEC>,
+    ) -> impl Future<Output = Result<SPEC::ResultMany, Error>> + Send
+    where
+        SPEC: StreamSpec<Error = dash_sdk::Error>,
+        SPEC::Validator: Send,
+        SPEC::ResultMany: MockResponse
+        + FromIterator<(Identifier, Option<ITEM>)>
+        + FromProof<ITEM::Request, Request=ITEM::Request, Response=<ITEM::Request as TransportRequest>::Response>
+        + Send
+        + Default,
+    ITEM: FetchMany<Identifier, SPEC::ResultMany>
+            + Send,
+        Q: Query<ITEM::Request>
+            + Clone
+            + Sync,
+        // O: MockResponse
+        //     + FromIterator<(Identifier, Option<ITEM>)>
+        //     + FromProof<ITEM::Request, Request=ITEM::Request, Response=<ITEM::Request as TransportRequest>::Response>
+        //     + Send
+        //     + Default
+    {
+        async move {
+            strategy.stream_many(|| {
+                let query = query.clone();
+                async {
+                    ITEM::fetch_many(self.sdk_ref(), query).await
+                }
+            })
+                .await
+                .map_err(Error::from)
+        }
+    }
+    fn stream_many_with_settings<SPEC, ITEM, Q>(
+        &self,
+        query: Q,
+        retry: RetryStrategy,
+        stream_settings: StreamSettings<SPEC>,
+        validator: SPEC::Validator,
+    ) -> impl Future<Output = Result<SPEC::ResultMany, Error>> + Send
+    where
+        SPEC: StreamSpec<Error = dash_sdk::Error>,
+        SPEC::Validator: Send,
+        SPEC::ResultMany: MockResponse
+        + FromIterator<(Identifier, Option<ITEM>)>
+        + FromProof<ITEM::Request, Request=ITEM::Request, Response=<ITEM::Request as TransportRequest>::Response>
+        + Send
+        + Default,
+        ITEM: FetchMany<Identifier, SPEC::ResultMany>
+            + Send,
+        Q: Query<ITEM::Request>
+            + Clone
+            + Sync {
+        async move {
+            let strategy = StreamStrategy::<SPEC>::with_retry_and_settings(retry, stream_settings)
+                .with_validator(validator)
+                .on_max_retries_reached(dash_sdk::Error::Generic("Max retry reached".to_string()));
+            self.stream_many_with_strategy(query, strategy).await
         }
     }
 
@@ -288,10 +412,11 @@ pub trait StreamManager {
         callback: F,
     ) -> impl Future<Output = Result<R, Error>> + Send
     where
-        F: FnOnce(DataContract, Args) -> Fut + Send,
-        Fut: Future<Output = Result<R, Error>> + Send,
-        Args: Send,
-        Self: Send + Sync {
+        F: FnOnce(DataContract, Args) -> Fut
+            + Send,
+        Fut: Future<Output = Result<R, Error>>
+            + Send,
+        Args: Send {
         async move {
             match DataContract::fetch(self.sdk_ref(), system_contract.id()).await {
                 Ok(Some(contract)) => callback(contract, args).await,
@@ -300,4 +425,20 @@ pub trait StreamManager {
             }
         }
     }
+
+    fn many_documents_with_query(&self, query: DocumentQuery) -> impl Future<Output = Result<IndexMap<Identifier, Option<Document>>, Error>> + Send {
+        async move {
+            Document::fetch_many(self.sdk_ref(), query).await
+                .map_err(Error::from)
+        }
+    }
+    fn document_with_query(&self, query: DocumentQuery) -> impl Future<Output = Result<Option<Document>, Error>> + Send
+    where Self: Send + Sync {
+        async move {
+            Document::fetch(self.sdk_ref(), query).await
+                .map_err(Error::from)
+        }
+    }
+
+    // fn monitor_document_with_query(&self, q)
 }

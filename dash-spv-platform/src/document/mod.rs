@@ -4,6 +4,7 @@ use platform_value::Value;
 pub mod contact_request;
 pub mod manager;
 pub mod salted_domain_hashes;
+pub mod usernames;
 
 #[ferment_macro::export]
 pub fn get_document_property(document: Document, property: &str) -> Option<Value> {

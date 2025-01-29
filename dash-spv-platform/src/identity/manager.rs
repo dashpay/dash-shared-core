@@ -50,10 +50,17 @@ impl Validator<Option<Identity>> for IdentityValidator {
         value.is_some() || value.is_none() && self.accept_not_found()
     }
 }
+impl Validator<IndexMap<Identifier, Option<Identity>>> for IdentityValidator {
+    fn validate(&self, _value: &IndexMap<Identifier, Option<Identity>>) -> bool {
+        true
+        // value.is_some() || value.is_none() && self.accept_not_found()
+    }
+}
 impl StreamSpec for IdentityValidator {
     type Validator = IdentityValidator;
     type Error = dash_sdk::Error;
     type Result = Option<Identity>;
+    type ResultMany = IndexMap<Identifier, Option<Identity>>;
 }
 
 
@@ -157,13 +164,13 @@ impl IdentitiesManager {
     }
 
     pub async fn monitor(&self, unique_id: Identifier, retry: RetryStrategy, options: IdentityValidator) -> Result<Option<Identity>, Error> {
-        self.stream::<IdentityValidator, Identity>(unique_id, retry, options).await
+        self.stream::<IdentityValidator, Identity, Identifier>(unique_id, retry, options).await
     }
     pub async fn monitor_for_id_bytes(&self, unique_id: [u8; 32], retry: RetryStrategy, options: IdentityValidator) -> Result<Option<Identity>, Error> {
-        self.stream::<IdentityValidator, Identity>(Identifier::from(unique_id), retry, options).await
+        self.stream::<IdentityValidator, Identity, Identifier>(Identifier::from(unique_id), retry, options).await
     }
     pub async fn monitor_with_delay(&self, unique_id: [u8; 32], retry: RetryStrategy, options: IdentityValidator, delay: u64) -> Result<Option<Identity>, Error> {
-        self.stream_with_settings::<IdentityValidator, Identity>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_with_settings::<IdentityValidator, Identity, Identifier>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
     }
 
 }

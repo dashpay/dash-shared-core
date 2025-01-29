@@ -7,6 +7,8 @@ use dpp::data_contracts::SystemDataContract;
 #[cfg(feature = "state-transitions")]
 use dpp::state_transition::state_transitions::contract::data_contract_create_transition::DataContractCreateTransition;
 use dpp::system_data_contracts::load_system_data_contract;
+use drive_proof_verifier::types::RetrievedObjects;
+use indexmap::IndexMap;
 use platform_value::Identifier;
 #[cfg(feature = "state-transitions")]
 use platform_version::TryFromPlatformVersioned;
@@ -79,13 +81,13 @@ impl ContractsManager {
     //
 
     pub async fn monitor(&self, unique_id: Identifier, retry: RetryStrategy, options: ContractValidator) -> Result<Option<DataContract>, Error> {
-        self.stream::<ContractValidator, DataContract>(unique_id, retry, options).await
+        self.stream::<ContractValidator, DataContract, Identifier>(unique_id, retry, options).await
     }
     pub async fn monitor_for_id_bytes(&self, unique_id: [u8; 32], retry: RetryStrategy, options: ContractValidator) -> Result<Option<DataContract>, Error> {
-        self.stream::<ContractValidator, DataContract>(Identifier::from(unique_id), retry, options).await
+        self.stream::<ContractValidator, DataContract, Identifier>(Identifier::from(unique_id), retry, options).await
     }
     pub async fn monitor_with_delay(&self, unique_id: [u8; 32], retry: RetryStrategy, options: ContractValidator, delay: u64) -> Result<Option<DataContract>, Error> {
-        self.stream_with_settings::<ContractValidator, DataContract>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_with_settings::<ContractValidator, DataContract, Identifier>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
     }
 }
 
@@ -107,10 +109,17 @@ impl Validator<Option<DataContract>> for ContractValidator {
         value.is_some() || value.is_none() && self.accept_not_found()
     }
 }
+impl Validator<RetrievedObjects<Identifier, DataContract>> for ContractValidator {
+    fn validate(&self, _value: &RetrievedObjects<Identifier, DataContract>) -> bool {
+        true
+        // value.is_some() || value.is_none() && self.accept_not_found()
+    }
+}
 impl StreamSpec for ContractValidator {
     type Validator = ContractValidator;
     type Error = dash_sdk::Error;
     type Result = Option<DataContract>;
+    type ResultMany = IndexMap<Identifier, Option<DataContract>>;
 }
 
 

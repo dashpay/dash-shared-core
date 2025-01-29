@@ -1,16 +1,17 @@
 use std::sync::Arc;
-use dash_sdk::platform::{DocumentQuery, Fetch, FetchMany};
+use dash_sdk::platform::DocumentQuery;
 use dash_sdk::Sdk;
 use dash_spv_macro::StreamManager;
 use dpp::data_contract::DataContract;
 use dpp::document::Document;
 use dpp::system_data_contracts::SystemDataContract;
+use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::Identifier;
 use dash_spv_crypto::network::ChainType;
 use crate::error::Error;
 use crate::query::{order_by_asc_salted_domain_hash, where_salted_domain_hash_in, where_salted_domain_hash_is};
-use crate::util::StreamManager;
+use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 
 #[derive(Clone, Debug, StreamManager)]
 #[ferment_macro::opaque]
@@ -41,30 +42,89 @@ impl SaltedDomainHashesManager {
 
 #[ferment_macro::export]
 impl SaltedDomainHashesManager {
-    pub async fn dpns_documents_for_preorder_salted_domain_hashes(&self, hashes: Vec<Vec<u8>>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        self.with_contract(
-            SystemDataContract::DPNS,
-            hashes,
-            |contract, hashes|
-                self.dpns_documents_for_preorder_salted_domain_hashes_using_contract(hashes, contract)).await
-    }
-    pub async fn dpns_documents_for_preorder_salted_domain_hash(&self, hash: Vec<u8>) -> Result<Option<Document>, Error> {
+    pub async fn preorder_salted_domain_hash(&self, hash: Vec<u8>) -> Result<Option<Document>, Error> {
         self.with_contract(
             SystemDataContract::DPNS,
             hash,
             |contract, hash|
-                self.dpns_documents_for_preorder_salted_domain_hash_using_contract(hash, contract)).await
+                self.preorder_salted_domain_hash_with_contract(hash, contract)).await
     }
-    pub async fn dpns_documents_for_preorder_salted_domain_hashes_using_contract(&self, hashes: Vec<Vec<u8>>, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
-        let query = self.query_preorder_salted_domain_hashes(contract, hashes)?;
-        Document::fetch_many(self.sdk_ref(), query).await
-            .map_err(Error::from)
-    }
-    pub async fn dpns_documents_for_preorder_salted_domain_hash_using_contract(&self, hash: Vec<u8>, contract: DataContract) -> Result<Option<Document>, Error> {
-        let query = self.query_preorder_salted_domain_hash(contract, hash)?;
-        Document::fetch(self.sdk_ref(), query).await
-            .map_err(Error::from)
+    pub async fn preorder_salted_domain_hashes(&self, hashes: Vec<Vec<u8>>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        self.with_contract(
+            SystemDataContract::DPNS,
+            hashes,
+            |contract, hashes|
+                self.preorder_salted_domain_hashes_with_contract(hashes, contract)).await
     }
 
+    pub async fn preorder_salted_domain_hash_stream(&self, hash: Vec<u8>, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<Option<Document>, Error> {
+        self.with_contract(
+            SystemDataContract::DPNS,
+            (hash, retry, options, delay),
+            |contract, (hash, retry, options, delay)|
+                self.stream_preorder_salted_domain_hash_with_contract(hash, contract, retry, options, delay)).await
+    }
+
+    pub async fn preorder_salted_domain_hashes_stream(&self, hashes: Vec<Vec<u8>>, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        self.with_contract(
+            SystemDataContract::DPNS,
+            (hashes, retry, options, delay),
+            |contract, (hashes, retry, options, delay)|
+                self.stream_preorder_salted_domain_hashes_with_contract(hashes, contract, retry, options, delay)).await
+    }
+
+
+    pub async fn preorder_salted_domain_hash_with_contract(&self, hash: Vec<u8>, contract: DataContract) -> Result<Option<Document>, Error> {
+        let query = self.query_preorder_salted_domain_hash(contract, hash)?;
+        self.document_with_query(query).await
+    }
+
+    pub async fn preorder_salted_domain_hashes_with_contract(&self, hashes: Vec<Vec<u8>>, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        let query = self.query_preorder_salted_domain_hashes(contract, hashes)?;
+        self.many_documents_with_query(query).await
+    }
+
+    pub async fn stream_preorder_salted_domain_hash_with_contract(&self, hash: Vec<u8>, contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<Option<Document>, Error> {
+        let query = self.query_preorder_salted_domain_hash(contract, hash)?;
+        self.stream_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+    }
+    pub async fn stream_preorder_salted_domain_hashes_with_contract(&self, hashes: Vec<Vec<u8>>, contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+        let query = self.query_preorder_salted_domain_hashes(contract, hashes)?;
+        self.stream_many_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+    }
+
+}
+
+
+#[ferment_macro::export]
+pub enum SaltedDomainHashValidator {
+    None = 0,
+    AcceptNotFoundAsNotAnError = 1,
+}
+
+impl SaltedDomainHashValidator {
+    pub fn accept_not_found(&self) -> bool {
+        match self {
+            SaltedDomainHashValidator::None => false,
+            SaltedDomainHashValidator::AcceptNotFoundAsNotAnError => true
+        }
+    }
+}
+impl Validator<Option<Document>> for SaltedDomainHashValidator {
+    fn validate(&self, value: &Option<Document>) -> bool {
+        value.is_some() || value.is_none() && self.accept_not_found()
+    }
+}
+impl Validator<RetrievedObjects<Identifier, Document>> for SaltedDomainHashValidator {
+    fn validate(&self, _value: &RetrievedObjects<Identifier, Document>) -> bool {
+        true
+    }
+}
+
+impl StreamSpec for SaltedDomainHashValidator {
+    type Validator = SaltedDomainHashValidator;
+    type Error = dash_sdk::Error;
+    type Result = Option<Document>;
+    type ResultMany = IndexMap<Identifier, Self::Result>;
 }
 

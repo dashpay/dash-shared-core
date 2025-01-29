@@ -173,11 +173,17 @@ pub fn where_created_since(time: u64) -> WhereClause {
 pub fn where_normalized_label_equal_to(username: String) -> WhereClause {
     WhereClause { field: "normalizedLabel".to_string(), operator: WhereOperator::Equal, value: Value::Text(username) }
 }
+pub fn where_normalized_label_in(usernames: Vec<String>) -> WhereClause {
+    WhereClause { field: "normalizedLabel".to_string(), operator: WhereOperator::In, value: Value::Array(usernames.into_iter().map(|u| Value::Text(u.to_lowercase())).collect()) }
+}
 pub fn where_normalized_label_starts_with(prefix: String) -> WhereClause {
     WhereClause { field: "normalizedLabel".to_string(), operator: WhereOperator::StartsWith, value: Value::Text(prefix) }
 }
 pub fn where_domain_is_dash() -> WhereClause {
     WhereClause { field: "normalizedParentDomainName".to_string(), operator: WhereOperator::Equal, value: Value::Text("dash".to_string()) }
+}
+pub fn where_domain_is(domain: String) -> WhereClause {
+    WhereClause { field: "normalizedParentDomainName".to_string(), operator: WhereOperator::Equal, value: Value::Text(domain) }
 }
 pub fn where_recipient_is(user_id: [u8; 32]) -> WhereClause {
     WhereClause { field: "toUserId".to_string(), operator: WhereOperator::Equal, value: Value::Identifier(user_id) }

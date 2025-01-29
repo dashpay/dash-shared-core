@@ -8,7 +8,7 @@ documentation_style = "c"
 #style = "tag"
 #swift_enum_macro = "CF_ENUM"
 include_guard = "dash_shared_core_h"
-trailer = "typedef struct Runtime Runtime;"
+#trailer = "typedef struct Runtime Runtime;"
 [parse]
 parse_deps = true
 #expand = ["dash-spv-masternode-processor", ]
@@ -25,6 +25,8 @@ include = [
     "drive-proof-verifier",
     "rs-dapi-client",
     "rs-merk-verify-c-binding",
+    "dashcore",
+    "dashcore_hashes",
     "tokio",
     "versioned-feature-core"
 ]
@@ -40,6 +42,8 @@ extra_bindings = [
     "drive-proof-verifier",
     "rs-dapi-client",
     "rs-merk-verify-c-binding",
+    "dashcore",
+    "dashcore_hashes",
     "tokio",
     "versioned-feature-core"
 ]

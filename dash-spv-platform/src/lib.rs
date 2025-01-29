@@ -28,8 +28,12 @@ use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
 
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
+use dashcore::consensus::Decodable;
+use dashcore::Transaction;
 use dpp::data_contract::{DataContract, DataContractFacade};
+use dpp::data_contract::accessors::v0::DataContractV0Getters;
 use dpp::data_contract::document_type::{DocumentType, DocumentTypeRef};
+use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0, IdentityFacade, KeyID};
 use dpp::document::Document;
@@ -49,21 +53,21 @@ use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use drive_proof_verifier::types::EvoNodeStatus;
 use indexmap::IndexMap;
 use platform_version::version::LATEST_PLATFORM_VERSION;
-use platform_value::{BinaryData, Bytes32, Identifier, Value};
+use platform_value::{BinaryData, Bytes32, Identifier, Value, ValueMap};
 use tokio::runtime::Runtime;
-use dash_spv_crypto::consensus::Decodable;
 use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_crypto::keys::{IKey, OpaqueKey};
 use dash_spv_crypto::network::ChainType;
-use dash_spv_crypto::tx::Transaction;
 use dash_spv_event_bus::DAPIAddressHandler;
 use crate::cache::PlatformCache;
 use crate::contract::manager::ContractsManager;
 use crate::document::contact_request::ContactRequestManager;
 use crate::document::manager::DocumentsManager;
 use crate::document::salted_domain_hashes::SaltedDomainHashesManager;
+use crate::document::usernames::{UsernameStatus, UsernamesManager};
 use crate::error::Error;
 use crate::identity::manager::IdentitiesManager;
+use crate::models::profile::Profile;
 use crate::provider::PlatformProvider;
 use crate::query::QueryKind;
 use crate::signer::CallbackSigner;
@@ -125,6 +129,7 @@ pub struct PlatformSDK {
     pub contract_manager: Arc<ContractsManager>,
     pub contact_requests: Arc<ContactRequestManager>,
     pub salted_domain_hashes: Arc<SaltedDomainHashesManager>,
+    pub usernames: Arc<UsernamesManager>,
     pub doc_manager: Arc<DocumentsManager>,
 
     pub identities: IdentityFacade,
@@ -202,6 +207,9 @@ impl PlatformSDK {
     pub fn salted_domain_hashes(&self) -> Arc<SaltedDomainHashesManager> {
         Arc::clone(&self.salted_domain_hashes)
     }
+    pub fn usernames(&self) -> Arc<UsernamesManager> {
+        Arc::clone(&self.usernames)
+    }
 
     pub async fn get_status(&self, address: &str) -> Result<bool, Error> {
         let evo_node = Address::from_str(address)
@@ -214,12 +222,29 @@ impl PlatformSDK {
     }
 
     pub async fn get_transaction_with_hash(&self, hash: [u8; 32]) -> Result<Transaction, Error> {
-        let client = self.sdk.maybe_dapi_client().unwrap();
         let request = GetTransactionRequest { id: hash.reversed().to_hex() };
-        client.execute(request, RequestSettings::default()).await
+        self.sdk.execute(request, RequestSettings::default()).await
             .map_err(Error::from)
-            .map(|response| Transaction::consensus_decode(&*response.inner.transaction).map_err(Error::from))?
+            .map(|response| {
+                let mut writer: &[u8] = &response.inner.transaction;
+                let tx = Transaction::consensus_decode(&mut writer);
+                tx.map_err(Error::from)
+            })?
+            // .map(|response| Transaction::consensus_decode(&*response.inner.transaction).map_err(Error::from))?
     }
+
+    // pub async fn get_best_block_height(&self) -> Result<u32, Error> {
+    //     let request = GetBestBlockHeightRequest {};
+    //     self.sdk.execute(request, RequestSettings::default()).await
+    //         .map_err(Error::from)
+    //         .map(|response| {
+    //             response.inner.height
+    //             // let mut writer: &[u8] = &response.inner;
+    //             // // let tx = Transaction::consensus_decode(&mut writer);
+    //             // tx.map_err(Error::from)
+    //         })?
+    //
+    // }
 
     pub async fn check_ping_times_for_current_masternode_list(&self) {
 
@@ -336,10 +361,38 @@ impl PlatformSDK {
     }
 
     #[cfg(feature = "state-transitions")]
-    pub async fn document_single(&self, action_type: DocumentTransitionActionType, document_type: DocumentType, document: Document, entropy: [u8; 32], private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+    pub async fn document_single(
+        &self,
+        action_type: DocumentTransitionActionType,
+        document_type: DocumentType,
+        document: Document,
+        entropy: [u8; 32],
+        private_key: OpaqueKey
+    ) -> Result<StateTransitionProofResult, Error> {
         println!("transition document call: {:?} -- {:?} -- {:?} -- {} -- {:?}", action_type, document_type, document, entropy.to_hex(), private_key);
         let doc_type_ref = document_type.as_ref();
         let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, doc_type_ref, Bytes32(entropy))])]);
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
+            .map_err(Error::from)?;
+        println!("transition document created: {:?} {:?}", transition, nonce_counter);
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+    }
+
+    #[cfg(feature = "state-transitions")]
+    pub async fn document_single_on_table(
+        &self,
+        data_contract: DataContract,
+        action_type: DocumentTransitionActionType,
+        table_name: &str,
+        document: Document,
+        entropy: [u8; 32],
+        private_key: OpaqueKey
+    ) -> Result<StateTransitionProofResult, Error> {
+        let document_type = data_contract.document_type_for_name(table_name).map_err(Error::from)?;
+        println!("transition document call: {:?} -- {:?} -- {:?} -- {} -- {:?}", action_type, document_type, document, entropy.to_hex(), private_key);
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, document_type, Bytes32(entropy))])]);
         let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
         let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
             .map_err(Error::from)?;
@@ -365,12 +418,195 @@ impl PlatformSDK {
         self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
     }
 
-    // #[cfg(feature = "state-transitions")]
-    // pub async fn contract_create(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<Option<DataContract>, Error> {
-    //     let mut transitions = self.identities.cre
-    // }
-    // DataContractCreate(DataContractCreateTransition),
-    // DataContractUpdate(DataContractUpdateTransition),
+    pub fn friend_request_document(
+        &self,
+        contract: DataContract,
+        identity_id: [u8; 32],
+        table_name: &str,
+        created_at: u64,
+        to_user_id: [u8; 32],
+        encrypted_extended_public_key_data: Vec<u8>,
+        sender_key_index: u32,
+        recipient_key_index: u32,
+        account_reference: u32,
+        entropy: [u8; 32]
+    ) -> Result<Document, Error> {
+        // uint64_t createAtMs = (self.createdAt) * 1000;
+        // DSStringValueDictionary *data = @{
+        //     @"$createdAt": @(createAtMs),
+        //     @"toUserId": uint256_data([self destinationIdentityUniqueId]),
+        //     @"encryptedPublicKey": self.encryptedExtendedPublicKeyData,
+        //     @"senderKeyIndex": @(self.sourceKeyIndex),
+        //     @"recipientKeyIndex": @(self.destinationKeyIndex),
+        //     @"accountReference": @([self createAccountReference])
+        // };
+        // DPDocument *contact = [self.sourceIdentity.dashpayDocumentFactory documentOnTable:@"contactRequest" withDataDictionary:data usingEntropy:entropyData error:&error];
+
+        // json[@"$type"] = self.tableName;
+        // json[@"$dataContractId"] = uint256_data(self.contractId);
+        // json[@"$id"] = uint256_data(self.documentId);
+        // json[@"$action"] = @(self.currentLocalDocumentState.documentStateType >> 1);
+        // if (!(self.currentLocalDocumentState.documentStateType >> 1)) {
+        //     json[@"$entropy"] = self.entropy;
+        // }
+
+        let dict = Value::Map(Vec::from_iter([
+            (Value::Text("$createdAt".to_string()), Value::U64(created_at)),
+            (Value::Text("toUserId".to_string()), Value::Identifier(to_user_id.into())),
+            (Value::Text("encryptedPublicKey".to_string()), Value::Bytes(encrypted_extended_public_key_data)),
+            (Value::Text("senderKeyIndex".to_string()), Value::U32(sender_key_index)),
+            (Value::Text("recipientKeyIndex".to_string()), Value::U32(recipient_key_index)),
+            (Value::Text("accountReference".to_string()), Value::U32(account_reference)),
+        ]));
+
+        let document_type = contract.document_type_for_name(table_name)
+            .map_err(ProtocolError::from)?;
+        let owner_id = Identifier::from(identity_id);
+        document_type.create_document_from_data(dict, owner_id, 1000, 1000, entropy, self.sdk.version())
+            .map_err(Error::from)
+    }
+
+    pub async fn send_friend_request(
+        &self,
+        contract: DataContract,
+        identity_id: [u8; 32],
+        created_at: u64,
+        to_user_id: [u8; 32],
+        encrypted_extended_public_key_data: Vec<u8>,
+        sender_key_index: u32,
+        recipient_key_index: u32,
+        account_reference: u32,
+        entropy: [u8; 32],
+        private_key: OpaqueKey
+    ) -> Result<StateTransitionProofResult, Error> {
+        let dict = Value::Map(Vec::from_iter([
+            (Value::Text("$createdAt".to_string()), Value::U64(created_at)),
+            (Value::Text("toUserId".to_string()), Value::Identifier(to_user_id.into())),
+            (Value::Text("encryptedPublicKey".to_string()), Value::Bytes(encrypted_extended_public_key_data)),
+            (Value::Text("senderKeyIndex".to_string()), Value::U32(sender_key_index)),
+            (Value::Text("recipientKeyIndex".to_string()), Value::U32(recipient_key_index)),
+            (Value::Text("accountReference".to_string()), Value::U32(account_reference)),
+        ]));
+        self.send_friend_request_with_value(contract, identity_id, dict, entropy, private_key).await
+    }
+    pub async fn send_friend_request_with_value(
+        &self,
+        contract: DataContract,
+        identity_id: [u8; 32],
+        value: Value,
+        entropy: [u8; 32],
+        private_key: OpaqueKey
+    ) -> Result<StateTransitionProofResult, Error> {
+        let document_type = contract.document_type_for_name("contactRequest")
+            .map_err(ProtocolError::from)?;
+        let owner_id = Identifier::from(identity_id);
+        let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
+            .map_err(Error::from)?;
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
+            .map_err(Error::from)?;
+        println!("transition document created: {:?} {:?}", transition, nonce_counter);
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+    }
+
+    pub async fn register_username_domains_for_username_full_paths<
+        SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
+    >(
+        &self,
+        contract: DataContract,
+        identity_id: [u8; 32],
+        username_values: Vec<Value>,
+        entropy: [u8; 32],
+        private_key: OpaqueKey,
+        save_context: *const std::os::raw::c_void,
+        save_callback: SUC,
+    ) -> Result<StateTransitionProofResult, Error> {
+        let document_type = contract.document_type_for_name("domain")
+            .map_err(ProtocolError::from)?;
+        let owner_id = Identifier::from(identity_id);
+        let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+        for value in username_values.into_iter() {
+            let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
+                .map_err(Error::from)?;
+            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+        }
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
+            .map_err(Error::from)?;
+        println!("transition register_username_domains_for_username_full_paths created: {:?} {:?}", transition, nonce_counter);
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        save_callback(save_context, UsernameStatus::RegistrationPending);
+        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+            .map(|result| {
+                save_callback(save_context, UsernameStatus::Confirmed);
+                result
+            })
+    }
+
+    pub async fn register_preordered_salted_domain_hashes_for_username_full_paths<
+        SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
+    >(
+        &self,
+        contract: DataContract,
+        identity_id: [u8; 32],
+        salted_domain_hashes: Vec<Vec<u8>>,
+        entropy: [u8; 32],
+        private_key: OpaqueKey,
+        save_context: *const std::os::raw::c_void,
+        save_callback: SUC,
+    ) -> Result<StateTransitionProofResult, Error> {
+        let document_type = contract.document_type_for_name("preorder")
+            .map_err(ProtocolError::from)?;
+        let owner_id = Identifier::from(identity_id);
+        let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+        for salted_domain_hash in salted_domain_hashes.into_iter() {
+            let map = ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]);
+            let document = document_type.create_document_from_data(Value::Map(map), owner_id, 1000, 1000, entropy, self.sdk.version())
+                .map_err(Error::from)?;
+            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+        }
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
+            .map_err(Error::from)?;
+        println!("transition register_preordered_salted_domain_hashes_for_username_full_paths created: {:?} {:?}", transition, nonce_counter);
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
+        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+            .map(|result| {
+                save_callback(save_context, UsernameStatus::Preordered);
+                result
+        })
+    }
+
+    pub async fn sign_and_publish_profile(
+        &self,
+        contract: DataContract,
+        identity_id: [u8; 32],
+        profile: Profile,
+        entropy: [u8; 32],
+        document_id: Option<[u8; 32]>,
+        private_key: OpaqueKey
+    ) -> Result<StateTransitionProofResult, Error> {
+        let document_type = contract.document_type_for_name("profile")
+            .map_err(ProtocolError::from)?;
+        let owner_id = Identifier::from(identity_id);
+        let document = match document_id {
+            None =>
+                document_type.create_document_from_data(profile.to_value(), owner_id, 1000, 1000, entropy, self.sdk.version()),
+            Some(document_id) =>
+                document_type.create_document_with_prevalidated_properties(Identifier::from(document_id), owner_id, 1000, 1000, profile.to_prevalidated_properties(), self.sdk.version()),
+        }.map_err(Error::from)?;
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
+            .map_err(Error::from)?;
+        println!("transition sign_and_publish_profile created: {:?} {:?}", transition, nonce_counter);
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+    }
+
 
 
 
@@ -420,6 +656,7 @@ impl PlatformSDK {
             doc_manager: Arc::new(DocumentsManager::new(&sdk_arc, chain_type.clone())),
             contact_requests: Arc::new(ContactRequestManager::new(&sdk_arc, chain_type.clone())),
             salted_domain_hashes: Arc::new(SaltedDomainHashesManager::new(&sdk_arc, chain_type.clone())),
+            usernames: Arc::new(UsernamesManager::new(&sdk_arc, chain_type.clone())),
             runtime: Arc::new(Runtime::new().unwrap()),
             callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc),
             identities: IdentityFacade::new(protocol_version),
@@ -531,6 +768,17 @@ pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Iden
 //             println!("Error: {:?}", err);
 //         }
 //     }
+// }
+
+// fn values_to_documents<'a>(document_type: DocumentTypeRef<'a>, identity_id: [u8; 32], entropy: [u8; 32], values: Vec<Value>, version: &'a PlatformVersion) -> Result<IndexMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>, Error> {
+//     let owner_id = Identifier::from(identity_id);
+//     let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+//     for value in values.into_iter() {
+//         let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, version)
+//             .map_err(Error::from)?;
+//         documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+//     }
+//     Ok(documents)
 // }
 
 // asdtwotwooct

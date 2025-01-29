@@ -81,6 +81,9 @@ if which clang-format >/dev/null; then
 else
     echo "warning: clang-format not installed, install it by running $(brew install clang-format)"
 fi
+sed -i '' '/#ifndef/ a\
+typedef struct Runtime Runtime;
+' target/include/dash_shared_core.h
 
 xcodebuild -create-xcframework \
 	-library target/lib/ios/lib${LIB_NAME}_ios.a -headers target/include \

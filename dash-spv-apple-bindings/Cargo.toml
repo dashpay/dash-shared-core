@@ -16,14 +16,14 @@ dash-spv-crypto = { path = "../dash-spv-crypto", features = ["default"] }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default"] }
 dash-spv-platform = { path = "../dash-spv-platform" }
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
+dashcore = { git = "https://github.com/pankcuf/rust-dashcore", features = [
     "std",
     "secp-recovery",
     "rand",
     "signer",
     "serde",
-], default-features = false, tag = "0.34.0" }
-dashcore-rpc = { git = "https://github.com/dashpay/rust-dashcore-rpc", tag = "v0.15.2" }
+], default-features = false, branch = "feat/ferment" }
+dashcore-rpc = { git = "https://github.com/pankcuf/rust-dashcore-rpc", branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
 dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }
 drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
@@ -74,6 +74,7 @@ default = ["state-transitions"]
 bls-signatures = ["dpp/bls-signatures"]
 blsful = ["dashcore/blsful"]
 cbor = ["platform-value/cbor", "dpp/cbor", "dpp/ciborium"]
+core2 = ["dashcore/core2"]
 core-types = ["dpp/core-types"]
 data-contract-cbor-conversion = ["dpp/data-contract-cbor-conversion"]
 data-contract-json-conversion = ["dpp/data-contract-json-conversion"]

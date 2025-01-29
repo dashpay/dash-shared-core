@@ -26,6 +26,8 @@ fn main() {
             "dpp",
             "drive-proof-verifier",
             "rs-dapi-client",
+            "dashcore",
+            "dashcore_hashes",
             "versioned-feature-core",
         ])
         .with_languages(vec![

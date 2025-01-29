@@ -1,11 +1,10 @@
 use std::sync::Arc;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
-use dash_sdk::platform::{DocumentQuery, FetchMany};
+use dash_sdk::platform::DocumentQuery;
 use dash_sdk::Sdk;
 use dash_spv_macro::StreamManager;
 use dpp::data_contract::DataContract;
 use dpp::data_contracts::SystemDataContract;
-use dpp::document::Document;
 use drive_proof_verifier::types::Documents;
 use dash_spv_crypto::network::ChainType;
 use crate::error::Error;
@@ -52,14 +51,12 @@ impl ContactRequestManager {
 impl ContactRequestManager {
     pub async fn incoming_contact_requests_using_contract(&self, contract: DataContract, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>) -> Result<Vec<ContactRequestKind>, Error> {
         let query = self.query_incoming_contact_requests(contract, user_id, since, start_after)?;
-        Document::fetch_many(self.sdk_ref(), query).await
-            .map_err(Error::from)
+        self.many_documents_with_query(query).await
             .map(|docs| process_contact_requests(&user_id, docs))
     }
     pub async fn outgoing_contact_requests_using_contract(&self, contract: DataContract, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>) -> Result<Vec<ContactRequestKind>, Error> {
         let query = self.query_outgoing_contact_requests(contract, user_id, since, start_after)?;
-        Document::fetch_many(self.sdk_ref(), query).await
-            .map_err(Error::from)
+        self.many_documents_with_query(query).await
             .map(|docs| process_contact_requests(&user_id, docs))
     }
     pub async fn incoming_contact_requests(&self, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>) -> Result<Vec<ContactRequestKind>, Error> {
