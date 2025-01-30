@@ -4,6 +4,7 @@ use dash_sdk::{platform::Fetch, Sdk};
 use dpp::data_contract::accessors::v0::DataContractV0Getters;
 use dpp::data_contract::{DataContract, DocumentName};
 use dpp::data_contracts::SystemDataContract;
+use dpp::serialization::PlatformSerializableWithPlatformVersion;
 #[cfg(feature = "state-transitions")]
 use dpp::state_transition::state_transitions::contract::data_contract_create_transition::DataContractCreateTransition;
 use dpp::system_data_contracts::load_system_data_contract;
@@ -32,6 +33,15 @@ impl ContractsManager {
 }
 #[ferment_macro::export]
 impl ContractsManager {
+
+    pub fn contract_serialized(&self, contract: DataContract) -> Result<Vec<u8>, Error> {
+        contract.serialize_to_bytes_with_platform_version(self.sdk_ref().version())
+            .map_err(Error::from)
+    }
+    pub fn contract_serialized_hash(&self, contract: DataContract) -> Result<Vec<u8>, Error> {
+        contract.hash(self.sdk_ref().version())
+            .map_err(Error::from)
+    }
     pub fn load_dashpay_contract(&self) -> DataContract {
         load_system_data_contract(SystemDataContract::Dashpay, self.sdk.version())
             .expect("Dashpay contract should be loaded")
