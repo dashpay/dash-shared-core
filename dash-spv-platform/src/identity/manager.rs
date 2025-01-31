@@ -32,6 +32,7 @@ pub struct IndexedKey {
     pub key: OpaqueKey
 }
 
+#[derive(Clone)]
 #[ferment_macro::export]
 pub enum IdentityValidator {
     None = 0,
@@ -125,7 +126,7 @@ impl IdentitiesManager {
         drop(lock);
         Ok(all_identities)
     }
-    pub async fn get_identities_for_key_hashes(&self, wallet_id: String, key_hashes: Vec<[u8; 20]>) -> Result<BTreeMap<[u8; 20], Identity>, Error> {
+    pub async fn get_identities_for_key_hashes(&self, wallet_id: String, key_hashes: Vec<[u8; 20]>, ) -> Result<BTreeMap<[u8; 20], Identity>, Error> {
         let mut identities = BTreeMap::new();
         for key_hash in key_hashes.into_iter() {
             match Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), DEFAULT_SETTINGS).await {
@@ -169,8 +170,30 @@ impl IdentitiesManager {
     pub async fn monitor_for_id_bytes(&self, unique_id: [u8; 32], retry: RetryStrategy, options: IdentityValidator) -> Result<Option<Identity>, Error> {
         self.stream::<IdentityValidator, Identity, Identifier>(Identifier::from(unique_id), retry, options).await
     }
+    pub async fn monitor_for_key_hash(&self, key_hash: [u8; 20], retry: RetryStrategy, options: IdentityValidator) -> Result<Option<Identity>, Error> {
+        self.stream::<IdentityValidator, Identity, PublicKeyHash>(PublicKeyHash(key_hash), retry, options).await
+    }
     pub async fn monitor_with_delay(&self, unique_id: [u8; 32], retry: RetryStrategy, options: IdentityValidator, delay: u64) -> Result<Option<Identity>, Error> {
         self.stream_with_settings::<IdentityValidator, Identity, Identifier>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
+    }
+    pub async fn monitor_for_key_hashes(&self, key_hashes: Vec<[u8; 20]>, retry: RetryStrategy, options: IdentityValidator) -> Result<BTreeMap<[u8; 20], Identity>, Error> {
+        println!("monitor_for_key_hashes: {}", key_hashes.len());
+        let mut identities = BTreeMap::new();
+        for key_hash in key_hashes.into_iter() {
+            match self.monitor_for_key_hash(key_hash, retry.clone(), options.clone()).await {
+                Ok(Some(identity)) => {
+                    println!("Ok::monitor_for_key_hashes -> key_hash: {}: identity_id: {}", key_hash.to_hex(), identity.id().to_buffer().to_hex());
+                    identities.insert(key_hash, identity);
+                },
+                Ok(None) => {
+                    println!("None::monitor_for_key_hashes -> key_hash: {}: identity_id: None", key_hash.to_hex());
+                }
+                Err(error) => {
+                    println!("Error::monitor_for_key_hashes -> key_hash: {}: error: {:?}", key_hash.to_hex(), error);
+                }
+            }
+        }
+        Ok(identities)
     }
 
 }

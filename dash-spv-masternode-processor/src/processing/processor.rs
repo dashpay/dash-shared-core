@@ -589,6 +589,7 @@ impl MasternodeProcessor {
             return maybe_height;
         }
         let chain_height = self.provider.lookup_block_height_by_hash(block_hash);
+        println!("lookup_block_height_by_hash: {} = {}", block_hash.to_hex(), chain_height);
         if chain_height != u32::MAX {
             //println!("[CACHE] cache_block_height_for_hash: {} = {chain_height}", block_hash.to_hex());
             cached_block_hash_heights_lock.insert(block_hash, chain_height);
@@ -1290,7 +1291,7 @@ impl MasternodeProcessor {
                             let work_block_height = llmq_height - 8;
                             let work_block_hash = self.provider.lookup_block_hash_by_height(work_block_height);
                             if work_block_hash.is_zero() {
-                                warn!("unknown hash for {}", work_block_height);
+                                warn!("zero hash for {}", work_block_height);
                             }
                             self.cache.add_cl_signature(work_block_hash, signature);
                         } else {
