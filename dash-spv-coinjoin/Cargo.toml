@@ -13,8 +13,6 @@ test-helpers = []
 
 [dependencies]
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
-#ferment-interfaces = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-interfaces" }
-#ferment-macro = { git = "https://github.com/pankcuf/ferment.git", package = "ferment-macro" }
 ferment-interfaces = { path = "../../ferment/ferment-interfaces" }
 ferment-macro = { path = "../../ferment/ferment-macro" }
 logging = { path = "../logging" }
@@ -24,13 +22,6 @@ tracing = "0.1.40"
 [build-dependencies]
 cbindgen = "0.24.3"
 ferment = { path = "../../ferment/ferment" }
-#ferment = { git = "https://github.com/pankcuf/ferment.git", package = "ferment" }
 
 [lib]
 name = "dash_spv_coinjoin"
-#crate-type = ["staticlib", "cdylib"]
-
-#[profile.release]
-#lto = "thin"
-#opt-level = 3
-#debug = true
