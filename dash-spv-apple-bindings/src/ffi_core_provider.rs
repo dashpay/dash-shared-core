@@ -173,9 +173,6 @@ impl FFICoreProvider  {
 #[cfg(test)]
 impl FFICoreProvider {
     pub fn register_default(context: Arc<FFIContext>, chain_type: ChainType) -> Self {
-        #[cfg(feature = "use_serde")]
-        use dash_spv_masternode_processor::util::insight::{insight_block_by_block_hash, insight_block_by_block_height};
-        use dash_spv_crypto::crypto::byte_util::Reversed;
         let context_raw = Arc::into_raw(context.clone()) as *const std::ffi::c_void;
         Self {
             context: context_raw,
@@ -184,18 +181,18 @@ impl FFICoreProvider {
                 let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_hash| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let mut result = context.block_for_hash(block_hash)
+                    let result = context.block_for_hash(block_hash)
                         .map(MBlock::from)
                         .ok_or(CoreProviderError::NullResult);
-                    if result.is_err() && cfg!(feature = "use_serde") {
-                        if let Some(insight_url) = clone_chain.insight_url() {
-                            result = insight_block_by_block_hash(insight_url, &block_hash.reversed())
-                                .map(MBlock::from)
-                                .map_err(|e| CoreProviderError::NullResult);
-                        }
-                    }
-
                     std::mem::forget(context);
+                    #[cfg(feature = "use_serde")]
+                    if result.is_err() {
+                        return clone_chain.insight_url()
+                            .ok_or(CoreProviderError::NullResult)
+                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_hash(url, &dash_spv_crypto::crypto::byte_util::Reversed::reversed(&block_hash))
+                            .map(MBlock::from)
+                            .map_err(|e| CoreProviderError::NullResult));
+                    }
                     result
                 })
             },
@@ -203,17 +200,18 @@ impl FFICoreProvider {
                 let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_hash, peer| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let mut result = context.block_for_hash(block_hash)
+                    let result = context.block_for_hash(block_hash)
                         .map(MBlock::from)
                         .ok_or(CoreProviderError::NullResult);
-                    if result.is_err() && cfg!(feature = "use_serde") {
-                        if let Some(insight_url) = clone_chain.insight_url() {
-                            result = insight_block_by_block_hash(insight_url, &block_hash.reversed())
-                                .map(MBlock::from)
-                                .map_err(|e| CoreProviderError::NullResult);
-                        }
-                    }
                     std::mem::forget(context);
+                    #[cfg(feature = "use_serde")]
+                    if result.is_err() {
+                        return clone_chain.insight_url()
+                            .ok_or(CoreProviderError::NullResult)
+                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_hash(url, &dash_spv_crypto::crypto::byte_util::Reversed::reversed(&block_hash))
+                                .map(MBlock::from)
+                                .map_err(|e| CoreProviderError::NullResult));
+                    }
                     result
                 })
             },
@@ -221,15 +219,16 @@ impl FFICoreProvider {
                 let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_hash| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let mut result = context.block_height_for_hash(block_hash);
-                    if result == u32::MAX && cfg!(feature = "use_serde") {
-                        if let Some(insight_url) = clone_chain.insight_url() {
-                            result = insight_block_by_block_hash(insight_url, &block_hash.reversed())
-                                .map(|b| MBlock::from(b).height)
-                                .unwrap_or(u32::MAX)
-                        }
-                    }
+                    let result = context.block_height_for_hash(block_hash);
                     std::mem::forget(context);
+                    #[cfg(feature = "use_serde")]
+                    if result == u32::MAX {
+                        return clone_chain.insight_url()
+                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_hash(url, &dash_spv_crypto::crypto::byte_util::Reversed::reversed(&block_hash))
+                                .ok()
+                                .map(|b| MBlock::from(b).height))
+                            .unwrap_or(u32::MAX);
+                    }
                     result
                 })
             },
@@ -237,16 +236,18 @@ impl FFICoreProvider {
                 let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_height| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let mut result = context.block_hash_for_height(block_height);
-                    if result.is_err() && cfg!(feature = "use_serde") {
-                        if let Some(insight_url) = clone_chain.insight_url() {
-                            result = insight_block_by_block_height(insight_url, block_height)
+                    let result = context.block_hash_for_height(block_height);
+                    std::mem::forget(context);
+                    #[cfg(feature = "use_serde")]
+                    if result.is_err() {
+                        return clone_chain.insight_url()
+                            .ok_or(CoreProviderError::NullResult)
+                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_height(url, block_height)
                                 .map(|b| MBlock::from(b).hash)
-                                .map_err(|e| CoreProviderError::NullResult);
-                        }
+                                .map_err(|e| CoreProviderError::NullResult))
+                            .unwrap_or([0u8; 32])
                     }
 
-                    std::mem::forget(context);
                     result.unwrap_or([0u8; 32])
                 })
             },
@@ -254,17 +255,18 @@ impl FFICoreProvider {
                 let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_height| unsafe {
                     let context = Arc::from_raw(context as *const FFIContext);
-                    let mut result = context.block_for_height(block_height)
+                    let result = context.block_for_height(block_height)
                         .map(Block::from)
                         .ok_or(CoreProviderError::NullResult);
-                    if result.is_err() && cfg!(feature = "use_serde") {
-                        if let Some(insight_url) = clone_chain.insight_url() {
-                            result = insight_block_by_block_height(insight_url, block_height)
-                                .map(|b| Block::from(b))
-                                .map_err(|e| CoreProviderError::NullResult);
-                        }
-                    }
                     std::mem::forget(context);
+                    #[cfg(feature = "use_serde")]
+                    if result.is_err() {
+                        return clone_chain.insight_url()
+                            .ok_or(CoreProviderError::NullResult)
+                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_height(url, block_height)
+                                .map(|b| Block::from(b))
+                                .map_err(|e| CoreProviderError::NullResult));
+                    }
                     result
                 })
             },

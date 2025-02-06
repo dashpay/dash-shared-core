@@ -1,7 +1,6 @@
 use crate::processing::CoreProviderError;
 
 #[warn(non_camel_case_types)]
-#[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub enum ProcessingError {
@@ -16,7 +15,7 @@ pub enum ProcessingError {
 }
 impl std::fmt::Display for ProcessingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{}", self.string_value())
     }
 }
 
@@ -90,5 +89,17 @@ impl From<&ProcessingError> for u8 {
 impl ProcessingError {
     pub fn index(&self) -> u8 {
         u8::from(self)
+    }
+    pub fn string_value(&self) -> String {
+        match self {
+            ProcessingError::PersistInRetrieval => "PersistInRetrieval",
+            ProcessingError::LocallyStored => "LocallyStored",
+            ProcessingError::ParseError => "ParseError",
+            ProcessingError::HasNoBaseBlockHash => "HasNoBaseBlockHash",
+            ProcessingError::UnknownBlockHash => "UnknownBlockHash",
+            ProcessingError::InvalidResult => "InvalidResult",
+            ProcessingError::CoreProvider => "CoreProvider",
+            ProcessingError::MissingLists => "MissingLists",
+        }.to_string()
     }
 }

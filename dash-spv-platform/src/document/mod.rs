@@ -12,3 +12,7 @@ pub fn get_document_property(document: Document, property: &str) -> Option<Value
         .get(property)
         .cloned()
 }
+#[ferment_macro::export]
+pub fn print_document(document: Document) {
+    println!("{}", document.to_string());
+}

@@ -23,6 +23,7 @@ fn main() {
             "dash-sdk",
             "platform-value",
             "platform-version",
+            "data-contracts",
             "dpp",
             "drive-proof-verifier",
             "rs-dapi-client",

@@ -372,11 +372,11 @@ impl ChainType {
         }
     }
 
-    pub fn devnet_version(&self) -> Option<i16> {
+    pub fn devnet_version(&self) -> i16 {
         if let ChainType::DevNet(devnet_type) = self {
-            Some(devnet_type.version() as i16)
+            devnet_type.version() as i16
         } else {
-            None
+            0
         }
     }
 

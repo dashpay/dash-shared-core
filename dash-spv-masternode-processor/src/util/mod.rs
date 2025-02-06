@@ -2,7 +2,7 @@
 pub mod file;
 #[cfg(feature = "generate-dashj-tests")]
 pub mod java;
-#[cfg(feature = "serde")]
+#[cfg(feature = "use_serde")]
 pub mod insight;
 pub mod formatter;
 

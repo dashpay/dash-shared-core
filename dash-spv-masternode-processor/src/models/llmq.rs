@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::BTreeMap;
+use std::fmt::{Display, Formatter};
 use hashes::hex::ToHex;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_crypto::crypto::byte_util::Reversed;
@@ -18,17 +19,27 @@ pub enum LLMQVerificationContext {
     QRInfo(bool),
 }
 
+impl Display for LLMQVerificationContext {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            LLMQVerificationContext::None => "None".to_string(),
+            LLMQVerificationContext::MNListDiff => "MNListDiff".to_string(),
+            LLMQVerificationContext::QRInfo(is_quorum_rotation_activated) => format!("QRInfo({is_quorum_rotation_activated})"),
+        }.as_str())
+    }
+}
+
 impl LLMQVerificationContext {
     pub fn should_validate_quorums(&self) -> bool {
         *self != Self::None
     }
     pub fn should_validate_quorum_of_type(&self, llmq_type: LLMQType, chain_type: ChainType) -> bool {
         match self {
-            LLMQVerificationContext::None => false,
             LLMQVerificationContext::MNListDiff =>
                 chain_type.isd_llmq_type() != llmq_type && chain_type.should_process_llmq_of_type(llmq_type),
-            LLMQVerificationContext::QRInfo(is_quorum_rotation_activated) =>
-                chain_type.isd_llmq_type() == llmq_type && *is_quorum_rotation_activated == true
+            LLMQVerificationContext::QRInfo(true) =>
+                chain_type.isd_llmq_type() == llmq_type,
+            _ => false
         }
     }
 }

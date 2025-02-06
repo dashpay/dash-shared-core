@@ -391,7 +391,11 @@ impl MasternodeProcessorCache {
 
     pub fn stored_masternode_lists_count(&self) -> usize {
         let lists = self.mn_lists.read().unwrap();
-        println!("[CACHE] stored_masternode_lists_count: {}", lists.len());
+        let debug_str = lists.iter().fold(String::new(), |mut acc, (hash, list)| {
+            acc.push_str(format!("\t{}: {},\n", hash.to_hex(), list.known_height).as_str());
+            acc
+        });
+        println!("[CACHE] stored_masternode_lists_count: {}:\n{debug_str}", lists.len());
         let result = lists.len();
         drop(lists);
         result

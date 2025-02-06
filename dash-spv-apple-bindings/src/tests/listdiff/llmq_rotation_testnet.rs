@@ -8,6 +8,7 @@ use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::models;
 use dash_spv_masternode_processor::models::llmq;
 use dash_spv_masternode_processor::models::llmq::validate_payload;
+use dash_spv_masternode_processor::models::masternode_list::quorum_vec_to_map;
 use dash_spv_masternode_processor::processing::CoreProviderError;
 use dash_spv_masternode_processor::test_helpers::{block_hash_to_block_hash, load_message};
 use dash_spv_masternode_processor::tests::serde_helper::{ListDiff, masternode_list_from_genesis_diff, QRInfo};
@@ -49,27 +50,9 @@ fn mainnet_quorum_quarters() {
     println!("block_hash_8792: {}", block_hash_8792.to_hex());
     println!("block_hash_8840: {}", block_hash_8840.to_hex());
     println!("block_hash_8888: {}", block_hash_8888.to_hex());
-    let added_quorums_8792 = list_diff_8792.added_quorums.iter()
-        .fold(BTreeMap::new(), |mut acc, entry| {
-            acc.entry(entry.llmq_type.clone())
-                .or_insert_with(BTreeMap::new)
-                .insert(entry.llmq_hash, entry.clone());
-            acc
-        });
-    let added_quorums_8840 = list_diff_8840.added_quorums.iter()
-        .fold(BTreeMap::new(), |mut acc, entry| {
-            acc.entry(entry.llmq_type.clone())
-                .or_insert_with(BTreeMap::new)
-                .insert(entry.llmq_hash, entry.clone());
-            acc
-        });
-    let added_quorums_8888 = list_diff_8888.added_quorums.iter()
-        .fold(BTreeMap::new(), |mut acc, entry| {
-            acc.entry(entry.llmq_type.clone())
-                .or_insert_with(BTreeMap::new)
-                .insert(entry.llmq_hash, entry.clone());
-            acc
-    });
+    let added_quorums_8792 = quorum_vec_to_map(list_diff_8792.added_quorums);
+    let added_quorums_8840 = quorum_vec_to_map(list_diff_8840.added_quorums);
+    let added_quorums_8888 = quorum_vec_to_map(list_diff_8888.added_quorums);
     let masternode_list_8792 = models::MasternodeList::new(list_diff_8792.added_or_modified_masternodes, added_quorums_8792, block_hash_8792, block_height_8792, true);
     let masternode_list_8840 = models::MasternodeList::new(list_diff_8840.added_or_modified_masternodes, added_quorums_8840, block_hash_8840, block_height_8840, true);
     let masternode_list_8888 = models::MasternodeList::new(list_diff_8888.added_or_modified_masternodes, added_quorums_8888, block_hash_8888, block_height_8888, true);

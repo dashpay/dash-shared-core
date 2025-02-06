@@ -32,6 +32,7 @@ dash-spv-macro = { path = "../dash-spv-macro" }
 
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
 #dispatch = "0.2.0"
+data-contracts = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "data-contracts" }
 dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }
 drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
 drive-proof-verifier = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive-proof-verifier" }

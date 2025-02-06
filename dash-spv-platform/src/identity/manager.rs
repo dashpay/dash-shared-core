@@ -8,6 +8,8 @@ use dash_sdk::{RequestSettings, Sdk};
 use dash_spv_macro::StreamManager;
 use dpp::identity::accessors::IdentityGettersV0;
 use dpp::identity::identity_public_key::accessors::v0::IdentityPublicKeyGettersV0;
+use dpp::identity::identity_public_key::contract_bounds::ContractBounds;
+use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::Identifier;
 use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
@@ -51,8 +53,8 @@ impl Validator<Option<Identity>> for IdentityValidator {
         value.is_some() || value.is_none() && self.accept_not_found()
     }
 }
-impl Validator<IndexMap<Identifier, Option<Identity>>> for IdentityValidator {
-    fn validate(&self, _value: &IndexMap<Identifier, Option<Identity>>) -> bool {
+impl Validator<RetrievedObjects<Identifier, Identity>> for IdentityValidator {
+    fn validate(&self, _value: &RetrievedObjects<Identifier, Identity>) -> bool {
         true
         // value.is_some() || value.is_none() && self.accept_not_found()
     }
@@ -182,11 +184,23 @@ impl IdentitiesManager {
         for key_hash in key_hashes.into_iter() {
             match self.monitor_for_key_hash(key_hash, retry.clone(), options.clone()).await {
                 Ok(Some(identity)) => {
-                    println!("Ok::monitor_for_key_hashes -> key_hash: {}: identity_id: {}", key_hash.to_hex(), identity.id().to_buffer().to_hex());
+                    let identity_id = identity.id();
+                    let public_keys = identity.public_keys();
+                    let debug_keys = public_keys.iter().fold(String::new(), |mut acc, (key_id, pub_key)| {
+                        let debug_key = format!("[id: {}, key_type: {}, purpose: {}, security_level: {}, contract_bounds: {}, read_only: {}, data: {}, disabled_at: {}]",
+                                                pub_key.id(), pub_key.key_type(), pub_key.purpose(), pub_key.security_level(),
+                                                pub_key.contract_bounds().map_or("None".to_string(), |b| match b {
+                                                    ContractBounds::SingleContract { id } => format!("SingleContract({})", id.to_buffer().to_hex()),
+                                                    ContractBounds::SingleContractDocumentType { id,  document_type_name} => format!("SingleContractDocumentType({}, {})", id.to_buffer().to_hex(), document_type_name),
+                                                }), pub_key.read_only(), pub_key.data().0.to_hex(), pub_key.disabled_at().map_or("None".to_string(), |p| p.to_string()));
+                        acc.push_str(format!("{}:{}", *key_id, debug_key).as_str());
+                        acc
+                    });
+                    println!("Ok::monitor_for_key_hashes -> key_hash: {}: identity: [id: {}, balance: {}, revision: {}, public_keys: {}]", key_hash.to_hex(), identity.balance(), identity.revision(), identity_id.to_buffer().to_hex(), debug_keys);
                     identities.insert(key_hash, identity);
                 },
                 Ok(None) => {
-                    println!("None::monitor_for_key_hashes -> key_hash: {}: identity_id: None", key_hash.to_hex());
+                    println!("None::monitor_for_key_hashes -> key_hash: {}: identity: None", key_hash.to_hex());
                 }
                 Err(error) => {
                     println!("Error::monitor_for_key_hashes -> key_hash: {}: error: {:?}", key_hash.to_hex(), error);

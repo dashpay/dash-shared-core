@@ -497,8 +497,14 @@ pub fn load_masternode_lists_for_files(
     let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain_type.clone());
     for file in files {
         let bytes = load_message(chain_type.identifier(), file.as_str());
-        let result = processor.mn_list_diff_result_from_message(&bytes, true, 70221, allow_invalid_merkle_roots, null())
-            .expect("Failed to process mnlistdiff");
+        match processor.mn_list_diff_result_from_message(&bytes, true, 70221, allow_invalid_merkle_roots, null()) {
+            Ok((base_block_hash, block_hash, has_added_rotated_quorums)) => {
+                println!("List {}..{} successfully processed", base_block_hash.to_hex(), block_hash.to_hex())
+            }
+            Err(err) => {
+                panic!("Should be valid result: {}", err);
+            }
+        }
     }
     true
 }

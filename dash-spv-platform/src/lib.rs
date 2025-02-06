@@ -30,10 +30,13 @@ use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dashcore::consensus::Decodable;
 use dashcore::Transaction;
+use data_contracts::SystemDataContract;
 use dpp::data_contract::{DataContract, DataContractFacade};
-use dpp::data_contract::accessors::v0::DataContractV0Getters;
+use dpp::data_contract::accessors::v0::{DataContractV0Getters, DataContractV0Setters};
+use dpp::data_contract::created_data_contract::CreatedDataContract;
 use dpp::data_contract::document_type::{DocumentType, DocumentTypeRef};
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
+use dpp::data_contracts;
 use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0, IdentityFacade, KeyID};
 use dpp::document::Document;
@@ -345,6 +348,22 @@ impl PlatformSDK {
     pub async fn data_contract_create(&self, owner_id: [u8; 32], nonce: u64, documents: Value, config: Option<Value>, definitions: Option<Value>, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
         println!("transition create contract call: {} -- {} -- {:?} -- {:?} -- {:?} -- {:?}", owner_id.to_hex(), nonce, documents, config, definitions, private_key);
         let created = self.contracts.create(Identifier::from(owner_id), nonce, documents, config, definitions).map_err(Error::from)?;
+        println!("transition create contract created.1: {:?}", created);
+        let transition = self.contracts.create_data_contract_create_transition(created)
+            .map_err(Error::from)?;
+        let signature = self.create_transition_signature(&transition, private_key)?;
+        self.sign_and_publish_transition(StateTransition::DataContractCreate(transition), signature.to_vec()).await
+    }
+    pub async fn data_contract_create2(&self, system_contract: SystemDataContract, owner_id: [u8; 32], nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("transition create contract call: {} -- {} -- {:?} ", owner_id.to_hex(), nonce, private_key);
+        let mut data_contract = self.contract_manager().load_system_contract(system_contract);
+        data_contract.set_owner_id(Identifier::from(owner_id));
+        let created = CreatedDataContract::from_contract_and_identity_nonce(
+            data_contract,
+            nonce,
+            self.sdk.version(),
+        ).map_err(Error::from)?;
+
         println!("transition create contract created.1: {:?}", created);
         let transition = self.contracts.create_data_contract_create_transition(created)
             .map_err(Error::from)?;

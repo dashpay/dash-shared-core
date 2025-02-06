@@ -25,6 +25,7 @@ dashcore = { git = "https://github.com/pankcuf/rust-dashcore", features = [
 ], default-features = false, branch = "feat/ferment" }
 dashcore-rpc = { git = "https://github.com/pankcuf/rust-dashcore-rpc", branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
+data-contracts = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "data-contracts" }
 dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }
 drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
 drive-proof-verifier = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive-proof-verifier" }

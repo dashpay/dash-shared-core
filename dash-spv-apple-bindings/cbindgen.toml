@@ -18,6 +18,7 @@ include = [
     "dash-spv-masternode-processor",
     "dash-spv-platform",
     "dash-sdk",
+    "data-contracts",
     "platform-value",
     "platform-version",
     # TODO: cbindgen fails with this crate for some reason so it doesn't expose opaque types
@@ -36,6 +37,7 @@ extra_bindings = [
     "dash-spv-masternode-processor",
     "dash-spv-platform",
     "dash-sdk",
+    "data-contracts",
     "platform-value",
     "platform-version",
     "dpp",

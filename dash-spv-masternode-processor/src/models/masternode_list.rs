@@ -283,8 +283,8 @@ impl MasternodeList {
     }
 
     pub fn usage_info(&self, previous_quarters: [&Vec<Vec<MasternodeEntry>>; 3], skip_removed_masternodes: bool, quorum_count: usize) -> (Vec<MasternodeEntry>, Vec<MasternodeEntry>, Vec<Vec<MasternodeEntry>>) {
-        let mut used_at_h_masternodes = Vec::<models::MasternodeEntry>::new();
-        let mut used_at_h_indexed_masternodes = vec![Vec::<models::MasternodeEntry>::new(); quorum_count];
+        let mut used_at_h_masternodes = Vec::<MasternodeEntry>::new();
+        let mut used_at_h_indexed_masternodes = vec![Vec::<MasternodeEntry>::new(); quorum_count];
         for i in 0..quorum_count {
             // for quarters h - c, h -2c, h -3c
             for quarter in &previous_quarters {
@@ -320,8 +320,18 @@ impl MasternodeList {
     }
 
     pub fn calculate_masternodes_merkle_root(&self, block_height: u32) -> Option<[u8; 32]> {
-        self.hashes_for_merkle_root(block_height).and_then(merkle_root_from_hashes)
+        self.hashes_for_merkle_root(block_height)
+            .and_then(merkle_root_from_hashes)
     }
+    pub fn calculate_masternodes_merkle_root_with_block_height_lookup<BL: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32>(
+        &self,
+        context: *const std::os::raw::c_void,
+        block_height_lookup: BL
+    ) -> Option<[u8; 32]> {
+        self.hashes_for_merkle_root_with_block_height_lookup(context, block_height_lookup)
+            .and_then(merkle_root_from_hashes)
+    }
+
     pub fn calculate_llmq_merkle_root(&self) -> Option<[u8; 32]> {
         merkle_root_from_hashes(self.hashes_for_quorum_merkle_root())
     }
@@ -345,6 +355,23 @@ impl MasternodeList {
                 .map(|hash| (&self.masternodes[hash]).entry_hash_at(block_height))
                 .collect::<Vec<_>>()
         })
+    }
+
+    pub fn hashes_for_merkle_root_with_block_height_lookup<BL: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32>(
+        &self,
+        context: *const std::os::raw::c_void,
+        block_height_lookup: BL
+    ) -> Option<Vec<[u8; 32]>> {
+        let pro_tx_hashes = self.provider_tx_ordered_hashes();
+        let block_height = block_height_lookup(context, self.block_hash);
+        if block_height == u32::MAX {
+            println!("Block height lookup queried an unknown block {}", self.block_hash.to_hex());
+            return None; //this should never happen
+        }
+        Some(pro_tx_hashes
+            .into_iter()
+            .map(|hash| (&self.masternodes[&hash]).entry_hash_at(block_height))
+            .collect::<Vec<_>>())
     }
 
     pub fn hashes_for_quorum_merkle_root(&self) -> Vec<[u8; 32]> {
@@ -504,16 +531,24 @@ pub fn from_entry_pool(
     masternodes: Vec<MasternodeEntry>,
     quorums: Vec<LLMQEntry>,
 ) -> MasternodeList {
-    let masternodes = masternodes.into_iter().map(|entry| (entry.provider_registration_transaction_hash.reversed(), entry)).collect();
-    let quorums = quorums.iter().fold(BTreeMap::new(), |mut acc, entry| {
-        acc.entry(entry.llmq_type.clone())
-            .or_insert_with(BTreeMap::new)
-            .insert(entry.llmq_hash, entry.clone());
-        acc
-    });
+    let masternodes = masternode_vec_to_map(masternodes);
+    let quorums = quorum_vec_to_map(quorums);
     let list = MasternodeList::with_merkle_roots(masternodes, quorums, block_hash, block_height, mn_merkle_root, llmq_merkle_root);
     //println!("from_entry_pool: {}", list.format());
     list
+}
+
+pub fn quorum_vec_to_map(vec: Vec<LLMQEntry>) -> BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>> {
+    vec.into_iter()
+        .fold(BTreeMap::new(), |mut acc, entry| {
+            acc.entry(entry.llmq_type.clone())
+                .or_insert_with(BTreeMap::new)
+                .insert(entry.llmq_hash, entry);
+            acc
+        })
+}
+pub fn masternode_vec_to_map(vec: Vec<MasternodeEntry>) -> BTreeMap<[u8; 32], MasternodeEntry> {
+    vec.into_iter().map(|entry| (entry.provider_registration_transaction_hash.reversed(), entry)).collect()
 }
 
 pub fn score_masternodes_map(

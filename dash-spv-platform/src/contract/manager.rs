@@ -3,7 +3,7 @@ use std::sync::Arc;
 use dash_sdk::{platform::Fetch, Sdk};
 use dpp::data_contract::accessors::v0::DataContractV0Getters;
 use dpp::data_contract::{DataContract, DocumentName};
-use dpp::data_contracts::SystemDataContract;
+use data_contracts::SystemDataContract;
 use dpp::serialization::PlatformSerializableWithPlatformVersion;
 #[cfg(feature = "state-transitions")]
 use dpp::state_transition::state_transitions::contract::data_contract_create_transition::DataContractCreateTransition;
@@ -42,13 +42,15 @@ impl ContractsManager {
         contract.hash(self.sdk_ref().version())
             .map_err(Error::from)
     }
-    pub fn load_dashpay_contract(&self) -> DataContract {
-        load_system_data_contract(SystemDataContract::Dashpay, self.sdk.version())
+    pub fn load_system_contract(&self, contract: SystemDataContract) -> DataContract {
+        load_system_data_contract(contract, self.sdk.version())
             .expect("Dashpay contract should be loaded")
     }
+    pub fn load_dashpay_contract(&self) -> DataContract {
+        self.load_system_contract(SystemDataContract::Dashpay)
+    }
     pub fn load_dpns_contract(&self) -> DataContract {
-        load_system_data_contract(SystemDataContract::DPNS, self.sdk.version())
-            .expect("DPNS contract should be loaded")
+        self.load_system_contract(SystemDataContract::DPNS)
     }
     pub async fn fetch_contract_by_id_bytes(&self, id_bytes: [u8; 32]) -> Result<Option<DataContract>, Error> {
         self.fetch_contract_by_id(Identifier::from(id_bytes)).await
