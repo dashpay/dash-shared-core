@@ -5,7 +5,6 @@ use crate::messages::coinjoin_message::CoinJoinMessageType;
 // senddsq
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
 pub struct SendCoinJoinQueue {
     pub send: bool,
 }

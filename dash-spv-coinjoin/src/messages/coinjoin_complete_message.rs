@@ -6,7 +6,6 @@ use crate::messages::coinjoin_message::CoinJoinMessageType;
 // dsc
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
 pub struct CoinJoinCompleteMessage {
     pub msg_session_id: i32,
     pub msg_message_id: PoolMessage,

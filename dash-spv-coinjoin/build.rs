@@ -1,18 +1,19 @@
 extern crate cbindgen;
-extern crate ferment;
 
-use std::process::Command;
+use std::env;
 
 fn main() {
-    match ferment::Builder::new()
-        .with_crates(vec![])
-        .generate() {
-        Ok(()) => match Command::new("cbindgen")
-            .args(&["--config", "cbindgen.toml", "-o", "target/example.h"])
-            .status() {
-            Ok(status) => println!("Bindings generated into target/example.h with status: {status}"),
-            Err(err) => panic!("Can't generate bindings: {}", err)
-        }
-        Err(err) => panic!("Can't create FFI expansion: {}", err)
-    }
+    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let mut config = cbindgen::Config::from_file("./cbindgen.toml").expect("Error config");
+    let includes = vec![];
+    config.language = cbindgen::Language::C;
+    config.parse = cbindgen::ParseConfig {
+        parse_deps: true,
+        include: Some(includes.clone()),
+        extra_bindings: includes,
+        ..Default::default()
+    };
+    cbindgen::generate_with_config(&crate_dir, config)
+        .unwrap()
+        .write_to_file("target/dash_spv_coinjoin.h");
 }

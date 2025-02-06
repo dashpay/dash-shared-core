@@ -19,7 +19,6 @@ use crate::constants::COINJOIN_QUEUE_TIMEOUT;
 // A currently in progress mixing merge and denomination information
 // #[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq)]
-// #[ferment_macro::export]
 pub struct CoinJoinQueueMessage {
     pub denomination: u32,
     pub pro_tx_hash: UInt256,

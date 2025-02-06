@@ -3,7 +3,6 @@ use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_masternode_processor::consensus::encode;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
-// #[ferment_macro::export]
 pub struct TxOutPoint {
     pub hash: UInt256,
     pub index: u32,

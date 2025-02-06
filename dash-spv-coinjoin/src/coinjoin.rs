@@ -4,10 +4,10 @@ use dash_spv_masternode_processor::chain::common::ChainType;
 use dash_spv_masternode_processor::chain::params::DUFFS;
 use dash_spv_masternode_processor::common::Block;
 use dash_spv_masternode_processor::crypto::byte_util::UInt256;
+use dash_spv_masternode_processor::ffi::boxer::boxed;
 use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::tx::transaction::Transaction;
 use dash_spv_masternode_processor::util::script::ScriptType;
-use ferment_interfaces::boxed;
 use logging::*;
 use tracing::{info, warn, debug};
 use crate::ffi::callbacks::{GetInputValueByPrevoutHash, HasChainLock, DestroyInputValue};
@@ -19,7 +19,6 @@ use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
 use crate::utils::coin_format::CoinFormat;
 
 #[derive(Debug)]
-// #[ferment_macro::export]
 pub struct CoinJoin {
     pub opaque_context: *const std::ffi::c_void,
     pub get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,

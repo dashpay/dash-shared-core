@@ -1,9 +1,9 @@
 use std::ffi::c_void;
 use std::{collections::HashMap, io::Cursor};
+use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
 use dash_spv_masternode_processor::types;
 use dash_spv_masternode_processor::{hashes::hex::FromHex, consensus::Decodable};
 use dash_spv_masternode_processor::tx::transaction::Transaction;
-use ferment_interfaces::unbox_any;
 
 use crate::ffi::input_value::InputValue;
 use crate::coinjoin::CoinJoin;

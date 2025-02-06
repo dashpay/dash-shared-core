@@ -13,15 +13,12 @@ test-helpers = []
 
 [dependencies]
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
-ferment-interfaces = { path = "../../ferment/ferment-interfaces" }
-ferment-macro = { path = "../../ferment/ferment-macro" }
 logging = { path = "../logging" }
 byte = "0.2"
 tracing = "0.1.40"
 
 [build-dependencies]
 cbindgen = "0.24.3"
-ferment = { path = "../../ferment/ferment" }
 
 [lib]
 name = "dash_spv_coinjoin"

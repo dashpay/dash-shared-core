@@ -8,7 +8,6 @@ use crate::messages::coinjoin_message::CoinJoinMessageType;
 // A client's transaction in the mixing pool
 // #[repr(C)]
 #[derive(Clone, Debug)]
-// #[ferment_macro::export]
 pub struct CoinJoinEntry {
     pub mixing_inputs: Vec<TransactionInput>,
     pub mixing_outputs: Vec<TransactionOutput>,

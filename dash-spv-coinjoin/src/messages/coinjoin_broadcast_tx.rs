@@ -14,7 +14,6 @@ use crate::messages::coinjoin_message::CoinJoinMessageType;
 // dstx
 // #[repr(C)]
 #[derive(Clone, Debug)]
-// #[ferment_macro::export]
 pub struct CoinJoinBroadcastTx {
     pub tx: Transaction,
     pub pro_tx_hash: UInt256,

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::{from::FromFFI, unboxer::unbox_any}, models::MasternodeEntry};
-use ferment_interfaces::boxed;
+use dash_spv_masternode_processor::{common::SocketAddress, crypto::UInt256, ffi::{boxer::boxed, from::FromFFI, unboxer::unbox_any}, models::MasternodeEntry};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, info, warn};
 use logging::*;

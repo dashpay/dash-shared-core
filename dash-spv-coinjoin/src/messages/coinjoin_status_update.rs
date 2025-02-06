@@ -9,7 +9,6 @@ use crate::messages::coinjoin_message::CoinJoinMessageType;
 // dssu
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[ferment_macro::export]
 pub struct CoinJoinStatusUpdate {
     pub session_id: i32,
     pub pool_state: PoolState,

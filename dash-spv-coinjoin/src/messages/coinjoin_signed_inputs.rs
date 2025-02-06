@@ -6,7 +6,6 @@ use crate::messages::coinjoin_message::CoinJoinMessageType;
 // dss
 // #[repr(C)]
 #[derive(Clone, Debug)]
-// #[ferment_macro::export]
 pub struct CoinJoinSignedInputs {
     pub inputs: Vec<TransactionInput>,
 }
