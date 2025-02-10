@@ -44,7 +44,7 @@ use dash_spv_masternode_processor::processing::{MasternodeProcessor, MasternodeP
 use dash_spv_platform::PlatformSDK;
 use platform_value::{BinaryData, Identifier};
 use dash_spv_crypto::crypto::byte_util::Reversed;
-use dash_spv_masternode_processor::models::sync_state::SyncState;
+use dash_spv_masternode_processor::models::sync_state::CacheState;
 use dash_spv_platform::cache::PlatformCache;
 use crate::ffi_core_provider::FFICoreProvider;
 
@@ -73,14 +73,14 @@ impl DashSPVCore {
         LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         INS: Fn(*const std::os::raw::c_void, [u8; 32]) + Send + Sync + 'static,
         CLSBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 96], CoreProviderError> + Send + Sync + 'static,
-        SML: Fn(*const std::os::raw::c_void, Arc<MasternodeList>, BTreeMap<[u8; 32], MasternodeEntry>) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
-        LML: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<Arc<MasternodeList>, CoreProviderError> + Send + Sync + 'static,
+        SML: Fn(*const std::os::raw::c_void, [u8; 32], BTreeMap<[u8; 32], MasternodeEntry>) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
+        LML: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MasternodeList, CoreProviderError> + Send + Sync + 'static,
         SLS: Fn(*const std::os::raw::c_void, [u8; 32], LLMQSnapshot) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
         LLS: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<LLMQSnapshot, CoreProviderError> + Send + Sync + 'static,
         UMU: Fn(*const std::os::raw::c_void, Vec<MasternodeEntry>) + Send + Sync + 'static,
         RRIR: Fn(*const std::os::raw::c_void, bool, [u8; 32], [u8; 32]) -> bool + Send + Sync + 'static,
         IWMLFP: Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void) + Send + Sync + 'static,
-        NSS: Fn(*const std::os::raw::c_void, SyncState) + Send + Sync + 'static,
+        NSS: Fn(*const std::os::raw::c_void, CacheState) + Send + Sync + 'static,
         DML: Fn(*const std::os::raw::c_void, bool) + Send + Sync + 'static,
     >(
         chain_type: ChainType,
@@ -130,7 +130,7 @@ impl DashSPVCore {
             notify_sync_state,
             dequeue_masternode_list,
             context));
-        let processor = MasternodeProcessor::new(provider, Arc::new(MasternodeProcessorCache::default()));
+        let processor = MasternodeProcessor::new(provider.clone(), Arc::new(MasternodeProcessorCache::new(provider)));
         let processor_arc = Arc::new(processor);
         let processor_arc_clone = Arc::clone(&processor_arc);
         let get_quorum_public_key = Arc::new(move |llmq_type: u32, llmq_hash: [u8; 32], core_chain_locked_height: u32| {

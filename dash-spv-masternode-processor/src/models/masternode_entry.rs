@@ -355,6 +355,10 @@ impl MasternodeEntry {
 
 #[ferment_macro::export]
 impl MasternodeEntry {
+
+    // pub fn entry_hash_by_pro_reg_tx_hash(&self, hash: [u8; 32]) -> Option<[u8; 32]> {
+    //     self.previous_entry_hashes.iter().find(|(block, used_hash)| hash.eq(used_hash).then_some(used_hash))
+    // }
     pub fn entry_hash_at(&self, block_height: u32) -> [u8; 32] {
         if self.previous_entry_hashes.is_empty() || block_height == u32::MAX {
             return self.entry_hash;
@@ -417,6 +421,9 @@ impl MasternodeEntry {
     }
     pub fn unique_id(&self) -> String {
         short_hex_string_from(&self.provider_registration_transaction_hash)
+    }
+    pub fn print_description(&self) {
+        println!("{}", self);
     }
     pub fn confirmed_hash_hashed_with_pro_reg_tx_hash_at(
         &self,
@@ -484,13 +491,65 @@ impl MasternodeEntry {
         address::address::from_hash160_for_script_map(&self.platform_node_id, &script_map)
     }
 
-//     pub fn merged_with_old_entry(&mut self, entry: &MasternodeEntry, block_height: u32) {
-//
-//     }
-//
-//     pub fn merge_previous_fields(&self, ) {
-//
-//     }
+    pub fn is_equal_to_entry(&self, other: MasternodeEntry) -> bool {
+        other.eq(self)
+    }
+
+    pub fn entry_hashes_are_equal_to_hashes(&self, hashes: Vec<[u8; 32]>) -> bool {
+        self.previous_entry_hashes.values().eq(&hashes)
+    }
+    pub fn entry_hashes_are_equal_to_hash(&self, hash: [u8; 32]) -> bool {
+        self.previous_entry_hashes.values().eq(&[hash])
+    }
+
+    pub fn merged_with_new_entry(&mut self, entry: &MasternodeEntry, block_height: u32) {
+        if self.update_height < block_height {
+            self.update_height = entry.update_height;
+            if !self.socket_address.eq(&entry.socket_address) {
+                self.socket_address = entry.socket_address.clone();
+            }
+            if !self.confirmed_hash.eq(&entry.confirmed_hash) {
+                self.confirmed_hash = entry.confirmed_hash;
+                self.known_confirmed_at_height = entry.known_confirmed_at_height;
+            }
+            if !self.key_id_voting.eq(&entry.key_id_voting) {
+                self.key_id_voting = entry.key_id_voting;
+            }
+            if !self.operator_public_key.eq(&entry.operator_public_key) {
+                self.operator_public_key = entry.operator_public_key.clone();
+            }
+            if self.is_valid != entry.is_valid {
+                self.is_valid = entry.is_valid;
+            }
+            self.entry_hash = entry.entry_hash;
+            self.merge_previous_fields(entry, block_height);
+        }
+        else if block_height < self.update_height {
+            self.merge_previous_fields(entry, block_height);
+        }
+    }
+
+    pub fn merge_previous_fields(&mut self, entry: &MasternodeEntry, block_height: u32) {
+        let MasternodeEntry { previous_entry_hashes, previous_operator_public_keys, previous_validity, .. } = entry;
+        if !entry.previous_entry_hashes.is_empty() {
+            self.previous_entry_hashes.extend(entry.previous_entry_hashes.clone());
+        }
+        if !entry.previous_operator_public_keys.is_empty() {
+            self.previous_operator_public_keys.extend(entry.previous_operator_public_keys.clone());
+        }
+        if !entry.previous_validity.is_empty() {
+            self.previous_validity.extend(entry.previous_validity.clone());
+        }
+
+        if !self.confirmed_hash.is_zero() && !entry.confirmed_hash.is_zero() {
+            if let Some(self_confirmed_height) = self.known_confirmed_at_height {
+                if self_confirmed_height > block_height {
+                    //we now know it was confirmed earlier so update to earlier
+                    self.known_confirmed_at_height = Some(block_height);
+                }
+            }
+        }
+    }
 }
 
 pub fn calculate_entry_hash(

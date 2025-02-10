@@ -229,6 +229,7 @@ impl MNListDiff {
             }
         }
 
+
         Ok(Self {
             base_block_hash,
             block_hash,

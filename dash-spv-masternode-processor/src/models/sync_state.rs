@@ -1,6 +1,6 @@
 
 #[ferment_macro::export]
-pub enum SyncState {
+pub enum CacheState {
     QueueChanged {
         count: usize,
         max_amount: usize,
@@ -8,10 +8,14 @@ pub enum SyncState {
     StoreChanged {
         count: usize,
         last_block_height: u32
-    }
+    },
+    StubCount {
+        count: usize
+    },
+
 }
 
-impl SyncState {
+impl CacheState {
     pub fn queue(count: usize, max_amount: usize) -> Self {
         Self::QueueChanged { count, max_amount }
     }

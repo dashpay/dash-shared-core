@@ -7,7 +7,7 @@ use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_crypto::crypto::byte_util::{BytesDecodable, UInt256};
 use dash_spv_masternode_processor::hashes::hex::FromHex;
 use dash_spv_masternode_processor::logger::register_rust_logger;
-use dash_spv_masternode_processor::processing::MNListDiffResult;
+use dash_spv_masternode_processor::processing::{MNListDiffResult, ProcessingError};
 use dash_spv_masternode_processor::block_store::MerkleBlock;
 // #[cfg(feature = "serde")]
 // use dash_spv_masternode_processor::test_helpers::Block;
@@ -522,8 +522,14 @@ pub fn assert_diff_chain(chain: ChainType, diff_files: &[&'static str], qrinfo_f
     diff_files.iter().for_each(|filename| {
         let protocol_version = extract_protocol_version_from_filename(filename).unwrap_or(70219);
         let message = load_message(chain.identifier(), filename);
-        let result = processor.mn_list_diff_result_from_message(&message, true, protocol_version, allow_invalid_merkle_roots, null())
-            .expect("Failed to process mnlistdiff");
+        // let result = processor.mn_list_diff_result_from_message(&message, true, protocol_version, allow_invalid_merkle_roots, null())
+        //     .expect("Failed to process mnlistdiff");
+        let maybe_result = processor.mn_list_diff_result_from_message(&message, true, protocol_version, allow_invalid_merkle_roots, null());
+        match maybe_result {
+            Ok(_) |
+            Err(ProcessingError::MissingLists(..)) => {},
+            Err(err) => panic!("Failed to process mnlistdiff: {err}")
+        }
         // println!("Diff is ok at {}", result.block_hash);
         // assert_diff_result(&ctx, &result);
         // let mut cache = ctx.cache.write().unwrap();

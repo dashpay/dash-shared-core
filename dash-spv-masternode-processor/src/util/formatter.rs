@@ -20,6 +20,23 @@ impl CustomFormatter for BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>> {
         })
     }
 }
+impl CustomFormatter for Vec<LLMQEntry> {
+    fn format(&self) -> String {
+        self.iter().fold(String::new(), |mut acc, entry| {
+            acc.push_str(&format!("\t{}:\n", entry));
+            acc
+        })
+    }
+}
+impl CustomFormatter for BTreeMap<LLMQType, Vec<[u8; 32]>> {
+    fn format(&self) -> String {
+        self.iter().fold(String::new(), |mut acc, (llmq_type, hashes)| {
+            acc.push_str(&format!("\t{}:\n", llmq_type));
+            acc.push_str(&format!("\t{}:\n", hashes.format()));
+            acc
+        })
+    }
+}
 impl CustomFormatter for BTreeMap<[u8; 32], MasternodeEntry> {
     fn format(&self) -> String {
         self.iter().fold(String::new(), |mut acc, (h, node)| {
@@ -57,7 +74,7 @@ impl CustomFormatter for Vec<[u8; 32]> {
 impl CustomFormatter for HashSet<[u8; 32]> {
     fn format(&self) -> String {
         self.iter().fold(String::new(), |mut acc, node| {
-            acc.push_str(&format!("{}\n", node.to_hex()));
+            acc.push_str(&format!("\t{}\n", node.to_hex()));
             acc
         })
     }

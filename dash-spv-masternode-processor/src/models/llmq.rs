@@ -5,12 +5,12 @@ use hashes::hex::ToHex;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_crypto::keys::BLSKey;
-use dash_spv_crypto::llmq::entry::LLMQEntry;
+use dash_spv_crypto::llmq::entry::{LLMQEntry, LLMQEntryVerificationSkipStatus, LLMQEntryVerificationStatus};
+use dash_spv_crypto::llmq::status::{LLMQValidationError, LLMQPayloadValidationStatus};
 use dash_spv_crypto::llmq::modifier::LLMQModifierType;
 use crate::models::masternode_list::score_masternodes_map;
 use crate::models::MasternodeEntry;
 use crate::processing::core_provider::CoreProviderError;
-use crate::processing::llmq_validation_status::{LLMQValidationError, LLMQPayloadValidationStatus};
 
 #[derive(PartialEq)]
 pub enum LLMQVerificationContext {
@@ -33,13 +33,19 @@ impl LLMQVerificationContext {
     pub fn should_validate_quorums(&self) -> bool {
         *self != Self::None
     }
-    pub fn should_validate_quorum_of_type(&self, llmq_type: LLMQType, chain_type: ChainType) -> bool {
+    pub fn has_reason_to_skip_validation(&self, llmq_type: LLMQType, chain_type: ChainType, block_height: u32) -> Option<LLMQEntryVerificationSkipStatus> {
         match self {
-            LLMQVerificationContext::MNListDiff =>
-                chain_type.isd_llmq_type() != llmq_type && chain_type.should_process_llmq_of_type(llmq_type),
-            LLMQVerificationContext::QRInfo(true) =>
-                chain_type.isd_llmq_type() == llmq_type,
-            _ => false
+            LLMQVerificationContext::QRInfo(true) if !chain_type.isd_llmq_type().eq(&llmq_type) =>
+                Some(LLMQEntryVerificationSkipStatus::OtherContext(format!("Non-rotated LLMQ in {self} ({block_height})"))),
+            LLMQVerificationContext::QRInfo(false) =>
+                Some(LLMQEntryVerificationSkipStatus::OtherContext(format!("Rotated llmq aren't activated yet ({block_height} {self})"))),
+            LLMQVerificationContext::MNListDiff if chain_type.isd_llmq_type().eq(&llmq_type) =>
+                Some(LLMQEntryVerificationSkipStatus::OtherContext(format!("Rotated llmq in {self} ({block_height})"))),
+            LLMQVerificationContext::MNListDiff if !chain_type.should_process_llmq_of_type(llmq_type) =>
+                Some(LLMQEntryVerificationSkipStatus::OtherContext(format!("Unappropriated llmq in {self} ({block_height})"))),
+            LLMQVerificationContext::None =>
+                Some(LLMQEntryVerificationSkipStatus::OtherContext(format!("{self} ({block_height})"))),
+            _ => None
         }
     }
 }
@@ -69,6 +75,7 @@ pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, 
     );
     if !all_commitment_aggregated_signature_validated {
         warn!("INVALID AGGREGATED SIGNATURE {block_height} {} {} {} masternodes: {valid_masternodes_count}, keys: {operator_keys_count}", entry.llmq_type, entry.llmq_hash.to_hex(), entry.all_commitment_aggregated_signature.to_hex());
+        entry.verified = LLMQEntryVerificationStatus::Invalid(LLMQValidationError::InvalidAggregatedSignature);
         return Err(CoreProviderError::QuorumValidation(LLMQValidationError::InvalidAggregatedSignature));
     }
     // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
@@ -81,7 +88,8 @@ pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, 
     );
     if !quorum_signature_validated {
         warn!("INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, entry.llmq_type, entry.threshold_signature.to_hex());
-        return  Err(CoreProviderError::QuorumValidation(LLMQValidationError::InvalidQuorumSignature));
+        entry.verified = LLMQEntryVerificationStatus::Invalid(LLMQValidationError::InvalidQuorumSignature);
+        return Err(CoreProviderError::QuorumValidation(LLMQValidationError::InvalidQuorumSignature));
     }
     println!("LLMQ of {} at {block_height}: {} verified", entry.llmq_type, entry.llmq_hash.to_hex());
     Ok(())

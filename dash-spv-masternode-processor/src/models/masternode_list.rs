@@ -1,14 +1,13 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::sync::Arc;
 use hashes::hex::ToHex;
 use dash_spv_crypto::blake3;
 use dash_spv_crypto::crypto::byte_util::{sup, Reversed};
-use dash_spv_crypto::llmq::entry::LLMQEntry;
+use dash_spv_crypto::llmq::entry::{LLMQEntry, LLMQEntryVerificationStatus};
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_crypto::tx::CoinbaseTransaction;
 use dash_spv_crypto::util::data_ops::merkle_root_from_hashes;
-use crate::{models, models::masternode_entry::MasternodeEntry};
+use crate::models::masternode_entry::MasternodeEntry;
 use crate::common::SocketAddress;
 use crate::util::formatter::CustomFormatter;
 
@@ -92,119 +91,26 @@ impl MasternodeList {
         }
     }
 
-    pub fn merged_with_old_list(&self, masternode_list: Arc<MasternodeList>, height: u32) {
-        self.masternodes.iter().for_each(|(pro_tx_hash, node)| {
-            if let Some(old_entry) = masternode_list.masternodes.get(pro_tx_hash) {
-                let mut mn_diff = String::new();
-                if !node.mn_type.eq(&old_entry.mn_type) {
-                    mn_diff.push_str(&format!("{} --> {}\n", old_entry.mn_type, node.mn_type));
-                }
-                if !node.socket_address.eq(&old_entry.socket_address) {
-                    mn_diff.push_str(&format!("{}:{} --> {}:{}\n", old_entry.socket_address.ip_address.to_hex(), old_entry.socket_address.port, node.socket_address.ip_address.to_hex(), node.socket_address.port));
-                }
-                if node.is_valid != old_entry.is_valid {
-                    mn_diff.push_str(&format!("valid: {} --> {}\n", old_entry.is_valid, node.is_valid));
-                }
-                if node.update_height != old_entry.update_height {
-                    mn_diff.push_str(&format!("update_height: {} --> {}\n", old_entry.update_height, node.update_height));
-                }
-                if node.known_confirmed_at_height != old_entry.known_confirmed_at_height {
-                    mn_diff.push_str(&format!("confirmed_at_height: {} --> {}\n", old_entry.known_confirmed_at_height.unwrap_or_default(), node.known_confirmed_at_height.unwrap_or_default()));
-                }
-                if !node.provider_registration_transaction_hash.eq(&old_entry.provider_registration_transaction_hash) {
-                    mn_diff.push_str(&format!("pro_reg_tx_hash: {} --> {}\n", old_entry.provider_registration_transaction_hash.to_hex(), node.provider_registration_transaction_hash.to_hex()));
-                }
-                if !node.operator_public_key.eq(&old_entry.operator_public_key) {
-                    mn_diff.push_str(&format!("pk: v{} {} --> v{} {}\n", old_entry.operator_public_key.version, old_entry.operator_public_key.data.to_hex(), node.operator_public_key.version, node.operator_public_key.data.to_hex()));
-                }
-                if !node.key_id_voting.eq(&old_entry.key_id_voting) {
-                    mn_diff.push_str(&format!("key_id: {} --> {}\n", old_entry.key_id_voting.to_hex(), node.key_id_voting.to_hex()));
-                }
-                if !node.platform_node_id.eq(&old_entry.platform_node_id) {
-                    mn_diff.push_str(&format!("evo_node_id: {} --> {}\n", old_entry.platform_node_id.to_hex(), node.platform_node_id.to_hex()));
-                }
-                if !node.confirmed_hash.eq(&old_entry.confirmed_hash) {
-                    mn_diff.push_str(&format!("confirmed_hash: {} --> {}\n", old_entry.confirmed_hash.to_hex(), node.confirmed_hash.to_hex()));
-                }
-                if !node.entry_hash.eq(&old_entry.entry_hash) {
-                    mn_diff.push_str(&format!("entry_hash: {} --> {}\n", old_entry.entry_hash.to_hex(), node.entry_hash.to_hex()));
-                }
-                if node.platform_http_port != old_entry.platform_http_port {
-                    mn_diff.push_str(&format!("platform_http_port: {} --> {}\n", old_entry.platform_http_port, node.platform_http_port));
-                }
-                if node.confirmed_hash_hashed_with_provider_registration_transaction_hash != old_entry.confirmed_hash_hashed_with_provider_registration_transaction_hash {
-                    mn_diff.push_str(&format!("confirmed_hash_hashed_with_provider_registration_transaction_hash: {} --> {}\n", old_entry.confirmed_hash_hashed_with_provider_registration_transaction_hash.map(|h| h.to_hex()).unwrap_or("".to_string()), node.confirmed_hash_hashed_with_provider_registration_transaction_hash.map(|h| h.to_hex()).unwrap_or("".to_string())));
-                }
-                let node_prev_keys = models::masternode_entry::previous_operator_public_keys_to_string(&node.previous_operator_public_keys);
-                let old_prev_keys = models::masternode_entry::previous_operator_public_keys_to_string(&old_entry.previous_operator_public_keys);
-                if !node_prev_keys.eq(&old_prev_keys) {
-                    mn_diff.push_str(&format!("prev pk: {} --> {}\n", old_prev_keys, node_prev_keys));
-                }
-                let node_prev_eh = models::masternode_entry::previous_entry_hashes_to_string(&node.previous_entry_hashes);
-                let old_prev_eh = models::masternode_entry::previous_entry_hashes_to_string(&old_entry.previous_entry_hashes);
-                if !node_prev_eh.eq(&old_prev_eh) {
-                    mn_diff.push_str(&format!("prev entry_hashes: {} --> {}\n", old_prev_eh, node_prev_eh));
-                }
-                let node_prev_val = models::masternode_entry::previous_validity_to_string(&node.previous_validity);
-                let old_prev_val = models::masternode_entry::previous_validity_to_string(&old_entry.previous_validity);
-                if !node_prev_val.eq(&old_prev_val) {
-                    mn_diff.push_str(&format!("prev validity: {} --> {}\n", old_prev_val, node_prev_val));
-                }
-                if !mn_diff.is_empty() {
-                    println!("MN diff:\n{}\n\t", mn_diff);
-                }
-            }
-        });
-        self.quorums.iter().for_each(|(llmq_type, map)| {
-            if let Some(old_quorums_of_type) = masternode_list.quorums.get(llmq_type) {
-                map.iter().for_each(|(llmq_hash, entry)| {
-                    if let Some(old_entry) = old_quorums_of_type.get(llmq_hash) {
-                        let mut diff = String::new();
-                        if entry.version != old_entry.version {
-                            diff.push_str(&format!("version: {} --> {}\n", old_entry.version.index(), entry.version.index()));
-                        }
-                        if !entry.llmq_hash.eq(&old_entry.llmq_hash) {
-                            diff.push_str(&format!("llmq_hash: {} --> {}\n", old_entry.llmq_hash.to_hex(), entry.llmq_hash.to_hex()));
-                        }
-                        if !entry.index.eq(&old_entry.index) {
-                            diff.push_str(&format!("index: {} --> {}\n", old_entry.index, entry.index));
-                        }
-                        if !entry.public_key.eq(&old_entry.public_key) {
-                            diff.push_str(&format!("pk: {} --> {}\n", old_entry.public_key.to_hex(), entry.public_key.to_hex()));
-                        }
-                        if !entry.threshold_signature.eq(&old_entry.threshold_signature) {
-                            diff.push_str(&format!("ts: {} --> {}\n", old_entry.threshold_signature.to_hex(), entry.threshold_signature.to_hex()));
-                        }
-                        if !entry.verification_vector_hash.eq(&old_entry.verification_vector_hash) {
-                            diff.push_str(&format!("vv: {} --> {}\n", old_entry.verification_vector_hash.to_hex(), entry.verification_vector_hash.to_hex()));
-                        }
-                        if !entry.all_commitment_aggregated_signature.eq(&old_entry.all_commitment_aggregated_signature) {
-                            diff.push_str(&format!("asig: {} --> {}\n", old_entry.all_commitment_aggregated_signature.to_hex(), entry.all_commitment_aggregated_signature.to_hex()));
-                        }
-                        if !entry.all_commitment_aggregated_signature.eq(&old_entry.all_commitment_aggregated_signature) {
-                            diff.push_str(&format!("asig: {} --> {}\n", old_entry.all_commitment_aggregated_signature.to_hex(), entry.all_commitment_aggregated_signature.to_hex()));
-                        }
-                        if !entry.signers.eq(&old_entry.signers) {
-                            diff.push_str(&format!("signers: {}::{} --> {}::{}\n", old_entry.signers.count, old_entry.signers.bitset.to_hex(), entry.signers.count, entry.signers.bitset.to_hex()));
-                        }
-                        if !entry.valid_members.eq(&old_entry.valid_members) {
-                            diff.push_str(&format!("valid_members: {}::{} --> {}::{}\n", old_entry.valid_members.count, old_entry.valid_members.bitset.to_hex(), entry.valid_members.count, entry.valid_members.bitset.to_hex()));
-                        }
-                        if !entry.entry_hash.eq(&old_entry.entry_hash) {
-                            diff.push_str(&format!("entry_hash: {} --> {}\n", old_entry.entry_hash.to_hex(), entry.entry_hash.to_hex()));
-                        }
-                        if !entry.commitment_hash.eq(&old_entry.commitment_hash) {
-                            diff.push_str(&format!("entry_hash: {} --> {}\n", old_entry.commitment_hash.map(|h|h.to_hex()).unwrap_or("None".to_string()), entry.commitment_hash.map(|h|h.to_hex()).unwrap_or("None".to_string())));
-                        }
-                        if !diff.is_empty() {
-                            println!("LLMQ diff:\n{}\n\t", diff);
-                        }
-                    }
-                });
-            }
-        });
+    pub fn short_description(&self) -> String {
+        format!("\t\t{}: {}:\n\t\t\tmn: \n\t\t\t\troot: {}\n\t\t\t\tcount: {}\n\t\t\tllmq:\n\t\t\t\troot: {}\n\t\t\t\tdesc:\n{}\n",
+                self.known_height,
+                self.block_hash.to_hex(),
+                self.masternode_merkle_root.map_or("None".to_string(), |r| r.to_hex()),
+                self.masternode_count(),
+                self.llmq_merkle_root.map_or("None".to_string(), |r| r.to_hex()),
+                self.quorums_short_description())
     }
 
+    pub fn quorums_short_description(&self) -> String {
+        self.quorums.iter().fold(String::new(), |mut acc, (ty, map)| {
+            let s = map.iter().fold(String::new(), |mut acc, (hash, q)| {
+                acc.push_str(format!("\t\t\t{}: {}\n", q.llmq_hash_hex(), q.verified).as_str());
+                acc
+            });
+            acc.push_str(format!("\t\t{ty}: \n{s}").as_str());
+            acc
+        })
+    }
 
     pub fn has_valid_mn_list_root(&self, tx: &CoinbaseTransaction) -> bool {
         // we need to check that the coinbase is in the transaction hashes we got back
@@ -419,13 +325,13 @@ impl MasternodeList {
     pub fn has_unverified_rotated_quorums(&self, chain_type: ChainType) -> bool {
         let isd_llmq_type = chain_type.isd_llmq_type();
         self.quorums.get(&isd_llmq_type)
-            .map(|q| q.values().any(|llmq| !llmq.verified))
+            .map(|q| q.values().any(|llmq| llmq.verified != LLMQEntryVerificationStatus::Verified))
             .unwrap_or(false)
     }
     pub fn has_unverified_regular_quorums(&self, chain_type: ChainType) -> bool {
         let isd_llmq_type = chain_type.isd_llmq_type();
         self.quorums.get(&isd_llmq_type)
-            .map(|q| q.values().any(|llmq| !llmq.verified))
+            .map(|q| q.values().any(|llmq| llmq.verified != LLMQEntryVerificationStatus::Verified))
             .unwrap_or(false)
     }
 
@@ -480,7 +386,8 @@ impl MasternodeList {
     }
     pub fn provider_tx_ordered_hashes(&self) -> Vec<[u8; 32]> {
         let mut vec = Vec::from_iter(self.masternodes.keys().cloned());
-        vec.sort_by(|hash1, hash2| if sup(*hash1, hash2) { Ordering::Less } else { Ordering::Greater });
+        vec.sort_by(|hash1, hash2| if sup(*hash1, hash2) { Ordering::Greater } else { Ordering::Less });
+        // vec.sort_by(|hash1, hash2| if sup(*hash1, hash2) { Ordering::Less } else { Ordering::Greater });
         vec
     }
     pub fn reversed_pro_reg_tx_hashes_cloned(&self) -> Vec<[u8; 32]> {
@@ -492,6 +399,14 @@ impl MasternodeList {
     pub fn compare_provider_tx_ordered_hashes(&self, list: MasternodeList) -> bool {
         let list_hashes = list.provider_tx_ordered_hashes();
         self.provider_tx_ordered_hashes().eq(&list_hashes)
+    }
+
+    pub fn compare_masternodes(&self, list: MasternodeList) -> bool {
+        let mut vec1 = Vec::from_iter(self.masternodes.values());
+        vec1.sort();
+        let mut vec2 = Vec::from_iter(list.masternodes.values());
+        vec2.sort();
+        vec1.eq(&vec2)
     }
 
     //     self.masternodes.iter_mut().for_each(|(hash, node)| {

@@ -28,7 +28,7 @@ impl Display for QRInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let h4c = self.diff_h_4c.as_ref().map(|d| format!("h-4c:\n\t{d}\n\t")).unwrap_or(String::new());
         let sh4c = self.snapshot_h_4c.as_ref().map(|d| format!("h-4c: {d}\n\t\t")).unwrap_or(String::new());
-        let aq = if !self.last_quorum_per_index.is_empty() { format!("active_quorums:\n\t\t{}\n\t", self.last_quorum_per_index.iter().fold(String::new(), |mut acc, q| {
+        let aq = if !self.last_quorum_per_index.is_empty() { format!("active_llmq:\n\t\t{}\n\t", self.last_quorum_per_index.iter().fold(String::new(), |mut acc, q| {
             acc.push_str(format!("{q}\n\t\t").as_str());
             acc
         }))} else { String::new() };
@@ -122,14 +122,16 @@ impl QRInfo {
 
         let mut last_quorum_per_index: Vec<LLMQEntry> =
             Vec::with_capacity(last_quorum_per_index_count);
-        let mut active_quorums_lock = processor.cache.active_quorums.write().unwrap();
+        let mut active_llmq_lock = processor.cache.active_llmq.write().unwrap();
+
         for _i in 0..last_quorum_per_index_count {
             let q = message.read_with::<LLMQEntry>(&mut offset, byte::LE)
                 .map_err(ProcessingError::from)?;
-            active_quorums_lock.insert(q.clone());
+
+            active_llmq_lock.insert(q.clone());
             last_quorum_per_index.push(q);
         }
-        drop(active_quorums_lock);
+        drop(active_llmq_lock);
         let quorum_snapshot_list_count = read_var_int(&mut offset)?.0 as usize;
         let mut quorum_snapshot_list: Vec<LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
         for _i in 0..quorum_snapshot_list_count {

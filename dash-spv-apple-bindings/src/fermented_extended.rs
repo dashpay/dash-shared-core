@@ -6,11 +6,11 @@ use dash_spv_crypto::llmq::LLMQEntry;
 use dash_spv_crypto::network::LLMQType;
 use dash_spv_masternode_processor::models::{MasternodeEntry, MasternodeList};
 use crate::DashSPVCore;
-use crate::fermented::generics::{std_collections_Map_keys_dash_spv_crypto_network_llmq_type_LLMQType_values_std_collections_Map_keys_u8_arr_32_values_dash_spv_crypto_llmq_entry_LLMQEntry, std_collections_Map_keys_u8_arr_32_values_dash_spv_masternode_processor_models_masternode_entry_MasternodeEntry, std_collections_Map_keys_u8_arr_32_values_std_sync_Arc_dash_spv_masternode_processor_models_masternode_list_MasternodeList, std_sync_Arc_dash_spv_masternode_processor_models_masternode_list_MasternodeList, Arr_u8_32};
+use crate::fermented::generics::{std_collections_Map_keys_dash_spv_crypto_network_llmq_type_LLMQType_values_std_collections_Map_keys_u8_arr_32_values_dash_spv_crypto_llmq_entry_LLMQEntry, std_collections_Map_keys_u8_arr_32_values_dash_spv_masternode_processor_models_masternode_entry_MasternodeEntry, std_collections_Map_keys_u8_arr_32_values_dash_spv_masternode_processor_models_masternode_list_MasternodeList, Arr_u8_32};
 use crate::fermented::types::dash_spv_crypto::llmq::entry::dash_spv_crypto_llmq_entry_LLMQEntry;
 use crate::fermented::types::dash_spv_crypto::network::llmq_type::dash_spv_crypto_network_llmq_type_LLMQType;
 use crate::fermented::types::dash_spv_masternode_processor::models::masternode_entry::dash_spv_masternode_processor_models_masternode_entry_MasternodeEntry;
-
+use crate::fermented::types::dash_spv_masternode_processor::models::masternode_list::dash_spv_masternode_processor_models_masternode_list_MasternodeList;
 //TODO: this is a tmp additional setup
 
 #[repr(C)]
@@ -25,13 +25,13 @@ pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_runtime(self_: *mut
 }
 #[no_mangle]
 pub unsafe extern "C" fn masternode_list_map_by_key(
-    self_: *mut std_collections_Map_keys_u8_arr_32_values_std_sync_Arc_dash_spv_masternode_processor_models_masternode_list_MasternodeList,
+    self_: *mut std_collections_Map_keys_u8_arr_32_values_dash_spv_masternode_processor_models_masternode_list_MasternodeList,
     key: *mut Arr_u8_32,
-) -> *mut std_sync_Arc_dash_spv_masternode_processor_models_masternode_list_MasternodeList {
-    let self_ = FFIConversionFrom::<BTreeMap<[u8; 32], Arc<MasternodeList>>>::ffi_from(self_);
+) -> *mut dash_spv_masternode_processor_models_masternode_list_MasternodeList {
+    let self_ = FFIConversionFrom::<BTreeMap<[u8; 32], MasternodeList>>::ffi_from(self_);
     let key = FFIConversionFrom::<[u8; 32]>::ffi_from(key);
     let result = self_.get(&key).cloned();
-    FFIConversionTo::<Arc<MasternodeList>>::ffi_to_opt(result)
+    FFIConversionTo::<MasternodeList>::ffi_to_opt(result)
 }
 #[no_mangle]
 pub unsafe extern "C" fn masternode_by_pro_reg_tx_hash(

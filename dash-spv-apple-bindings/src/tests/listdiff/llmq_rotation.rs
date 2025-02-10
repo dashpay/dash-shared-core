@@ -515,7 +515,7 @@ fn test_processor_devnet_333_2() {
             let context = Arc::from_raw(context as *const FFIContext);
             let result = context.block_for_hash(block_hash)
                 .map(MBlock::from)
-                .ok_or(CoreProviderError::NullResult);
+                .ok_or(CoreProviderError::NullResult(format!("No block for hash {}", block_hash.to_hex())));
             std::mem::forget(context);
             result
         }),
@@ -523,7 +523,7 @@ fn test_processor_devnet_333_2() {
             let context = Arc::from_raw(context as *const FFIContext);
             let result = context.block_for_hash(block_hash)
                 .map(MBlock::from)
-                .ok_or(CoreProviderError::NullResult);
+                .ok_or(CoreProviderError::NullResult(format!("No last block for block hash {}", block_hash.to_hex())));
 
 
             std::mem::forget(context);
@@ -545,7 +545,7 @@ fn test_processor_devnet_333_2() {
             let context = Arc::from_raw(context as *const FFIContext);
             let result = context.cl_signature_by_block_hash(&block_hash)
                 .cloned()
-                .ok_or(CoreProviderError::NullResult);
+                .ok_or(CoreProviderError::NullResult(format!("No clsig for block hash {}", block_hash.to_hex())));
             std::mem::forget(context);
             result
         }),
@@ -553,12 +553,12 @@ fn test_processor_devnet_333_2() {
             let context = Arc::from_raw(context as *const FFIContext);
             let result = context.block_for_height(block_height)
                 .map(Block::from)
-                .ok_or(CoreProviderError::NullResult);
+                .ok_or(CoreProviderError::NullResult(format!("No block or last terminal for {}", block_height)));
             std::mem::forget(context);
             result
         }),
         load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
-        save_masternode_list_into_db: Arc::new(|context, list, modified_masternodes| Ok(true)),
+        save_masternode_list_into_db: Arc::new(|context, list_block_hash, modified_masternodes| Ok(true)),
         load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
         save_llmq_snapshot_into_db: Arc::new(|context, block_hash, snapshot| Ok(true)),
         update_address_usage_of_masternodes: Arc::new(|context, modified_masternodes| {}),
@@ -567,8 +567,9 @@ fn test_processor_devnet_333_2() {
         notify_sync_state: Arc::new(|context, state| {}),
         dequeue_masternode_list: Arc::new(|context, is_dip24| {}),
     };
-    let cache = Arc::new(MasternodeProcessorCache::default());
-    let processor = Arc::new(MasternodeProcessor::new(Arc::new(provider), Arc::clone(&cache)));
+    let provider_arc = Arc::new(provider);
+    let cache = Arc::new(MasternodeProcessorCache::new(provider_arc.clone()));
+    let processor = Arc::new(MasternodeProcessor::new(provider_arc, Arc::clone(&cache)));
     let message = load_message(chain.identifier(), "mnlistdiff--1-25480.dat");
     let result = processor.mn_list_diff_result_from_message(&message, false, 70221, false, null());
     let message = load_message(chain.identifier(), "qrinfo--1-24868.dat");

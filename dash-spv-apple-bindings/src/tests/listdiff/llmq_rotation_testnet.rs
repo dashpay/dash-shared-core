@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::ptr::null;
 use std::sync::Arc;
 use hashes::hex::ToHex;
@@ -61,9 +60,9 @@ fn mainnet_quorum_quarters() {
     let bytes = load_message(chain_identifier.clone(),"QRINFO_0_1739226.dat");
     let old_bytes = load_message(chain_identifier.clone(),"QRINFO_0_1740902.dat");
     let old_bytes2 = load_message(chain_identifier.clone(),"QRINFO_0_1740910.dat");
-    processor.cache.add_masternode_list(block_hash_8792, Arc::new(masternode_list_8792));
-    processor.cache.add_masternode_list(block_hash_8840, Arc::new(masternode_list_8840));
-    processor.cache.add_masternode_list(block_hash_8888, Arc::new(masternode_list_8888));
+    processor.cache.add_masternode_list(block_hash_8792, masternode_list_8792);
+    processor.cache.add_masternode_list(block_hash_8840, masternode_list_8840);
+    processor.cache.add_masternode_list(block_hash_8888, masternode_list_8888);
     // processor.provider.save_masternode_list(block_hash_8792, &masternode_list_8792);
     // processor.provider.save_masternode_list(block_hash_8840, &masternode_list_8840);
     // processor.provider.save_masternode_list(block_hash_8888, &masternode_list_8888);
@@ -95,21 +94,20 @@ fn mainnet_quorum_quarters() {
     let block_hash_8936_h_2c = block_hash_to_block_hash(qrinfo_8936.mn_list_diff_at_hminus2c.block_hash).reversed();
     let block_hash_8936_h_3c = block_hash_to_block_hash(qrinfo_8936.mn_list_diff_at_hminus3c.block_hash).reversed();
 
-    let mut llmq_snapshots_lock = processor.cache.llmq_snapshots.write().unwrap();
-
-    llmq_snapshots_lock.insert(block_hash_8792_h_c, snapshot_8792_h_c);
-    llmq_snapshots_lock.insert(block_hash_8792_h_2c, snapshot_8792_h_2c);
-    llmq_snapshots_lock.insert(block_hash_8792_h_3c, snapshot_8792_h_3c);
-    llmq_snapshots_lock.insert(block_hash_8840_h_c, snapshot_8840_h_c);
-    llmq_snapshots_lock.insert(block_hash_8840_h_2c, snapshot_8840_h_2c);
-    llmq_snapshots_lock.insert(block_hash_8840_h_3c, snapshot_8840_h_3c);
-    llmq_snapshots_lock.insert(block_hash_8888_h_c, snapshot_8888_h_c);
-    llmq_snapshots_lock.insert(block_hash_8888_h_2c, snapshot_8888_h_2c);
-    llmq_snapshots_lock.insert(block_hash_8888_h_3c, snapshot_8888_h_3c);
-    llmq_snapshots_lock.insert(block_hash_8936_h_c, snapshot_8936_h_c);
-    llmq_snapshots_lock.insert(block_hash_8936_h_2c, snapshot_8936_h_2c);
-    llmq_snapshots_lock.insert(block_hash_8936_h_3c, snapshot_8936_h_3c);
-    drop(llmq_snapshots_lock);
+    processor.cache.write_llmq_snapshots(|lock| {
+        lock.insert(block_hash_8792_h_c, snapshot_8792_h_c);
+        lock.insert(block_hash_8792_h_2c, snapshot_8792_h_2c);
+        lock.insert(block_hash_8792_h_3c, snapshot_8792_h_3c);
+        lock.insert(block_hash_8840_h_c, snapshot_8840_h_c);
+        lock.insert(block_hash_8840_h_2c, snapshot_8840_h_2c);
+        lock.insert(block_hash_8840_h_3c, snapshot_8840_h_3c);
+        lock.insert(block_hash_8888_h_c, snapshot_8888_h_c);
+        lock.insert(block_hash_8888_h_2c, snapshot_8888_h_2c);
+        lock.insert(block_hash_8888_h_3c, snapshot_8888_h_3c);
+        lock.insert(block_hash_8936_h_c, snapshot_8936_h_c);
+        lock.insert(block_hash_8936_h_2c, snapshot_8936_h_2c);
+        lock.insert(block_hash_8936_h_3c, snapshot_8936_h_3c);
+    });
 
 
     let old_result = processor.qr_info_result_from_message(&old_bytes, true, 70221, true, false, null());
@@ -117,12 +115,11 @@ fn mainnet_quorum_quarters() {
     let result = processor.qr_info_result_from_message(&bytes, true, 70221, true, false, null());
     // let last_quorum = result.unwrap().last_quorum_per_index.first().expect("Last llmq persist");
 
-    let active_quorums = processor.cache.active_quorums.read().unwrap();
+    let block_hash = UInt256::from_hex("64bd1057ab434352e4e26fe235412f37a8de6b4cb215ca580a00000000000000").unwrap().0;
+    let mut target_quorum = processor.cache.read_active_llmq(|lock| lock.iter().find(|q| block_hash.eq(&q.llmq_hash)).cloned())
+        .expect("Target quorum");
 
     let llmq_type = LLMQType::Llmqtype60_75;
-    let block_hash = UInt256::from_hex("64bd1057ab434352e4e26fe235412f37a8de6b4cb215ca580a00000000000000").unwrap().0;
-    let mut target_quorum = active_quorums.iter().find(|q| block_hash.eq(&q.llmq_hash)).cloned()
-        .expect("Target quorum");
     // let mut last_quorum = active_quorums.iter().last().unwrap().clone();
     let block_height = 1738944;
     // let block_hash = last_quorum.llmq_hash;

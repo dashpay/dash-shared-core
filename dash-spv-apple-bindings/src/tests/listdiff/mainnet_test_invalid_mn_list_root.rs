@@ -18,10 +18,10 @@ fn mainnet_test_invalid_mn_list_root() {
     let list_1761048: MNList = serde_json::from_slice(&message_from_file("mainnet/MNLIST_1761048_1666773093.153379_saveMasternodeList.json")).unwrap();
     let masternode_list_1761054 = MasternodeList::from(list_1761054);
     let masternode_list_1761048 = MasternodeList::from(list_1761048);
-    let mut lists_lock = processor.cache.mn_lists.write().unwrap();
-    lists_lock.insert(masternode_list_1761048.block_hash, Arc::new(masternode_list_1761048));
-    lists_lock.insert(masternode_list_1761054.block_hash, Arc::new(masternode_list_1761054));
-    drop(lists_lock);
+    processor.cache.write_mn_lists(|lock| {
+        lock.insert(masternode_list_1761048.block_hash, masternode_list_1761048);
+        lock.insert(masternode_list_1761054.block_hash, masternode_list_1761054);
+    });
     let result = processor.mn_list_diff_result_from_message(&bytes, true, 70221, false, null())
         .expect("SUCCESS");
     // let processor = register_default_processor(&mut context);
