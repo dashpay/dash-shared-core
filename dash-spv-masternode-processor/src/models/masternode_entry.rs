@@ -8,7 +8,7 @@ use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
 use dash_spv_crypto::consensus::Encodable;
-use dash_spv_crypto::crypto::byte_util::{UInt160, UInt256, Zeroable};
+use dash_spv_crypto::crypto::byte_util::{Reversed, UInt160, UInt256, Zeroable};
 use dash_spv_crypto::keys::{ECDSAKey, OperatorPublicKey};
 use dash_spv_crypto::network::{ChainType, CORE_PROTO_19_2};
 use dash_spv_crypto::util::address;
@@ -304,13 +304,20 @@ impl MasternodeEntry {
 
 
     pub fn score(&self, modifier: [u8; 32], block_height: u32) -> Option<[u8; 32]> {
+        if self.provider_registration_transaction_hash.reversed().to_hex() == "7afccfe4be5bca95906efd36c2e887dc64b74cc7548c3f3478c9656ef39d3b11" {
+            println!("height is {}, this guy is valid {}", block_height, self.is_valid_at(block_height));
+        }
         if !self.is_valid_at(block_height) ||
             self.confirmed_hash.is_zero() ||
-            self.confirmed_hash_at(block_height).is_none() {
+            self.confirmed_hash_at(block_height + 8).is_none() { //todo remove +8 when we merge instead of overwriting known_confirmed_at_height
+            if self.provider_registration_transaction_hash.reversed().to_hex() == "7afccfe4be5bca95906efd36c2e887dc64b74cc7548c3f3478c9656ef39d3b11" {
+                println!("we are returning none, {:?}, {:?}", self.confirmed_hash_at(block_height), self.known_confirmed_at_height);
+            }
             return None;
         }
         let mut buffer: Vec<u8> = Vec::new();
-        if let Some(hash) = self.confirmed_hash_hashed_with_pro_reg_tx_hash_at(block_height) {
+        //todo remove +8 when we merge instead of overwriting known_confirmed_at_height
+        if let Some(hash) = self.confirmed_hash_hashed_with_pro_reg_tx_hash_at(block_height + 8) {
             hash.enc(&mut buffer);
         }
         modifier.enc(&mut buffer);

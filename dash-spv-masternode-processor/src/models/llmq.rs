@@ -11,6 +11,7 @@ use dash_spv_crypto::llmq::modifier::LLMQModifierType;
 use crate::models::masternode_list::score_masternodes_map;
 use crate::models::MasternodeEntry;
 use crate::processing::core_provider::CoreProviderError;
+use crate::util::formatter::CustomFormatter;
 
 #[derive(PartialEq)]
 pub enum LLMQVerificationContext {
@@ -53,11 +54,16 @@ impl LLMQVerificationContext {
 pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, block_height: u32) -> Result<(), CoreProviderError> {
     let commitment_hash = entry.generate_commitment_hash();
     let use_legacy = entry.version.use_bls_legacy();
+    if block_height == 2188848 {
+        println!("hello");
+    }
     let operator_keys = valid_masternodes
         .iter()
         .enumerate()
         .filter_map(|(i, node)| {
-            if entry.signers.bit_is_true_at_le_index(i) {
+            if !node.is_valid {
+                None
+            } else if entry.signers.bit_is_true_at_le_index(i) {
                 Some(node.operator_public_key_at(block_height))
             } else {
                 None
@@ -66,14 +72,30 @@ pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, 
         .collect::<Vec<_>>();
     let valid_masternodes_count = valid_masternodes.len();
     let operator_keys_count = operator_keys.len();
-    //println!("validate llmq: {entry}({use_legacy}){}\n{}\n{}", commitment_hash.to_hex(), valid_masternodes.format(), operator_keys.format());
     let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(
         commitment_hash,
         entry.all_commitment_aggregated_signature,
-        operator_keys,
+        operator_keys.clone(),
         use_legacy,
     );
     if !all_commitment_aggregated_signature_validated {
+        let key_map = valid_masternodes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, node)| {
+                if !node.is_valid {
+                    None
+                } else if entry.signers.bit_is_true_at_le_index(i) {
+                    Some((node.provider_registration_transaction_hash.reversed().to_hex(), node.operator_public_key_at(block_height).data.to_hex()))
+                } else {
+                    None
+                }
+            })
+            .map(|(a, b)| format!("{};{}", a, b)).collect::<Vec<_>>().join("\n");
+        println!("signers {}", entry.signers);
+        println!("valid_masternodes {}", key_map);
+        println!("validate llmq: {entry}({use_legacy}){}\n{}\n{}", commitment_hash.to_hex(), valid_masternodes.format(), operator_keys.format());
+        println!("commitment_hash {}", commitment_hash.to_hex());
         warn!("INVALID AGGREGATED SIGNATURE {block_height} {} {} {} masternodes: {valid_masternodes_count}, keys: {operator_keys_count}", entry.llmq_type, entry.llmq_hash.to_hex(), entry.all_commitment_aggregated_signature.to_hex());
         entry.verified = LLMQEntryVerificationStatus::Invalid(LLMQValidationError::InvalidAggregatedSignature);
         return Err(CoreProviderError::QuorumValidation(LLMQValidationError::InvalidAggregatedSignature));
@@ -147,30 +169,17 @@ pub fn valid_masternodes(
     let quorum_modifier = llmq_modifier.build_llmq_hash();
     let quorum_count = llmq_type.size();
     let masternode_count = masternodes.len();
-    let score_dictionary = score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
-    let count = min(masternode_count, score_dictionary.len());
+    let mut score_dictionary = score_masternodes_map(masternodes, quorum_modifier, block_height, hpmn_only);
+    let count = min(quorum_count as usize, score_dictionary.len());
     // println!("score_dictionary: \n{}", format_masternodes_map(&score_dictionary));
     // println!("•••••••••••••••••••");
-    let mut scores = Vec::from_iter(score_dictionary.keys().cloned());
-    scores.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
+    score_dictionary.sort_by(|(s1, _), (s2, _)| s2.reversed().cmp(&s1.reversed()));
     // println!("scores: \n{}", format_hash_vec(&scores));
     // println!("•••••••••••••••••••");
-    let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
-    // TODO: is that correct to take count here before checking validity?
-    for score in scores.iter().take(count) {
-        if let Some(masternode) = score_dictionary.get(score) {
-            if masternode.is_valid_at(block_height) {
-                valid_masternodes.push(masternode.clone());
-            }
-        }
-        if valid_masternodes.len() == quorum_count as usize {
-            break;
-        }
-    }
+    score_dictionary.into_iter().take(count).map(|(_,masternode_entry)| masternode_entry).collect()
     // println!("valid_masternodes: \n{}", format_masternodes_vec(&valid_masternodes));
     // println!("•••••••••••••••••••");
     // println!("•••••••••••••••••••");
     // println!("•••••••••••••••••••");
-    valid_masternodes
 }
 

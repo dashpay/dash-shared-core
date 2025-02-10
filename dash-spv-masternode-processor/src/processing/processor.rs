@@ -1376,7 +1376,15 @@ impl MasternodeProcessor {
         //     .ok_or(CoreProviderError::MissedMasternodeListAt(llmq_block_hash))?;
         let block_height = self.height_for_block_hash(llmq_block_hash);
         if let Some(masternode_list) = maybe_masternode_list {
+            // if block_height == 2188848 {
+            //     let masternodes = masternode_list.masternodes.values().map(|entry| format!("{} : {}", entry.provider_registration_transaction_hash.reversed().to_hex(), entry.is_valid)).collect::<Vec<_>>().join("\n ");
+            //     println!("{}", masternodes);
+            // }
             let valid_masternodes = self.find_valid_masternodes_for_quorum(quorum, block_height, skip_removed_masternodes, &masternode_list.masternodes)?;
+            if block_height == 2188848 {
+                let masternodes = valid_masternodes.iter().map(|entry| format!("{} : {}", entry.provider_registration_transaction_hash.reversed().to_hex(), entry.is_valid)).collect::<Vec<_>>().join("\n ");
+                println!("v {}", masternodes);
+            }
             let payload_status = validate_payload(quorum);
             if !payload_status.is_ok() {
                 quorum.verified = LLMQEntryVerificationStatus::Invalid(LLMQValidationError::InvalidPayload(payload_status.clone()));
@@ -1406,7 +1414,7 @@ impl MasternodeProcessor {
             quorum,
             self.provider.chain_type(),
             masternodes,
-            block_height,
+            block_height - 8,
             self.llmq_modifier_type_for(llmq_type, block_hash, block_height - 8)))
     }
 
@@ -1679,10 +1687,9 @@ fn find_cl_signature_at_index(quorums_cl_sigs: &BTreeMap<[u8; 96], HashSet<u16>>
         if index_set.iter().any(|i| *i == index) { Some(*signature) } else { None })
 }
 
-fn sort_scored_masternodes(scored_masternodes: BTreeMap<[u8; 32], MasternodeEntry>) -> Vec<MasternodeEntry> {
-    let mut v = Vec::from_iter(scored_masternodes);
-    v.sort_by(|(s1, _), (s2, _)| s2.reversed().cmp(&s1.reversed()));
-    v.into_iter().map(|(s, node)| node).collect()
+fn sort_scored_masternodes(mut scored_masternodes: Vec<([u8; 32], MasternodeEntry)>) -> Vec<MasternodeEntry> {
+    scored_masternodes.sort_by(|(s1, _), (s2, _)| s2.reversed().cmp(&s1.reversed()));
+    scored_masternodes.into_iter().map(|(s, node)| node).collect()
 }
 fn usage_info_from_snapshot(masternodes: &BTreeMap<[u8; 32], MasternodeEntry>, snapshot: &LLMQSnapshot, quorum_modifier: [u8; 32], work_block_height: u32) -> (Vec<MasternodeEntry>, Vec<MasternodeEntry>) {
     let scored_masternodes = score_masternodes_map(masternodes, quorum_modifier, work_block_height, false);
@@ -1705,7 +1712,7 @@ fn valid_masternodes_for_rotated_quorum_map(
         .into_iter()
         .filter_map(|entry| entry.score(quorum_modifier, block_height)
             .map(|score| (score, entry)))
-        .collect::<BTreeMap<_, _>>();
+        .collect::<Vec<_>>();
     sort_scored_masternodes(scored_masternodes)
 }
 

@@ -471,15 +471,15 @@ pub fn score_masternodes_map(
     quorum_modifier: [u8; 32],
     block_height: u32,
     hpmn_only: bool,
-) -> BTreeMap<[u8; 32], MasternodeEntry> {
-    BTreeMap::from_iter(masternodes.iter().filter_map(|(_, entry)| {
+) -> Vec<([u8; 32], MasternodeEntry)> {
+    masternodes.iter().filter_map(|(_, entry)| {
         if !hpmn_only || entry.mn_type.is_hpmn() {
             entry.score(quorum_modifier, block_height)
                 .map(|score| (score, entry.clone()))
         } else {
             None
         }
-    }))
+    }).collect()
 }
 
 #[cfg(all(feature = "serde", feature = "test-helpers"))]
