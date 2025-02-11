@@ -4,6 +4,8 @@ use std::ptr::null_mut;
 use std::slice;
 use byte::BytesExt;
 use secp256k1::Scalar;
+use logging::*;
+use tracing::*;
 use crate::chain::bip::bip32;
 use crate::chain::bip::bip38::BIP38;
 use crate::chain::common::{ChainType, IHaveChainSettings};
@@ -21,6 +23,8 @@ use crate::processing::keys_cache::KeysCache;
 use crate::types::opaque_key::{AsCStringPtr, AsOpaqueKey, OpaqueKey, KeyWithUniqueId, OpaqueKeys, OpaqueSerializedKeys};
 use crate::util::address::address;
 use crate::util::sec_vec::SecVec;
+#[cfg(feature = "use_serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Destroys
 /// # Safety
@@ -44,7 +48,7 @@ pub unsafe extern "C" fn processor_destroy_serialized_opaque_keys(data: *mut Opa
 #[no_mangle]
 pub unsafe extern "C" fn keys_create_cache() -> *mut KeysCache {
     let cache = KeysCache::default();
-    println!("keys_create_cache: {:?}", cache);
+    log_info!(target: "masternode-processor", "keys_create_cache: {:?}", cache);
     boxed(cache)
 }
 
@@ -52,7 +56,7 @@ pub unsafe extern "C" fn keys_create_cache() -> *mut KeysCache {
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn keys_clear_cache(cache: *mut KeysCache) {
-    println!("keys_clear_cache: {:p}", cache);
+    log_info!(target: "masternode-processor", "keys_clear_cache: {:p}", cache);
     (*cache).clear();
 }
 
@@ -60,7 +64,7 @@ pub unsafe extern "C" fn keys_clear_cache(cache: *mut KeysCache) {
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn keys_destroy_cache(cache: *mut KeysCache) {
-    println!("keys_destroy_cache: {:?}", cache);
+    log_info!(target: "masternode-processor", "keys_destroy_cache: {:?}", cache);
     let cache = unbox_any(cache);
 }
 

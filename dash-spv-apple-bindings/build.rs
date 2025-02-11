@@ -7,6 +7,7 @@ fn main() {
     // Here we write down crate names (!) where we want to retrieve C-bindings
     let includes = vec![
         "dash-spv-masternode-processor".to_string(),
+        "dash-spv-coinjoin".to_string(),
         "rs-merk-verify-c-binding".to_string()
     ];
     let config = cbindgen::Config {

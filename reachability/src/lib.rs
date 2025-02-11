@@ -4,6 +4,8 @@ use std::{ptr, thread};
 use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
+use logging::*;
+use tracing::*;
 
 use system_configuration::core_foundation::base::{kCFAllocatorDefault, TCFType};
 use system_configuration::core_foundation::runloop::{__CFRunLoop, __CFRunLoopSource, CFRunLoopAddSource, CFRunLoopContainsSource, CFRunLoopGetCurrent, CFRunLoopRef, CFRunLoopRemoveSource, CFRunLoopRun, CFRunLoopSourceContext, CFRunLoopSourceCreate, CFRunLoopStop, kCFRunLoopCommonModes};
@@ -92,17 +94,17 @@ impl MonitorContext {
         Self { host, receiver }
     }
     extern "C" fn schedule_callback(info: *const c_void, run_loop_ref: CFRunLoopRef, _run_loop_mode: CFStringRef) {
-        println!("MonitorContext::schedule_callback {:?} {:?}", info, run_loop_ref);
+        log_info!(target: "MonitorContext", "schedule_callback {:?} {:?}", info, run_loop_ref);
         // let context: &mut Self = unsafe { &mut (*(info as *mut _)) };
     }
 
     extern "C" fn cancel_callback(info: *const c_void, run_loop_ref: CFRunLoopRef, _run_loop_mode: CFStringRef) {
-        println!("MonitorContext::cancel_callback {:?} {:?}", info, run_loop_ref);
+        log_info!(target: "MonitorContext", "cancel_callback {:?} {:?}", info, run_loop_ref);
         // let context: &mut Self = unsafe { &mut (*(info as *mut _)) };
     }
 
     extern "C" fn perform_callback(info: *const c_void) {
-        println!("MonitorContext::perform_callback {:?}", info);
+        log_info!(target: "MonitorContext", "perform_callback {:?}", info);
     }
 
     extern "C" fn copy_ctx_description(_ctx: *const c_void) -> CFStringRef {
@@ -291,7 +293,7 @@ impl ReachabilityManager {
     }
 
     pub fn start_monitoring(&mut self) {
-        println!("ReachabilityManager::start");
+        log_info!(target: "ReachabilityManager", "start");
         let (sender, receiver) = channel();
         self.is_running = true;
         self.sender = Some(Arc::new(sender));
@@ -300,7 +302,7 @@ impl ReachabilityManager {
     }
 
     pub fn stop_monitoring(&mut self) {
-        println!("ReachabilityManager::stop");
+        log_info!(target: "ReachabilityManager", "stop");
         self.is_running = false;
         self.sender.as_ref().unwrap().send(Command::STOP).unwrap();
         self.handle.take().unwrap().join().unwrap();

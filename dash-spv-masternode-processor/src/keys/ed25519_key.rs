@@ -4,6 +4,8 @@ use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use hashes::hex::{FromHex, ToHex};
 use hashes::sha256;
+use logging::*;
+use tracing::*;
 use crate::crypto::{UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}, ECPoint};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
@@ -33,14 +35,14 @@ impl IKey for ED25519Key
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         if self.seckey.is_zero() {
-            warn!("There is no seckey for sign");
+            log_warn!(target: "masternode-processor", "There is no seckey for sign");
             return vec![];
         }
         let signing_key: SigningKey = self.seckey.into();
         match signing_key.try_sign(data) {
             Ok(signature) => signature.to_vec(),
             Err(err) => {
-                warn!("ED25519Key::sign::error {}", err);
+                log_warn!(target: "masternode-processor", "ED25519Key::sign::error {}", err);
                 vec![]
             }
         }

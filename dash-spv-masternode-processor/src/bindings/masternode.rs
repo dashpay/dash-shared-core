@@ -1,6 +1,8 @@
 use std::ptr::null_mut;
 use std::slice;
 use byte::BytesExt;
+use logging::*;
+use tracing::*;
 use crate::{models, types};
 use crate::chain::common::{ChainType, IHaveChainSettings, LLMQType};
 use crate::consensus::encode;
@@ -28,7 +30,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     let instant = std::time::Instant::now();
     let processor = &mut *processor;
     let cache = &mut *cache;
-    println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
+    log_debug!(target: "masternode-processor", "process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.chain_type = chain_type;
@@ -39,12 +41,12 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
         let error = processor
             .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
         if error != ProcessingError::None {
-            println!("process_mnlistdiff_from_message <- {:?} ms [{:?}]", instant.elapsed().as_millis(), error);
+            log_debug!(target: "masternode-processor", "process_mnlistdiff_from_message <- {:?} ms [{:?}]", instant.elapsed().as_millis(), error);
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
     }
     let result = processor.get_list_diff_result_with_base_lookup(list_diff, LLMQVerificationContext::MNListDiff, cache);
-    println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
+    log_debug!(target: "masternode-processor", "process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }
 
@@ -73,7 +75,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.chain_type = chain_type;
-    println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
+    log_debug!(target: "masternode-processor",  "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let offset = &mut 0;
     let mut process_list_diff = |list_diff: models::MNListDiff, verification_context: LLMQVerificationContext| {
         processor.get_list_diff_result_with_base_lookup(list_diff, verification_context, cache)
@@ -92,7 +94,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
         let error =
             processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
         if error != ProcessingError::None {
-            println!("process_qrinfo_from_message <- {:?} ms [{:#?}]", instant.elapsed().as_millis(), error);
+            log_debug!(target: "masternode-processor", "process_qrinfo_from_message <- {:?} ms [{:#?}]", instant.elapsed().as_millis(), error);
             return boxed(types::QRInfoResult::default_with_error(error));
         }
     }
@@ -178,7 +180,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
 
     #[cfg(feature = "generate-dashj-tests")]
     crate::util::java::generate_qr_state_test_file_json(chain_type, &result);
-    println!("process_qrinfo_from_message <- {:?} ms", instant.elapsed().as_millis());
+    log_debug!(target: "masternode-processor", "process_qrinfo_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }
 

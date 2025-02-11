@@ -36,6 +36,9 @@ pub trait IKey: Send + Sync + Debug {
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         panic!("Should be overriden in implementation")
     }
+    fn verify_with_uint(&mut self, message_digest: UInt256, signature: &[u8]) -> bool {
+        panic!("Should be overriden in implementation")
+    }
     fn secret_key(&self) -> UInt256 {
         panic!("Should be overriden in implementation")
     }

@@ -1,0 +1,24 @@
+[package]
+name = "dash-spv-coinjoin"
+version = "0.1.0"
+description = "Library for processing coinjoin messages"
+
+edition = "2021"
+build = "build.rs"
+publish = false
+
+[features]
+unstable = []
+test-helpers = []
+
+[dependencies]
+dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
+logging = { path = "../logging" }
+byte = "0.2"
+tracing = "0.1.40"
+
+[build-dependencies]
+cbindgen = "0.24.3"
+
+[lib]
+name = "dash_spv_coinjoin"

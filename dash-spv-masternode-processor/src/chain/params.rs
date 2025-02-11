@@ -4,8 +4,8 @@ use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 
-pub(crate) const DUFFS: u64 = 100000000;
-pub(crate) const MAX_MONEY: u64 = 21000000 * DUFFS;
+pub const DUFFS: u64 = 100000000;
+pub const MAX_MONEY: u64 = 21000000 * DUFFS;
 /// standard tx fee per b of tx size
 pub(crate) const TX_FEE_PER_B: u64 = 1;
 /// standard ix fee per input
@@ -15,7 +15,7 @@ pub(crate) const TX_OUTPUT_SIZE: u64 = 34;
 /// estimated size for a typical compact pubkey transaction input
 pub(crate) const TX_INPUT_SIZE: u64 = 148;
 /// no txout can be below this amount
-pub(crate) const TX_MIN_OUTPUT_AMOUNT: u64 = TX_FEE_PER_B * 3 * (TX_OUTPUT_SIZE + TX_INPUT_SIZE);
+pub const TX_MIN_OUTPUT_AMOUNT: u64 = TX_FEE_PER_B * 3 * (TX_OUTPUT_SIZE + TX_INPUT_SIZE);
 /// no tx can be larger than this size in bytes
 pub(crate) const TX_MAX_SIZE: u64 = 100000;
 /// block height indicating transaction is unconfirmed

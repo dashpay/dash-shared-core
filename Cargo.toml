@@ -4,6 +4,7 @@ members = [
     "dash-spv-apple-bindings",
     "dash-spv-example-app",
     "dash-spv-masternode-processor",
+    "logging",
     "reachability",
 ]
 

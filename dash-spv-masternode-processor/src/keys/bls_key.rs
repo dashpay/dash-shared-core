@@ -1,6 +1,7 @@
 use bls_signatures::bip32::{ChainCode, ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
-use hashes::{Hash, hex::FromHex, sha256, sha256d};
+use hashes::{Hash, hex::FromHex, sha256, sha256d, hex};
+use hashes::hex::ToHex;
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
@@ -8,6 +9,8 @@ use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::models::OperatorPublicKey;
 use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
+#[cfg(feature = "use_serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Debug, Default)]
 pub struct BLSKey {
@@ -68,6 +71,9 @@ impl IKey for BLSKey {
     }
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         self.verify_uint768(UInt256::from(message_digest), UInt768::from(signature))
+    }
+    fn verify_with_uint(&mut self, message_digest: UInt256, signature: &[u8]) -> bool {
+        self.verify_uint768(message_digest, UInt768::from(signature))
     }
 
     fn secret_key(&self) -> UInt256 {
@@ -372,7 +378,21 @@ impl BLSKey {
     }
 
     pub fn verify_uint768(&self, digest: UInt256, signature: UInt768) -> bool {
+        let digest_hex = digest.as_bytes().to_hex();
+        let signature_hex = signature.as_bytes().to_hex();
+
         Self::verify_message_with_key(self, digest.as_bytes(), signature)
+    }
+
+    pub fn verify_insecure(&self, message: &[u8], signature: UInt768) -> bool {
+        return self.bls_public_key()
+            .map_or(false, |public_key| 
+                match g2_element_from_bytes(false, signature.as_bytes()) {
+                    Ok(signature) =>
+                        BasicSchemeMPL::new().verify(&public_key, message, &signature),
+                    _ => false
+                }
+            );
     }
 
     pub fn verify_with_public_key(digest: UInt256, signature: UInt768, public_key: UInt384, use_legacy: bool) -> bool {
