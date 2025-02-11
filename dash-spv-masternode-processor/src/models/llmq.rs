@@ -54,9 +54,6 @@ impl LLMQVerificationContext {
 pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, block_height: u32) -> Result<(), CoreProviderError> {
     let commitment_hash = entry.generate_commitment_hash();
     let use_legacy = entry.version.use_bls_legacy();
-    if block_height == 2188848 {
-        println!("hello");
-    }
     let operator_keys = valid_masternodes
         .iter()
         .enumerate()
@@ -79,23 +76,6 @@ pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, 
         use_legacy,
     );
     if !all_commitment_aggregated_signature_validated {
-        let key_map = valid_masternodes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, node)| {
-                if !node.is_valid {
-                    None
-                } else if entry.signers.bit_is_true_at_le_index(i) {
-                    Some((node.provider_registration_transaction_hash.reversed().to_hex(), node.operator_public_key_at(block_height).data.to_hex()))
-                } else {
-                    None
-                }
-            })
-            .map(|(a, b)| format!("{};{}", a, b)).collect::<Vec<_>>().join("\n");
-        println!("signers {}", entry.signers);
-        println!("valid_masternodes {}", key_map);
-        println!("validate llmq: {entry}({use_legacy}){}\n{}\n{}", commitment_hash.to_hex(), valid_masternodes.format(), operator_keys.format());
-        println!("commitment_hash {}", commitment_hash.to_hex());
         warn!("INVALID AGGREGATED SIGNATURE {block_height} {} {} {} masternodes: {valid_masternodes_count}, keys: {operator_keys_count}", entry.llmq_type, entry.llmq_hash.to_hex(), entry.all_commitment_aggregated_signature.to_hex());
         entry.verified = LLMQEntryVerificationStatus::Invalid(LLMQValidationError::InvalidAggregatedSignature);
         return Err(CoreProviderError::QuorumValidation(LLMQValidationError::InvalidAggregatedSignature));

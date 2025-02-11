@@ -1372,19 +1372,9 @@ impl MasternodeProcessor {
     fn validate_quorum(&self, quorum: &mut LLMQEntry, skip_removed_masternodes: bool, missing_lists: &mut HashSet<[u8; 32]>) -> Result<(), CoreProviderError> {
         let llmq_block_hash = quorum.llmq_hash;
         let maybe_masternode_list = self.masternode_list_for_block_hash(llmq_block_hash);
-        // let masternode_list = self.masternode_list_for_block_hash(llmq_block_hash)
-        //     .ok_or(CoreProviderError::MissedMasternodeListAt(llmq_block_hash))?;
         let block_height = self.height_for_block_hash(llmq_block_hash);
         if let Some(masternode_list) = maybe_masternode_list {
-            // if block_height == 2188848 {
-            //     let masternodes = masternode_list.masternodes.values().map(|entry| format!("{} : {}", entry.provider_registration_transaction_hash.reversed().to_hex(), entry.is_valid)).collect::<Vec<_>>().join("\n ");
-            //     println!("{}", masternodes);
-            // }
             let valid_masternodes = self.find_valid_masternodes_for_quorum(quorum, block_height, skip_removed_masternodes, &masternode_list.masternodes)?;
-            if block_height == 2188848 {
-                let masternodes = valid_masternodes.iter().map(|entry| format!("{} : {}", entry.provider_registration_transaction_hash.reversed().to_hex(), entry.is_valid)).collect::<Vec<_>>().join("\n ");
-                println!("v {}", masternodes);
-            }
             let payload_status = validate_payload(quorum);
             if !payload_status.is_ok() {
                 quorum.verified = LLMQEntryVerificationStatus::Invalid(LLMQValidationError::InvalidPayload(payload_status.clone()));
