@@ -41,10 +41,17 @@ impl MasternodeMetadataManager {
     }
 
     pub fn allow_mixing(&mut self, pro_tx_hash: UInt256) {
-        if let Some(mut mm) = self.get_meta_info(pro_tx_hash, true) {
+        if let Some(mm) = self.meta_infos.get_mut(&pro_tx_hash) {
             self.dsq_count += 1;
             mm.last_dsq = self.dsq_count;
             mm.mixing_tx_count = 0;
+            return;
         }
+
+        let mut info = MasternodeMetaInfo::new(pro_tx_hash);
+        self.dsq_count += 1;
+        info.last_dsq = self.dsq_count;
+        info.mixing_tx_count = 0;
+        self.meta_infos.insert(pro_tx_hash, info);
     }
 }

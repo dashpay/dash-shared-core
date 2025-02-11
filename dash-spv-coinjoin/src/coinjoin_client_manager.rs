@@ -221,8 +221,8 @@ impl CoinJoinClientManager {
                 // (DashJ) we may not need this
                 if !dry_run && self.is_waiting_for_new_block() {
                     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-                            
-                    if current_time - self.last_time_report_too_recent > 15_000 {
+                    
+                    if current_time - self.last_time_report_too_recent > 15 {
                         self.str_auto_denom_result = "Last successful action was too recent.".to_string();
                         log_info!(target: "CoinJoin", "do_automatic_denominating {}", self.str_auto_denom_result);
                         self.last_time_report_too_recent = current_time;
