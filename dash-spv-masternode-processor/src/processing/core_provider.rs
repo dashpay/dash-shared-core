@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use hashes::hex::ToHex;
 use dash_spv_crypto::network::ChainType;
-use dash_spv_crypto::llmq::status::LLMQValidationError;
+use dash_spv_crypto::llmq::validation_error::LLMQValidationError;
 use crate::common::Block;
 use crate::common::block::MBlock;
 use crate::models::masternode_list::MasternodeList;

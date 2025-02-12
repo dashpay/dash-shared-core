@@ -8,7 +8,6 @@ use crate::consensus::{Decodable, Encodable, encode};
 use crate::crypto::byte_util::BytesDecodable;
 use crate::network::ChainType;
 
-#[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub struct DKGParams {
@@ -19,7 +18,6 @@ pub struct DKGParams {
     pub bad_votes_threshold: u32,
 }
 
-#[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub struct LLMQParams {

@@ -26,12 +26,12 @@ dashcore = { git = "https://github.com/pankcuf/rust-dashcore", features = [
 dashcore-rpc = { git = "https://github.com/pankcuf/rust-dashcore-rpc", branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
 data-contracts = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "data-contracts" }
-dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }
-drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
+dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp", default-features = false, features = ["dash-sdk-features"] }
+drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive", default-features = false, features = ["verify"] }
 drive-proof-verifier = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive-proof-verifier" }
 platform-value = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-value" }
 platform-version = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-version" }
-rs-dapi-client = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "rs-dapi-client" }
+rs-dapi-client = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "rs-dapi-client", default-features = false }
 
 #dpp = { path = "../../platform/packages/rs-dpp", features = ["state-transitions"] }
 #drive = { path = "../../platform/packages/rs-drive" }

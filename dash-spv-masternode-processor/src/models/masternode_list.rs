@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use hashes::hex::ToHex;
 use dash_spv_crypto::blake3;
-use dash_spv_crypto::crypto::byte_util::{sup, Reversed};
-use dash_spv_crypto::llmq::entry::{LLMQEntry, LLMQEntryVerificationStatus};
+use dash_spv_crypto::crypto::byte_util::{sup, Reversed, Zeroable};
+use dash_spv_crypto::llmq::entry::LLMQEntry;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_crypto::tx::CoinbaseTransaction;
 use dash_spv_crypto::util::data_ops::merkle_root_from_hashes;
@@ -325,13 +325,13 @@ impl MasternodeList {
     pub fn has_unverified_rotated_quorums(&self, chain_type: ChainType) -> bool {
         let isd_llmq_type = chain_type.isd_llmq_type();
         self.quorums.get(&isd_llmq_type)
-            .map(|q| q.values().any(|llmq| llmq.verified != LLMQEntryVerificationStatus::Verified))
+            .map(|q| q.values().any(LLMQEntry::is_not_verified))
             .unwrap_or(false)
     }
     pub fn has_unverified_regular_quorums(&self, chain_type: ChainType) -> bool {
         let isd_llmq_type = chain_type.isd_llmq_type();
         self.quorums.get(&isd_llmq_type)
-            .map(|q| q.values().any(|llmq| llmq.verified != LLMQEntryVerificationStatus::Verified))
+            .map(|q| q.values().any(LLMQEntry::is_not_verified))
             .unwrap_or(false)
     }
 
@@ -469,12 +469,14 @@ pub fn masternode_vec_to_map(vec: Vec<MasternodeEntry>) -> BTreeMap<[u8; 32], Ma
 pub fn score_masternodes_map(
     masternodes: &BTreeMap<[u8; 32], MasternodeEntry>,
     quorum_modifier: [u8; 32],
-    block_height: u32,
+    work_block_height: u32,
     hpmn_only: bool,
 ) -> Vec<([u8; 32], MasternodeEntry)> {
+    let llmq_height = work_block_height + 8;
     masternodes.iter().filter_map(|(_, entry)| {
-        if !hpmn_only || entry.mn_type.is_hpmn() {
-            entry.score(quorum_modifier, block_height)
+        let is_scorable = (!hpmn_only || entry.mn_type.is_hpmn()) && entry.is_valid_at(work_block_height) && !entry.confirmed_hash.is_zero() && entry.confirmed_hash_at(llmq_height).is_some();
+        if is_scorable {
+            entry.score(quorum_modifier, work_block_height, entry.confirmed_hash_hashed_with_pro_reg_tx_hash_at(llmq_height))
                 .map(|score| (score, entry.clone()))
         } else {
             None

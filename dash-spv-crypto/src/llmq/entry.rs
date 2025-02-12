@@ -15,45 +15,10 @@ use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::Reversed;
 use crate::impl_bytes_decodable;
 use crate::keys::BLSKey;
-use crate::llmq::{Bitset, LLMQValidationError, LLMQVersion};
+use crate::llmq::{Bitset, LLMQVersion};
+use crate::llmq::validation_status::LLMQEntryValidationStatus;
 use crate::network::LLMQType;
 
-#[derive(Clone, Ord, PartialOrd, PartialEq, Eq, Hash, Debug)]
-#[ferment_macro::export]
-pub enum LLMQEntryVerificationSkipStatus {
-    MissedList([u8; 32]),
-    UnknownBlock([u8; 32]),
-    OtherContext(String),
-}
-
-impl Display for LLMQEntryVerificationSkipStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            LLMQEntryVerificationSkipStatus::MissedList(block_hash) => format!("MissedList({})", block_hash.to_hex()),
-            LLMQEntryVerificationSkipStatus::UnknownBlock(block_hash) => format!("UnknownBlock({})", block_hash.to_hex()),
-            LLMQEntryVerificationSkipStatus::OtherContext(message) => format!("OtherContext({message})"),
-        }.as_str())
-    }
-}
-
-#[derive(Clone, Ord, PartialOrd, PartialEq, Eq, Hash, Debug)]
-#[ferment_macro::export]
-pub enum LLMQEntryVerificationStatus {
-    Unknown,
-    Verified,
-    Skipped(LLMQEntryVerificationSkipStatus),
-    Invalid(LLMQValidationError),
-}
-impl Display for LLMQEntryVerificationStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            LLMQEntryVerificationStatus::Unknown => "unknown".to_string(),
-            LLMQEntryVerificationStatus::Verified => "verified".to_string(),
-            LLMQEntryVerificationStatus::Invalid(error) => format!("Invalid({error})"),
-            LLMQEntryVerificationStatus::Skipped(reason) => format!("Skipped({reason})"),
-        }.as_str())
-    }
-}
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq, Hash)]
 #[ferment_macro::export]
@@ -70,7 +35,7 @@ pub struct LLMQEntry {
     pub signers: Bitset,
     pub valid_members: Bitset,
     pub entry_hash: [u8; 32],
-    pub verified: LLMQEntryVerificationStatus,
+    pub verified: LLMQEntryValidationStatus,
     pub saved: bool,
     pub commitment_hash: Option<[u8; 32]>,
 }
@@ -119,7 +84,7 @@ impl Display for LLMQEntry {
 }
 
 impl std::fmt::Debug for LLMQEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
             .field("version", &self.version)
             .field("llmq_hash", &self.llmq_hash.to_hex())
@@ -262,7 +227,7 @@ impl LLMQEntry {
             signers,
             valid_members,
             entry_hash: sha256d::Hash::hash(q_data.as_ref()).into_inner(),
-            verified: LLMQEntryVerificationStatus::Unknown,
+            verified: LLMQEntryValidationStatus::Unknown,
             saved: false,
             commitment_hash: None,
         }
@@ -454,7 +419,10 @@ impl LLMQEntry {
     }
 
     pub fn is_verified(&self) -> bool {
-        self.verified == LLMQEntryVerificationStatus::Verified
+        self.verified.is_verified()
+    }
+    pub fn is_not_verified(&self) -> bool {
+        self.verified.is_not_verified()
     }
 }
 
@@ -498,7 +466,7 @@ pub fn from_entity(
     verification_vector_hash: [u8; 32],
     threshold_signature: [u8; 96],
     all_commitment_aggregated_signature: [u8; 96],
-    verified: LLMQEntryVerificationStatus,
+    verified: LLMQEntryValidationStatus,
     entry_hash: Option<[u8; 32]>
 ) -> LLMQEntry {
     let signers = Bitset { count: signers_count, bitset: signers };

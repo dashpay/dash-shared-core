@@ -1,5 +1,5 @@
 const INSIGHT_URL: &str = "https://insight.dash.org/insight-api";
-const TESTNET_INSIGHT_URL: &str = "https://insight.testnet.networks.dash.org:3002/insight-api-dash";
+const TESTNET_INSIGHT_URL: &str = "https://insight.testnet.networks.dash.org/insight-api";
 
 use serde::Deserialize;
 use std::error::Error;

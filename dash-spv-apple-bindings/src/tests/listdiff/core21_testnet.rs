@@ -1,5 +1,11 @@
+use std::ptr::null;
+use std::sync::Arc;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::block_store::{init_mainnet_store, init_testnet_store};
+use dash_spv_masternode_processor::processing::ProcessingError;
+use dash_spv_masternode_processor::test_helpers::load_message;
+use dash_spv_masternode_processor::tests::FFIContext;
+use crate::ffi_core_provider::FFICoreProvider;
 use crate::tests::common::assert_diff_chain;
 
 #[test]
@@ -110,5 +116,30 @@ pub fn core21_mainnet() {
         &[],
         Some(init_mainnet_store()),
         false);
+
+}
+
+#[test]
+pub fn testnet_quorums_70235() {
+    let chain = ChainType::TestNet;
+    let context = Arc::new(FFIContext::chain_default(chain.clone(), false, init_testnet_store()));
+    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
+
+    let message = load_message(chain.identifier(), "MNL_0_530000__70228.dat");
+    let maybe_result = processor.mn_list_diff_result_from_message(&message, true, 70228, false, null());
+    match maybe_result {
+        Ok(_) |
+        Err(ProcessingError::MissingLists(..)) => {},
+        Err(err) => panic!("Failed to process: {err}")
+    }
+
+    // let protocol_version = extract_protocol_version_from_filename("QRINFO_1194627_1194629__70235.dat").unwrap_or(70219);
+    let message = load_message(chain.identifier(), "QRINFO_1194627_1194629__70235.dat");
+    let maybe_result = processor.qr_info_result_from_message(&message, true, 70235, true, false, null());
+    match maybe_result {
+        Ok(_) |
+        Err(ProcessingError::MissingLists(..)) => {},
+        Err(err) => panic!("Failed to process: {err}")
+    }
 
 }

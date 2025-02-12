@@ -247,7 +247,7 @@ impl IHaveChainSettings for ChainType {
     }
 
     fn is_evolution_enabled(&self) -> bool {
-        false
+        true
     }
 
     fn name(&self) -> String {
@@ -340,7 +340,7 @@ impl ChainType {
     pub fn insight_url(&self) -> Option<String> {
         match self {
             ChainType::MainNet => Some("https://insight.dash.org/insight-api".to_string()),
-            ChainType::TestNet => Some("https://insight.testnet.networks.dash.org:3002/insight-api-dash".to_string()),
+            ChainType::TestNet => Some("https://insight.testnet.networks.dash.org/insight-api".to_string()),
             ChainType::DevNet(_) => None
         }
     }

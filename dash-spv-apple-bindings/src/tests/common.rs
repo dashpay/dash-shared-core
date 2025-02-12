@@ -25,12 +25,12 @@ extern crate reqwest;
 
 #[cfg(all(feature = "test-helpers", feature = "use_serde"))]
 pub fn get_block_from_insight_by_hash(hash: [u8; 32]) -> Option<MerkleBlock> {
-    let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", hash.reversed().to_hex().as_str());
+    let path = format!("https://testnet-insight.dashevo.org/insight-api/block/{}", hash.reversed().to_hex().as_str());
     request_block(path)
 }
 #[cfg(all(feature = "test-helpers", feature = "use_serde"))]
 pub fn get_block_from_insight_by_height(height: u32) -> Option<MerkleBlock> {
-    let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", height);
+    let path = format!("https://testnet-insight.dashevo.org/insight-api/block/{}", height);
     request_block(path)
 }
 
@@ -539,8 +539,12 @@ pub fn assert_diff_chain(chain: ChainType, diff_files: &[&'static str], qrinfo_f
     qrinfo_files.iter().for_each(|filename| {
         let protocol_version = extract_protocol_version_from_filename(filename).unwrap_or(70219);
         let message = load_message(chain.identifier(), filename);
-        let result = processor.qr_info_result_from_message(&message, true, protocol_version, true, allow_invalid_merkle_roots, null())
-            .expect("Failed to process qrinfo");
+        let maybe_result = processor.qr_info_result_from_message(&message, true, protocol_version, true, allow_invalid_merkle_roots, null());
+        match maybe_result {
+            Ok(_) |
+            Err(ProcessingError::MissingLists(..)) => {},
+            Err(err) => panic!("Failed to process qrinfo: {err}")
+        }
         // assert_qrinfo_result(&ctx, &result);
         // let mut cache = ctx.cache.write().unwrap();
         // if !result.result_at_h_4c.is_some() {

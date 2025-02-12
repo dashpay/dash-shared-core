@@ -135,12 +135,19 @@ impl DashSPVCore {
         let processor_arc_clone = Arc::clone(&processor_arc);
         let get_quorum_public_key = Arc::new(move |llmq_type: u32, llmq_hash: [u8; 32], core_chain_locked_height: u32| {
             let llmq_type = LLMQType::from_u16(llmq_type as u16);
-            let maybe_llmq_public_key = processor_arc_clone.cache
-                .get_last_queried_qr_masternode_list_at_tip()
-                .and_then(|last| last.quorum_entry_of_type_for_quorum_hash(llmq_type.clone(), llmq_hash.reversed()).cloned())
-                .map(|llmq| llmq.public_key);
-            println!("get_quorum_public_key: {}: {}: {} = {}", llmq_type, llmq_hash.to_hex(), core_chain_locked_height, maybe_llmq_public_key.as_ref().map_or("None".to_string(), |pk| pk.to_hex()));
-            maybe_llmq_public_key.ok_or(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {} ({})", llmq_type, llmq_hash.to_hex(), llmq_hash.reversed().to_hex())))
+            let recent_lists = processor_arc_clone.cache.recent_masternode_lists();
+            for list in recent_lists {
+                if let Some(quorum) = list.quorum_entry_of_type_for_quorum_hash(llmq_type.clone(), llmq_hash.reversed()) {
+                    println!("get_quorum_public_key: Found {}: {}: {} = {}", llmq_type, llmq_hash.to_hex(), core_chain_locked_height, quorum.public_key.to_hex());
+                    return Ok(quorum.public_key);
+                }
+            }
+            println!("get_quorum_public_key: Not Found {}: {}: {}", llmq_type, llmq_hash.to_hex(), core_chain_locked_height);
+            Err(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {} ({})", llmq_type, llmq_hash.to_hex(), llmq_hash.reversed().to_hex())))
+            // let maybe_llmq_public_key = processor_arc_clone.current_masternode_list(true)
+            //     .and_then(|last| last.quorum_entry_of_type_for_quorum_hash(llmq_type.clone(), llmq_hash.reversed()).cloned())
+            //     .map(|llmq| llmq.public_key);
+            // maybe_llmq_public_key.ok_or()
         });
         let platform = Arc::new(PlatformSDK::new(
             Arc::new(PlatformCache::default()),

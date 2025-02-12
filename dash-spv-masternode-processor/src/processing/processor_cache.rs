@@ -5,12 +5,10 @@ use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use hashes::hex::ToHex;
 use indexmap::IndexSet;
-use dash_spv_crypto::llmq::entry::LLMQEntryVerificationStatus;
-use dash_spv_crypto::llmq::LLMQEntry;
+use dash_spv_crypto::llmq::{LLMQEntry, LLMQEntryValidationStatus};
 use dash_spv_crypto::network::LLMQType;
 use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 use crate::models::masternode_entry::{previous_entry_hashes_to_string, previous_operator_public_keys_to_string, previous_validity_to_string};
-use crate::models::sync_state::CacheState;
 use crate::processing::{CoreProvider, MasternodeProcessor};
 
 #[derive(Clone, Default)]
@@ -59,7 +57,7 @@ impl RetrievalQueue {
             let h2 = processor.height_for_block_hash(*hash2);
             h1.cmp(&h2)
         });
-        processor.provider.notify_sync_state(CacheState::queue(self.queue.len(), self.max_amount));
+        // processor.provider.notify_sync_state(CacheState::queue(self.queue.len(), self.max_amount));
     }
 
     pub fn clear(&mut self) {
@@ -889,11 +887,11 @@ impl MasternodeProcessorCache {
                             if let Some(new_map) = list.quorums.get(llmq_type) {
                                 if let Some(new_entry) = new_map.get(llmq_hash) {
                                     let mut debug_string = String::new();
-                                    if new_entry.verified == LLMQEntryVerificationStatus::Verified && old_entry.verified != LLMQEntryVerificationStatus::Verified {
-                                        old_entry.verified = LLMQEntryVerificationStatus::Verified;
+                                    if new_entry.is_verified() && old_entry.is_not_verified() {
+                                        old_entry.verified = LLMQEntryValidationStatus::Verified;
                                         debug_string.push_str("verified");
                                     }
-                                    if old_entry.commitment_hash.is_none() && new_entry.commitment_hash.is_some() {
+                                    if !old_entry.commitment_hash.eq(&new_entry.commitment_hash) {
                                         debug_string.push_str(format!("(commitment_hash: {})", new_entry.commitment_hash.as_ref().map_or("None".to_string(), |h| h.to_hex())).as_str());
                                         old_entry.commitment_hash = new_entry.commitment_hash;
                                     }
@@ -1040,6 +1038,9 @@ impl MasternodeProcessorCache {
     pub fn get_last_queried_qr_masternode_list_at_h(&self) -> Option<MasternodeList> {
         self.read_last_qr_list_at_h(|lock| lock.clone())
             .and_then(|block_hash: [u8; 32]| self.masternode_list_by_block_hash(block_hash))
+    }
+    pub fn has_last_queried_qr_masternode_list_at_h(&self) -> bool {
+        self.read_last_qr_list_at_h(Option::is_some)
     }
     pub fn set_last_queried_qr_masternode_list_at_h(&self, list_block_hash: [u8; 32]) {
         self.write_last_qr_list_at_h(|lock| *lock = Some(list_block_hash));

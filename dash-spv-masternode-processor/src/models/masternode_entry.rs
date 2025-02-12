@@ -8,7 +8,7 @@ use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
 use dash_spv_crypto::consensus::Encodable;
-use dash_spv_crypto::crypto::byte_util::{Reversed, UInt160, UInt256, Zeroable};
+use dash_spv_crypto::crypto::byte_util::{UInt160, UInt256, Zeroable};
 use dash_spv_crypto::keys::{ECDSAKey, OperatorPublicKey};
 use dash_spv_crypto::network::{ChainType, CORE_PROTO_19_2};
 use dash_spv_crypto::util::address;
@@ -22,7 +22,9 @@ pub struct MasternodeReadContext(pub u32, pub u16, pub u32);
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[ferment_macro::export]
 pub struct MasternodeEntry {
+    /// The hash of the ProRegTx that identifies the masternode
     pub provider_registration_transaction_hash: [u8; 32],
+    /// The hash of the block at which the masternode got confirmed
     pub confirmed_hash: [u8; 32],
     pub confirmed_hash_hashed_with_provider_registration_transaction_hash: Option<[u8; 32]>,
     pub socket_address: SocketAddress,
@@ -32,8 +34,11 @@ pub struct MasternodeEntry {
     pub previous_validity: BTreeMap<Block, bool>,
     pub known_confirmed_at_height: Option<u32>,
     pub update_height: u32,
+    /// The public key hash used for voting
     pub key_id_voting: [u8; 20],
+    /// True if a masternode is not PoSe-banned
     pub is_valid: bool,
+    /// protocol_version >= 70227
     pub mn_type: MasternodeType,
     pub platform_http_port: u16,
     pub platform_node_id: [u8; 20],
@@ -303,21 +308,9 @@ impl MasternodeEntry {
 
 
 
-    pub fn score(&self, modifier: [u8; 32], block_height: u32) -> Option<[u8; 32]> {
-        if self.provider_registration_transaction_hash.reversed().to_hex() == "7afccfe4be5bca95906efd36c2e887dc64b74cc7548c3f3478c9656ef39d3b11" {
-            println!("height is {}, this guy is valid {}", block_height, self.is_valid_at(block_height));
-        }
-        if !self.is_valid_at(block_height) ||
-            self.confirmed_hash.is_zero() ||
-            self.confirmed_hash_at(block_height + 8).is_none() { //todo remove +8 when we merge instead of overwriting known_confirmed_at_height
-            if self.provider_registration_transaction_hash.reversed().to_hex() == "7afccfe4be5bca95906efd36c2e887dc64b74cc7548c3f3478c9656ef39d3b11" {
-                println!("we are returning none, {:?}, {:?}", self.confirmed_hash_at(block_height), self.known_confirmed_at_height);
-            }
-            return None;
-        }
+    pub fn score(&self, modifier: [u8; 32], block_height: u32, confirmed_hash: Option<[u8; 32]>) -> Option<[u8; 32]> {
         let mut buffer: Vec<u8> = Vec::new();
-        //todo remove +8 when we merge instead of overwriting known_confirmed_at_height
-        if let Some(hash) = self.confirmed_hash_hashed_with_pro_reg_tx_hash_at(block_height + 8) {
+        if let Some(hash) = confirmed_hash {
             hash.enc(&mut buffer);
         }
         modifier.enc(&mut buffer);
@@ -432,19 +425,6 @@ impl MasternodeEntry {
     pub fn print_description(&self) {
         println!("{}", self);
     }
-    pub fn confirmed_hash_hashed_with_pro_reg_tx_hash_at(
-        &self,
-        block_height: u32,
-    ) -> Option<[u8; 32]> {
-        if self.known_confirmed_at_height.is_none() || self.known_confirmed_at_height? <= block_height {
-            self.confirmed_hash_hashed_with_provider_registration_transaction_hash
-        } else {
-            Some(Self::hash_confirmed_hash(
-                [0u8; 32],
-                self.provider_registration_transaction_hash,
-            ))
-        }
-    }
 
     pub fn host(&self) -> String {
         format!("{}", self.socket_address)
@@ -453,6 +433,17 @@ impl MasternodeEntry {
         self.known_confirmed_at_height
             .and_then(|h| (h <= block_height)
                 .then_some(self.confirmed_hash))
+    }
+
+    pub fn confirmed_hash_hashed_with_pro_reg_tx_hash_at(
+        &self,
+        block_height: u32,
+    ) -> Option<[u8; 32]> {
+        if self.known_confirmed_at_height.is_none() || self.known_confirmed_at_height? <= block_height {
+            self.confirmed_hash_hashed_with_provider_registration_transaction_hash
+        } else {
+            Some(Self::hash_confirmed_hash([0u8; 32], self.provider_registration_transaction_hash))
+        }
     }
 
     pub fn address_is_equal_to(&self, addr: [u8; 16]) -> bool {
