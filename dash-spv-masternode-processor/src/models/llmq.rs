@@ -50,10 +50,11 @@ impl LLMQVerificationContext {
 pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, block_height: u32) -> Result<(), CoreProviderError> {
     let commitment_hash = entry.generate_commitment_hash();
     let use_legacy = entry.version.use_bls_legacy();
+    let llmq_type = entry.llmq_type;
     let llmq_hash = entry.llmq_hash;
     let aggregated_signature = entry.all_commitment_aggregated_signature;
     let threshold_signature = entry.threshold_signature;
-    let count = min(entry.llmq_type.size() as usize, valid_masternodes.len());
+    let count = min(llmq_type.size() as usize, valid_masternodes.len());
     let operator_keys = valid_masternodes
         .iter()
         .enumerate()
@@ -73,11 +74,11 @@ pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, 
             block_height,
             operator_keys_count,
             valid_masternodes_count: valid_masternodes.len(),
-            llmq_type: entry.llmq_type.clone(),
+            llmq_type,
             llmq_hash,
             aggregated_signature
         };
-        warn!("INVALID AGGREGATED SIGNATURE {block_height} {} {} {} masternodes: {}, keys: {operator_keys_count}", entry.llmq_type, llmq_hash.to_hex(), aggregated_signature.to_hex(), valid_masternodes.len());
+        warn!("INVALID AGGREGATED SIGNATURE {block_height} {} {} {} masternodes: {}, keys: {operator_keys_count}", llmq_type, llmq_hash.to_hex(), aggregated_signature.to_hex(), valid_masternodes.len());
         entry.verified = LLMQEntryValidationStatus::Invalid(error.clone());
         return Err(CoreProviderError::QuorumValidation(error));
     }
@@ -90,17 +91,17 @@ pub fn validate(entry: &mut LLMQEntry, valid_masternodes: Vec<MasternodeEntry>, 
         use_legacy,
     );
     if !quorum_signature_validated {
-        warn!("INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, entry.llmq_type, threshold_signature.to_hex());
+        warn!("INVALID QUORUM SIGNATURE {}: {:?} ({})", block_height, llmq_type, threshold_signature.to_hex());
         let error = LLMQValidationError::InvalidQuorumSignature {
             block_height,
-            llmq_type: entry.llmq_type.clone(),
+            llmq_type,
             llmq_hash,
             threshold_signature,
         };
         entry.verified = LLMQEntryValidationStatus::Invalid(error.clone());
         return Err(CoreProviderError::QuorumValidation(error));
     }
-    println!("LLMQ of {} at {block_height}: {} verified", entry.llmq_type, llmq_hash.to_hex());
+    println!("LLMQ of {} at {block_height}: {} verified", llmq_type, llmq_hash.to_hex());
     entry.verified = LLMQEntryValidationStatus::Verified;
     Ok(())
 }

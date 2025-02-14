@@ -8,8 +8,7 @@ use crate::consensus::{Decodable, Encodable, encode::Error};
 use crate::crypto::byte_util::BytesDecodable;
 
 #[warn(non_camel_case_types)]
-#[repr(C)]
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub enum LLMQVersion {
     Default = 1,
@@ -35,7 +34,7 @@ impl LLMQVersion {
     }
 
     pub fn index(&self) -> u16 {
-        u16::from(self.clone())
+        u16::from(*self)
     }
 }
 

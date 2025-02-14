@@ -295,7 +295,7 @@ pub fn quorums_to_quorums_map(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<[
     value.into_iter().for_each(|llmq| {
         let entry = LLMQEntry::from(llmq);
         quorums
-            .entry(entry.llmq_type.clone())
+            .entry(entry.llmq_type)
             .or_insert_with(BTreeMap::new)
             .insert(entry.llmq_hash, entry);
 

@@ -105,6 +105,9 @@ impl From<&KeyKind> for u8 {
 
 #[ferment_macro::export]
 impl OpaqueKey {
+    pub fn has_kind(&self, kind: KeyKind) -> bool {
+        self.kind().eq(&kind)
+    }
     pub fn hash160(&self) -> [u8; 20] {
         match self {
             OpaqueKey::ECDSA(key) => key.hash160(),
@@ -401,6 +404,10 @@ impl From<&Vec<u32>> for IndexPath<u32> {
 
 #[ferment_macro::export]
 impl KeyKind {
+
+    pub fn equal_to_kind(&self, kind: KeyKind) -> bool {
+        kind.eq(self)
+    }
     pub fn index(&self) -> i16 {
         match self {
             KeyKind::ECDSA => 0,
@@ -761,4 +768,23 @@ impl IKey for OpaqueKey {
 #[ferment_macro::export]
 pub fn key_kind_from_index(index: i16) -> KeyKind {
     KeyKind::from(index)
+}
+
+
+#[ferment_macro::export]
+pub fn maybe_opaque_key_used_in_tx_input_script(
+    tx_input_script: Vec<u8>,
+    keys: Vec<OpaqueKey>,
+    chain: ChainType
+) -> Option<OpaqueKey> {
+    for key in keys {
+        let chain_script_map = chain.script_map();
+        if let Some(script_address) = address::with_script_pub_key(&tx_input_script, &chain_script_map) {
+            let key_addr = address::with_public_key_data_and_script_pub_key(&key.public_key_data(), chain_script_map.pubkey);
+            if script_address.eq(&key_addr) {
+                return Some(key);
+            }
+        }
+    }
+    None
 }

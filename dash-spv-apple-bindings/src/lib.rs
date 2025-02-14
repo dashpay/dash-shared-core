@@ -28,6 +28,7 @@ pub extern crate merk;
 pub extern crate bitcoin_hashes as hashes;
 
 use std::collections::BTreeMap;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use dpp::data_contract::DataContract;
 use dpp::identity::identity_public_key::IdentityPublicKey;
@@ -36,7 +37,7 @@ use dpp::prelude::CoreBlockHeight;
 use dpp::errors::ProtocolError;
 use drive_proof_verifier::error::ContextProviderError;
 use hashes::hex::ToHex;
-use dash_spv_crypto::network::{ChainType, LLMQType};
+use dash_spv_crypto::network::{ChainType, IHaveChainSettings, LLMQType};
 use dash_spv_masternode_processor::common::block::{Block, MBlock};
 use dash_spv_masternode_processor::models::{masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 use dash_spv_masternode_processor::processing::core_provider::CoreProviderError;
@@ -53,6 +54,12 @@ pub struct DashSPVCore {
     pub processor: Arc<MasternodeProcessor>,
     pub platform: Arc<PlatformSDK>,
     context: *const std::os::raw::c_void,
+}
+
+impl Debug for DashSPVCore {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("[{}] [SPVCore]", self.processor.provider.chain_type().name()).as_str())
+    }
 }
 
 #[ferment_macro::export]
@@ -135,19 +142,8 @@ impl DashSPVCore {
         let processor_arc_clone = Arc::clone(&processor_arc);
         let get_quorum_public_key = Arc::new(move |llmq_type: u32, llmq_hash: [u8; 32], core_chain_locked_height: u32| {
             let llmq_type = LLMQType::from_u16(llmq_type as u16);
-            let recent_lists = processor_arc_clone.cache.recent_masternode_lists();
-            for list in recent_lists {
-                if let Some(quorum) = list.quorum_entry_of_type_for_quorum_hash(llmq_type.clone(), llmq_hash.reversed()) {
-                    println!("get_quorum_public_key: Found {}: {}: {} = {}", llmq_type, llmq_hash.to_hex(), core_chain_locked_height, quorum.public_key.to_hex());
-                    return Ok(quorum.public_key);
-                }
-            }
-            println!("get_quorum_public_key: Not Found {}: {}: {}", llmq_type, llmq_hash.to_hex(), core_chain_locked_height);
-            Err(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {} ({})", llmq_type, llmq_hash.to_hex(), llmq_hash.reversed().to_hex())))
-            // let maybe_llmq_public_key = processor_arc_clone.current_masternode_list(true)
-            //     .and_then(|last| last.quorum_entry_of_type_for_quorum_hash(llmq_type.clone(), llmq_hash.reversed()).cloned())
-            //     .map(|llmq| llmq.public_key);
-            // maybe_llmq_public_key.ok_or()
+            processor_arc_clone.cache.find_llmq_entry_public_key(llmq_type, llmq_hash.reversed())
+                .ok_or(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {} ({})", llmq_type, llmq_hash.to_hex(), llmq_hash.reversed().to_hex())))
         });
         let platform = Arc::new(PlatformSDK::new(
             Arc::new(PlatformCache::default()),

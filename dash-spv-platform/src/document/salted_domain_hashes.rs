@@ -86,11 +86,11 @@ impl SaltedDomainHashesManager {
 
     pub async fn stream_preorder_salted_domain_hash_with_contract(&self, hash: Vec<u8>, contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<Option<Document>, Error> {
         let query = self.query_preorder_salted_domain_hash(contract, hash)?;
-        self.stream_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
     pub async fn stream_preorder_salted_domain_hashes_with_contract(&self, hashes: Vec<Vec<u8>>, contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_preorder_salted_domain_hashes(contract, hashes)?;
-        self.stream_many_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_many_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
 
 }

@@ -456,7 +456,7 @@ pub fn from_entry_pool(
 pub fn quorum_vec_to_map(vec: Vec<LLMQEntry>) -> BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>> {
     vec.into_iter()
         .fold(BTreeMap::new(), |mut acc, entry| {
-            acc.entry(entry.llmq_type.clone())
+            acc.entry(entry.llmq_type)
                 .or_insert_with(BTreeMap::new)
                 .insert(entry.llmq_hash, entry);
             acc

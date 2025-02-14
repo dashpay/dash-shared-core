@@ -287,8 +287,7 @@ pub const LLMQ_DEV_PLATFORM: LLMQParams = LLMQParams {
 };
 
 #[warn(non_camel_case_types)]
-#[repr(C)]
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[ferment_macro::export]
 pub enum LLMQType {
     LlmqtypeUnknown = 0,    // other kind of

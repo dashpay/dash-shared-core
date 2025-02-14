@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use hashes::hex::ToHex;
 use indexmap::IndexSet;
 use dash_spv_crypto::llmq::{LLMQEntry, LLMQEntryValidationStatus};
-use dash_spv_crypto::network::LLMQType;
+use dash_spv_crypto::network::{IHaveChainSettings, LLMQType};
 use crate::models::{llmq_indexed_hash::LLMQIndexedHash, masternode_entry::MasternodeEntry, masternode_list::MasternodeList, snapshot::LLMQSnapshot};
 use crate::models::masternode_entry::{previous_entry_hashes_to_string, previous_operator_public_keys_to_string, previous_validity_to_string};
 use crate::processing::{CoreProvider, MasternodeProcessor};
@@ -119,15 +119,7 @@ pub struct MasternodeProcessorCache {
 
 impl std::fmt::Debug for MasternodeProcessorCache {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MasternodeProcessorCache")
-            .field("llmq_members", &self.llmq_members)
-            .field("llmq_indexed_members", &self.llmq_indexed_members)
-            .field("llmq_snapshots", &self.llmq_snapshots)
-            .field("mn_lists", &self.mn_lists)
-            .field("cl_signatures", &self.cl_signatures)
-            .field("needed_masternode_lists", &self.needed_masternode_lists)
-            .field("lists_awaiting_quorum_validation", &self.list_awaiting_quorum_validation)
-            .finish()
+        f.write_str(format!("[{}] [CACHE]", self.dispatcher.chain_type().name()).as_str())
     }
 }
 
@@ -634,7 +626,7 @@ impl MasternodeProcessorCache {
         debug_string.push_str(self.queue_description().as_str());
         debug_string.push_str(self.llmq_snapshots_description().as_str());
 
-        println!("[Cache] status: \n{debug_string}");
+        println!("{self:?} status: \n{debug_string}");
     }
 
     pub fn clear_llmq_members(&self) {
@@ -760,11 +752,11 @@ impl MasternodeProcessorCache {
             match lock.entry(block_hash) {
                 Entry::Vacant(vacant) => {
                     vacant.insert(list);
-                    println!("[CACHE] add_masternode_list (new): {h}: {} count: {old_count} + 1", block_hash.to_hex());
+                    println!("{self:?} add_masternode_list (new): {h}: {} count: {old_count} + 1", block_hash.to_hex());
                 }
                 Entry::Occupied(mut occupied) => {
                     let old = occupied.get_mut();
-                    let mut mn_diff = format!("[CACHE] add_masternode_list (merge): {h}: {} count: {old_count}\n", block_hash.to_hex());
+                    let mut mn_diff = format!("{self:?} add_masternode_list (merge): {h}: {} count: {old_count}\n", block_hash.to_hex());
                     list.masternodes.iter().for_each(|(pro_tx_hash, node)| {
                         if let Some(old_entry) = old.masternodes.get(pro_tx_hash) {
                             if !node.mn_type.eq(&old_entry.mn_type) {
@@ -896,7 +888,7 @@ impl MasternodeProcessorCache {
                                         old_entry.commitment_hash = new_entry.commitment_hash;
                                     }
                                     if !debug_string.is_empty() {
-                                        println!("[CACHE] add_masternode_list (llmq merge): {llmq_type}: {}: {}", new_entry.llmq_hash_hex(), debug_string);
+                                        println!("{self:?} add_masternode_list (llmq merge): {llmq_type}: {}: {}", new_entry.llmq_hash_hex(), debug_string);
                                     }
                                 }
                             }
@@ -933,7 +925,7 @@ impl MasternodeProcessorCache {
     pub fn all_needed_masternode_list(&self) -> HashSet<[u8; 32]> {
         let b_lock = self.cached_block_hash_heights.read().unwrap();
         let lock = self.needed_masternode_lists.read().unwrap();
-        println!("[CACHE] all_needed_masternode_list: {}", lock.iter().fold(String::new(), |mut acc, h| {
+        println!("{self:?} all_needed_masternode_list: {}", lock.iter().fold(String::new(), |mut acc, h| {
             acc.push_str(format!("\t{}:{},\n", b_lock.get(h).unwrap_or(&u32::MAX), h.to_hex()).as_str());
             acc
         }));
@@ -947,14 +939,29 @@ impl MasternodeProcessorCache {
         self.write_needed_masternode_lists(|lock| lock.extend(lists))
     }
 
+    pub fn find_llmq_entry_public_key(&self, llmq_type: LLMQType, llmq_hash: [u8; 32]) -> Option<[u8; 48]> {
+        self.read_mn_lists(|lock| {
+            let mut sorted = Vec::from_iter(lock.values());
+            sorted.sort_by_key(|list| list.known_height);
+            for list in sorted.iter().rev() {
+                if let Some(LLMQEntry { public_key, .. }) = list.quorum_entry_of_type_for_quorum_hash(llmq_type, llmq_hash) {
+                    println!("{self:?} find_llmq_entry_public_key: Found in list at {} {}: {} = {}", list.known_height, llmq_type, llmq_hash.to_hex(), public_key.to_hex());
+                    return Some(public_key.clone());
+                }
+            }
+            println!("{self:?} find_llmq_entry_public_key: Not Found {}: {}", llmq_type, llmq_hash.to_hex());
+            None
+        })
+    }
+
     pub fn recent_masternode_lists(&self) -> Vec<MasternodeList> {
-        self.write_mn_lists(|lock| {
+        self.read_mn_lists(|lock| {
             let mut sorted = Vec::from_iter(lock.values().cloned());
             sorted.sort_by_key(|list| list.known_height);
-            println!("[CACHE] recent_masternode_lists: {}", sorted.iter().fold(String::new(), |mut acc, h| {
-                acc.push_str(format!("{}, ", h.known_height).as_str());
-                acc
-            }));
+            // println!("[CACHE] recent_masternode_lists: {}", sorted.iter().fold(String::new(), |mut acc, h| {
+            //     acc.push_str(format!("{}, ", h.known_height).as_str());
+            //     acc
+            // }));
             sorted
         })
     }

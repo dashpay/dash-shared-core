@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use dpp::identity::{Identity, IdentityPublicKey, KeyType};
@@ -16,7 +17,7 @@ use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
 use dash_spv_crypto::hashes::{hash160, Hash};
 use dash_spv_crypto::hashes::hex::ToHex;
 use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
-use dash_spv_crypto::network::ChainType;
+use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::error::Error;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 const KEYS_TO_CHECK: u32 = 5;
@@ -67,7 +68,7 @@ impl StreamSpec for IdentityValidator {
 }
 
 
-#[derive(Clone, Debug, StreamManager)]
+#[derive(Clone, StreamManager)]
 #[ferment_macro::opaque]
 pub struct IdentitiesManager {
     pub sdk: Arc<Sdk>,
@@ -77,6 +78,12 @@ pub struct IdentitiesManager {
     pub has_recent_identities_sync: bool,
     // key is wallet_unique_id
     pub all_identities: Arc<RwLock<BTreeMap<String, BTreeMap<[u8; 20], Identity>>>>,
+}
+
+impl Debug for IdentitiesManager {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("[{}] [IdentitiesManager]", self.chain_type.name()).as_str())
+    }
 }
 
 impl IdentitiesManager {
@@ -104,20 +111,20 @@ impl IdentitiesManager {
     pub async fn get_identities_for_wallets_public_keys(&self, wallets: BTreeMap<String, Vec<[u8; 20]>>) -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
         let mut all_identities = BTreeMap::new();
         for (wallet_id, key_hashes) in wallets.into_iter() {
-            println!("get_identities_for_wallets_public_keys -> {} -- {:?}", wallet_id, key_hashes);
+            println!("{self:?} get_identities_for_wallets_public_keys -> {} -- {:?}", wallet_id, key_hashes);
             let mut identities = BTreeMap::new();
             for key_hash in key_hashes {
                 let identity_result = Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), DEFAULT_SETTINGS).await;
                 match identity_result {
                     Ok(Some(identity)) => {
-                        println!("Ok::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: {}", wallet_id, key_hash.to_hex(), identity.id().to_buffer().to_hex());
+                        println!("{self:?} Ok::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: {}", wallet_id, key_hash.to_hex(), identity.id().to_buffer().to_hex());
                         identities.insert(key_hash, identity);
                     },
                     Ok(None) => {
-                        println!("None::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: None", wallet_id, key_hash.to_hex());
+                        println!("{self:?} None::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: None", wallet_id, key_hash.to_hex());
                     }
                     Err(error) => {
-                        println!("Error::get_identities_for_wallets -> wallet_id: {}: index: {}: error: {}", wallet_id, key_hash.to_hex(), error.to_string());
+                        println!("{self:?} Error::get_identities_for_wallets -> wallet_id: {}: index: {}: error: {}", wallet_id, key_hash.to_hex(), error.to_string());
                     }
                 }
             }
@@ -133,14 +140,14 @@ impl IdentitiesManager {
         for key_hash in key_hashes.into_iter() {
             match Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), DEFAULT_SETTINGS).await {
                 Ok(Some(identity)) => {
-                    println!("Ok::get_identities_for_wallets -> key_hash: {}: identity_id: {}", key_hash.to_hex(), identity.id().to_buffer().to_hex());
+                    println!("{self:?} Ok::get_identities_for_wallets -> key_hash: {}: identity_id: {}", key_hash.to_hex(), identity.id().to_buffer().to_hex());
                     identities.insert(key_hash, identity);
                 },
                 Ok(None) => {
-                    println!("None::get_identities_for_wallets -> key_hash: {}: identity_id: None", key_hash.to_hex());
+                    println!("{self:?} None::get_identities_for_wallets -> key_hash: {}: identity_id: None", key_hash.to_hex());
                 }
                 Err(error) => {
-                    println!("Error::get_identities_for_wallets -> key_hash: {}: error: {}", key_hash.to_hex(), error.to_string());
+                    println!("{self:?} Error::get_identities_for_wallets -> key_hash: {}: error: {}", key_hash.to_hex(), error.to_string());
                 }
             }
         }
@@ -176,10 +183,10 @@ impl IdentitiesManager {
         self.stream::<IdentityValidator, Identity, PublicKeyHash>(PublicKeyHash(key_hash), retry, options).await
     }
     pub async fn monitor_with_delay(&self, unique_id: [u8; 32], retry: RetryStrategy, options: IdentityValidator, delay: u64) -> Result<Option<Identity>, Error> {
-        self.stream_with_settings::<IdentityValidator, Identity, Identifier>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_with_settings::<IdentityValidator, Identity, Identifier>(Identifier::from(unique_id), retry, StreamSettings::default_with_delay(delay), options).await
     }
     pub async fn monitor_for_key_hashes(&self, key_hashes: Vec<[u8; 20]>, retry: RetryStrategy, options: IdentityValidator) -> Result<BTreeMap<[u8; 20], Identity>, Error> {
-        println!("monitor_for_key_hashes: {}", key_hashes.len());
+        println!("{self:?} monitor_for_key_hashes: {}", key_hashes.len());
         let mut identities = BTreeMap::new();
         for key_hash in key_hashes.into_iter() {
             match self.monitor_for_key_hash(key_hash, retry.clone(), options.clone()).await {
@@ -196,14 +203,14 @@ impl IdentitiesManager {
                         acc.push_str(format!("{}:{}", *key_id, debug_key).as_str());
                         acc
                     });
-                    println!("Ok::monitor_for_key_hashes -> key_hash: {}: identity: [id: {}, balance: {}, revision: {}, public_keys: {}]", key_hash.to_hex(), identity.balance(), identity.revision(), identity_id.to_buffer().to_hex(), debug_keys);
+                    println!("{self:?} Ok::monitor_for_key_hashes -> key_hash: {}: identity: [id: {}, balance: {}, revision: {}, public_keys: {}]", key_hash.to_hex(), identity.balance(), identity.revision(), identity_id.to_buffer().to_hex(), debug_keys);
                     identities.insert(key_hash, identity);
                 },
                 Ok(None) => {
-                    println!("None::monitor_for_key_hashes -> key_hash: {}: identity: None", key_hash.to_hex());
+                    println!("{self:?} None::monitor_for_key_hashes -> key_hash: {}: identity: None", key_hash.to_hex());
                 }
                 Err(error) => {
-                    println!("Error::monitor_for_key_hashes -> key_hash: {}: error: {:?}", key_hash.to_hex(), error);
+                    println!("{self:?} Error::monitor_for_key_hashes -> key_hash: {}: error: {:?}", key_hash.to_hex(), error);
                 }
             }
         }

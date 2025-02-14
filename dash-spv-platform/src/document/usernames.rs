@@ -100,11 +100,11 @@ impl UsernamesManager {
 
     pub async fn stream_username_with_contract(&self, domain: String, username: String, contract: DataContract, retry: RetryStrategy, options: UsernameValidator, delay: u64) -> Result<Option<Document>, Error> {
         let query = self.query_username(contract, domain, username)?;
-        self.stream_with_settings::<UsernameValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_with_settings::<UsernameValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
     pub async fn stream_usernames_with_contract(&self, domain: String, usernames: Vec<String>, contract: DataContract, retry: RetryStrategy, options: UsernameValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_usernames(contract, domain, usernames)?;
-        self.stream_many_with_settings::<UsernameValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_many_with_settings::<UsernameValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
 
 }

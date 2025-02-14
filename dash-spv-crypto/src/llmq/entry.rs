@@ -204,8 +204,8 @@ impl LLMQEntry {
         all_commitment_aggregated_signature: [u8; 96],
     ) -> Self {
         let q_data = generate_data(
-            u16::from(version.clone()),
-            u8::from(llmq_type.clone()),
+            u16::from(version),
+            u8::from(llmq_type),
             llmq_hash,
             index,
             &signers,
@@ -304,8 +304,8 @@ impl LLMQEntry {
 impl LLMQEntry {
     pub fn to_data(&self) -> Vec<u8> {
         generate_data(
-            u16::from(self.version.clone()),
-            u8::from(self.llmq_type.clone()),
+            u16::from(self.version),
+            u8::from(self.llmq_type),
             self.llmq_hash,
             self.index,
             &self.signers,
@@ -319,7 +319,7 @@ impl LLMQEntry {
     pub fn commitment_data(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
-        let llmq_type = VarInt(self.llmq_type.clone() as u64);
+        let llmq_type = VarInt(u64::from(&self.llmq_type));
         *offset += llmq_type.enc(&mut buffer);
         *offset += self.llmq_hash.enc(&mut buffer);
         *offset += self.valid_members.enc(&mut buffer);

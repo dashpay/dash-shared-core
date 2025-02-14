@@ -99,7 +99,7 @@ impl ContractsManager {
         self.stream::<ContractValidator, DataContract, Identifier>(Identifier::from(unique_id), retry, options).await
     }
     pub async fn monitor_with_delay(&self, unique_id: [u8; 32], retry: RetryStrategy, options: ContractValidator, delay: u64) -> Result<Option<DataContract>, Error> {
-        self.stream_with_settings::<ContractValidator, DataContract, Identifier>(Identifier::from(unique_id), retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_with_settings::<ContractValidator, DataContract, Identifier>(Identifier::from(unique_id), retry, StreamSettings::default_with_delay(delay), options).await
     }
 }
 

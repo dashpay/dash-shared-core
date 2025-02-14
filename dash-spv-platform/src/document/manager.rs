@@ -159,7 +159,7 @@ impl DocumentsManager {
     }
     pub async fn stream_dpns_documents_for_identity_with_user_id_using_contract(&self, user_id: [u8; 32], contract: DataContract, retry: RetryStrategy, options: DocumentValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_dpns_documents_for_identity_with_user_id(contract, user_id)?;
-        self.stream_many_with_settings::<DocumentValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_many_with_settings::<DocumentValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
 
     pub async fn dpns_documents_for_username(&self, username: String) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
@@ -205,7 +205,7 @@ impl DocumentsManager {
     }
     pub async fn stream_dashpay_profile_for_user_id_using_contract(&self, user_id: [u8; 32], contract: DataContract, retry: RetryStrategy, options: DocumentValidator, delay: u64) -> Result<Option<Document>, Error> {
         let query = self.query_dashpay_profile_for_user_id(contract, user_id)?;
-        self.stream_with_settings::<DocumentValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_with_settings::<DocumentValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
 
     pub async fn dashpay_profiles_for_user_ids_using_contract(&self, user_ids: Vec<[u8; 32]>, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
@@ -214,7 +214,7 @@ impl DocumentsManager {
     }
     pub async fn stream_dashpay_profiles_for_user_ids_using_contract(&self,  user_ids: Vec<[u8; 32]>, contract: DataContract, retry: RetryStrategy, options: DocumentValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_dashpay_profiles_for_user_ids(contract, user_ids)?;
-        self.stream_many_with_settings::<DocumentValidator, Document, DocumentQuery>(query, retry, StreamSettings::default().with_delay(delay), options).await
+        self.stream_many_with_settings::<DocumentValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
 
     pub async fn dpns_documents_for_username_using_contract(&self, username: String, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {

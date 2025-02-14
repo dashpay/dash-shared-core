@@ -13,11 +13,11 @@ impl LLMQModifierType {
         let mut writer = vec![];
         match self {
             LLMQModifierType::PreCoreV20(llmq_type, block_hash) => {
-                VarInt(llmq_type.clone() as u64).enc(&mut writer);
+                VarInt(u64::from(llmq_type)).enc(&mut writer);
                 block_hash.enc(&mut writer);
             },
             LLMQModifierType::CoreV20(llmq_type, block_height, cl_signature) => {
-                VarInt(llmq_type.clone() as u64).enc(&mut writer);
+                VarInt(u64::from(llmq_type)).enc(&mut writer);
                 block_height.enc(&mut writer);
                 cl_signature.enc(&mut writer);
             }

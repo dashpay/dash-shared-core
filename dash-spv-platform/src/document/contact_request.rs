@@ -5,12 +5,48 @@ use dash_sdk::Sdk;
 use dash_spv_macro::StreamManager;
 use dpp::data_contract::DataContract;
 use dpp::data_contracts::SystemDataContract;
+use dpp::document::Document;
 use drive_proof_verifier::types::Documents;
 use dash_spv_crypto::network::ChainType;
+use drive_proof_verifier::types::RetrievedObjects;
+use indexmap::IndexMap;
+use platform_value::Identifier;
 use crate::error::Error;
 use crate::models::contact_request::{ContactRequest, ContactRequestKind};
 use crate::query::{order_by_asc_created_at, where_created_since, where_owner_is, where_recipient_is};
-use crate::util::StreamManager;
+use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
+
+#[derive(Clone)]
+#[ferment_macro::export]
+pub enum ContactRequestValidator {
+    None = 0,
+    AcceptNotFoundAsNotAnError = 1,
+}
+impl ContactRequestValidator {
+    pub fn accept_not_found(&self) -> bool {
+        match self {
+            ContactRequestValidator::None => false,
+            ContactRequestValidator::AcceptNotFoundAsNotAnError => true
+        }
+    }
+}
+impl Validator<Option<Document>> for ContactRequestValidator {
+    fn validate(&self, value: &Option<Document>) -> bool {
+        value.is_some() || value.is_none() && self.accept_not_found()
+    }
+}
+impl Validator<RetrievedObjects<Identifier, Document>> for ContactRequestValidator {
+    fn validate(&self, _value: &RetrievedObjects<Identifier, Document>) -> bool {
+        true
+        // value.is_some() || value.is_none() && self.accept_not_found()
+    }
+}
+impl StreamSpec for ContactRequestValidator {
+    type Validator = ContactRequestValidator;
+    type Error = dash_sdk::Error;
+    type Result = Option<Document>;
+    type ResultMany = IndexMap<Identifier, Option<Document>>;
+}
 
 #[derive(Clone, Debug, StreamManager)]
 #[ferment_macro::opaque]
@@ -73,6 +109,34 @@ impl ContactRequestManager {
             |contract, (user_id, since, start_after)|
                 self.outgoing_contact_requests_using_contract(contract, user_id, since, start_after)).await
     }
+
+
+
+    pub async fn stream_incoming_contact_requests(&self, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>, retry: RetryStrategy, options: ContactRequestValidator, delay: u64) -> Result<Vec<ContactRequestKind>, Error> {
+        self.with_contract(
+            SystemDataContract::Dashpay,
+            (user_id, since, start_after, retry, options, delay),
+            |contract, (user_id, since, start_after, retry, options, delay)|
+                self.stream_incoming_contact_requests_with_contract(user_id, since, start_after, contract, retry, options, delay)).await
+    }
+    pub async fn stream_incoming_contact_requests_with_contract(&self, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>, contract: DataContract, retry: RetryStrategy, options: ContactRequestValidator, delay: u64) -> Result<Vec<ContactRequestKind>, Error> {
+        let query = self.query_incoming_contact_requests(contract, user_id, since, start_after)?;
+        self.stream_many_with_settings::<ContactRequestValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
+            .map(|docs| process_contact_requests(&user_id, docs))
+    }
+
+    pub async fn stream_outgoing_contact_requests(&self, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>, retry: RetryStrategy, options: ContactRequestValidator, delay: u64) -> Result<Vec<ContactRequestKind>, Error> {
+        self.with_contract(
+            SystemDataContract::Dashpay,
+            (user_id, since, start_after, retry, options, delay),
+            |contract, (user_id, since, start_after, retry, options, delay)|
+                self.stream_outgoing_contact_requests_with_contract(user_id, since, start_after, contract, retry, options, delay)).await
+    }
+    pub async fn stream_outgoing_contact_requests_with_contract(&self, user_id: [u8; 32], since: u64, start_after: Option<Vec<u8>>, contract: DataContract, retry: RetryStrategy, options: ContactRequestValidator, delay: u64) -> Result<Vec<ContactRequestKind>, Error> {
+        let query = self.query_outgoing_contact_requests(contract, user_id, since, start_after)?;
+        self.stream_many_with_settings::<ContactRequestValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
+            .map(|docs| process_contact_requests(&user_id, docs))
+    }
 }
 
 fn process_contact_requests(user_id: &[u8; 32], documents: Documents) -> Vec<ContactRequestKind> {
@@ -90,3 +154,17 @@ fn process_contact_requests(user_id: &[u8; 32], documents: Documents) -> Vec<Con
     }))
 }
 
+#[ferment_macro::export]
+pub fn as_incoming_request(kind: ContactRequestKind) -> Option<ContactRequest> {
+    match kind {
+        ContactRequestKind::Incoming(request) => Some(request),
+        _ => None
+    }
+}
+#[ferment_macro::export]
+pub fn as_outgoing_request(kind: ContactRequestKind) -> Option<ContactRequest> {
+    match kind {
+        ContactRequestKind::Outgoing(request) => Some(request),
+        _ => None
+    }
+}

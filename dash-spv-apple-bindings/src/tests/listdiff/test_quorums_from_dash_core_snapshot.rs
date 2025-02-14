@@ -36,7 +36,7 @@ pub fn test_from_snapshot() {
         // let llmq_block_height = get_height(entry.llmq_hash);
         // println!("rotated_quorum: ({}: {})\n {:#?}", llmq_block_height, entry.llmq_hash, entry);
         let masternodes = processor.get_rotated_masternodes_for_quorum(
-            entry.llmq_type.clone(),
+            entry.llmq_type,
             entry.llmq_hash,
             llmq_block_height,
             false,

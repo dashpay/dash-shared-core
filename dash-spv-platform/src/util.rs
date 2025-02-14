@@ -15,7 +15,6 @@ use crate::error::Error;
 
 pub const NONE_ERROR: &str = "Platform returned none while some was expected";
 
-
 pub trait Validator<T> {
     fn validate(&self, value: &T) -> bool;
 }
@@ -27,9 +26,11 @@ pub trait StreamSpec {
     type ResultMany;
 }
 pub trait Pagination {
+    type Offset;
     type Item;
     fn has_next(&self) -> bool;
     fn len(&self) -> usize;
+    fn offset(&self) -> Self::Offset;
     fn extend(&mut self, items: Vec<Self::Item>);
     fn into_items(self) -> Vec<Self::Item>;
 }
@@ -73,6 +74,11 @@ impl<SPEC> Default for StreamSettings<SPEC> where SPEC: StreamSpec {
 }
 
 impl<SPEC> StreamSettings<SPEC> where SPEC: StreamSpec {
+    pub fn default_with_delay(delay: u64) -> Self {
+        let mut s = Self::default();
+        s.delay = delay;
+        s
+    }
     pub fn with_delay(mut self, delay: u64) -> Self {
         self.delay = delay;
         self
@@ -198,42 +204,44 @@ impl<SPEC> StreamStrategy<SPEC> where SPEC: StreamSpec {
         }
 
     }
-    pub async fn paginated_stream<F, Fut, BN>(
-        self,
-        f: F,
-        mut shift: u32,
-        mut notifier: BN,
-    ) -> Result<SPEC::Result, SPEC::Error>
-    where SPEC::Result: Pagination + Default,
-        // N: Pagination + NoneCondition<E> + Default,
-        F: Fn(u32) -> Fut,
-        Fut: Future<Output = Result<SPEC::Result, SPEC::Error>>,
-        BN: FnMut(&SPEC::Result) {
-        let mut results = SPEC::Result::default();
-        let mut retry_count = 0u32;
-        loop {
-            match f(shift).await {
-                Ok(batch) => {
-                    if let Some(ref validator) = self.settings.validator {
-                        if !validator.validate(&batch) {
-                            return Err(SPEC::Error::validation_error());
-                        }
-                    }
-                    notifier(&batch);
-                    results.extend(batch.into_items());
-                    if !results.has_next() {
-                        return Ok(results);
-                    }
-                    shift += results.len() as u32;
-                    retry_count = 0;
-                }
-                Err(_err) if self.has_retries_after(&mut retry_count) =>
-                    tokio::time::sleep(self.delay()).await,
-                Err(err) =>
-                    return Err(err),
-            }
-        }
-    }
+//     pub async fn paginated_stream<F, Fut, Q, BN>(
+//         self,
+//         f: F,
+//         mut shift: Q::Offset,
+//         mut notifier: BN,
+//     ) -> Result<SPEC::ResultMany, SPEC::Error>
+//     where SPEC::ResultMany: Pagination + Default,
+//         // N: Pagination + NoneCondition<E> + Default,
+//         F: Fn(Q::Offset) -> Fut,
+//         Fut: Future<Output = Result<SPEC::ResultMany, SPEC::Error>>,
+//         Q: ApplyOffset,
+//         BN: FnMut(&SPEC::ResultMany) + Send {
+//         let mut results = SPEC::ResultMany::default();
+//         let mut retry_count = 0u32;
+//         loop {
+//             match f(shift).await {
+//                 Ok(batch) => {
+//                     if let Some(ref validator) = self.settings.validator {
+//                         if !validator.validate(&batch) {
+//                             return Err(SPEC::Error::validation_error());
+//                         }
+//                     }
+//                     notifier(&batch);
+//                     results.extend(batch.into_items());
+//                     if !results.has_next() {
+//                         return Ok(results);
+//                     }
+//                     shift.apply_offset(batch.offset());
+//                     // shift += results.len() as u32;
+//                     retry_count = 0;
+//                 }
+//                 Err(_err) if self.has_retries_after(&mut retry_count) =>
+//                     tokio::time::sleep(self.delay()).await,
+//                 Err(err) =>
+//                     return Err(err),
+//             }
+//         }
+//     }
 }
 
 impl<SPEC> Default for StreamStrategy<SPEC>
@@ -308,7 +316,6 @@ pub trait StreamManager: Send + Sync {
                 .map_err(Error::from)
         }
     }
-
     fn stream_many<SPEC, ITEM, Q>(
         &self,
         query: Q,
@@ -328,11 +335,6 @@ pub trait StreamManager: Send + Sync {
         Q: Query<ITEM::Request>
             + Clone
             + Sync,
-        // O: MockResponse
-        //     + FromIterator<(Identifier, Option<ITEM>)>
-        //     + FromProof<ITEM::Request, Request=ITEM::Request, Response=<ITEM::Request as TransportRequest>::Response>
-        //     + Send
-        //     + Default
     {
         async move {
             let strategy = StreamStrategy::<SPEC>::with_retry(retry)
@@ -360,11 +362,6 @@ pub trait StreamManager: Send + Sync {
         Q: Query<ITEM::Request>
             + Clone
             + Sync,
-        // O: MockResponse
-        //     + FromIterator<(Identifier, Option<ITEM>)>
-        //     + FromProof<ITEM::Request, Request=ITEM::Request, Response=<ITEM::Request as TransportRequest>::Response>
-        //     + Send
-        //     + Default
     {
         async move {
             strategy.stream_many(|| {
