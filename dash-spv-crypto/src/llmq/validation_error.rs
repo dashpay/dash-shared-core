@@ -35,8 +35,8 @@ pub enum LLMQValidationError {
 impl Display for LLMQValidationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            LLMQValidationError::InvalidAggregatedSignature { block_height, operator_keys_count, valid_masternodes_count: scored_masternodes_count, llmq_type, llmq_hash, aggregated_signature } =>
-                format!("InvalidAggregatedSignature({block_height}: {llmq_type}: {}: {}: {operator_keys_count}/{scored_masternodes_count})", llmq_hash.to_hex(), aggregated_signature.to_hex()),
+            LLMQValidationError::InvalidAggregatedSignature { block_height, operator_keys_count, valid_masternodes_count, llmq_type, llmq_hash, aggregated_signature } =>
+                format!("InvalidAggregatedSignature({block_height}: {llmq_type}: {}: {}: {operator_keys_count}/{valid_masternodes_count})", llmq_hash.to_hex(), aggregated_signature.to_hex()),
             LLMQValidationError::InvalidQuorumSignature { block_height, llmq_type, llmq_hash, threshold_signature } =>
                 format!("InvalidQuorumSignature({block_height}: {llmq_type}: {}: {})", llmq_hash.to_hex(), threshold_signature.to_hex()),
             LLMQValidationError::InvalidSigners(message) =>

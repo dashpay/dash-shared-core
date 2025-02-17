@@ -39,7 +39,7 @@ pub enum CoreProviderError {
     BadBlockHash([u8; 32]),
     UnknownBlockHeightForHash([u8; 32]),
     BlockHashNotFoundAt(u32),
-    NoSnapshot,
+    NoSnapshot([u8; 32]),
     HexError(hashes::hex::Error),
     MissedMasternodeListAt([u8; 32]),
     QuorumValidation(LLMQValidationError)
@@ -52,10 +52,10 @@ impl std::fmt::Display for CoreProviderError {
             CoreProviderError::BadBlockHash(h) => format!("CoreProviderError::BadBlockHash({})", h.to_hex()),
             CoreProviderError::UnknownBlockHeightForHash(h) => format!("CoreProviderError::UnknownBlockHeightForHash({})", h.to_hex()),
             CoreProviderError::BlockHashNotFoundAt(h) => format!("CoreProviderError::BlockHashNotFound({h})"),
-            CoreProviderError::HexError(err) => "CoreProviderError::HexError".to_string(),
-            CoreProviderError::NoSnapshot => "CoreProviderError::NoSnapshot".to_string(),
+            CoreProviderError::HexError(err) => format!("CoreProviderError::HexError({err})"),
+            CoreProviderError::NoSnapshot(block_hash) => format!("CoreProviderError::NoSnapshot({})", block_hash.to_hex()),
             CoreProviderError::MissedMasternodeListAt(block_hash) => format!("CoreProviderError::MissedMasternodeListAt({})", block_hash.to_hex()),
-            CoreProviderError::QuorumValidation(status) => format!("CoreProviderError::QuorumValidation({:?})", status),
+            CoreProviderError::QuorumValidation(status) => format!("CoreProviderError::QuorumValidation({status})"),
         })
     }
 }

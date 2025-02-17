@@ -268,10 +268,8 @@ impl MasternodeProcessor {
                 self.cache.add_needed_masternode_lists(needed_masternode_lists.clone());
             }
         }
+        self.cache.write_mn_list_retrieval_queue(|lock| lock.remove_one(&block_hash));
         if !needed_masternode_lists.is_empty() {
-            self.cache.write_mn_list_retrieval_queue(|lock| {
-                lock.queue.shift_remove(&block_hash);
-            });
             let debug_info = needed_masternode_lists.format();
             println!("{self:?} missing lists:\n {}", debug_info);
             self.process_missing_masternode_lists(block_hash, needed_masternode_lists);
@@ -586,11 +584,11 @@ impl MasternodeProcessor {
         if !error_info.is_empty() {
             Err(ProcessingError::InvalidResult(error_info))
         } else {
-            let missed = self.cache.read_needed_masternode_lists(|lock| lock.clone());
+            let missed = self.cache.read_needed_masternode_lists(Clone::clone);
+            self.cache.write_qr_info_retrieval_queue(|lock| lock.remove_one(&block_hash));
             if missed.is_empty() {
                 Ok((base_block_hash, block_hash))
             } else {
-                self.cache.write_qr_info_retrieval_queue(|lock| lock.remove_one(&block_hash));
                 let debug_info = missed.format();
                 self.process_missing_masternode_lists(block_hash, missed);
                 Err(ProcessingError::MissingLists(debug_info))
@@ -791,6 +789,7 @@ impl MasternodeProcessor {
     }
 
     pub fn closest_known_block_hash_for_block_hash(&self, block_hash: [u8; 32]) -> [u8; 32] {
+        // TODO: involve checkpoint here
         self.masternode_list_before_block_hash(block_hash)
             .map(|list| list.block_hash)
             .unwrap_or_else(|| self.provider.chain_type().genesis_hash())
@@ -1337,7 +1336,7 @@ impl MasternodeProcessor {
                                 panic!("missing block for height: {}", height)
                             },
                             Err(error) => {
-                                warn!("{self:?} LLMQ validation Error: ({error})");
+                                warn!("{self:?} LLMQ validation Error: ({})", error.to_string());
                                 has_valid_quorums &= false;
                             }
                         }
@@ -1461,15 +1460,8 @@ impl MasternodeProcessor {
                         usage_info_from_snapshot(&masternode_list.masternodes, &snapshot, quorum_modifier, work_block_height);
                     Ok(apply_skip_strategy_of_type(LLMQQuarterUsageType::Snapshot(snapshot), used_at_h_masternodes, unused_at_h_masternodes, work_block_height, quorum_modifier, quorum_count, quarter_size))
                 } else {
-                    Err(CoreProviderError::NoSnapshot)
+                    Err(CoreProviderError::NoSnapshot(work_block_hash))
                 }
-
-                // self.provider.find_snapshot(work_block_hash, &self.cache)
-                //     .map(|snapshot| {
-                //         let (used_at_h_masternodes, unused_at_h_masternodes) =
-                //             usage_info_from_snapshot(masternode_list, &snapshot, quorum_modifier, work_block_height);
-                //         apply_skip_strategy_of_type(LLMQQuarterUsageType::Snapshot(snapshot), used_at_h_masternodes, unused_at_h_masternodes, work_block_height, quorum_modifier, quorum_count, quarter_size)
-                //     })
             }
         }
     }
