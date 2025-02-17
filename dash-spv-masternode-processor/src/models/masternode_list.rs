@@ -221,6 +221,10 @@ impl MasternodeList {
 #[ferment_macro::export]
 impl MasternodeList {
 
+    pub fn mark_quorums_as_saved(&mut self) {
+        self.quorums.values_mut().for_each(|map| map.values_mut().for_each(LLMQEntry::mark_as_saved));
+    }
+
     pub fn print_description(&self) {
         println!("{}", self.format());
     }

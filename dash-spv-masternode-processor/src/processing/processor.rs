@@ -1038,8 +1038,16 @@ impl MasternodeProcessor {
         self.provider.update_address_usage_of_masternodes(changed);
         self.cache.remove_from_awaiting_quorum_validation_list(block_hash);
         self.cache.remove_stub_for_masternode_list(block_hash);
-        let count = self.cache.add_masternode_list(block_hash, masternode_list.clone());
-        self.provider.save_masternode_list_into_db(block_hash, modified_masternodes)
+        let count = self.cache.add_masternode_list(block_hash, masternode_list);
+        let result = self.provider.save_masternode_list_into_db(block_hash, modified_masternodes);
+        if result.is_ok() {
+            self.cache.write_mn_lists(|lock| {
+                if let Some(saved_list) = lock.get_mut(&block_hash) {
+                    saved_list.mark_quorums_as_saved()
+                }
+            })
+        }
+        result
     }
 
     fn process_missing_masternode_lists(&self, block_hash: [u8; 32], lists: HashSet<[u8; 32]>) {

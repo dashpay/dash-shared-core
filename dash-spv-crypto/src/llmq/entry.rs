@@ -240,6 +240,10 @@ impl LLMQEntry {
         self.commitment_hash.unwrap()
     }
 
+    pub fn mark_as_saved(&mut self) {
+        self.saved = true;
+    }
+
     pub fn validate_bitset(bitset: &Bitset) -> bool {
         let Bitset { bitset, count } = bitset;
         if bitset.len() != (count + 7) / 8 {
