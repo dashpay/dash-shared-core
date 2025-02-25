@@ -19,6 +19,8 @@ use crate::processing::{MasternodeProcessorCache, processing_error::ProcessingEr
 use crate::processing::processor_cache::RetrievalQueue;
 use crate::util::formatter::CustomFormatter;
 
+pub const QUORUM_VALIDATION_WINDOW: u32 = 4 * 576 + 100;
+
 pub enum LLMQQuarterType {
     AtHeightMinus3Cycles,
     AtHeightMinus2Cycles,
@@ -106,6 +108,7 @@ impl MasternodeProcessor {
         assert!(!block_hash.is_zero(), "the hash must not be empty");
         self.cache.write_mn_list_retrieval_queue(|lock| {
             lock.queue.insert(block_hash);
+            println!("{self:?} queue: {} added ", block_hash.to_hex());
             lock.update_retrieval_queue(self);
             self.provider.notify_sync_state(CacheState::queue(lock.queue.len(), lock.max_amount));
         });
@@ -113,16 +116,19 @@ impl MasternodeProcessor {
     pub fn extend_mn_list_retrieval_queue(&self, block_hashes: Vec<[u8; 32]>) {
         // assert!(!block_hash.is_zero(), "the hash must not be empty");
         self.cache.write_mn_list_retrieval_queue(|lock| {
+            println!("{self:?} queue: extended {}", block_hashes.len());
             lock.queue.extend(block_hashes);
             lock.update_retrieval_queue(self);
+
             self.provider.notify_sync_state(CacheState::queue(lock.queue.len(), lock.max_amount));
         });
     }
     pub fn remove_from_mn_list_retrieval_queue(&self, block_hash: &[u8; 32]) {
         // assert!(!block_hash.is_zero(), "the hash must not be empty");
         self.cache.write_mn_list_retrieval_queue(|lock| {
-            lock.queue.shift_remove(block_hash);
+            lock.remove_one(block_hash);
             lock.update_retrieval_queue(self);
+            println!("{self:?} queue: removed {} (remove_from_mn_list)", block_hash.to_hex());
             self.provider.notify_sync_state(CacheState::queue(lock.queue.len(), lock.max_amount));
         });
     }
@@ -138,8 +144,8 @@ impl MasternodeProcessor {
         self.cache.write_mn_list_retrieval_queue(|lock| {
             lock.queue.clear();
             lock.update_retrieval_queue(self);
+            println!("{self:?} Masternode list queue cleaned up: {}/{}", lock.queue.len(), lock.max_amount);
             self.provider.notify_sync_state(CacheState::queue(lock.queue.len(), lock.max_amount));
-            println!("{self:?} Masternode list queue cleaned up: 0/{}", lock.max_amount);
         });
     }
     pub fn add_to_qr_info_retrieval_queue(&self, block_hash: [u8; 32]) {
@@ -268,7 +274,10 @@ impl MasternodeProcessor {
                 self.cache.add_needed_masternode_lists(needed_masternode_lists.clone());
             }
         }
-        self.cache.write_mn_list_retrieval_queue(|lock| lock.remove_one(&block_hash));
+        self.cache.write_mn_list_retrieval_queue(|lock| {
+            let _removed = lock.remove_one(&block_hash);
+            println!("{self:?} queue: {} removed {_removed} (after processing)", block_hash.to_hex());
+        });
         if !needed_masternode_lists.is_empty() {
             let debug_info = needed_masternode_lists.format();
             println!("{self:?} missing lists:\n {}", debug_info);
@@ -749,7 +758,7 @@ impl MasternodeProcessor {
         } else {
             None
         };
-        println!("{self:?} masternode_list_for_block_hash: {block_height} {} ({}) -- {}", block_hash.to_hex(), block_hash.reversed().to_hex(), result.as_ref().map(|l| l.known_height.to_string()).unwrap_or("None".to_string()));
+        //println!("{self:?} masternode_list_for_block_hash: {block_height} {} ({}) -- {}", block_hash.to_hex(), block_hash.reversed().to_hex(), result.as_ref().map(|l| l.known_height.to_string()).unwrap_or("None".to_string()));
         result
     }
     pub fn masternode_list_before_block_hash(&self, block_hash: [u8; 32]) -> Option<MasternodeList> {
@@ -906,6 +915,8 @@ impl MasternodeProcessor {
             let is_empty = lock.queue.is_empty();
             assert!(!hash.is_zero(), "the hash data must not be empty");
             lock.add(hash, self);
+            println!("{self:?} queue: added {} (get_recent_mn_list)", hash.to_hex());
+
             self.provider.notify_sync_state(CacheState::queue(lock.queue.len(), lock.max_amount));
             is_empty
         });
@@ -982,7 +993,8 @@ impl MasternodeProcessor {
         }
         let list = self.masternode_list_for_block_hash(block_hash);
         let need_verify_rotated_quorums = is_dip24 && (self.cache.get_last_queried_qr_masternode_list_at_h().is_none() || self.cache.get_last_queried_qr_masternode_list_at_h().unwrap().has_unverified_rotated_quorums(self.provider.chain_type()));
-        let need_verify_regular_quorums = !is_dip24 && (list.is_none() || list.unwrap().has_unverified_regular_quorums(self.provider.chain_type()));
+        let need_verify_regular_quorums = !is_dip24 && list.is_none();
+        // let need_verify_regular_quorums = !is_dip24 && (list.is_none() || list.unwrap().has_unverified_regular_quorums(self.provider.chain_type()));
         let no_need_to_verify_quorums = !(need_verify_rotated_quorums || need_verify_regular_quorums);
         let has_locally_stored = self.cache.has_masternode_list_at(block_hash);
         if has_locally_stored && no_need_to_verify_quorums {
@@ -991,7 +1003,8 @@ impl MasternodeProcessor {
                 self.cache.write_qr_info_retrieval_queue(|lock| lock.queue.shift_remove(&block_hash));
             } else {
                 self.provider.notify_sync_state(self.cache.write_mn_list_retrieval_queue(|lock| {
-                    let _removed = lock.queue.shift_remove(&block_hash);
+                    let _removed = lock.remove_one(&block_hash);
+                    println!("{self:?} queue: {} removed {_removed} (should process diff)", block_hash.to_hex());
                     CacheState::queue(lock.queue.len(), lock.max_amount)
                 }))
             }
@@ -1053,8 +1066,10 @@ impl MasternodeProcessor {
         self.cache.add_to_awaiting_quorum_validation_list(block_hash);
         self.cache.clear_needed_masternode_lists();
         self.cache.write_mn_list_retrieval_queue(|lock| {
+            let count = lists.len();
             lock.queue.extend(lists);
             lock.queue.insert(block_hash);
+            println!("{self:?} queue: extended {} (process_missing_masternode_lists {})", block_hash.to_hex(), count);
             lock.update_retrieval_queue(self);
         });
         self.provider.dequeue_masternode_list(false);
@@ -1298,6 +1313,7 @@ impl MasternodeProcessor {
     ) -> (bool, HashSet<[u8; 32]>) {
         let mut has_valid_quorums = true;
         let mut block_hashes_for_missed_lists = HashSet::<[u8; 32]>::new();
+        let chain_tip = self.provider.get_tip_height();
         if verification_context.should_validate_quorums() {
             added_quorums
                 .iter_mut()
@@ -1325,19 +1341,25 @@ impl MasternodeProcessor {
                     match verification_context.has_reason_to_skip_validation(quorum.llmq_type, self.provider.chain_type(), llmq_height) {
                         Some(skip_status) => {
                             quorum.verified = LLMQEntryValidationStatus::Skipped(skip_status);
-                        }
-                        None => match self.validate_quorum(quorum, skip_removed_masternodes, &mut block_hashes_for_missed_lists) {
-                            Ok(()) => {
-                                has_valid_quorums &= true;
-                            }
-                            Err(CoreProviderError::BlockHashNotFoundAt(height)) => {
-                                error!("{self:?} LLMQ validation: BlockHashNotFoundAt: ({height})");
-                                has_valid_quorums &= false;
-                                panic!("missing block for height: {}", height)
-                            },
-                            Err(error) => {
-                                warn!("{self:?} LLMQ validation Error: ({})", error.to_string());
-                                has_valid_quorums &= false;
+                        },
+                        None => {
+                            if chain_tip - QUORUM_VALIDATION_WINDOW >= llmq_height {
+                                quorum.verified = LLMQEntryValidationStatus::Skipped(LLMQEntryValidationSkipStatus::Outdated(llmq_height, chain_tip));
+                            } else {
+                                match self.validate_quorum(quorum, skip_removed_masternodes, &mut block_hashes_for_missed_lists) {
+                                    Ok(()) => {
+                                        has_valid_quorums &= true;
+                                    }
+                                    Err(CoreProviderError::BlockHashNotFoundAt(height)) => {
+                                        error!("{self:?} LLMQ validation: BlockHashNotFoundAt: ({height})");
+                                        has_valid_quorums &= false;
+                                        panic!("missing block for height: {}", height)
+                                    },
+                                    Err(error) => {
+                                        warn!("{self:?} LLMQ validation Error: ({})", error.to_string());
+                                        has_valid_quorums &= false;
+                                    }
+                                }
                             }
                         }
                     }

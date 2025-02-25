@@ -22,7 +22,7 @@ impl From<TransactionInput> for TxIn {
     fn from(value: TransactionInput) -> Self {
         TxIn {
             previous_output: OutPoint { txid: Txid::from_byte_array(value.input_hash), vout: value.index },
-            script_sig: ScriptBuf(value.script.unwrap_or_default()),
+            script_sig: ScriptBuf(value.signature.unwrap_or(value.script.unwrap_or_default())),
             sequence: value.sequence,
             witness: Default::default(),
         }

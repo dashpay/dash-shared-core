@@ -25,7 +25,8 @@ use dash_sdk::dpp::dashcore::secp256k1::rand::SeedableRng;
 use dash_sdk::platform::FetchUnproved;
 use dash_sdk::platform::transition::put_contract::PutContract;
 use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
-
+use dash_sdk::platform::transition::put_identity::PutIdentity;
+use dash_sdk::platform::transition::put_settings::PutSettings;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dashcore::consensus::Decodable;
@@ -41,8 +42,11 @@ use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0, IdentityFacade, KeyID};
 use dpp::document::Document;
 use dpp::document::document_factory::DocumentFactory;
+use dpp::errors::consensus::basic::BasicError;
+use dpp::errors::consensus::ConsensusError;
 use dpp::identity::core_script::CoreScript;
 use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
+use dpp::native_bls::NativeBlsModule;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
 use dpp::state_transition::state_transitions::document::documents_batch_transition::document_transition::action_type::DocumentTransitionActionType;
@@ -286,76 +290,54 @@ impl PlatformSDK {
     }
 
     // #[cfg(feature = "state-transitions")]
-    pub async fn identity_register(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition register call: {:?} -- {:?} -- {:?}", identity, proof, private_key);
-        let transition = self.identities.create_identity_create_transition(&identity, proof)
-            .map_err(Error::from)?;
-        println!("transition register created: {:?}", transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::IdentityCreate(transition), signature.to_vec()).await
+    /// Create signed transition
+    pub fn identity_registration_signed_transition(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
+        self.identities.create_identity_create_transition(&identity, proof)
+            .map_err(Error::from)
+            .and_then(|transition|
+                Self::sign_transition(StateTransition::IdentityCreate, transition, private_key))
     }
-    pub async fn identity_register_using_public_keys(&self, public_keys: BTreeMap<u32, IdentityPublicKey>, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition identity_register_using_public_keys: {:?} -- {:?} -- {:?}", public_keys, proof, private_key);
-        let (identity, transition) = self.identities.create_identity_create_transition_using_public_keys(public_keys, proof)
-            .map_err(Error::from)?;
-        println!("transition register created: {:?} -- {:?}", identity, transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::IdentityCreate(transition), signature.to_vec()).await
+    pub fn identity_registration_signed_transition_with_public_keys(&self, public_keys: BTreeMap<u32, IdentityPublicKey>, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
+        self.identities.create_identity_create_transition_using_public_keys(public_keys, proof)
+            .map_err(Error::from)
+            .and_then(|(_identity, transition)|
+                Self::sign_transition(StateTransition::IdentityCreate, transition, private_key))
     }
-    pub async fn identity_register_using_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition identity_register_using_public_key_at_index: {:?} -- {} -- {:?} -- {:?}", public_key, index, proof, private_key);
-        let public_keys = BTreeMap::from_iter([(index, public_key)]);
-        let (identity, transition) = self.identities.create_identity_create_transition_using_public_keys(public_keys, proof)
-            .map_err(Error::from)?;
-        println!("transition register created: {:?} -- {:?}", identity, transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::IdentityCreate(transition), signature.to_vec()).await
+    pub fn identity_registration_signed_transition_with_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
+        self.identities.create_identity_create_transition_using_public_keys(BTreeMap::from_iter([(index, public_key)]), proof)
+            .map_err(Error::from)
+            .and_then(|(_identity, transition)|
+                Self::sign_transition(StateTransition::IdentityCreate, transition, private_key))
     }
-    pub async fn identity_topup(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition topup call: {} -- {:?} -- {:?}", identity_id.to_hex(), proof, private_key);
+
+    pub fn identity_topup_signed_transition(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
         let transition = self.identities.create_identity_topup_transition(Identifier::from(identity_id), proof)
             .map_err(Error::from)?;
-        println!("transition topup created: {:?} ", transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::IdentityTopUp(transition), signature.to_vec()).await
+        Self::sign_transition(StateTransition::IdentityTopUp, transition, private_key)
     }
-    pub async fn identity_withdraw(&self, identity_id: [u8; 32], amount: u64, fee: u32, proof: AssetLockProof, pooling: Pooling, private_key: OpaqueKey, script: Option<Vec<u8>>, nonce: u64) -> Result<StateTransitionProofResult, Error> {
-        println!("transition credit withdrawal call: {} -- {:?} -- {:?}", identity_id.to_hex(), proof, private_key);
+    pub fn identity_withdraw_signed_transition(&self, identity_id: [u8; 32], amount: u64, fee: u32, pooling: Pooling, private_key: OpaqueKey, script: Option<Vec<u8>>, nonce: u64) -> Result<StateTransition, Error> {
         let transition = self.identities.create_identity_credit_withdrawal_transition(Identifier::from(identity_id), amount, fee, pooling, script.map(CoreScript::from), nonce)
             .map_err(Error::from)?;
-        println!("transition credit withdrawal created: {:?}", transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::IdentityCreditWithdrawal(transition), signature.to_vec()).await
+        Self::sign_transition(StateTransition::IdentityCreditWithdrawal, transition, private_key)
     }
-
-    pub async fn identity_update(&self, identity: Identity, nonce: u64, add_public_keys: Option<Vec<IdentityPublicKeyInCreation>>, disable_key_ids: Option<Vec<KeyID>>, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition update call: {:?} -- {} -- {:?} -- {:?} -- {:?}", identity, nonce, add_public_keys, disable_key_ids, private_key);
+    pub fn identity_update_signed_transition(&self, identity: Identity, nonce: u64, add_public_keys: Option<Vec<IdentityPublicKeyInCreation>>, disable_key_ids: Option<Vec<KeyID>>, private_key: OpaqueKey) -> Result<StateTransition, Error> {
         let transition = self.identities.create_identity_update_transition(identity, nonce, add_public_keys, disable_key_ids)
             .map_err(Error::from)?;
-        println!("transition update created: {:?}", transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::IdentityUpdate(transition), signature.to_vec()).await
+        Self::sign_transition(StateTransition::IdentityUpdate, transition, private_key)
     }
-    pub async fn identity_transfer(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition credit transfer call: {:?} -- {} -- {} -- {} -- {:?}", identity, recipient_id.to_hex(), amount, nonce, private_key);
+    pub fn identity_transfer_signed_transition(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<StateTransition, Error> {
         let transition = self.identities.create_identity_credit_transfer_transition(&identity, Identifier::from(recipient_id), amount, nonce)
             .map_err(Error::from)?;
-        println!("transition credit transfer created: {:?}", transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::IdentityCreditTransfer(transition), signature.to_vec()).await
+        Self::sign_transition(StateTransition::IdentityCreditTransfer, transition, private_key)
     }
 
-    pub async fn data_contract_create(&self, owner_id: [u8; 32], nonce: u64, documents: Value, config: Option<Value>, definitions: Option<Value>, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition create contract call: {} -- {} -- {:?} -- {:?} -- {:?} -- {:?}", owner_id.to_hex(), nonce, documents, config, definitions, private_key);
+    pub fn data_contract_create_signed_transition(&self, owner_id: [u8; 32], nonce: u64, documents: Value, config: Option<Value>, definitions: Option<Value>, private_key: OpaqueKey) -> Result<StateTransition, Error> {
         let created = self.contracts.create(Identifier::from(owner_id), nonce, documents, config, definitions).map_err(Error::from)?;
-        println!("transition create contract created.1: {:?}", created);
         let transition = self.contracts.create_data_contract_create_transition(created)
             .map_err(Error::from)?;
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DataContractCreate(transition), signature.to_vec()).await
+        Self::sign_transition(StateTransition::DataContractCreate, transition, private_key)
     }
-    pub async fn data_contract_create2(&self, system_contract: SystemDataContract, owner_id: [u8; 32], nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition create contract call: {} -- {} -- {:?} ", owner_id.to_hex(), nonce, private_key);
+    pub fn data_contract_create_signed_transition2(&self, system_contract: SystemDataContract, owner_id: [u8; 32], nonce: u64, private_key: OpaqueKey) -> Result<StateTransition, Error> {
         let mut data_contract = self.contract_manager().load_system_contract(system_contract);
         data_contract.set_owner_id(Identifier::from(owner_id));
         let created = CreatedDataContract::from_contract_and_identity_nonce(
@@ -363,20 +345,143 @@ impl PlatformSDK {
             nonce,
             self.sdk.version(),
         ).map_err(Error::from)?;
-
-        println!("transition create contract created.1: {:?}", created);
         let transition = self.contracts.create_data_contract_create_transition(created)
             .map_err(Error::from)?;
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DataContractCreate(transition), signature.to_vec()).await
+        Self::sign_transition(StateTransition::DataContractCreate, transition, private_key)
     }
-    pub async fn data_contract_update(&self, data_contract: DataContract, nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("transition update contract call: {:?} -- {} -- {:?}", data_contract, nonce, private_key);
+    pub fn data_contract_update_signed_transition(&self, data_contract: DataContract, nonce: u64, private_key: OpaqueKey) -> Result<StateTransition, Error> {
         let transition = self.contracts.create_data_contract_update_transition(data_contract, nonce)
             .map_err(Error::from)?;
-        println!("transition update contract created: {:?}", transition);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DataContractUpdate(transition), signature.to_vec()).await
+        Self::sign_transition(StateTransition::DataContractUpdate, transition, private_key)
+    }
+
+    #[cfg(feature = "state-transitions")]
+    pub fn document_single_signed_transition(
+        &self,
+        action_type: DocumentTransitionActionType,
+        document_type: DocumentType,
+        document: Document,
+        entropy: [u8; 32],
+        private_key: OpaqueKey
+    ) -> Result<StateTransition, Error> {
+        let doc_type_ref = document_type.as_ref();
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, doc_type_ref, Bytes32(entropy))])]);
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
+            .map_err(Error::from)?;
+        Self::sign_transition(StateTransition::DocumentsBatch, transition, private_key)
+    }
+
+    #[cfg(feature = "state-transitions")]
+    pub fn document_single_on_table_signed_transition(
+        &self,
+        data_contract: DataContract,
+        action_type: DocumentTransitionActionType,
+        table_name: &str,
+        document: Document,
+        entropy: [u8; 32],
+        private_key: OpaqueKey
+    ) -> Result<StateTransition, Error> {
+        let document_type = data_contract.document_type_for_name(table_name).map_err(Error::from)?;
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, document_type, Bytes32(entropy))])]);
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
+            .map_err(Error::from)?;
+        Self::sign_transition(StateTransition::DocumentsBatch, transition, private_key)
+    }
+    #[cfg(feature = "state-transitions")]
+    pub fn document_batch_signed_transition<'a>(
+        &self,
+        documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>,
+        private_key: OpaqueKey,
+    ) -> Result<StateTransition, Error> {
+        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+        let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
+            .map_err(Error::from)?;
+        Self::sign_transition(StateTransition::DocumentsBatch, transition, private_key)
+    }
+
+    /// Publish state transition
+    pub async fn identity_register(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("identity_register: {identity:?} -- {proof:?} -- {private_key:?}");
+        let signed_transition = self.identity_registration_signed_transition(identity, proof, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+    pub async fn identity_register2(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
+        println!("identity_register: {identity:?} -- {proof:?} -- {private_key:?}");
+        let maybe_private_key = private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
+        identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
+            .map_err(Error::from)
+    }
+
+
+    pub async fn identity_register_using_public_keys(&self, public_keys: BTreeMap<u32, IdentityPublicKey>, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("identity_register_using_public_keys: {public_keys:?} -- {proof:?} -- {private_key:?}");
+        let signed_transition = self.identity_registration_signed_transition_with_public_keys(public_keys, proof, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+    pub async fn identity_register_using_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("identity_register_using_public_key_at_index: {public_key:?} -- {index} -- {proof:?} -- {private_key:?}");
+        let signed_transition = self.identity_registration_signed_transition_with_public_key_at_index(public_key, index, proof, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+    pub async fn identity_register_using_public_key_at_index2(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
+        println!("identity_register_using_public_key_at_index: {public_key:?} -- {index} -- {proof:?} -- {private_key:?}");
+        let maybe_private_key = private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
+        let identity = Identity::V0(IdentityV0 {
+            id: proof.create_identifier().map_err(Error::from)?,
+            public_keys: BTreeMap::from_iter([(index, public_key)]),
+            balance: 0,
+            revision: 0,
+        });
+        match identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await {
+            Ok(state_transition_result) => Ok(state_transition_result),
+            Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(err))) => match *err {
+                ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) =>
+                    Err(Error::InstantSendSignatureVerificationError(format!("{err:?}"))),
+                _ => Err(Error::from(err)),
+            },
+            Err(err) => Err(Error::from(err)),
+        }
+
+    }
+
+    pub async fn identity_topup(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("identity_topup: {} -- {proof:?} -- {private_key:?}", identity_id.to_hex());
+        let signed_transition = self.identity_topup_signed_transition(identity_id, proof, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+    pub async fn identity_withdraw(&self, identity_id: [u8; 32], amount: u64, fee: u32, pooling: Pooling, private_key: OpaqueKey, script: Option<Vec<u8>>, nonce: u64) -> Result<StateTransitionProofResult, Error> {
+        println!("identity_withdraw: {} -- {amount} {fee} {pooling:?} {private_key:?} -- {} -- {nonce}", identity_id.to_hex(), script.as_ref().map_or("None".to_string(), |s| s.to_hex()));
+        let signed_transition = self.identity_withdraw_signed_transition(identity_id, amount, fee, pooling, private_key, script, nonce)?;
+        self.publish_state_transition(signed_transition).await
+    }
+
+    pub async fn identity_update(&self, identity: Identity, nonce: u64, add_public_keys: Option<Vec<IdentityPublicKeyInCreation>>, disable_key_ids: Option<Vec<KeyID>>, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("identity_update: {identity:?} -- {nonce} -- {add_public_keys:?} -- {disable_key_ids:?} -- {private_key:?}");
+        let signed_transition = self.identity_update_signed_transition(identity, nonce, add_public_keys, disable_key_ids, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+    pub async fn identity_transfer(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("identity_transfer: {identity:?} -- {} -- {amount} -- {nonce} -- {private_key:?}", recipient_id.to_hex());
+        let signed_transition = self.identity_transfer_signed_transition(identity, recipient_id, amount, nonce, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+
+    pub async fn data_contract_create(&self, owner_id: [u8; 32], nonce: u64, documents: Value, config: Option<Value>, definitions: Option<Value>, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("data_contract_create: {} -- {nonce} -- {documents:?} -- {config:?} -- {definitions:?} -- {private_key:?}", owner_id.to_hex());
+        let signed_transition = self.data_contract_create_signed_transition(owner_id, nonce, documents, config, definitions, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+    pub async fn data_contract_create2(&self, system_contract: SystemDataContract, owner_id: [u8; 32], nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("data_contract_create2: {system_contract:?} {} -- {nonce} -- {private_key:?} ", owner_id.to_hex());
+        let signed_transition = self.data_contract_create_signed_transition2(system_contract, owner_id, nonce, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
+    pub async fn data_contract_update(&self, data_contract: DataContract, nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
+        println!("data_contract_update: {data_contract:?} -- {nonce} -- {private_key:?}");
+        let signed_transition = self.data_contract_update_signed_transition(data_contract, nonce, private_key)?;
+        self.publish_state_transition(signed_transition).await
     }
 
     #[cfg(feature = "state-transitions")]
@@ -388,15 +493,9 @@ impl PlatformSDK {
         entropy: [u8; 32],
         private_key: OpaqueKey
     ) -> Result<StateTransitionProofResult, Error> {
-        println!("transition document call: {:?} -- {:?} -- {:?} -- {} -- {:?}", action_type, document_type, document, entropy.to_hex(), private_key);
-        let doc_type_ref = document_type.as_ref();
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, doc_type_ref, Bytes32(entropy))])]);
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
-            .map_err(Error::from)?;
-        println!("transition document created: {:?} {:?}", transition, nonce_counter);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+        println!("document_single: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
+        let signed_transition = self.document_single_signed_transition(action_type, document_type, document, entropy, private_key)?;
+        self.publish_state_transition(signed_transition).await
     }
 
     #[cfg(feature = "state-transitions")]
@@ -409,32 +508,21 @@ impl PlatformSDK {
         entropy: [u8; 32],
         private_key: OpaqueKey
     ) -> Result<StateTransitionProofResult, Error> {
-        let document_type = data_contract.document_type_for_name(table_name).map_err(Error::from)?;
-        println!("transition document call: {:?} -- {:?} -- {:?} -- {} -- {:?}", action_type, document_type, document, entropy.to_hex(), private_key);
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, document_type, Bytes32(entropy))])]);
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
-            .map_err(Error::from)?;
-        println!("transition document created: {:?} {:?}", transition, nonce_counter);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+        println!("document_single_on_table: {data_contract:?} -- {action_type:?} -- {table_name} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
+        let signed_transition = self.document_single_on_table_signed_transition(data_contract, action_type, table_name, document, entropy, private_key)?;
+        self.publish_state_transition(signed_transition).await
     }
 
 
     #[cfg(feature = "state-transitions")]
     pub async fn document_batch<'a>(
         &self,
-        data_contract: DataContract,
         documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>,
         private_key: OpaqueKey,
     ) -> Result<StateTransitionProofResult, Error> {
-        println!("transition document batch call: {:?} -- {:?}", data_contract, documents);
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
-            .map_err(Error::from)?;
-        println!("transition document batch created: {:?} {:?}", transition, nonce_counter);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+        println!("document_batch: {documents:?} -- {private_key:?}");
+        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
+        self.publish_state_transition(signed_transition).await
     }
 
     pub fn friend_request_document(
@@ -521,13 +609,9 @@ impl PlatformSDK {
         let owner_id = Identifier::from(identity_id);
         let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
             .map_err(Error::from)?;
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
-            .map_err(Error::from)?;
-        println!("transition document created: {:?} {:?}", transition, nonce_counter);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+        let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
+        let signed_transition = self.document_batch_signed_transition(documents_iter, private_key)?;
+        self.publish_state_transition(signed_transition).await
     }
 
     pub async fn register_username_domains_for_username_full_paths<
@@ -545,19 +629,14 @@ impl PlatformSDK {
         let document_type = contract.document_type_for_name("domain")
             .map_err(ProtocolError::from)?;
         let owner_id = Identifier::from(identity_id);
-        let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
         for value in username_values.into_iter() {
             let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
                 .map_err(Error::from)?;
             documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
         }
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
-            .map_err(Error::from)?;
-        println!("transition register_username_domains_for_username_full_paths created: {:?} {:?}", transition, nonce_counter);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        save_callback(save_context, UsernameStatus::RegistrationPending);
-        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
+        self.publish_state_transition(signed_transition).await
             .map(|result| {
                 save_callback(save_context, UsernameStatus::Confirmed);
                 result
@@ -579,24 +658,20 @@ impl PlatformSDK {
         let document_type = contract.document_type_for_name("preorder")
             .map_err(ProtocolError::from)?;
         let owner_id = Identifier::from(identity_id);
-        let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
         for salted_domain_hash in salted_domain_hashes.into_iter() {
             let map = ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]);
             let document = document_type.create_document_from_data(Value::Map(map), owner_id, 1000, 1000, entropy, self.sdk.version())
                 .map_err(Error::from)?;
             documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
         }
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
-            .map_err(Error::from)?;
-        println!("transition register_preordered_salted_domain_hashes_for_username_full_paths created: {:?} {:?}", transition, nonce_counter);
-        let signature = self.create_transition_signature(&transition, private_key)?;
+        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
         save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
-        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+        self.publish_state_transition(signed_transition).await
             .map(|result| {
                 save_callback(save_context, UsernameStatus::Preordered);
                 result
-        })
+            })
     }
 
     pub async fn sign_and_publish_profile(
@@ -617,19 +692,10 @@ impl PlatformSDK {
             Some(document_id) =>
                 document_type.create_document_with_prevalidated_properties(Identifier::from(document_id), owner_id, 1000, 1000, profile.to_prevalidated_properties(), self.sdk.version()),
         }.map_err(Error::from)?;
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
-            .map_err(Error::from)?;
-        println!("transition sign_and_publish_profile created: {:?} {:?}", transition, nonce_counter);
-        let signature = self.create_transition_signature(&transition, private_key)?;
-        self.sign_and_publish_transition(StateTransition::DocumentsBatch(transition), signature.to_vec()).await
+        let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
+        let signed_transition = self.document_batch_signed_transition(documents_iter, private_key)?;
+        self.publish_state_transition(signed_transition).await
     }
-
-
-
-
-
 
     // pub async fn check_ping_times(&self, masternodes: Vec<MasternodeEntry>) -> Result<GetStatusResponse, Error> {
     //     self.sdk_ref()
@@ -703,18 +769,31 @@ impl PlatformSDK {
         self.doc_manager.documents_with_query(query).await
     }
 
-    fn create_transition_signature<T: Signable>(&self, transition: &T, private_key: OpaqueKey) -> Result<[u8; 65], Error> {
-        let data = transition.signable_bytes().map_err(Error::from)?;
-        println!("transition signable bytes: {}", data.to_hex());
+    fn sign_transition<T: Signable, F: Fn(T) -> StateTransition>(f: F, transition: T, private_key: OpaqueKey) -> Result<StateTransition, Error> {
         let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
-        let signature = dashcore::signer::sign(&data, &private_key_data).map_err(Error::from)?;
-        println!("transition signature: {}", signature.to_hex());
-        Ok(signature)
+        let mut state_transition = f(transition);
+        let data = state_transition.signable_bytes().map_err(Error::from)?;
+        println!("transition signable bytes: {}", data.to_hex());
+        state_transition.sign_by_private_key(&private_key_data, KeyType::ECDSA_SECP256K1, &NativeBlsModule).map_err(Error::from)?;
+        println!("transition signature: {}", state_transition.signature().0.to_hex());
+        Ok(state_transition)
     }
+    // async fn sign_and_publish_transition(&self, mut transition: StateTransition, signature: Vec<u8>) -> Result<StateTransitionProofResult, Error> {
+    //     transition.set_signature(signature.into());
+    //     self.publish_state_transition(transition).await
+    // }
 
-    async fn sign_and_publish_transition(&self, mut transition: StateTransition, signature: Vec<u8>) -> Result<StateTransitionProofResult, Error> {
-        transition.set_signature(signature.into());
-        transition.broadcast_and_wait(&self.sdk, None).await.map_err(Error::from)
+    async fn publish_state_transition(&self, transition: StateTransition) -> Result<StateTransitionProofResult, Error> {
+        println!("publish_state_transition: {:?}", transition);
+        match transition.broadcast_and_wait(&self.sdk, None).await {
+            Ok(state_transition_result) => Ok(state_transition_result),
+            Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(err))) => match *err {
+                ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) =>
+                    Err(Error::InstantSendSignatureVerificationError(format!("{err:?}"))),
+                _ => Err(Error::from(err)),
+            },
+            Err(err) => Err(Error::from(err)),
+        }
     }
 }
 
@@ -747,7 +826,6 @@ pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Iden
     ))]);
     Ok(Identity::V0(IdentityV0 { id, public_keys, balance: 2, revision: 1 }))
 }
-
 
 // #[tokio::test]
 // async fn test_mainnet_get_identities_for_wallets_public_keys() {
@@ -808,7 +886,7 @@ fn create_test_sdk(chain: &ChainType) -> Sdk {
         _ => Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:1443").as_str()).ok())),
     };
     let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
-    let get_data_contract = |ctx, identifier| {
+    let get_data_contract = |_ctx, identifier| {
         println!("get_data_contract: {:?}", identifier);
         Err(ContextProviderError::Generic("DDDDD".to_string()))
     };
@@ -816,7 +894,7 @@ fn create_test_sdk(chain: &ChainType) -> Sdk {
         println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash, core_chain_locked_height);
         Err(ContextProviderError::Generic("DDDDD".to_string()))
     };
-    let get_platform_activation_height = |ctx| {
+    let get_platform_activation_height = |_ctx| {
         println!("get_platform_activation_height");
         Ok(0)
     };
@@ -872,7 +950,7 @@ async fn test_testnet_get_identities_for_wallets_public_keys() {
         ];
 
         let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
-        let get_data_contract = |ctx, identifier| {
+        let get_data_contract = |_ctx, identifier| {
             println!("get_data_contract: {:?}", identifier);
             Err(ContextProviderError::Generic("get_data_contract: DDDDD".to_string()))
         };
@@ -880,7 +958,7 @@ async fn test_testnet_get_identities_for_wallets_public_keys() {
             println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash.to_hex(), core_chain_locked_height);
             Ok(dash_spv_crypto::crypto::UInt384::from_hex("90bfc37734097f59401a45554a7ddcf0e846e333b74bcd70c8f973a3d932697bdaf5671d0e4a4961a7d2c9a853833429").unwrap().0)
         });
-        let get_platform_activation_height = |ctx| {
+        let get_platform_activation_height = |_ctx| {
             println!("get_platform_activation_height");
             Ok(0)
         };

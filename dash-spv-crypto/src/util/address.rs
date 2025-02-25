@@ -31,6 +31,16 @@ pub mod address {
         base58::check_encode_slice(&writer)
     }
 
+    #[ferment_macro::export]
+    pub fn public_key_hash_from_script(script: Vec<u8>) -> Option<Vec<u8>> {
+        match script.script_elements()[..] {
+            // pay-to-pubkey-hash scriptPubKey
+            [ScriptElement::Number(0x76/*OP_DUP*/), ScriptElement::Number(0xa9/*OP_HASH160*/), ScriptElement::Data(data, _len @ b'\x14'), ScriptElement::Number(0x88/*OP_EQUALVERIFY*/), ScriptElement::Number(0xac/*OP_CHECKSIG*/)] =>
+                Some(data.to_vec()),
+            _ => None
+        }
+    }
+
 
     // NOTE: It's important here to be permissive with scriptSig (spends) and strict with scriptPubKey (receives). If we
     // miss a receive transaction, only that transaction's funds are missed, however if we accept a receive transaction that

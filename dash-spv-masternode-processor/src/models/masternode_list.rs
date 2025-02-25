@@ -100,6 +100,15 @@ impl MasternodeList {
                 self.llmq_merkle_root.map_or("None".to_string(), |r| r.to_hex()),
                 self.quorums_short_description())
     }
+    pub fn very_short_description(&self) -> String {
+        format!("\t\t{}: {}:\n\t\t\tmn: \n\t\t\t\troot: {}\n\t\t\t\tcount: {}\n\t\t\tllmq:\n\t\t\t\troot: {}\n\t\t\t\tdesc:\n{}\n",
+                self.known_height,
+                self.block_hash.to_hex(),
+                self.masternode_merkle_root.map_or("None".to_string(), |r| r.to_hex()),
+                self.masternode_count(),
+                self.llmq_merkle_root.map_or("None".to_string(), |r| r.to_hex()),
+                self.quorums_very_short_description())
+    }
 
     pub fn quorums_short_description(&self) -> String {
         self.quorums.iter().fold(String::new(), |mut acc, (ty, map)| {
@@ -108,6 +117,12 @@ impl MasternodeList {
                 acc
             });
             acc.push_str(format!("\t\t{ty}: \n{s}").as_str());
+            acc
+        })
+    }
+    pub fn quorums_very_short_description(&self) -> String {
+        self.quorums.iter().fold(String::new(), |mut acc, (ty, map)| {
+            acc.push_str(format!("\t\t{ty}: \n{}", map.len()).as_str());
             acc
         })
     }

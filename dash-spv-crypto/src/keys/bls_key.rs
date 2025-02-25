@@ -179,6 +179,11 @@ impl IKey for BLSKey {
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         self.sign_digest(UInt256::from(data).0).to_vec()
     }
+
+    fn hash_and_sign(&self, data: Vec<u8>) -> Vec<u8> {
+        self.sign_digest(sha256d::Hash::hash(&data).into_inner()).to_vec()
+    }
+
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError> {
         let digest = <[u8; 32]>::consensus_decode(message_digest)?;
         let signature = <[u8; 96]>::consensus_decode(signature)?;

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use dpp::identity::{Identity, IdentityPublicKey, KeyType};
+use dpp::identity::{Identity, IdentityPublicKey, identity_public_key::key_type::KeyType};
 use dash_sdk::platform::Fetch;
 use dash_sdk::platform::types::identity::PublicKeyHash;
 use dash_sdk::{RequestSettings, Sdk};
@@ -10,9 +10,11 @@ use dash_spv_macro::StreamManager;
 use dpp::identity::accessors::IdentityGettersV0;
 use dpp::identity::identity_public_key::accessors::v0::IdentityPublicKeyGettersV0;
 use dpp::identity::identity_public_key::contract_bounds::ContractBounds;
+use dpp::identity::identity_public_key::{Purpose, SecurityLevel};
+use dpp::identity::identity_public_key::v0::IdentityPublicKeyV0;
 use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
-use platform_value::Identifier;
+use platform_value::{BinaryData, Identifier};
 use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
 use dash_spv_crypto::hashes::{hash160, Hash};
 use dash_spv_crypto::hashes::hex::ToHex;
@@ -220,6 +222,20 @@ impl IdentitiesManager {
 }
 
 #[ferment_macro::export]
+pub fn identity_registration_public_key(index: u32, public_key: OpaqueKey) -> IdentityPublicKey {
+    IdentityPublicKey::V0(IdentityPublicKeyV0 {
+        id: index,
+        purpose: Purpose::AUTHENTICATION,
+        security_level: SecurityLevel::MASTER,
+        contract_bounds: None,
+        key_type: KeyType::ECDSA_SECP256K1,
+        read_only: false,
+        data: BinaryData(public_key.public_key_data()),
+        disabled_at: None,
+    })
+}
+
+#[ferment_macro::export]
 pub fn opaque_key_from_identity_public_key(public_key: IdentityPublicKey) -> Result<OpaqueKey, KeyError> {
     let public_key_data = public_key.data();
     match public_key.key_type() {
@@ -233,5 +249,14 @@ pub fn opaque_key_from_identity_public_key(public_key: IdentityPublicKey) -> Res
                 .map(OpaqueKey::BLS)
         }
         key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
+    }
+}
+
+#[ferment_macro::export]
+pub fn key_type_from_opaque_key(opaque_key: OpaqueKey) -> Result<KeyType, KeyError> {
+    match opaque_key {
+        OpaqueKey::ECDSA(_) => Ok(KeyType::ECDSA_SECP256K1),
+        OpaqueKey::BLS(_) => Ok(KeyType::BLS12_381),
+        OpaqueKey::ED25519(_) => Ok(KeyType::EDDSA_25519_HASH160)
     }
 }

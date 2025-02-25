@@ -119,7 +119,7 @@ fn mainnet_quorum_quarters() {
     let mut target_quorum = processor.cache.read_active_llmq(|lock| lock.iter().find(|q| block_hash.eq(&q.llmq_hash)).cloned())
         .expect("Target quorum");
 
-    let llmq_type = LLMQType::Llmqtype60_75;
+    let llmq_type = LLMQType::Llmqtype60_75a
     // let mut last_quorum = active_quorums.iter().last().unwrap().clone();
     let block_height = 1738944;
     // let block_hash = last_quorum.llmq_hash;

@@ -75,6 +75,7 @@ impl DashSPVCore {
         // masternode
         BHT: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32 + Send + Sync + 'static,
         BHH: Fn(*const std::os::raw::c_void, u32) -> [u8; 32] + Send + Sync + 'static,
+        TIPBH: Fn(*const std::os::raw::c_void) -> u32 + Send + Sync + 'static,
         BORLT: Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError> + Send + Sync + 'static,
         BBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
@@ -104,7 +105,7 @@ impl DashSPVCore {
         get_block_by_height_or_last_terminal: BORLT,
         block_by_hash: BBH,
         last_block_for_block_hash: LBBBH,
-
+        get_tip_height: TIPBH,
         add_insight: INS,
         get_cl_signature_by_block_hash: CLSBH,
         load_masternode_list_from_db: LML,
@@ -125,6 +126,7 @@ impl DashSPVCore {
             get_block_by_height_or_last_terminal,
             block_by_hash,
             last_block_for_block_hash,
+            get_tip_height,
             add_insight,
             get_cl_signature_by_block_hash,
             load_masternode_list_from_db,
@@ -179,3 +181,4 @@ impl DashSPVCore {
         Arc::clone(&self.platform)
     }
 }
+

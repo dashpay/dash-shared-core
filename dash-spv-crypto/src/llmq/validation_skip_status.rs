@@ -7,6 +7,7 @@ pub enum LLMQEntryValidationSkipStatus {
     MissedList([u8; 32]),
     UnknownBlock([u8; 32]),
     OtherContext(String),
+    Outdated(u32, u32)
 }
 
 impl Display for LLMQEntryValidationSkipStatus {
@@ -15,6 +16,7 @@ impl Display for LLMQEntryValidationSkipStatus {
             LLMQEntryValidationSkipStatus::MissedList(block_hash) => format!("MissedList({})", block_hash.to_hex()),
             LLMQEntryValidationSkipStatus::UnknownBlock(block_hash) => format!("UnknownBlock({})", block_hash.to_hex()),
             LLMQEntryValidationSkipStatus::OtherContext(message) => format!("OtherContext({message})"),
+            LLMQEntryValidationSkipStatus::Outdated(block_height, tip_height) => format!("Outdated({block_height}/{tip_height})"),
         }.as_str())
     }
 }

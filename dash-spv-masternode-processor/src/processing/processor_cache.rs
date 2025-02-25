@@ -22,13 +22,13 @@ impl Display for RetrievalQueue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Self { queue, max_amount } = self;
         let s = if queue.is_empty() {
-            format!("\t\t\tqueue (max: {max_amount}): empty\n")
+            format!("\t\t\tqueue (0/{max_amount})\n")
         } else {
             let s = queue.iter().fold(String::new(), |mut acc, hash| {
                 acc.push_str(format!("\t\t{}\n", hash.to_hex()).as_str());
                 acc
             });
-            format!("\t\t\tqueue (max: {max_amount}):\n {s}\n")
+            format!("\t\t\tqueue ({}/{max_amount}):\n {s}\n", queue.len())
         };
         f.write_str(s.as_str())
     }
@@ -358,6 +358,7 @@ impl MasternodeProcessorCache {
     where F: FnOnce(&mut RetrievalQueue) -> O {
         let mut lock = self.mn_list_retrieval_queue.write().unwrap();
         let result = writer(&mut lock);
+        println!("{self:?} {}", lock.to_string());
         drop(lock);
         result
     }
@@ -374,6 +375,7 @@ impl MasternodeProcessorCache {
     where F: FnOnce(&mut RetrievalQueue) -> O {
         let mut lock = self.qr_info_retrieval_queue.write().unwrap();
         let result = writer(&mut lock);
+        println!("{self:?} {}", lock.to_string());
         drop(lock);
         result
     }
@@ -581,6 +583,13 @@ impl MasternodeProcessorCache {
         }));
         format!("\tmasternode lists (cached):\n{s}")
     }
+    pub fn lists_short_description(&self) -> String {
+        let s = self.read_mn_lists(|lock| lock.iter().fold(String::new(), |mut acc, (hash, list)| {
+            acc.push_str(list.very_short_description().as_str());
+            acc
+        }));
+        format!("\tmasternode lists (cached):\n{s}")
+    }
 
     pub fn last_queried_lists_description(&self) -> String {
         let descript = |list: &Arc<RwLock<Option<[u8; 32]>>>| {
@@ -629,6 +638,25 @@ impl MasternodeProcessorCache {
         println!("{self:?} status: \n{debug_string}");
     }
 
+    pub fn print_needed_masternode_lists_description(&self) {
+        println!("{self:?} {}", self.needed_masternode_lists_description());
+    }
+    pub fn print_last_queried_lists_description(&self) {
+        println!("{self:?} {}", self.last_queried_lists_description());
+    }
+
+    pub fn print_queue_description(&self) {
+        println!("{self:?} {}", self.queue_description());
+    }
+
+    pub fn print_lists_description(&self) {
+        println!("{self:?} {}", self.lists_description());
+    }
+
+    pub fn print_lists_short_description(&self) {
+        println!("{self:?} {}", self.lists_short_description());
+    }
+
     pub fn clear_llmq_members(&self) {
         self.write_llmq_members(BTreeMap::clear)
     }
@@ -667,6 +695,7 @@ impl MasternodeProcessorCache {
     }
     pub fn clear_mn_list_retrieval_queue(&self) {
         self.write_mn_list_retrieval_queue(RetrievalQueue::clear);
+        println!("{self:?} queue: cleared");
     }
     pub fn clear_qr_info_retrieval_queue(&self) {
         self.write_qr_info_retrieval_queue(RetrievalQueue::clear);

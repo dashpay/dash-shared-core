@@ -14,6 +14,7 @@ pub trait CoreProvider: std::fmt::Debug + Send + Sync {
     fn chain_type(&self) -> ChainType;
     fn block_by_hash(&self, block_hash: [u8; 32]) -> Result<MBlock, CoreProviderError>;
     fn last_block_for_block_hash(&self, block_hash: [u8; 32], peer: *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError>;
+    fn get_tip_height(&self) -> u32;
     fn lookup_cl_signature_by_block_hash(&self, block_hash: [u8; 32]) -> Result<[u8; 96], CoreProviderError>;
     fn lookup_block_hash_by_height(&self, block_height: u32) -> [u8; 32];
     fn lookup_block_height_by_hash(&self, block_hash: [u8; 32]) -> u32;

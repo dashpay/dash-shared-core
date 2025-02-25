@@ -2,7 +2,7 @@ use byte::BytesExt;
 use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use hashes::hex::{FromHex, ToHex};
-use hashes::{hash160, sha256, Hash};
+use hashes::{hash160, sha256, sha256d, Hash};
 use log::warn;
 use crate::crypto::byte_util::{AsBytes, ECPoint, UInt160, UInt256, UInt512, Zeroable};
 use crate::derivation::{IIndexPath, IndexPath};
@@ -108,6 +108,10 @@ impl IKey for ED25519Key {
         }
     }
 
+    fn hash_and_sign(&self, data: Vec<u8>) -> Vec<u8> {
+        let hash = sha256d::Hash::hash(&data);
+        self.sign(hash.as_ref())
+    }
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError> {
         // todo: check if this needed & correct
         Signature::from_slice(signature)

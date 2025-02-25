@@ -18,6 +18,7 @@ pub struct FFICoreProvider {
     pub block_by_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError>>,
     pub last_block_for_block_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError>>,
     pub get_block_hash_by_height: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> [u8; 32]>,
+    pub get_tip_height: Arc<dyn Fn(*const std::os::raw::c_void) -> u32>,
     pub get_block_by_height_or_last_terminal: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError>>,
     pub add_insight: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32])>,
     pub get_cl_signature_by_block_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 96], CoreProviderError>>,
@@ -58,6 +59,10 @@ impl CoreProvider for FFICoreProvider {
 
     fn lookup_block_by_height_or_last_terminal(&self, block_height: u32) -> Result<Block, CoreProviderError> {
         (self.get_block_by_height_or_last_terminal)(self.context, block_height)
+    }
+
+    fn get_tip_height(&self) -> u32 {
+        (self.get_tip_height)(self.context)
     }
 
     fn add_insight(&self, block_hash: [u8; 32]) {
@@ -113,6 +118,7 @@ impl FFICoreProvider  {
     pub fn new<
         BHT: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32 + Send + Sync + 'static,
         BHH: Fn(*const std::os::raw::c_void, u32) -> [u8; 32] + Send + Sync + 'static,
+        TIPBH: Fn(*const std::os::raw::c_void) -> u32 + Send + Sync + 'static,
         BORLT: Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError> + Send + Sync + 'static,
         BBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
@@ -134,6 +140,7 @@ impl FFICoreProvider  {
         get_block_by_height_or_last_terminal: BORLT,
         block_by_hash: BBH,
         last_block_for_block_hash: LBBBH,
+        get_tip_height: TIPBH,
         add_insight: INS,
         get_cl_signature_by_block_hash: CLSBH,
         load_masternode_list_from_db: LML,
@@ -154,6 +161,7 @@ impl FFICoreProvider  {
             get_block_hash_by_height: Arc::new(get_block_hash_by_height),
             get_block_by_height_or_last_terminal: Arc::new(get_block_by_height_or_last_terminal),
             block_by_hash: Arc::new(block_by_hash),
+            get_tip_height: Arc::new(get_tip_height),
             last_block_for_block_hash: Arc::new(last_block_for_block_hash),
             add_insight: Arc::new(add_insight),
             get_cl_signature_by_block_hash: Arc::new(get_cl_signature_by_block_hash),
@@ -197,6 +205,16 @@ impl FFICoreProvider {
                     }
                     result
                 })
+            },
+            get_tip_height: {
+                let clone_chain = chain_type.clone();
+                Arc::new(move |context| unsafe {
+                    let context = Arc::from_raw(context as *const FFIContext);
+                    let result = context.get_tip_height();
+                    std::mem::forget(context);
+                    result
+                })
+
             },
             last_block_for_block_hash: {
                 let clone_chain = chain_type.clone();

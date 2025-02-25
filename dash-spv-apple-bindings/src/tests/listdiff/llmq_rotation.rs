@@ -540,6 +540,12 @@ fn test_processor_devnet_333_2() {
             std::mem::forget(context);
             result.unwrap_or([0u8; 32])
         }),
+        get_tip_height: Arc::new(move |context| unsafe {
+            let context = Arc::from_raw(context as *const FFIContext);
+            let result = context.get_tip_height();
+            std::mem::forget(context);
+            result
+        }),
         add_insight: Arc::new(|context, block_hash| {}),
         get_cl_signature_by_block_hash: Arc::new(move |context, block_hash| unsafe {
             let context = Arc::from_raw(context as *const FFIContext);

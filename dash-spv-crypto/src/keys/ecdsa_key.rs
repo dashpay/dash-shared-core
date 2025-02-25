@@ -489,6 +489,10 @@ impl IKey for ECDSAKey {
         }
     }
 
+    fn hash_and_sign(&self, data: Vec<u8>) -> Vec<u8> {
+        let hash = sha256d::Hash::hash(&data);
+        self.sign(hash.as_ref())
+    }
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError> {
         if signature.len() > 65 {
             // not compact

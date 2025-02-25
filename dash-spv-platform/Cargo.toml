@@ -30,8 +30,6 @@ dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-macro = { path = "../dash-spv-macro" }
 
-dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
-#dispatch = "0.2.0"
 data-contracts = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "data-contracts" }
 dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }
 drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
@@ -43,8 +41,6 @@ ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-
 ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment-macro" }
 http = { version = "0.2.12" }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
-tokio-util = { version = "0.7.10" }
-bitflags = "2.6.0"
 base64 = "0.22.1"
 [dev-dependencies]
 base64 = "0.22.1"

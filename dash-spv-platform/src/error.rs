@@ -1,5 +1,6 @@
 use dash_sdk::dapi_client::{AddressListError, DapiClientError, ExecutionError};
 use dpp::data_contract::errors::DataContractError;
+use dpp::errors::consensus::ConsensusError;
 use dash_spv_crypto::keys::KeyError;
 use dpp::errors::ProtocolError;
 use http::uri::InvalidUri;
@@ -13,6 +14,7 @@ pub enum Error {
     DashSDKError(String),
     Any(i32, String),
     MaxRetryExceeded(String),
+    InstantSendSignatureVerificationError(String)
 }
 
 
@@ -60,6 +62,12 @@ impl From<encode::Error> for Error {
 impl From<dashcore::consensus::encode::Error> for Error {
     fn from(value: dashcore::consensus::encode::Error) -> Self {
         Error::DashSDKError(value.to_string())
+    }
+}
+
+impl From<Box<ConsensusError>> for Error {
+    fn from(value: Box<ConsensusError>) -> Self {
+        Error::DashSDKError(format!("{value:?}"))
     }
 }
 

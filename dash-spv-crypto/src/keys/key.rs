@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use dashcore::{Network, PrivateKey};
 use hashes::{sha256, sha256d, Hash};
 use crate::derivation::{IIndexPath, IndexPath, index_path::{Extremum, IndexHardSoft}};
 use crate::consensus::Encodable;
@@ -102,9 +103,20 @@ impl From<&KeyKind> for u8 {
     }
 }
 
-
+impl OpaqueKey {
+    pub fn convert_opaque_key_to_ecdsa_private_key(&self, chain_type: &ChainType) -> Result<PrivateKey, KeyError> {
+        match (chain_type, self) {
+            (ChainType::MainNet, OpaqueKey::ECDSA(key)) =>
+                key.private_key_data().and_then(|data| PrivateKey::from_slice(&data, Network::Dash).map_err(|err| KeyError::Any(format!("Can't convert dash_shared_core key ({self:?}) to platform key: {err}")))),
+            (ChainType::TestNet, OpaqueKey::ECDSA(key)) =>
+                key.private_key_data().and_then(|data| PrivateKey::from_slice(&data, Network::Testnet).map_err(|err| KeyError::Any(format!("Can't convert dash_shared_core key ({self:?}) to platform key: {err}")))),
+            _ => Err(KeyError::Any(format!("Can't convert dash_shared_core key ({self:?}) to platform key"))),
+        }
+    }
+}
 #[ferment_macro::export]
 impl OpaqueKey {
+
     pub fn has_kind(&self, kind: KeyKind) -> bool {
         self.kind().eq(&kind)
     }
@@ -652,6 +664,11 @@ impl IKey for OpaqueKey {
         }
     }
 
+    fn hash_and_sign(&self, data: Vec<u8>) -> Vec<u8> {
+        let hash = sha256d::Hash::hash(&data);
+        self.sign(hash.as_ref())
+    }
+
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError> {
         match self {
             OpaqueKey::ECDSA(key) => key.verify(message_digest, signature),
@@ -788,3 +805,24 @@ pub fn maybe_opaque_key_used_in_tx_input_script(
     }
     None
 }
+
+
+// impl From<OpaqueKey> for PrivateKey {
+//     fn from(value: OpaqueKey) -> Self {
+//         match  {  }
+//     }
+// }
+
+// impl TryFrom<OpaqueKey> for PrivateKey {
+//     type Error = KeyError;
+//
+//     fn try_from(value: OpaqueKey) -> Result<Self, Self::Error> {
+//         match value {
+//             OpaqueKey::ECDSA(key) => {
+//                 value.private_key_data().map(|data| PrivateKey::from_slice(&data, ))
+//                 PrivateKey::from_slice()
+//             }
+//             _ => Err(KeyError::Any("Wrong key type".to_string())),
+//         }
+//     }
+// }

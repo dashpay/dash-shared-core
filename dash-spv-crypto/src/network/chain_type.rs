@@ -4,6 +4,7 @@ use crate::util::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::util::params::DUFFS;
 use hashes::hex::{FromHex, ToHex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use dashcore::Network;
 
 #[ferment_macro::export]
 pub trait IHaveChainSettings {
@@ -624,4 +625,23 @@ pub fn devnet_type_from_index(index: u16) -> DevnetType {
 }#[ferment_macro::export]
 pub fn devnet_type_from_identifier(identifier: &str) -> DevnetType {
     DevnetType::from(identifier)
+}
+
+impl From<ChainType> for Network {
+    fn from(value: ChainType) -> Self {
+        match value {
+            ChainType::MainNet => Network::Dash,
+            ChainType::TestNet => Network::Testnet,
+            ChainType::DevNet(_) => Network::Devnet,
+        }
+    }
+}
+impl From<Network> for ChainType {
+    fn from(value: Network) -> Self {
+        match value {
+            Network::Dash => ChainType::MainNet,
+            Network::Testnet => ChainType::TestNet,
+            _ => ChainType::DevNet(DevnetType::default()),
+        }
+    }
 }

@@ -44,6 +44,7 @@ pub trait IKey: Send + Sync + Debug {
     //     address::with_public_key_data(&self.public_key_data(), script_map)
     // }
     fn sign(&self, data: &[u8]) -> Vec<u8>;
+    fn hash_and_sign(&self, data: Vec<u8>) -> Vec<u8>;
     // fn sign_message_digest(&self)
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError>;
     fn secret_key(&self) -> [u8; 32];

@@ -23,6 +23,10 @@ pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_tokio_runtime(self_
 pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_runtime(self_: *mut DashSPVCore) -> *mut Runtime {
     Arc::as_ptr(&(&*self_).platform.runtime) as *mut _
 }
+# [no_mangle]
+pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_destroy(self_: *mut DashSPVCore) {
+    ferment::unbox_any(self_);
+}
 #[no_mangle]
 pub unsafe extern "C" fn masternode_list_map_by_key(
     self_: *mut std_collections_Map_keys_u8_arr_32_values_dash_spv_masternode_processor_models_masternode_list_MasternodeList,
