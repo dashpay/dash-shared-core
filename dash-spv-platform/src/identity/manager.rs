@@ -19,6 +19,7 @@ use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
 use dash_spv_crypto::hashes::{hash160, Hash};
 use dash_spv_crypto::hashes::hex::ToHex;
 use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
+use dash_spv_crypto::keys::key::KeyKind;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::error::Error;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
@@ -258,5 +259,30 @@ pub fn key_type_from_opaque_key(opaque_key: OpaqueKey) -> Result<KeyType, KeyErr
         OpaqueKey::ECDSA(_) => Ok(KeyType::ECDSA_SECP256K1),
         OpaqueKey::BLS(_) => Ok(KeyType::BLS12_381),
         OpaqueKey::ED25519(_) => Ok(KeyType::EDDSA_25519_HASH160)
+    }
+}
+#[ferment_macro::export]
+pub fn key_kind_from_key_type(key_type: KeyType) -> KeyKind {
+    match key_type {
+        KeyType::ECDSA_SECP256K1 | KeyType::ECDSA_HASH160 | KeyType::BIP13_SCRIPT_HASH => KeyKind::ECDSA,
+        KeyType::BLS12_381 => KeyKind::BLSBasic,
+        KeyType::EDDSA_25519_HASH160 => KeyKind::ED25519
+    }
+}
+#[ferment_macro::export]
+pub fn key_kind_to_key_type_index(kind: KeyKind) -> u8 {
+    match kind {
+        KeyKind::ECDSA => 0,
+        KeyKind::BLS | KeyKind::BLSBasic => 1,
+        KeyKind::ED25519 => 4,
+    }
+}
+
+#[ferment_macro::export]
+pub fn opaque_key_to_key_type_index(opaque_key: OpaqueKey) -> u8 {
+    match opaque_key {
+        OpaqueKey::ECDSA(_) => 0,
+        OpaqueKey::BLS(_) => 1,
+        OpaqueKey::ED25519(_) => 4
     }
 }

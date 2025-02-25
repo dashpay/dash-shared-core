@@ -49,6 +49,7 @@ use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
 use dpp::native_bls::NativeBlsModule;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
+use dpp::state_transition::document::documents_batch_transition::DocumentsBatchTransition;
 use dpp::state_transition::state_transitions::document::documents_batch_transition::document_transition::action_type::DocumentTransitionActionType;
 use dpp::state_transition::state_transition_factory::StateTransitionFactory;
 use dpp::state_transition::StateTransition;
@@ -493,6 +494,8 @@ impl PlatformSDK {
         entropy: [u8; 32],
         private_key: OpaqueKey
     ) -> Result<StateTransitionProofResult, Error> {
+        // DocumentsBatchTransition::new_document_creation_transition_from_document(document, document_type.as_ref(), entropy, iden)
+        // TODO: switch onto DocumentsBatchTransition::new_document_creation_transition_from_document
         println!("document_single: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
         let signed_transition = self.document_single_signed_transition(action_type, document_type, document, entropy, private_key)?;
         self.publish_state_transition(signed_transition).await
