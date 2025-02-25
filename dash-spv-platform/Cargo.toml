@@ -18,7 +18,7 @@ anyhow = "1.0.95"
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
 bitcoin_hashes = { version = "0.11.0", default-features = false }
 dapi-grpc = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dapi-grpc" }
-dashcore = { git = "https://github.com/pankcuf/rust-dashcore", features = [
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
     "std",
     "secp-recovery",
     "rand",
@@ -37,8 +37,8 @@ drive-proof-verifier = { git = "https://github.com/pankcuf/platform", branch = "
 indexmap = "2.7.0"
 platform-value = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-value" }
 platform-version = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-version" }
-ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment" }
-ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment-macro" }
+ferment = { git = "https://github.com/dashpay/ferment", package = "ferment" }
+ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
 http = { version = "0.2.12" }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 base64 = "0.22.1"
