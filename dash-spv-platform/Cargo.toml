@@ -18,12 +18,15 @@ anyhow = "1.0.95"
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
 bitcoin_hashes = { version = "0.11.0", default-features = false }
 dapi-grpc = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dapi-grpc" }
-dashcore = { git = "https://github.com/pankcuf/rust-dashcore", features = [
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
     "std",
     "secp-recovery",
     "rand",
     "signer",
     "serde",
+    "bls",
+    "quorum_validation",
+    "bincode",
 ], default-features = false, branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
 dash-spv-crypto = { path = "../dash-spv-crypto" }

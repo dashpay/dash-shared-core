@@ -1,10 +1,10 @@
-use crate::network::LLMQType;
 use crate::crypto::byte_util::{Reversable, Reversed, UInt256};
 use crate::util::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::util::params::DUFFS;
 use hashes::hex::{FromHex, ToHex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use dashcore::Network;
+use dashcore::sml::llmq_type::LLMQType;
 
 #[ferment_macro::export]
 pub trait IHaveChainSettings {

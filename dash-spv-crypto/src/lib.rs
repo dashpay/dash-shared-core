@@ -12,7 +12,7 @@ pub(crate) mod hash_types;
 #[macro_use]
 pub(crate) mod internal_macros;
 pub mod keys;
-pub mod llmq;
+// pub mod llmq;
 pub mod network;
 pub mod tx;
 pub mod util;

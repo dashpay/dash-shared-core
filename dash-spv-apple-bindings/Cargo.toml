@@ -16,12 +16,15 @@ dash-spv-crypto = { path = "../dash-spv-crypto", features = ["default"] }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default"] }
 dash-spv-platform = { path = "../dash-spv-platform" }
-dashcore = { git = "https://github.com/pankcuf/rust-dashcore", features = [
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
     "std",
     "secp-recovery",
     "rand",
     "signer",
     "serde",
+    "bls",
+    "quorum_validation",
+    "bincode",
 ], default-features = false, branch = "feat/ferment" }
 dashcore-rpc = { git = "https://github.com/pankcuf/rust-dashcore-rpc", branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }

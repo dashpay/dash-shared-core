@@ -1,9 +1,8 @@
 pub mod chain_type;
 pub mod constants;
-pub mod llmq_type;
+// pub mod llmq_type;
 pub mod protocol;
 pub use self::chain_type::{ChainType, DevnetType, IHaveChainSettings};
-pub use self::llmq_type::{LLMQParams, LLMQType};
 
 pub const DASH_MESSAGE_MAGIC: &str = "DarkCoin Signed Message:\n";
 

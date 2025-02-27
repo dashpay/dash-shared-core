@@ -618,7 +618,7 @@ impl_vec!(bool);
 impl_vec!(crate::crypto::byte_util::UInt256);
 impl_vec!(crate::tx::TransactionInput);
 impl_vec!(crate::tx::TransactionOutput);
-impl_vec!(crate::llmq::entry::LLMQEntry);
+// impl_vec!(crate::llmq::entry::LLMQEntry);
 impl_vec!([u8; 32]);
 // #[cfg(feature = "std")] impl_vec!(Inventory);
 // #[cfg(feature = "std")] impl_vec!((u32, Address));
