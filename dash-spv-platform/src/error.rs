@@ -22,7 +22,7 @@ pub enum Error {
 impl From<dash_sdk::Error> for Error {
     fn from(e: dash_sdk::Error) -> Self {
         if let dash_sdk::Error::Protocol(ProtocolError::ConsensusError(ref err)) = e {
-            if let ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) = err {
+            if let ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) = &**err {
                 return Error::InstantSendSignatureVerificationError(format!("{err:?}"));
             }
         }

@@ -723,8 +723,8 @@ impl PlatformSDK {
                 result
             })
 
-        document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
-            .map_err(Error::from)
+        // document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
+        //     .map_err(Error::from)
 
     }
 
