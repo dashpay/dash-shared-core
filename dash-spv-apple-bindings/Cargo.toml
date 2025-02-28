@@ -25,7 +25,8 @@ dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
     "bls",
     "quorum_validation",
     "bincode",
-], default-features = false, branch = "feat/ferment" }
+    "apple",
+], default-features = false, rev = "c8b35fda317136e6ffb9035dbb90bbd6e2a1fb20" }
 dashcore-rpc = { git = "https://github.com/pankcuf/rust-dashcore-rpc", branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
 data-contracts = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "data-contracts" }

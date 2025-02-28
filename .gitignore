@@ -12,3 +12,4 @@
 /.idea/
 *.iml
 /DashSharedCore
+*.DS_Store
