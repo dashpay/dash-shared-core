@@ -25,6 +25,7 @@ use dash_sdk::dpp::dashcore::secp256k1::rand::SeedableRng;
 use dash_sdk::platform::FetchUnproved;
 use dash_sdk::platform::transition::put_contract::PutContract;
 use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
+use dash_sdk::platform::transition::put_document::PutDocument;
 use dash_sdk::platform::transition::put_identity::PutIdentity;
 use dash_sdk::platform::transition::put_settings::PutSettings;
 use dash_sdk::platform::types::evonode::EvoNode;
@@ -50,6 +51,7 @@ use dpp::native_bls::NativeBlsModule;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
 use dpp::state_transition::document::documents_batch_transition::DocumentsBatchTransition;
+use dpp::state_transition::document::documents_batch_transition::methods::v0::DocumentsBatchTransitionMethodsV0;
 use dpp::state_transition::state_transitions::document::documents_batch_transition::document_transition::action_type::DocumentTransitionActionType;
 use dpp::state_transition::state_transition_factory::StateTransitionFactory;
 use dpp::state_transition::StateTransition;
@@ -74,7 +76,7 @@ use crate::document::manager::DocumentsManager;
 use crate::document::salted_domain_hashes::SaltedDomainHashesManager;
 use crate::document::usernames::{UsernameStatus, UsernamesManager};
 use crate::error::Error;
-use crate::identity::manager::IdentitiesManager;
+use crate::identity::manager::{key_type_from_opaque_key, IdentitiesManager};
 use crate::models::profile::Profile;
 use crate::provider::PlatformProvider;
 use crate::query::QueryKind;
@@ -435,16 +437,8 @@ impl PlatformSDK {
             balance: 0,
             revision: 0,
         });
-        match identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await {
-            Ok(state_transition_result) => Ok(state_transition_result),
-            Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(err))) => match *err {
-                ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) =>
-                    Err(Error::InstantSendSignatureVerificationError(format!("{err:?}"))),
-                _ => Err(Error::from(err)),
-            },
-            Err(err) => Err(Error::from(err)),
-        }
-
+        identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
+            .map_err(Error::from)
     }
 
     pub async fn identity_topup(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
@@ -494,11 +488,25 @@ impl PlatformSDK {
         entropy: [u8; 32],
         private_key: OpaqueKey
     ) -> Result<StateTransitionProofResult, Error> {
-        // DocumentsBatchTransition::new_document_creation_transition_from_document(document, document_type.as_ref(), entropy, iden)
         // TODO: switch onto DocumentsBatchTransition::new_document_creation_transition_from_document
+        // DocumentsBatchTransition::DocumentsBatchTransition::new_document_creation_transition_from_document()
         println!("document_single: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
         let signed_transition = self.document_single_signed_transition(action_type, document_type, document, entropy, private_key)?;
         self.publish_state_transition(signed_transition).await
+    }
+    #[cfg(feature = "state-transitions")]
+    pub async fn document_single2(
+        &self,
+        action_type: DocumentTransitionActionType,
+        document_type: DocumentType,
+        document: Document,
+        entropy: [u8; 32],
+        identity_public_key: IdentityPublicKey,
+        private_key: OpaqueKey,
+    ) -> Result<Document, Error> {
+        println!("document_single2: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
+        document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
+            .map_err(Error::from)
     }
 
     #[cfg(feature = "state-transitions")]
@@ -668,13 +676,56 @@ impl PlatformSDK {
                 .map_err(Error::from)?;
             documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
         }
+
+        // Document::put_to_platform_and_wait_for_response(self.sdk.as_ref(), )
+
         let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
         save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
+
         self.publish_state_transition(signed_transition).await
             .map(|result| {
                 save_callback(save_context, UsernameStatus::Preordered);
                 result
             })
+    }
+
+    pub async fn register_preordered_salted_domain_hashes_for_username_full_paths2<
+        SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
+    >(
+        &self,
+        contract: DataContract,
+        identity_id: [u8; 32],
+        salted_domain_hashes: Vec<Vec<u8>>,
+        entropy: [u8; 32],
+        private_key: OpaqueKey,
+        save_context: *const std::os::raw::c_void,
+        save_callback: SUC,
+    ) -> Result<StateTransitionProofResult, Error> {
+        let document_type = contract.document_type_for_name("preorder")
+            .map_err(ProtocolError::from)?;
+        let owner_id = Identifier::from(identity_id);
+        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+        for salted_domain_hash in salted_domain_hashes.into_iter() {
+            let map = ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]);
+            let document = document_type.create_document_from_data(Value::Map(map), owner_id, 1000, 1000, entropy, self.sdk.version())
+                .map_err(Error::from)?;
+            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+        }
+
+        // Document::put_to_platform_and_wait_for_response(self.sdk.as_ref(), )
+
+        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
+        save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
+
+        self.publish_state_transition(signed_transition).await
+            .map(|result| {
+                save_callback(save_context, UsernameStatus::Preordered);
+                result
+            })
+
+        document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
+            .map_err(Error::from)
+
     }
 
     pub async fn sign_and_publish_profile(
@@ -723,7 +774,6 @@ impl PlatformSDK {
         callback_can_sign: CCS,
         address_list: Option<Vec<&'static str>>,
         chain_type: ChainType,
-        // masternode_provider: Arc<dyn MasternodeProvider>,
         context: *const std::os::raw::c_void,
     ) -> Self {
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
@@ -776,27 +826,16 @@ impl PlatformSDK {
         let private_key_data = private_key.private_key_data().map_err(Error::KeyError)?;
         let mut state_transition = f(transition);
         let data = state_transition.signable_bytes().map_err(Error::from)?;
+        let key_type = key_type_from_opaque_key(private_key).map_err(Error::KeyError)?;
         println!("transition signable bytes: {}", data.to_hex());
-        state_transition.sign_by_private_key(&private_key_data, KeyType::ECDSA_SECP256K1, &NativeBlsModule).map_err(Error::from)?;
+        state_transition.sign_by_private_key(&private_key_data, key_type, &NativeBlsModule).map_err(Error::from)?;
         println!("transition signature: {}", state_transition.signature().0.to_hex());
         Ok(state_transition)
     }
-    // async fn sign_and_publish_transition(&self, mut transition: StateTransition, signature: Vec<u8>) -> Result<StateTransitionProofResult, Error> {
-    //     transition.set_signature(signature.into());
-    //     self.publish_state_transition(transition).await
-    // }
 
     async fn publish_state_transition(&self, transition: StateTransition) -> Result<StateTransitionProofResult, Error> {
         println!("publish_state_transition: {:?}", transition);
-        match transition.broadcast_and_wait(&self.sdk, None).await {
-            Ok(state_transition_result) => Ok(state_transition_result),
-            Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(err))) => match *err {
-                ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) =>
-                    Err(Error::InstantSendSignatureVerificationError(format!("{err:?}"))),
-                _ => Err(Error::from(err)),
-            },
-            Err(err) => Err(Error::from(err)),
-        }
+        transition.broadcast_and_wait(&self.sdk, None).await.map_err(Error::from)
     }
 }
 
