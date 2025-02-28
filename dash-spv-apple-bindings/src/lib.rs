@@ -2,23 +2,14 @@
 #![allow(unused_variables)]
 
 mod address;
-// mod chain;
-// mod common;
-// mod crypto;
 #[cfg(not(test))]
 mod fermented;
 #[cfg(not(test))]
 mod fermented_extended;
 
-// mod keys;
-// mod masternode;
-// mod tx;
-
 #[cfg(test)]
 mod tests;
 mod ffi_core_provider;
-// mod ffi;
-// mod types;
 pub mod custom;
 mod bindings;
 

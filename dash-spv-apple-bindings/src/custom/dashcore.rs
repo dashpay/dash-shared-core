@@ -160,3 +160,43 @@ impl_hash_ferment!(
     dashcore_hash_types_MerkleRootQuorums_destroy,
     dashcore_hash_types_MerkleRootQuorums_inner);
 
+#[allow(non_camel_case_types)]
+#[ferment_macro::register(dashcore::hash_types::QuorumEntryHash)]
+pub struct dashcore_hash_types_QuorumEntryHash(pub *mut [u8; dashcore::hash_types::QuorumEntryHash::LEN]);
+impl_hash_ferment!(
+    dashcore::hash_types::QuorumEntryHash,
+    dashcore_hash_types_QuorumEntryHash,
+    dashcore_hash_types_QuorumEntryHash_ctor,
+    dashcore_hash_types_QuorumEntryHash_destroy,
+    dashcore_hash_types_QuorumEntryHash_inner);
+
+#[allow(non_camel_case_types)]
+#[ferment_macro::register(dashcore::hash_types::ConfirmedHashHashedWithProRegTx)]
+pub struct dashcore_hash_types_ConfirmedHashHashedWithProRegTx(pub *mut [u8; dashcore::hash_types::ConfirmedHashHashedWithProRegTx::LEN]);
+impl_hash_ferment!(
+    dashcore::hash_types::ConfirmedHashHashedWithProRegTx,
+    dashcore_hash_types_ConfirmedHashHashedWithProRegTx,
+    dashcore_hash_types_ConfirmedHashHashedWithProRegTx_ctor,
+    dashcore_hash_types_ConfirmedHashHashedWithProRegTx_destroy,
+    dashcore_hash_types_ConfirmedHashHashedWithProRegTx_inner);
+
+#[allow(non_camel_case_types)]
+#[ferment_macro::register(dashcore::hash_types::ConfirmedHash)]
+pub struct dashcore_hash_types_ConfirmedHash(pub *mut [u8; dashcore::hash_types::ConfirmedHash::LEN]);
+impl_hash_ferment!(
+    dashcore::hash_types::ConfirmedHash,
+    dashcore_hash_types_ConfirmedHash,
+    dashcore_hash_types_ConfirmedHash_ctor,
+    dashcore_hash_types_ConfirmedHash_destroy,
+    dashcore_hash_types_ConfirmedHash_inner);
+
+#[allow(non_camel_case_types)]
+#[ferment_macro::register(dashcore::hash_types::QuorumCommitmentHash)]
+pub struct dashcore_hash_types_QuorumCommitmentHash(pub *mut [u8; dashcore::hash_types::QuorumCommitmentHash::LEN]);
+impl_hash_ferment!(
+    dashcore::hash_types::QuorumCommitmentHash,
+    dashcore_hash_types_QuorumCommitmentHash,
+    dashcore_hash_types_QuorumCommitmentHash_ctor,
+    dashcore_hash_types_QuorumCommitmentHash_destroy,
+    dashcore_hash_types_QuorumCommitmentHash_inner);
+

@@ -1,5 +1,6 @@
 use dash_sdk::dapi_client::{AddressListError, DapiClientError, ExecutionError};
 use dpp::data_contract::errors::DataContractError;
+use dpp::errors::consensus::basic::BasicError;
 use dpp::errors::consensus::ConsensusError;
 use dash_spv_crypto::keys::KeyError;
 use dpp::errors::ProtocolError;
@@ -20,6 +21,11 @@ pub enum Error {
 
 impl From<dash_sdk::Error> for Error {
     fn from(e: dash_sdk::Error) -> Self {
+        if let dash_sdk::Error::Protocol(ProtocolError::ConsensusError(ref err)) = e {
+            if let ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) = &**err {
+                return Error::InstantSendSignatureVerificationError(format!("{err:?}"));
+            }
+        }
         Error::DashSDKError(format!("{e:?}"))
     }
 }

@@ -13,7 +13,6 @@ bitcoin_hashes = { version = "0.11.0", default-features = false }
 blake3 = "1.3.2"
 byte = "0.2"
 dash-spv-crypto = { path = "../dash-spv-crypto", features = ["default"] }
-dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default"] }
 dash-spv-platform = { path = "../dash-spv-platform" }
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
@@ -27,7 +26,6 @@ dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
     "bincode",
     "apple",
 ], default-features = false, rev = "c8b35fda317136e6ffb9035dbb90bbd6e2a1fb20" }
-dashcore-rpc = { git = "https://github.com/pankcuf/rust-dashcore-rpc", branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
 data-contracts = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "data-contracts" }
 dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp", default-features = false, features = ["dash-sdk-features"] }
@@ -44,8 +42,8 @@ rs-dapi-client = { git = "https://github.com/pankcuf/platform", branch = "test/f
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
 #rs-dapi-client = { path = "../../platform/packages/rs-dapi-client" }
 fancy-regex = "0.13.0"
-ferment = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment" }
-ferment-macro = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment-macro" }
+ferment = { git = "https://github.com/dashpay/ferment", package = "ferment" }
+ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
 #ferment = { path = "../../ferment/ferment" }
 #ferment-macro = { path = "../../ferment/ferment-macro" }
 grovedb-version = "2.1.0"
@@ -70,7 +68,7 @@ serde = { version = "1.0.209", features = ["derive"] }
 [build-dependencies]
 cbindgen = "0.28.0"
 #ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["cbindgen_only"] }
-ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/lifetime-support", package = "ferment-sys" }
+ferment-sys = { git = "https://github.com/dashpay/ferment", package = "ferment-sys" }
 #ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["objc"] }
 #ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }
 

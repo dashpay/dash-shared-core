@@ -158,7 +158,8 @@ impl BLSKey {
 #[ferment_macro::export]
 impl IKey for BLSKey {
     fn kind(&self) -> KeyKind {
-        KeyKind::BLS // &KeyType::BLSBasic
+        KeyKind::BLSBasic
+        // KeyKind::BLS // &KeyType::BLSBasic
     }
 
     fn secret_key_string(&self) -> String {
