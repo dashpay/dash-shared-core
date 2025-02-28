@@ -100,10 +100,6 @@ impl CoinJoinClientSession {
     }
 
     pub fn do_automatic_denominating(&mut self, client_manager: &mut CoinJoinClientManager, dry_run: bool, balance_info: Balance) -> bool {
-        if self.outpoints_locked.len() > 0 {
-            println!("[RUST] do_automatic_denominating, session: {}, outpoints_locked.len(): {}", self.id, self.outpoints_locked.len());
-        }
-
         if self.base_session.state != PoolState::Idle || !self.options.borrow().enable_coinjoin {
             return false;
         }
@@ -818,14 +814,11 @@ impl CoinJoinClientSession {
         }
 
         // TODO (DashJ): should we wait here? check Dash Core code
-
         for outpoint in &self.outpoints_locked {
-            println!("[RUST] CoinJoin: unlock_coin by session: {:?}: {:?}", self.id, outpoint);
             self.mixing_wallet.borrow_mut().unlock_coin(outpoint);
         }
 
         self.outpoints_locked.clear();
-        println!("[RUST] CoinJoin: session outpoints_locked: {:?}", self.outpoints_locked.iter().map(|x| x.hash.reversed().to_string()).collect::<Vec<String>>());
     }
 
     fn set_null(&mut self) {

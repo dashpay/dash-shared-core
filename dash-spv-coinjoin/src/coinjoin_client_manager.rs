@@ -1,4 +1,4 @@
-use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::{byte_util::Reversable, UInt256}, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
+use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::{byte_util::Reversable, UInt256}, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}, tx::Transaction};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
 use tracing::{info, warn, debug, error};
 use logging::*;
@@ -409,6 +409,13 @@ impl CoinJoinClientManager {
         self.deq_sessions.clear();
     }
 
+    pub fn unlock_outputs(&mut self, tx: &Transaction) {
+        println!("[RUST] CoinJoin ClientManager - unlock_outputs - tx: {:?}", tx);
+        for input in tx.inputs.iter() {
+            self.wallet_ex.borrow_mut().unlock_coin(&TxOutPoint::new(input.input_hash, input.index));
+        }
+    }
+
     fn get_valid_mns_count(&self, mn_list: &MasternodeList) -> usize {
         mn_list.masternodes.values().filter(|mn| mn.is_valid).count()
     }
@@ -433,12 +440,6 @@ impl CoinJoinClientManager {
     }
 
     fn queue_mixing_lifecycle_listeners(&self, is_complete: bool, is_interrupted: bool) {
-        println!("[RUST] CoinJoin: queue_mixing_lifecycle_listeners, self.deq_sessions.len(): {}", self.deq_sessions.len());
-        for session in &self.deq_sessions {
-            println!("[RUST] CoinJoin: session {:?} status {:?}", session.id, session.base_session.status);
-            println!("[RUST] CoinJoin: session outpoints_locked: {:?}", session.outpoints_locked.iter().map(|x| x.hash.reversed().to_string()).collect::<Vec<String>>());
-        }
-
         let statuses: Vec<PoolStatus> = self.deq_sessions.iter().map(|x| x.base_session.status).collect();
         let length = statuses.len();
 

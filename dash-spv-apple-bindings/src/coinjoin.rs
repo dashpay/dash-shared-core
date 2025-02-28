@@ -412,6 +412,14 @@ pub unsafe extern "C" fn get_coinjoin_tx_type(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn unlock_outputs(
+    client_manager: *mut CoinJoinClientManager,
+    tx: *mut types::Transaction
+) {
+    (*client_manager).unlock_outputs(&(*tx).decode());
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn process_used_scripts(
     client_manager: *mut CoinJoinClientManager,
     coinjoin_keys: *mut CoinJoinKeys
