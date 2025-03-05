@@ -2,9 +2,10 @@ use crate::network::LLMQType;
 use crate::crypto::byte_util::{Reversable, Reversed, UInt256};
 use crate::util::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::util::params::DUFFS;
-use hashes::hex::{FromHex, ToHex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use dashcore::hashes::hex::FromHex;
 use dashcore::Network;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 
 #[ferment_macro::export]
 pub trait IHaveChainSettings {
@@ -611,7 +612,7 @@ impl ChainType {
     pub fn unique_id(&self) -> String {
         let genesis = self.genesis_hash();
         let slice = &genesis[..8];
-        slice.to_hex()
+        slice.to_lower_hex_string()
     }
 
 }

@@ -1,7 +1,7 @@
 use std::io;
 use byte::ctx::Endian;
 use byte::{check_len, TryRead};
-use crate::consensus::Decodable;
+use dashcore::consensus::Decodable;
 use crate::crypto::byte_util::AsBytes;
 use crate::impl_bytes_decodable;
 
@@ -17,8 +17,8 @@ impl<'a> TryRead<'a, Endian> for Boolean {
 }
 impl Decodable for Boolean {
     #[inline]
-    fn consensus_decode<D: io::Read>(d: D) -> Result<Boolean, crate::consensus::encode::Error> {
-        match bool::consensus_decode(d) {
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        match bool::consensus_decode(reader) {
             Ok(data) => Ok(Boolean(data)),
             Err(err) => Err(err)
         }

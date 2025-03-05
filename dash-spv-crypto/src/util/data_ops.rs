@@ -1,8 +1,8 @@
 use secp256k1::rand;
 use secp256k1::rand::Rng;
 use std::fmt::Write;
-use hashes::{sha256d, Hash};
-use crate::consensus::Encodable;
+use dashcore::consensus::Encodable;
+use hashes::sha256d;
 
 #[inline]
 pub fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
@@ -43,9 +43,9 @@ pub fn merkle_root_from_hashes(hashes: Vec<[u8; 32]>) -> Option<[u8; 32]> {
                 let mut higher_level = Vec::<[u8; 32]>::with_capacity((0.5 * len as f64).ceil() as usize);
                 for pair in level.chunks(2) {
                     let mut buffer = Vec::with_capacity(64);
-                    pair[0].enc(&mut buffer);
-                    (pair.get(1).unwrap_or(&pair[0])).enc(&mut buffer);
-                    higher_level.push(sha256d::Hash::hash(buffer.as_ref()).into_inner());
+                    pair[0].consensus_encode(&mut buffer).unwrap();
+                    (pair.get(1).unwrap_or(&pair[0])).consensus_encode(&mut buffer);
+                    higher_level.push(sha256d::Hash::hash(buffer.as_ref()).to_byte_array());
                 }
                 level = higher_level;
             }

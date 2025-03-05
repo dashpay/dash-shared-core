@@ -30,15 +30,15 @@ impl std::fmt::Display for SocketAddress {
 impl Encodable for SocketAddress {
     #[inline]
     fn consensus_encode<S: io::Write>(&self, mut s: S) -> Result<usize, io::Error> {
-        self.ip_address.enc(&mut s);
-        self.port.swap_bytes().enc(&mut s);
+        self.ip_address.consensus_encode(&mut s).unwrap();
+        self.port.swap_bytes().consensus_encode(&mut s).unwrap();
         Ok(18)
     }
 }
 
 impl Decodable for SocketAddress {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, dashcore::consensus::encode::Error> {
         let ip_address = <[u8; 16]>::consensus_decode(&mut d)?;
         let port = u16::consensus_decode(&mut d)?;
         Ok(Self { ip_address, port })

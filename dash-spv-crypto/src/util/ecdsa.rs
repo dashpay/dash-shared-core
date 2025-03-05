@@ -21,10 +21,9 @@ use core::fmt::{self, Write as _fmtWrite};
 use std::io;
 use secp256k1::{self, Secp256k1};
 
-use crate::hash_types::{PubkeyHash, WPubkeyHash};
-use crate::hashes::{Hash, hash160};
-use crate::network::constants::Network;
-// use crate::network::constants::Network;
+use dashcore::hash_types::{PubkeyHash, WPubkeyHash};
+use dashcore::hashes::{Hash, hash160};
+use dashcore::network::constants::Network;
 use crate::util::base58;
 use crate::util::key::Error;
 
@@ -61,9 +60,7 @@ impl PublicKey {
     /// Returns bitcoin 160-bit hash of the public key for witness program
     pub fn wpubkey_hash(&self) -> Option<WPubkeyHash> {
         if self.compressed {
-            Some(WPubkeyHash::from_inner(
-                hash160::Hash::hash(&self.key.serialize()).into_inner()
-            ))
+            Some(WPubkeyHash::from_raw_hash(hash160::Hash::hash(&self.key.serialize())))
         } else {
             // We can't create witness pubkey hashes for an uncompressed
             // public keys
@@ -201,8 +198,8 @@ impl PrivateKey {
     pub fn fmt_wif(&self, fmt: &mut dyn fmt::Write) -> fmt::Result {
         let mut ret = [0; 34];
         ret[0] = match self.network {
-            Network::Bitcoin => 128,
-            Network::Testnet | Network::Signet | Network::Regtest => 239,
+            Network::Dash => 128,
+            _ => 239,
         };
         ret[1..33].copy_from_slice(&self.key[..]);
         let privkey = if self.compressed {
@@ -231,7 +228,7 @@ impl PrivateKey {
             _ => { return Err(Error::Base58(base58::Error::InvalidLength(data.len()))); }
         };
         let network = match data[0] {
-            128 => Network::Bitcoin,
+            128 => Network::Dash,
             239 => Network::Testnet,
             x=> { return Err(Error::Base58(base58::Error::InvalidAddressVersion(x))); }
         };

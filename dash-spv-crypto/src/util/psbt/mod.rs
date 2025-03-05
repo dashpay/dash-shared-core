@@ -19,4 +19,4 @@
 //! except we define PSBTs containing non-standard SigHash types as invalid.
 
 mod error;
-pub use self::error::Error;
+// pub use self::error::Error;

@@ -1,8 +1,8 @@
-use hashes::{Hash, sha256d};
+use dashcore::hashes::{Hash, sha256d};
 use crate::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, OP_RETURN};
 use crate::network::DevnetType;
 use crate::util::{params::BITCOIN_SCRIPT_ADDRESS, ScriptMap};
-use crate::consensus::{Encodable, WriteExt};
+use dashcore::consensus::{Encodable, WriteExt};
 use crate::util::base58;
 use crate::util::script::{op_len, ScriptElement};
 
@@ -61,33 +61,33 @@ impl DataAppend for Vec<u8> /* io::Write */ {
             0..=0xfc => {
                 let header = l as u8;
                 let payload = height as u8;
-                header.enc(&mut writer);
-                payload.enc(&mut writer);
+                header.consensus_encode(&mut writer).unwrap();
+                payload.consensus_encode(&mut writer).unwrap();
             },
             0xfd..=U16MAX => {
                 let header = (0xfd + l) as u8;
                 let payload = (height as u16).swap_bytes();
-                header.enc(&mut writer);
-                payload.enc(&mut writer);
+                header.consensus_encode(&mut writer).unwrap();
+                payload.consensus_encode(&mut writer).unwrap();
             },
             U16MAX_PLUS_1..=u32::MAX => {
                 let header = (0xfe + l) as u8;
                 let payload = height.swap_bytes();
-                header.enc(&mut writer);
-                payload.enc(&mut writer);
+                header.consensus_encode(&mut writer).unwrap();
+                payload.consensus_encode(&mut writer).unwrap();
             }
         }
-        message.enc(&mut writer);
+        message.consensus_encode(&mut writer).unwrap();
         writer
     }
 
     fn append_devnet_genesis_coinbase_message(devnet_type: DevnetType, _protocol_version: u32, mut writer: Self) -> Self {
         // A little weirder
-        0x51u8.enc(&mut writer);
+        0x51u8.consensus_encode(&mut writer).unwrap();
         let identifier = devnet_type.identifier();
         let bytes = identifier.as_bytes();
         let len: u8 = bytes.len() as u8;
-        len.enc(&mut writer);
+        len.consensus_encode(&mut writer).unwrap();
         writer.emit_slice(bytes).unwrap();
         //if protocol_version >= 70221 {
         //  [self appendUInt8:version + 0x50];
@@ -99,7 +99,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         // todo: check impl base58checkToData
         match base58::from_check(address.as_str()) {
             Ok(d) if d.len() == 21 => {
-                OP_RETURN.into_u8().enc(&mut writer);
+                OP_RETURN.into_u8().consensus_encode(&mut writer).unwrap();
                 // d[1..].to_vec().append_script_push_data(&mut writer);
                 // writer.append_script_push_data(d[1..].to_vec());
                 d[1..].to_vec().append_script_push_data(&mut writer);
@@ -110,10 +110,10 @@ impl DataAppend for Vec<u8> /* io::Write */ {
     }
 
     fn append_proposal_info(proposal_info: &[u8], mut writer: Self) -> Self {
-        let hash = sha256d::Hash::hash(proposal_info).into_inner();
-        OP_RETURN.into_u8().enc(&mut writer);
+        // let hash = sha256d::Hash::hash(proposal_info).into_inner();
+        OP_RETURN.into_u8().consensus_encode(&mut writer).unwrap();
         // TODO check we need to write varint
-        hash.to_vec().enc(&mut writer);
+        sha256d::Hash::hash(proposal_info).consensus_encode(&mut writer).unwrap();
         // writer.append_script_push_data(hash.to_vec());
         // hash.to_vec().append_script_push_data(&mut writer);
         writer
@@ -123,18 +123,18 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         match base58::from_check(address) {
             Ok(data) => match &data[..] {
                 [v, data @ ..] if *v == script_map.pubkey => {
-                    OP_DUP.into_u8().enc(&mut writer);
-                    OP_HASH160.into_u8().enc(&mut writer);
+                    OP_DUP.into_u8().consensus_encode(&mut writer).unwrap();
+                    OP_HASH160.into_u8().consensus_encode(&mut writer).unwrap();
                     // writer.append_script_push_data(data.to_vec());
                     data.to_vec().append_script_push_data(&mut writer);
-                    OP_EQUALVERIFY.into_u8().enc(&mut writer);
-                    OP_CHECKSIG.into_u8().enc(&mut writer);
+                    OP_EQUALVERIFY.into_u8().consensus_encode(&mut writer).unwrap();
+                    OP_CHECKSIG.into_u8().consensus_encode(&mut writer).unwrap();
                 },
                 [v, data @ ..] if *v == script_map.script => {
-                    OP_HASH160.into_u8().enc(&mut writer);
+                    OP_HASH160.into_u8().consensus_encode(&mut writer).unwrap();
                     writer.append_script_push_data(data.to_vec());
                     // data.to_vec().append_script_push_data(&mut writer);
-                    OP_EQUAL.into_u8().enc(&mut writer);
+                    OP_EQUAL.into_u8().consensus_encode(&mut writer).unwrap();
                 },
                 _ => {}
             },
@@ -149,19 +149,19 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         match len {
             0 => { return; },
             1..=0x4b => {
-                (len as u8).enc(&mut writer);
+                (len as u8).consensus_encode(&mut writer).unwrap();
             }
             0x4c..=0xffff => {
-                OP_PUSHDATA1.into_u8().enc(&mut writer);
-                (len as u8).enc(&mut writer);
+                OP_PUSHDATA1.into_u8().consensus_encode(&mut writer).unwrap();
+                (len as u8).consensus_encode(&mut writer).unwrap();
             },
             0x10000..=0xffffffff => {
-                OP_PUSHDATA2.into_u8().enc(&mut writer);
-                (len as u16).enc(&mut writer);
+                OP_PUSHDATA2.into_u8().consensus_encode(&mut writer).unwrap();
+                (len as u16).consensus_encode(&mut writer).unwrap();
             },
             _ => {
-                OP_PUSHDATA4.into_u8().enc(&mut writer);
-                (len as u32).enc(&mut writer);
+                OP_PUSHDATA4.into_u8().consensus_encode(&mut writer).unwrap();
+                (len as u32).consensus_encode(&mut writer).unwrap();
             },
         }
         writer.write(self)
@@ -174,14 +174,14 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                 let mut script_push = Vec::<u8>::new();
                 if d[0] == BITCOIN_SCRIPT_ADDRESS {
                     // OP_SHAPESHIFT_SCRIPT
-                    0xb3.enc(&mut script_push);
+                    0xb3.consensus_encode(&mut script_push).unwrap();
                 } else {
                     // shapeshift is actually part of the message
                     // OP_SHAPESHIFT
-                    0xb1.enc(&mut script_push);
+                    0xb1.consensus_encode(&mut script_push).unwrap();
                 }
                 script_push.extend(d.clone().drain(1..d.len()));
-                OP_RETURN.into_u8().enc(&mut writer);
+                OP_RETURN.into_u8().consensus_encode(&mut writer).unwrap();
                 // writer.append_script_push_data(script_push);
                 script_push.append_script_push_data(&mut writer);
             },

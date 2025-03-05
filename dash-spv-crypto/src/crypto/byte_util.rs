@@ -1,15 +1,21 @@
-use byte::{BytesExt, ctx::Endian, LE, Result, TryRead, TryWrite};
+use byte::{BytesExt, ctx::Endian, LE, TryRead, TryWrite};
 use std::{io::Write, mem, net::{IpAddr, Ipv4Addr}, slice};
 use ed25519_dalek::{SigningKey, VerifyingKey};
-use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
+use dashcore::hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
 use secp256k1::rand::{Rng, thread_rng};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
-use crate::hashes::{hex::{FromHex, ToHex}, hex};
+use dashcore::consensus::{Decodable, Encodable, ReadExt, WriteExt};
+use dashcore::hashes::hex::FromHex;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use crate::util::base58;
 use crate::util::data_ops::short_hex_string_from;
 use crate::util::params::{BIP32_SEED_KEY, ED25519_SEED_KEY};
+
+#[cfg(feature = "std")]
+use std::io;
+#[cfg(not(feature = "std"))]
+use core2::io;
 
 pub trait AsBytes {
     fn as_bytes(&self) -> &[u8];
@@ -32,13 +38,13 @@ pub trait Random {
 }
 
 pub trait MutDecodable<'a, T: TryRead<'a, Endian>> {
-    fn from_mut(bytes: *mut u8) -> Result<T>;
+    fn from_mut(bytes: *mut u8) -> byte::Result<T>;
 }
 pub trait ConstDecodable<'a, T: TryRead<'a, Endian>> {
-    fn from_const(bytes: *const u8) -> Result<T>;
+    fn from_const(bytes: *const u8) -> byte::Result<T>;
 }
 pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
-    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Result<T>;
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<T>;
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -164,7 +170,7 @@ macro_rules! define_try_from_bytes {
 macro_rules! define_try_read_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
         impl<'a> TryRead<'a, Endian> for $uint_type {
-            fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+            fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
                 // Ok(($uint_type(bytes[..$byte_len].try_into().unwrap_or([0u8; $byte_len])), $byte_len))
                 let mut offset = 0usize;
                 let mut data: [u8; $byte_len] = [0u8; $byte_len];
@@ -193,14 +199,14 @@ macro_rules! define_try_read_to_big_uint {
 macro_rules! define_serde_big_uint {
     ($uint_type: ident) => {
         impl Serialize for $uint_type {
-            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> where S: Serializer {
-                let str = self.0.to_hex();
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+                let str = self.0.to_lower_hex_string();
                 serializer.serialize_str(&str)
             }
         }
 
         impl<'de> Deserialize<'de> for $uint_type {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error> where D: Deserializer<'de> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
                 String::deserialize(deserializer)
                     .map(|s| $uint_type::from_hex(s.as_str()).unwrap())
             }
@@ -242,7 +248,7 @@ macro_rules! define_bytes_to_big_uint {
 
         impl std::fmt::Display for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{}", self.0.to_hex())?;
+                write!(f, "{}", self.0.to_lower_hex_string())?;
                 Ok(())
             }
         }
@@ -255,13 +261,13 @@ macro_rules! define_bytes_to_big_uint {
         // }
         impl std::fmt::Debug for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{}", self.0.to_hex())?;
+                write!(f, "{}", self.0.to_lower_hex_string())?;
                 Ok(())
             }
         }
         impl Encodable for $uint_type {
             #[inline]
-            fn consensus_encode<W: std::io::Write>(&self, mut writer: W) -> std::result::Result<usize, std::io::Error> {
+            fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
                 writer.emit_slice(&self.as_bytes())?;
                 Ok($byte_len)
             }
@@ -269,9 +275,9 @@ macro_rules! define_bytes_to_big_uint {
 
         impl Decodable for $uint_type {
             #[inline]
-            fn consensus_decode<D: std::io::Read>(mut d: D) -> std::result::Result<Self, crate::consensus::encode::Error> {
+            fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
                 let mut ret = [0; $byte_len];
-                d.read_slice(&mut ret)?;
+                reader.read_slice(&mut ret)?;
                 Ok($uint_type(ret))
             }
         }
@@ -300,10 +306,8 @@ macro_rules! define_bytes_to_big_uint {
         }
 
         impl FromHex for $uint_type {
-            fn from_byte_iter<I>(iter: I) -> std::result::Result<Self, hex::Error>
-                where I: Iterator<Item=std::result::Result<u8, hashes::hex::Error>> +
-                ExactSizeIterator +
-                DoubleEndedIterator {
+            fn from_byte_iter<I>(iter: I) -> Result<Self, dashcore::hashes::hex::Error>
+                where I: Iterator<Item = Result<u8, dashcore::hashes::hex::Error>> + ExactSizeIterator + DoubleEndedIterator {
                 if iter.len() == $byte_len {
                     let mut ret = [0; $byte_len];
                     for (n, byte) in iter.enumerate() {
@@ -311,7 +315,7 @@ macro_rules! define_bytes_to_big_uint {
                     }
                     Ok($uint_type(ret))
                 } else {
-                    Err(hex::Error::InvalidLength(2 * $byte_len, 2 * iter.len()))
+                    Err(dashcore::hashes::hex::Error::InvalidLength(2 * $byte_len, 2 * iter.len()))
                 }
             }
         }
@@ -507,16 +511,16 @@ fn shift_right_le(a: UInt256, bits: u8) -> UInt256 {
 
 impl UInt160 {
     pub fn hash160(data: &[u8]) -> Self {
-        UInt160(hash160::Hash::hash(data).into_inner())
+        UInt160(hash160::Hash::hash(data).to_byte_array())
     }
     pub fn hash160u32le(data: &[u8]) -> u32 {
         Self::hash160(data).u32_le()
     }
     pub fn ripemd160(data: &[u8]) -> Self {
-        UInt160(ripemd160::Hash::hash(data).into_inner())
+        UInt160(ripemd160::Hash::hash(data).to_byte_array())
     }
     pub fn sha1(data: &[u8]) -> Self {
-        UInt160(sha1::Hash::hash(data).into_inner())
+        UInt160(sha1::Hash::hash(data).to_byte_array())
     }
 
     pub fn u32_le(&self) -> u32 {
@@ -528,9 +532,9 @@ impl UInt128 {
     pub fn ip_address_from_u32(value: u32) -> Self {
         //UInt128 address = {.u32 = {0, 0, CFSwapInt32HostToBig(0xffff), CFSwapInt32HostToBig(self.address)}};
         let mut writer = Vec::<u8>::new();
-        0u64.enc(&mut writer);
-        0xffffu32.swap_bytes().enc(&mut writer);
-        value.swap_bytes().enc(&mut writer);
+        0u64.consensus_encode(&mut writer).unwrap();
+        0xffffu32.swap_bytes().consensus_encode(&mut writer).unwrap();
+        value.swap_bytes().consensus_encode(&mut writer).unwrap();
         UInt128(clone_into_array(&writer))
     }
 
@@ -566,16 +570,16 @@ impl From<IpAddr> for UInt128 {
 
 impl UInt256 {
     pub fn sha256(data: &[u8]) -> Self {
-        UInt256(sha256::Hash::hash(data).into_inner())
+        UInt256(sha256::Hash::hash(data).to_byte_array())
     }
     pub fn sha256_str(data: &str) -> Self {
-        UInt256(sha256::Hash::hash(data.as_bytes()).into_inner())
+        UInt256(sha256::Hash::hash(data.as_bytes()).to_byte_array())
     }
     pub fn sha256d(data: impl AsRef<[u8]>) -> Self {
-        UInt256(sha256d::Hash::hash(data.as_ref()).into_inner())
+        UInt256(sha256d::Hash::hash(data.as_ref()).to_byte_array())
     }
     pub fn sha256d_str(data: &str) -> Self {
-        UInt256(sha256d::Hash::hash(data.as_bytes()).into_inner())
+        UInt256(sha256d::Hash::hash(data.as_bytes()).to_byte_array())
     }
     pub fn x11_hash(data: &[u8]) -> Self {
         let hash = rs_x11_hash::get_x11_hash(&data);
@@ -584,12 +588,12 @@ impl UInt256 {
 
     pub fn block_hash_for_dev_net_genesis_block_with_version(version: u32, prev_hash: UInt256, merkle_root: UInt256, timestamp: u32, target: u32, nonce: u32) -> Self {
         let mut writer = Vec::<u8>::new();
-        version.enc(&mut writer);
-        prev_hash.enc(&mut writer);
-        merkle_root.enc(&mut writer);
-        timestamp.enc(&mut writer);
-        target.enc(&mut writer);
-        nonce.enc(&mut writer);
+        version.consensus_encode(&mut writer).unwrap();
+        prev_hash.consensus_encode(&mut writer).unwrap();
+        merkle_root.consensus_encode(&mut writer).unwrap();
+        timestamp.consensus_encode(&mut writer).unwrap();
+        target.consensus_encode(&mut writer).unwrap();
+        nonce.consensus_encode(&mut writer).unwrap();
         Self::x11_hash(&writer)
     }
 }
@@ -861,10 +865,10 @@ impl UInt256 {
 
 
 impl UInt256 {
-    pub fn hmac<T: Hash<Inner = [u8; 32]>>(key: &[u8], input: &[u8]) -> Self {
+    pub fn hmac<T: Hash<Bytes = [u8; 32]>>(key: &[u8], input: &[u8]) -> Self {
         let mut engine = HmacEngine::<T>::new(key);
         engine.input(input);
-        Self(Hmac::<T>::from_engine(engine).into_inner())
+        Self(Hmac::<T>::from_engine(engine).to_byte_array())
     }
 }
 
@@ -904,12 +908,12 @@ impl From<VerifyingKey> for ECPoint {
 
 impl UInt512 {
     pub fn sha512(data: &[u8]) -> Self {
-        UInt512(sha512::Hash::hash(data).into_inner())
+        UInt512(sha512::Hash::hash(data).to_byte_array())
     }
     pub fn hmac(key: &[u8], input: &[u8]) -> Self {
         let mut engine = HmacEngine::<sha512::Hash>::new(key);
         engine.input(input);
-        Self(Hmac::<sha512::Hash>::from_engine(engine).into_inner())
+        Self(Hmac::<sha512::Hash>::from_engine(engine).to_byte_array())
     }
 
     pub fn bip32_seed_key(input: &[u8]) -> Self {

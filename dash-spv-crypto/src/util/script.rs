@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Formatter};
-use hashes::hex::ToHex;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 
 #[derive(Debug)]
 pub enum ScriptType {
@@ -30,7 +30,7 @@ impl<'a> Debug for ScriptElement<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             ScriptElement::Number(code) => write!(f, "{:02x}", code)?,
-            ScriptElement::Data(data, _) => write!(f, "{}", data.to_hex())?,
+            ScriptElement::Data(data, _) => write!(f, "{}", data.to_lower_hex_string())?,
         }
         Ok(())
     }
@@ -51,7 +51,7 @@ pub fn op_len(data: &[u8]) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use hashes::hex::{FromHex, ToHex};
+    use dashcore::hashes::hex::FromHex;
 
     use crate::util::address::address;
     use crate::util::{base58, ScriptMap};

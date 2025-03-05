@@ -16,30 +16,28 @@ anyhow = "1.0.95"
 #drive-proof-verifier = { path = "../../platform/packages/rs-drive-proof-verifier" }
 #platform-value = { path = "../../platform/packages/rs-platform-value" }
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
-bitcoin_hashes = { version = "0.11.0", default-features = false }
-dapi-grpc = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dapi-grpc" }
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
-    "std",
-    "secp-recovery",
-    "rand",
-    "signer",
-    "serde",
-], default-features = false, branch = "feat/ferment" }
-dash-sdk = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dash-sdk" }
+bitcoin_hashes = { version = "0.16.0", default-features = false }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple"], default-features = false, branch = "feat/ferment" }
 dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-macro = { path = "../dash-spv-macro" }
 
-data-contracts = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "data-contracts" }
-dpp = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "dpp" }
-drive = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive" }
-drive-proof-verifier = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "drive-proof-verifier" }
-indexmap = "2.7.0"
-platform-value = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-value" }
-platform-version = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "platform-version" }
+dapi-grpc = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dapi-grpc" }
+
+
+dash-sdk = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dash-sdk", features = ["apple"] }
+data-contracts = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "data-contracts", features = ["apple"] }
+dpp = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dpp", default-features = false, features = ["dash-sdk-features", "apple", "system_contracts"] }
+drive = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive", default-features = false, features = ["verify"] }
+drive-proof-verifier = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive-proof-verifier", features = ["apple"] }
+platform-value = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-value", features = ["apple"] }
+platform-version = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-version", features = ["apple"] }
+
 ferment = { git = "https://github.com/dashpay/ferment", package = "ferment" }
 ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
+
 http = { version = "0.2.12" }
+indexmap = "2.7.0"
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 base64 = "0.22.1"
 [dev-dependencies]

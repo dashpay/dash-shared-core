@@ -1,10 +1,8 @@
-use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
-use hashes::{sha256d, Hash};
-use crate::consensus;
-use crate::consensus::encode::VarInt;
-use crate::consensus::{Encodable, encode};
+use hashes::sha256d;
+use dashcore::consensus::encode::VarInt;
+use dashcore::consensus::Encodable;
 use crate::crypto::byte_util::{UInt256, UInt768};
 use crate::tx::{Transaction, TransactionType};
 
@@ -25,43 +23,43 @@ pub struct CoinbaseTransaction {
     pub credit_pool_balance: Option<i64>,
 }
 
-impl consensus::Decodable for CoinbaseTransaction {
-    #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let mut base = Transaction::consensus_decode(&mut d)?;
-        let _extra_payload_size = VarInt::consensus_decode(&mut d)?;
-        let coinbase_transaction_version = u16::consensus_decode(&mut d)?;
-        let height = u32::consensus_decode(&mut d)?;
-        let merkle_root_mn_list = <[u8; 32]>::consensus_decode(&mut d)?;
-
-        let merkle_root_llmq_list = if coinbase_transaction_version >= 2 {
-            Some(<[u8; 32]>::consensus_decode(&mut d)?)
-        } else {
-            None
-        };
-        let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= 3 {
-            (
-                VarInt::consensus_decode(&mut d)?.0,
-                <[u8; 96]>::consensus_decode(&mut d).ok(),
-                i64::consensus_decode(&mut d).ok())
-        } else {
-            (u64::MAX, None, None)
-        };
-        base.tx_type = TransactionType::Coinbase;
-        let mut tx = Self {
-            base,
-            coinbase_transaction_version,
-            height,
-            merkle_root_mn_list,
-            merkle_root_llmq_list,
-            best_cl_height_diff,
-            best_cl_signature,
-            credit_pool_balance,
-        };
-        tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()).0);
-        Ok(tx)
-    }
-}
+// impl dashcore::consensus::Decodable for CoinbaseTransaction {
+//     #[inline]
+//     fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+//         let mut base = Transaction::consensus_decode(reader)?;
+//         let _extra_payload_size = VarInt::consensus_decode(reader)?;
+//         let coinbase_transaction_version = u16::consensus_decode(reader)?;
+//         let height = u32::consensus_decode(reader)?;
+//         let merkle_root_mn_list = <[u8; 32]>::consensus_decode(reader)?;
+//
+//         let merkle_root_llmq_list = if coinbase_transaction_version >= 2 {
+//             Some(<[u8; 32]>::consensus_decode(reader)?)
+//         } else {
+//             None
+//         };
+//         let (best_cl_height_diff, best_cl_signature, credit_pool_balance) = if coinbase_transaction_version >= 3 {
+//             (
+//                 VarInt::consensus_decode(reader)?.0,
+//                 <[u8; 96]>::consensus_decode(reader).ok(),
+//                 i64::consensus_decode(reader).ok())
+//         } else {
+//             (u64::MAX, None, None)
+//         };
+//         base.tx_type = TransactionType::Coinbase;
+//         let mut tx = Self {
+//             base,
+//             coinbase_transaction_version,
+//             height,
+//             merkle_root_mn_list,
+//             merkle_root_llmq_list,
+//             best_cl_height_diff,
+//             best_cl_signature,
+//             credit_pool_balance,
+//         };
+//         tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()).0);
+//         Ok(tx)
+//     }
+// }
 
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
@@ -105,21 +103,21 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
 impl CoinbaseTransaction {
     fn payload_data(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
-        self.coinbase_transaction_version.enc(&mut buffer);
-        self.height.enc(&mut buffer);
-        self.merkle_root_mn_list.enc(&mut buffer);
+        self.coinbase_transaction_version.consensus_encode(&mut buffer).unwrap();
+        self.height.consensus_encode(&mut buffer).unwrap();
+        self.merkle_root_mn_list.consensus_encode(&mut buffer).unwrap();
 
         if self.coinbase_transaction_version >= COINBASE_TX_CORE_19 {
             if let Some(llmq_root) = self.merkle_root_llmq_list {
-                llmq_root.enc(&mut buffer);
+                llmq_root.consensus_encode(&mut buffer).unwrap();
             }
             if self.coinbase_transaction_version >= COINBASE_TX_CORE_20 {
-                VarInt(self.best_cl_height_diff).enc(&mut buffer);
+                VarInt(self.best_cl_height_diff).consensus_encode(&mut buffer).unwrap();
                 if let Some(cl_sig) = self.best_cl_signature {
-                    cl_sig.enc(&mut buffer);
+                    cl_sig.consensus_encode(&mut buffer).unwrap();
                 }
                 if let Some(credit_pool_balance) = self.credit_pool_balance {
-                    credit_pool_balance.enc(&mut buffer);
+                    credit_pool_balance.consensus_encode(&mut buffer).unwrap();
                 }
             }
         }
@@ -140,13 +138,13 @@ impl CoinbaseTransaction {
             self.base.lock_time,
         );
         let payload = self.payload_data();
-        payload.enc(&mut buffer);
+        payload.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 
     pub fn has_found_coinbase(&mut self, hashes: &[[u8; 32]]) -> bool {
         let coinbase_hash = self.base.tx_hash.unwrap_or_else(|| {
-            let hash = sha256d::Hash::hash(&self.to_data()).into_inner();
+            let hash = sha256d::Hash::hash(&self.to_data()).to_byte_array();
             self.base.tx_hash = Some(hash);
             hash
         });

@@ -222,12 +222,30 @@ impl IdentitiesManager {
 
 }
 
+// TODO: Here we have ugly thing with keys conversion.
+// TODO: We should rework this to replace KeyKind with KeyType,
+// TODO: but for now it's not easy to do
+
 #[ferment_macro::export]
 pub fn identity_registration_public_key(index: u32, public_key: OpaqueKey) -> IdentityPublicKey {
     IdentityPublicKey::V0(IdentityPublicKeyV0 {
         id: index,
         purpose: Purpose::AUTHENTICATION,
         security_level: SecurityLevel::MASTER,
+        contract_bounds: None,
+        key_type: KeyType::ECDSA_SECP256K1,
+        read_only: false,
+        data: BinaryData(public_key.public_key_data()),
+        disabled_at: None,
+    })
+}
+
+#[ferment_macro::export]
+pub fn identity_public_key(index: u32, public_key: OpaqueKey, security_level: SecurityLevel, purpose: Purpose) -> IdentityPublicKey {
+    IdentityPublicKey::V0(IdentityPublicKeyV0 {
+        id: index,
+        purpose,
+        security_level,
         contract_bounds: None,
         key_type: KeyType::ECDSA_SECP256K1,
         read_only: false,
@@ -250,6 +268,51 @@ pub fn opaque_key_from_identity_public_key(public_key: IdentityPublicKey) -> Res
                 .map(OpaqueKey::BLS)
         }
         key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
+    }
+}
+#[ferment_macro::export]
+pub fn security_level_to_index(level: SecurityLevel) -> u8 {
+    match level {
+        SecurityLevel::MASTER => 0,
+        SecurityLevel::CRITICAL => 1,
+        SecurityLevel::HIGH => 2,
+        SecurityLevel::MEDIUM => 3,
+    }
+}
+#[ferment_macro::export]
+pub fn security_level_from_index(index: u8) -> SecurityLevel {
+    match index {
+        0 => SecurityLevel::MASTER,
+        1 => SecurityLevel::CRITICAL,
+        2 => SecurityLevel::HIGH,
+        3 => SecurityLevel::MEDIUM,
+        _ => panic!("Invalid security level index: {index}"),
+    }
+}
+
+#[ferment_macro::export]
+pub fn purpose_to_index(purpose: Purpose) -> u8 {
+    match purpose {
+        Purpose::AUTHENTICATION => 0,
+        Purpose::ENCRYPTION => 1,
+        Purpose::DECRYPTION => 2,
+        Purpose::TRANSFER => 3,
+        Purpose::SYSTEM => 4,
+        Purpose::VOTING => 5,
+        Purpose::OWNER => 6
+    }
+}
+#[ferment_macro::export]
+pub fn purpose_from_index(index: u8) -> Purpose {
+    match index {
+        0 => Purpose::AUTHENTICATION,
+        1 => Purpose::ENCRYPTION,
+        2 => Purpose::DECRYPTION,
+        3 => Purpose::TRANSFER,
+        4 => Purpose::SYSTEM,
+        5 => Purpose::VOTING,
+        6 => Purpose::OWNER,
+        _ => panic!("Invalid purpose index: {index}"),
     }
 }
 

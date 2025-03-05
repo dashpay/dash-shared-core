@@ -311,9 +311,9 @@ impl MasternodeEntry {
     pub fn score(&self, modifier: [u8; 32], block_height: u32, confirmed_hash: Option<[u8; 32]>) -> Option<[u8; 32]> {
         let mut buffer: Vec<u8> = Vec::new();
         if let Some(hash) = confirmed_hash {
-            hash.enc(&mut buffer);
+            hash.consensus_encode(&mut buffer).unwrap();
         }
-        modifier.enc(&mut buffer);
+        modifier.consensus_encode(&mut buffer).unwrap();
         let score = sha256::Hash::hash(&buffer).into_inner();
         (!score.is_zero() && !score.is_empty()).then_some(score)
     }
@@ -564,17 +564,17 @@ pub fn calculate_entry_hash(
     protocol_version: u32,
 ) -> [u8; 32] {
     let mut writer = Vec::<u8>::new();
-    provider_registration_transaction_hash.enc(&mut writer);
-    confirmed_hash.enc(&mut writer);
-    socket_address.enc(&mut writer);
-    operator_public_key.enc(&mut writer);
-    key_id_voting.enc(&mut writer);
-    is_valid.enc(&mut writer);
+    provider_registration_transaction_hash.consensus_encode(&mut writer).unwrap();
+    confirmed_hash.consensus_encode(&mut writer).unwrap();
+    socket_address.consensus_encode(&mut writer).unwrap();
+    operator_public_key.consensus_encode(&mut writer).unwrap();
+    key_id_voting.consensus_encode(&mut writer).unwrap();
+    is_valid.consensus_encode(&mut writer).unwrap();
     if version >= 2 {
-        u16::from(mn_type).enc(&mut writer);
+        u16::from(mn_type).consensus_encode(&mut writer).unwrap();
         if mn_type.is_hpmn() {
-            platform_http_port.swap_bytes().enc(&mut writer);
-            platform_node_id.enc(&mut writer);
+            platform_http_port.swap_bytes().consensus_encode(&mut writer).unwrap();
+            platform_node_id.consensus_encode(&mut writer).unwrap();
         }
     }
     sha256d::Hash::hash(&writer).into_inner()

@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::os::raw::c_ulong;
 use std::slice;
 use byte::{BytesExt, LE, TryRead};
-use crate::consensus::Encodable;
+use dashcore::consensus::Encodable;
 use crate::crypto::byte_util::{clone_into_array, UInt256};
 use super::BIP32_HARD;
 
@@ -192,7 +192,7 @@ pub trait IIndexPath: Sized {
     fn as_bytes_vec(&self) -> Vec<u8> {
         let mut writer = Vec::<u8>::new();
         self.indexes().iter().for_each(|index| {
-            index.enc(&mut writer);
+            index.consensus_encode(&mut writer).unwrap();
         });
         writer
     }

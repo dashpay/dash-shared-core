@@ -1,6 +1,6 @@
 use byte::{BytesExt, TryRead};
-use hashes::{Hash, sha256d};
-use crate::consensus::Encodable;
+use dashcore::hashes::{sha256d, Hash};
+use dashcore::consensus::Encodable;
 use crate::crypto::byte_util::{clone_into_array, UInt256};
 use crate::derivation::BIP32_HARD;
 use crate::keys::KeyError;
@@ -69,8 +69,8 @@ impl Key {
 
     pub fn extended_key_data(&self) -> Vec<u8> {
         let mut writer = Vec::<u8>::new();
-        self.fingerprint.enc(&mut writer);
-        self.chaincode.enc(&mut writer);
+        self.fingerprint.consensus_encode(&mut writer).unwrap();
+        self.chaincode.consensus_encode(&mut writer).unwrap();
         writer.extend_from_slice(&self.data);
         writer
     }
@@ -94,7 +94,7 @@ impl<'a> TryRead<'a, ChainType> for Key {
         let mid = len - 4;
         let (data, checked_data) = message.split_at(mid);
         let (head, _tail) = data.split_at(4);
-        let expected = endian::slice_to_u32_le(&sha256d::Hash::hash(&data)[..4]);
+        let expected = endian::slice_to_u32_le(&sha256d::Hash::hash(&data).to_byte_array()[..4]);
         let actual = endian::slice_to_u32_le(&checked_data);
         let header: [u8; 4] = clone_into_array(&head);
         let mut offset = &mut 4;
@@ -148,12 +148,12 @@ impl Key {
             let mut writer = SecVec::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub }); // 4
-            self.depth.enc(&mut writer);                // 5
-            self.fingerprint.enc(&mut writer);          // 9
-            child.enc(&mut writer);                     // 13
-            self.chaincode.enc(&mut writer);                // 45
+            self.depth.consensus_encode(&mut writer).unwrap();                // 5
+            self.fingerprint.consensus_encode(&mut writer).unwrap();          // 9
+            child.consensus_encode(&mut writer).unwrap();                     // 13
+            self.chaincode.consensus_encode(&mut writer).unwrap();                // 45
             if is_priv {
-                b'\0'.enc(&mut writer);                 // 46 (prv) / 45 (pub)
+                b'\0'.consensus_encode(&mut writer).unwrap();                 // 46 (prv) / 45 (pub)
             }
             writer.extend_from_slice(&self.data); // 78 (prv) / 78 (pub)
             base58::check_encode_slice(&writer)
@@ -163,13 +163,13 @@ impl Key {
             let mut writer = SecVec::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp }); // 4
-            self.depth.enc(&mut writer);                // 5
-            self.fingerprint.enc(&mut writer);          // 9
-            self.hardened.enc(&mut writer);             // 10
-            self.child.enc(&mut writer);                // 42
-            self.chaincode.enc(&mut writer);                // 74
+            self.depth.consensus_encode(&mut writer).unwrap();                // 5
+            self.fingerprint.consensus_encode(&mut writer).unwrap();          // 9
+            self.hardened.consensus_encode(&mut writer).unwrap();             // 10
+            self.child.consensus_encode(&mut writer).unwrap();                // 42
+            self.chaincode.consensus_encode(&mut writer).unwrap();                // 74
             if is_priv {
-                b'\0'.enc(&mut writer);                 // 75 (prv) / 74 (pub)
+                b'\0'.consensus_encode(&mut writer).unwrap();                 // 75 (prv) / 74 (pub)
             }
             writer.extend_from_slice(&self.data); // 107 (prv) / 107 (pub)
             base58::check_encode_slice(&writer)

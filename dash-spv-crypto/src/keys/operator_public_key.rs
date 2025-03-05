@@ -1,7 +1,7 @@
 use std::io;
 use bls_signatures::G1Element;
 use byte::{BytesExt, TryRead};
-use crate::consensus::{Decodable, Encodable, encode};
+use dashcore::consensus::{Decodable, Encodable};
 use crate::crypto::byte_util::UInt384;
 use crate::keys::BLSKey;
 
@@ -23,16 +23,16 @@ impl OperatorPublicKey {
 
 impl Encodable for OperatorPublicKey {
     #[inline]
-    fn consensus_encode<S: io::Write>(&self, mut s: S) -> Result<usize, io::Error> {
-        self.data.enc(&mut s);
+    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
+        self.data.consensus_encode(writer)?;
         Ok(48)
     }
 }
 
 impl Decodable for OperatorPublicKey {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let data = <[u8; 48]>::consensus_decode(&mut d)?;
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        let data = <[u8; 48]>::consensus_decode(reader)?;
         Ok(Self { data, version: 0 })
     }
 }

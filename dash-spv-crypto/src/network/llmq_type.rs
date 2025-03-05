@@ -4,7 +4,7 @@ use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
-use crate::consensus::{Decodable, Encodable, encode};
+use dashcore::consensus::{Decodable, Encodable};
 use crate::crypto::byte_util::BytesDecodable;
 use crate::network::ChainType;
 
@@ -443,9 +443,9 @@ impl<'a> TryRead<'a, Endian> for LLMQType {
 }
 
 impl<'a> TryWrite<Endian> for LLMQType {
-    fn try_write(self, bytes: &mut [u8], _endian: Endian) -> byte::Result<usize> {
+    fn try_write(self, mut bytes: &mut [u8], _endian: Endian) -> byte::Result<usize> {
         let orig: u8 = self.into();
-        orig.enc(bytes);
+        orig.consensus_encode(&mut bytes).unwrap();
         Ok(1)
     }
 }
@@ -456,14 +456,14 @@ impl<'a> BytesDecodable<'a, LLMQType> for LLMQType {
 }
 
 impl Encodable for LLMQType {
-    fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
-        u8::consensus_encode(&self.index(), &mut writer)
+    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
+        u8::consensus_encode(&self.index(), writer)
     }
 }
 
 impl Decodable for LLMQType {
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        u8::consensus_decode(&mut d)
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        u8::consensus_decode(reader)
             .map(LLMQType::from)
     }
 }

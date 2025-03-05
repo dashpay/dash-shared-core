@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use hashes::hex::ToHex;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use crate::network::LLMQType;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -36,9 +36,9 @@ impl Display for LLMQValidationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             LLMQValidationError::InvalidAggregatedSignature { block_height, operator_keys_count, valid_masternodes_count, llmq_type, llmq_hash, aggregated_signature } =>
-                format!("InvalidAggregatedSignature({block_height}: {llmq_type}: {}: {}: {operator_keys_count}/{valid_masternodes_count})", llmq_hash.to_hex(), aggregated_signature.to_hex()),
+                format!("InvalidAggregatedSignature({block_height}: {llmq_type}: {}: {}: {operator_keys_count}/{valid_masternodes_count})", llmq_hash.to_lower_hex_string(), aggregated_signature.to_lower_hex_string()),
             LLMQValidationError::InvalidQuorumSignature { block_height, llmq_type, llmq_hash, threshold_signature } =>
-                format!("InvalidQuorumSignature({block_height}: {llmq_type}: {}: {})", llmq_hash.to_hex(), threshold_signature.to_hex()),
+                format!("InvalidQuorumSignature({block_height}: {llmq_type}: {}: {})", llmq_hash.to_lower_hex_string(), threshold_signature.to_lower_hex_string()),
             LLMQValidationError::InvalidSigners(message) =>
                 format!("InvalidSigners({message})"),
             LLMQValidationError::InvalidMembers(message) =>

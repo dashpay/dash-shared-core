@@ -2,15 +2,15 @@ use std::fmt::{Display, Formatter};
 use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
-use hashes::{sha256, sha256d, Hash};
-use hashes::hex::ToHex;
 use log::{info, warn};
-use secp256k1::ThirtyTwoByteHash;
+// use secp256k1::ThirtyTwoByteHash;
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::ser::SerializeStruct;
-use crate::consensus::{Decodable, encode, encode::VarInt, Encodable};
+use dashcore::consensus::{Decodable, encode::VarInt, Encodable};
+use dashcore::hashes::{sha256, sha256d, Hash};
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::Reversed;
 use crate::impl_bytes_decodable;
@@ -49,13 +49,13 @@ impl Serialize for LLMQEntry {
         if self.index != u16::MAX {
             state.serialize_field("index", &self.index)?;
         }
-        state.serialize_field("public_key", &self.public_key.to_hex())?;
-        state.serialize_field("threshold_signature", &self.threshold_signature.to_hex())?;
-        state.serialize_field("verification_vector_hash", &self.verification_vector_hash.to_hex())?;
-        state.serialize_field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature.to_hex())?;
+        state.serialize_field("public_key", &self.public_key.to_lower_hex_string())?;
+        state.serialize_field("threshold_signature", &self.threshold_signature.to_lower_hex_string())?;
+        state.serialize_field("verification_vector_hash", &self.verification_vector_hash.to_lower_hex_string())?;
+        state.serialize_field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature.to_lower_hex_string())?;
         state.serialize_field("llmq_type", &self.llmq_type)?;
-        state.serialize_field("signers", &self.signers)?;
-        state.serialize_field("valid_members", &self.valid_members)?;
+        state.serialize_field("signers", &self.signers.to_string())?;
+        state.serialize_field("valid_members", &self.valid_members.to_string())?;
         state.end()
     }
 }
@@ -68,15 +68,15 @@ impl Display for LLMQEntry {
             q_index,
             self.verified,
             if self.saved { "yes" } else { "no" },
-            self.llmq_hash.to_hex(),
-            self.public_key.to_hex(),
-            self.threshold_signature.to_hex(),
-            self.verification_vector_hash.to_hex(),
-            self.all_commitment_aggregated_signature.to_hex(),
-            self.signers.count, self.signers.bitset.to_hex(),
-            self.valid_members.count, self.valid_members.bitset.to_hex(),
-            self.entry_hash.to_hex(),
-            self.commitment_hash.map(|h|h.to_hex()).unwrap_or("None".to_string())
+            self.llmq_hash.to_lower_hex_string(),
+            self.public_key.to_lower_hex_string(),
+            self.threshold_signature.to_lower_hex_string(),
+            self.verification_vector_hash.to_lower_hex_string(),
+            self.all_commitment_aggregated_signature.to_lower_hex_string(),
+            self.signers.count, self.signers.bitset.to_lower_hex_string(),
+            self.valid_members.count, self.valid_members.bitset.to_lower_hex_string(),
+            self.entry_hash.to_lower_hex_string(),
+            self.commitment_hash.map(|h|h.to_lower_hex_string()).unwrap_or("None".to_string())
         );
         write!(f, "{}", desc)
 
@@ -87,57 +87,57 @@ impl std::fmt::Debug for LLMQEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
             .field("version", &self.version)
-            .field("llmq_hash", &self.llmq_hash.to_hex())
+            .field("llmq_hash", &self.llmq_hash.to_lower_hex_string())
             .field("index", &self.index)
-            .field("public_key", &self.public_key.to_hex())
-            .field("threshold_signature", &self.threshold_signature.to_hex())
-            .field("verification_vector_hash", &self.verification_vector_hash.to_hex())
-            .field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature.to_hex())
+            .field("public_key", &self.public_key.to_lower_hex_string())
+            .field("threshold_signature", &self.threshold_signature.to_lower_hex_string())
+            .field("verification_vector_hash", &self.verification_vector_hash.to_lower_hex_string())
+            .field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature.to_lower_hex_string())
             .field("llmq_type", &self.llmq_type)
             .field("signers", &self.signers)
             .field("valid_members", &self.valid_members)
-            .field("entry_hash", &self.entry_hash.to_hex())
+            .field("entry_hash", &self.entry_hash.to_lower_hex_string())
             .field("verified", &self.verified)
             .field("saved", &self.saved)
-            .field("commitment_hash", &self.commitment_hash.map_or("None".to_string(), |h| h.to_hex()))
+            .field("commitment_hash", &self.commitment_hash.map_or("None".to_string(), |h| h.to_lower_hex_string()))
             .finish()
     }
 }
 
 impl Encodable for LLMQEntry {
-    fn consensus_encode<S: io::Write>(&self, mut s: S) -> Result<usize, io::Error> {
+    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
         let mut len = 0;
-        len += self.version.consensus_encode(&mut s)?;
-        len += self.llmq_type.consensus_encode(&mut s)?;
-        len += self.llmq_hash.consensus_encode(&mut s)?;
+        len += self.version.consensus_encode(writer)?;
+        len += self.llmq_type.consensus_encode(writer)?;
+        len += self.llmq_hash.consensus_encode(writer)?;
         if self.version.use_rotated_quorums() {
-            len += self.index.consensus_encode(&mut s)?;
+            len += self.index.consensus_encode(writer)?;
         }
-        len += self.signers.consensus_encode(&mut s)?;
-        len += self.valid_members.consensus_encode(&mut s)?;
-        len += self.public_key.consensus_encode(&mut s)?;
-        len += self.verification_vector_hash.consensus_encode(&mut s)?;
-        len += self.threshold_signature.consensus_encode(&mut s)?;
-        len += self.all_commitment_aggregated_signature.consensus_encode(&mut s)?;
+        len += self.signers.consensus_encode(writer)?;
+        len += self.valid_members.consensus_encode(writer)?;
+        len += self.public_key.consensus_encode(writer)?;
+        len += self.verification_vector_hash.consensus_encode(writer)?;
+        len += self.threshold_signature.consensus_encode(writer)?;
+        len += self.all_commitment_aggregated_signature.consensus_encode(writer)?;
         Ok(len)
     }
 }
 
 impl Decodable for LLMQEntry {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let version = LLMQVersion::consensus_decode(&mut d)?;
-        let llmq_type = LLMQType::consensus_decode(&mut d)?;
-        let llmq_hash = Decodable::consensus_decode(&mut d)?;
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        let version = LLMQVersion::consensus_decode(reader)?;
+        let llmq_type = LLMQType::consensus_decode(reader)?;
+        let llmq_hash = Decodable::consensus_decode(reader)?;
         let index = if version.use_rotated_quorums() {
-            u16::consensus_decode(&mut d)?
+            u16::consensus_decode(reader)?
         } else { u16::MAX };
-        let signers = Decodable::consensus_decode(&mut d)?;
-        let valid_members = Decodable::consensus_decode(&mut d)?;
-        let public_key = Decodable::consensus_decode(&mut d)?;
-        let verification_vector_hash = Decodable::consensus_decode(&mut d)?;
-        let threshold_signature = Decodable::consensus_decode(&mut d)?;
-        let all_commitment_aggregated_signature = Decodable::consensus_decode(&mut d)?;
+        let signers = Decodable::consensus_decode(reader)?;
+        let valid_members = Decodable::consensus_decode(reader)?;
+        let public_key = Decodable::consensus_decode(reader)?;
+        let verification_vector_hash = Decodable::consensus_decode(reader)?;
+        let threshold_signature = Decodable::consensus_decode(reader)?;
+        let all_commitment_aggregated_signature = Decodable::consensus_decode(reader)?;
         let entry = LLMQEntry::new(
             version,
             llmq_type,
@@ -226,7 +226,7 @@ impl LLMQEntry {
             llmq_type,
             signers,
             valid_members,
-            entry_hash: sha256d::Hash::hash(q_data.as_ref()).into_inner(),
+            entry_hash: sha256d::Hash::hash(q_data.as_ref()).to_byte_array(),
             verified: LLMQEntryValidationStatus::Unknown,
             saved: false,
             commitment_hash: None,
@@ -235,7 +235,7 @@ impl LLMQEntry {
 
     pub fn generate_commitment_hash(&mut self) -> [u8; 32] {
         if self.commitment_hash.is_none() {
-            self.commitment_hash = Some(sha256d::Hash::hash(self.commitment_data().as_ref()).into_inner());
+            self.commitment_hash = Some(sha256d::Hash::hash(self.commitment_data().as_ref()).to_byte_array());
         }
         self.commitment_hash.unwrap()
     }
@@ -324,21 +324,21 @@ impl LLMQEntry {
         let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
         let llmq_type = VarInt(u64::from(&self.llmq_type));
-        *offset += llmq_type.enc(&mut buffer);
-        *offset += self.llmq_hash.enc(&mut buffer);
-        *offset += self.valid_members.enc(&mut buffer);
-        *offset += self.public_key.enc(&mut buffer);
-        *offset += self.verification_vector_hash.enc(&mut buffer);
+        *offset += llmq_type.consensus_encode(&mut buffer).unwrap();
+        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += self.valid_members.consensus_encode(&mut buffer).unwrap();
+        *offset += self.public_key.consensus_encode(&mut buffer).unwrap();
+        *offset += self.verification_vector_hash.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 
     pub fn ordering_hash_for_request_id(&self, request_id: [u8; 32]) -> [u8; 32] {
         let llmq_type = VarInt(u64::from(&self.llmq_type));
         let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
-        llmq_type.enc(&mut writer);
-        self.llmq_hash.enc(&mut writer);
-        request_id.enc(&mut writer);
-        sha256d::Hash::hash(&writer).into_inner()
+        llmq_type.consensus_encode(&mut writer).unwrap();
+        self.llmq_hash.consensus_encode(&mut writer).unwrap();
+        request_id.consensus_encode(&mut writer).unwrap();
+        sha256d::Hash::hash(&writer).to_byte_array()
     }
 
     // pub fn is_lock_sign_id(&self, request_id: [u8; 32], tx_hash: [u8; 32]) -> [u8; 32] {
@@ -366,18 +366,18 @@ impl LLMQEntry {
     pub fn sign_id(&self, request_id: [u8; 32], payload: [u8; 32]) -> [u8; 32] {
         let llmq_type = VarInt(u64::from(&self.llmq_type));
         let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
-        llmq_type.enc(&mut writer);
-        self.llmq_hash.enc(&mut writer);
-        request_id.enc(&mut writer);
-        payload.enc(&mut writer);
-        sha256d::Hash::hash(&writer).into_inner()
+        llmq_type.consensus_encode(&mut writer).unwrap();
+        self.llmq_hash.consensus_encode(&mut writer).unwrap();
+        request_id.consensus_encode(&mut writer).unwrap();
+        payload.consensus_encode(&mut writer).unwrap();
+        sha256d::Hash::hash(&writer).to_byte_array()
     }
 
     pub fn platform_sign_id(&self, height: u32, state_msg_hash: [u8; 32]) -> [u8; 32] {
         let mut request_id_writer = Vec::new();
-        "dpsvote".to_string().enc(&mut request_id_writer);
-        (height as u64).enc(&mut request_id_writer);
-        let request_id = sha256::Hash::hash(&request_id_writer).into_32().reversed();
+        "dpsvote".to_string().consensus_encode(&mut request_id_writer).unwrap();
+        (height as u64).consensus_encode(&mut request_id_writer).unwrap();
+        let request_id = sha256::Hash::hash(&request_id_writer).to_byte_array().reversed();
         // let llmq_type = VarInt(self.llmq_type.index() as u64);
         self.sign_id(request_id, state_msg_hash.reversed())
         // let mut writer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
@@ -390,15 +390,15 @@ impl LLMQEntry {
 
 
     pub fn verify_signature(&self, sign_id: [u8; 32], signature: [u8; 96]) -> bool {
-        let sig = cfg!(debug_assertions).then(|| signature.to_hex()).unwrap_or("<REDACTED>".to_string());
+        let sig = cfg!(debug_assertions).then(|| signature.to_lower_hex_string()).unwrap_or("<REDACTED>".to_string());
         let verified = BLSKey::verify_signature(self.public_key.clone(), self.version.use_bls_legacy(), &sign_id, signature);
-        let sign_id = cfg!(debug_assertions).then(|| sign_id.to_hex()).unwrap_or("<REDACTED>".to_string());
+        let sign_id = cfg!(debug_assertions).then(|| sign_id.to_lower_hex_string()).unwrap_or("<REDACTED>".to_string());
         info!("llmq::verify_signature ({}): {:?}: {}: {}: {}: {}: {}",
             verified,
             self.llmq_type,
             self.verified,
             sign_id,
-            self.public_key.to_hex(),
+            self.public_key.to_lower_hex_string(),
             sig,
             self.version.use_bls_legacy());
         verified
@@ -415,7 +415,7 @@ impl LLMQEntry {
     // }
 
     pub fn llmq_hash_hex(&self) -> String {
-        self.llmq_hash.to_hex()
+        self.llmq_hash.to_lower_hex_string()
     }
 
     pub fn print_description(&self) {
@@ -488,7 +488,7 @@ pub fn from_entity(
             threshold_signature,
             all_commitment_aggregated_signature,
         );
-        sha256d::Hash::hash(q_data.as_ref()).into_inner()
+        sha256d::Hash::hash(q_data.as_ref()).to_byte_array()
     });
     LLMQEntry {
         version: LLMQVersion::from(version),
@@ -523,17 +523,17 @@ pub fn generate_data(
 ) -> Vec<u8> {
     let mut buffer: Vec<u8> = Vec::new();
     let offset = &mut 0;
-    *offset += version.enc(&mut buffer);
-    *offset += llmq_type.enc(&mut buffer);
-    *offset += llmq_hash.enc(&mut buffer);
+    *offset += version.consensus_encode(&mut buffer).unwrap();
+    *offset += llmq_type.consensus_encode(&mut buffer).unwrap();
+    *offset += llmq_hash.consensus_encode(&mut buffer).unwrap();
     if index != u16::MAX {
-        *offset += index.enc(&mut buffer);
+        *offset += index.consensus_encode(&mut buffer).unwrap();
     }
-    *offset += signers.enc(&mut buffer);
-    *offset += valid_members.enc(&mut buffer);
-    *offset += public_key.enc(&mut buffer);
-    *offset += verification_vector_hash.enc(&mut buffer);
-    *offset += threshold_signature.enc(&mut buffer);
-    *offset += all_commitment_aggregated_signature.enc(&mut buffer);
+    *offset += signers.consensus_encode(&mut buffer).unwrap();
+    *offset += valid_members.consensus_encode(&mut buffer).unwrap();
+    *offset += public_key.consensus_encode(&mut buffer).unwrap();
+    *offset += verification_vector_hash.consensus_encode(&mut buffer).unwrap();
+    *offset += threshold_signature.consensus_encode(&mut buffer).unwrap();
+    *offset += all_commitment_aggregated_signature.consensus_encode(&mut buffer).unwrap();
     buffer
 }

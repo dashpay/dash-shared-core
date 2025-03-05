@@ -2,7 +2,7 @@ use std::io;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
 use hashes::{sha256d, Hash};
-use crate::consensus::{Decodable, Encodable, encode, encode::VarInt};
+use dashcore::consensus::{Decodable, Encodable, encode::VarInt};
 use crate::crypto::byte_util::UInt256;
 use crate::network::protocol::SIGHASH_ALL;
 use crate::tx::{TransactionInput, TransactionOutput};
@@ -30,8 +30,8 @@ pub enum TransactionType {
 }
 impl Decodable for TransactionType {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        Ok(TransactionType::from(u16::consensus_decode(&mut d)?))
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        Ok(TransactionType::from(u16::consensus_decode(reader)?))
     }
 }
 
@@ -133,45 +133,45 @@ impl Transaction {
         let offset: &mut usize = &mut 0;
         let inputs_len = inputs.len();
         let outputs_len = outputs.len();
-        *offset += version.enc(&mut buffer);
-        *offset += tx_type.raw_value().enc(&mut buffer);
+        *offset += version.consensus_encode(&mut buffer).unwrap();
+        *offset += tx_type.raw_value().consensus_encode(&mut buffer).unwrap();
         *offset += VarInt(inputs_len as u64)
-            .enc(&mut buffer);
+            .consensus_encode(&mut buffer).unwrap();
         (0..inputs_len).into_iter().for_each(|i| {
             let input = &inputs[i];
-            *offset += input.input_hash.enc(&mut buffer);
-            *offset += input.index.enc(&mut buffer);
+            *offset += input.input_hash.consensus_encode(&mut buffer).unwrap();
+            *offset += input.index.consensus_encode(&mut buffer).unwrap();
             if subscript_index == u64::MAX && input.signature.is_some() {
                 *offset += input
                     .signature
                     .as_ref()
                     .unwrap()
-                    .enc(&mut buffer);
+                    .consensus_encode(&mut buffer).unwrap();
                 // *offset += consensus_encode_with_size(input.signature.unwrap(), &mut buffer).unwrap()
             } else if subscript_index == i as u64 && input.script.is_some() {
                 *offset += input
                     .script
                     .as_ref()
                     .unwrap()
-                    .enc(&mut buffer);
+                    .consensus_encode(&mut buffer).unwrap();
                 // *offset += consensus_encode_with_size(input.script.unwrap(), &mut buffer).unwrap()
             } else {
-                *offset += VarInt(0_u64).enc(&mut buffer);
+                *offset += VarInt(0_u64).consensus_encode(&mut buffer).unwrap();
             }
-            *offset += input.sequence.enc(&mut buffer);
+            *offset += input.sequence.consensus_encode(&mut buffer).unwrap();
         });
-        *offset += VarInt(outputs_len as u64).enc(&mut buffer);
+        *offset += VarInt(outputs_len as u64).consensus_encode(&mut buffer).unwrap();
         (0..outputs_len).into_iter().for_each(|i| {
             let output = &outputs[i];
-            *offset += output.amount.enc(&mut buffer);
+            *offset += output.amount.consensus_encode(&mut buffer).unwrap();
             if let Some(script) = &output.script {
-                *offset += script.enc(&mut buffer);
+                *offset += script.consensus_encode(&mut buffer).unwrap();
                 //*offset += consensus_encode_with_size(script, &mut buffer).unwrap()
             }
         });
-        *offset += lock_time.enc(&mut buffer);
+        *offset += lock_time.consensus_encode(&mut buffer).unwrap();
         if subscript_index != u64::MAX {
-            *offset += SIGHASH_ALL.enc(&mut buffer);
+            *offset += SIGHASH_ALL.consensus_encode(&mut buffer).unwrap();
         }
         buffer
     }
@@ -212,30 +212,30 @@ impl Transaction {
     }
 }
 
-impl Decodable for Transaction {
-    #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let version = u16::consensus_decode(&mut d)?;
-        let tx_type = TransactionType::consensus_decode(&mut d)?;
-        let is_classic = tx_type.is_classic();
-        let inputs: Vec<TransactionInput> = Vec::consensus_decode(&mut d)?;
-        let outputs: Vec<TransactionOutput> = Vec::consensus_decode(&mut d)?;
-        let lock_time = u32::consensus_decode(&mut d)?;
-        let mut tx = Self {
-            inputs,
-            outputs,
-            version,
-            tx_type,
-            lock_time,
-            block_height: TX_UNCONFIRMED as u32,
-            tx_hash: None,
-            payload_offset: 0,
-        };
-        tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(&tx.to_data()).into_inner());
-        Ok(tx)
-    }
-}
-
+// impl Decodable for Transaction {
+//     #[inline]
+//     fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+//         let version = u16::consensus_decode(reader)?;
+//         let tx_type = TransactionType::consensus_decode(reader)?;
+//         let is_classic = tx_type.is_classic();
+//         let inputs: Vec<TransactionInput> = Vec::consensus_decode(reader)?;
+//         let outputs: Vec<TransactionOutput> = Vec::consensus_decode(reader)?;
+//         let lock_time = u32::consensus_decode(reader)?;
+//         let mut tx = Self {
+//             inputs,
+//             outputs,
+//             version,
+//             tx_type,
+//             lock_time,
+//             block_height: TX_UNCONFIRMED as u32,
+//             tx_hash: None,
+//             payload_offset: 0,
+//         };
+//         tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(&tx.to_data()).to_byte_array());
+//         Ok(tx)
+//     }
+// }
+// impl_vec!(crate::tx::TransactionInput);
 impl<'a> TryRead<'a, Endian> for Transaction {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
@@ -270,7 +270,7 @@ impl<'a> TryRead<'a, Endian> for Transaction {
             tx_hash: None,
             block_height: TX_UNCONFIRMED as u32,
         };
-        tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(tx.to_data().as_ref()).into_inner());
+        tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(tx.to_data().as_ref()).to_byte_array());
         Ok((tx, *offset))
     }
 }

@@ -6,6 +6,7 @@ pub enum hashes_hex_Error_FFI {
     OddLengthString(usize),
     InvalidLength(usize, usize),
 }
+// use
 
 impl ferment::FFIConversionFrom<hashes::hex::Error> for hashes_hex_Error_FFI {
     unsafe fn ffi_from_const(ffi: *const hashes_hex_Error_FFI) -> hashes::hex::Error {

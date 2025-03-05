@@ -2,10 +2,11 @@ use bls_signatures::bip32::{ChainCode, ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
 #[cfg(test)]
 use byte::BytesExt;
-use hashes::{Hash, hex::{FromHex, ToHex}, sha256, sha256d};
+use dashcore::consensus::Encodable;
+use dashcore::hashes::{hex::FromHex, sha256, sha256d, Hash};
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 #[cfg(test)]
-use secp256k1::rand::{thread_rng, Rng};
-use crate::consensus::{Decodable, Encodable};
+use dashcore::secp256k1::rand::{thread_rng, Rng};
 use crate::crypto::byte_util::{AsBytes, Zeroable, UInt160, UInt256, UInt384, UInt768};
 #[cfg(test)]
 use crate::crypto::byte_util::Random;
@@ -50,7 +51,7 @@ impl BLSKey {
         Self { seckey: seckey.0, pubkey, use_legacy, chaincode: [0u8; 32], extended_public_key_data: Default::default(), extended_private_key_data: Default::default() }
     }
 
-    pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Result<BLSKey, hashes::hex::Error> {
+    pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Result<BLSKey, dashcore::hashes::hex::Error> {
         Vec::from_hex(string)
             .map(|data| Self::key_with_seed_data(&data, use_legacy))
     }
@@ -61,7 +62,7 @@ impl BLSKey {
     }
 
     pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Result<BLSKey, KeyError> {
-        <[u8; 32]>::consensus_decode(data)
+        <[u8; 32]>::try_from(data)
             .map_err(KeyError::from)
             .and_then(|seckey| PrivateKey::from_bytes(data, use_legacy)
                 .map_err(KeyError::from)
@@ -134,7 +135,7 @@ impl BLSKey {
         self.sign_with_key(|| md)
     }
     pub fn sign_data(&self, data: &[u8]) -> [u8; 96] {
-        self.sign_with_key(|| sha256d::Hash::hash(data).into_inner())
+        self.sign_with_key(|| sha256d::Hash::hash(data).to_byte_array())
     }
 
     pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
@@ -148,9 +149,10 @@ impl BLSKey {
     }
 
     pub fn public_key_serialized(&self, use_legacy: bool) -> Result<String, KeyError> {
+
         self.bls_public_key()
             .map_err(KeyError::from)
-            .map(|pk| g1_element_serialized(&pk, use_legacy).to_hex())
+            .map(|pk| g1_element_serialized(&pk, use_legacy).to_lower_hex_string())
     }
 
 }
@@ -182,14 +184,19 @@ impl IKey for BLSKey {
     }
 
     fn hash_and_sign(&self, data: Vec<u8>) -> Vec<u8> {
-        self.sign_digest(sha256d::Hash::hash(&data).into_inner()).to_vec()
+        self.sign_digest(sha256d::Hash::hash(&data).to_byte_array()).to_vec()
     }
 
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError> {
-        let digest = <[u8; 32]>::consensus_decode(message_digest)?;
-        let signature = <[u8; 96]>::consensus_decode(signature)?;
-
-        Ok(self.verify_uint768(digest, signature))
+        self.bls_public_key().map_err(KeyError::from).map(|public_key| {
+            match g2_element_from_bytes(self.use_legacy, signature) {
+                Ok(signature) if self.use_legacy =>
+                    LegacySchemeMPL::new().verify(&public_key, message_digest, &signature),
+                Ok(signature) =>
+                    BasicSchemeMPL::new().verify(&public_key, message_digest, &signature),
+                _ => false
+            }
+        })
     }
 
     fn secret_key(&self) -> [u8; 32] {
@@ -226,13 +233,14 @@ impl IKey for BLSKey {
         // if (uint256_is_zero(self.secretKey)) return nil;
         // NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
         let mut writer = SecVec::with_capacity(34);
-        chain_prefix.enc(&mut writer);
-        self.seckey.enc(&mut writer);
-        b'\x02'.enc(&mut writer);
+        chain_prefix.consensus_encode(&mut writer).unwrap();
+        self.seckey.consensus_encode(&mut writer).unwrap();
+        b'\x02'.consensus_encode(&mut writer).unwrap();
         base58::check_encode_slice(&writer)
     }
 
     fn hmac_256_data(&self, data: &[u8]) -> [u8; 32] {
+        // Hmac::<sha256::Hash>::hash()
         UInt256::hmac::<sha256::Hash>(&self.seckey, data).0
     }
 
@@ -384,9 +392,9 @@ impl BLSKey {
         } else {
             // todo: impl securebox here
             let mut writer = Vec::<u8>::with_capacity(34);
-            chain_prefix.enc(&mut writer);
-            self.seckey.enc(&mut writer);
-            b'\x02'.enc(&mut writer);
+            chain_prefix.consensus_encode(&mut writer).unwrap();
+            self.seckey.consensus_encode(&mut writer).unwrap();
+            b'\x02'.consensus_encode(&mut writer).unwrap();
             Ok(base58::check_encode_slice(&writer))
         }
     }
@@ -479,7 +487,7 @@ impl BLSKey {
     }
 
     pub fn sign_data_single_sha256(&self, data: &[u8]) -> [u8; 96] {
-        self.sign_with_key(|| sha256::Hash::hash(data).into_inner())
+        self.sign_with_key(|| sha256::Hash::hash(data).to_byte_array())
     }
 
 
@@ -736,7 +744,7 @@ fn bls_chaincode() {
     let chain_code = BLSKey::extended_private_key_with_seed_data(&seed, true)
         .expect("Failed to derive key")
         .chaincode();
-    assert_eq!(chain_code.to_hex(), "d8b12555b4cc5578951e4a7c80031e22019cc0dce168b3ed88115311b8feb1e3", "Testing BLS derivation chain code");
+    assert_eq!(chain_code.to_lower_hex_string(), "d8b12555b4cc5578951e4a7c80031e22019cc0dce168b3ed88115311b8feb1e3", "Testing BLS derivation chain code");
 }
 
 #[test]
@@ -762,10 +770,10 @@ pub fn test_bls_sign() {
     assert_eq!(fingerprint1, 0x26d53247, "Testing BLS private child public key fingerprint");
     assert_eq!(fingerprint2, 0x289bb56e, "Testing BLS private child public key fingerprint");
     let signature1 = keypair1.sign_data_single_sha256(&message1);
-    assert_eq!(signature1.to_hex(), "93eb2e1cb5efcfb31f2c08b235e8203a67265bc6a13d9f0ab77727293b74a357ff0459ac210dc851fcb8a60cb7d393a419915cfcf83908ddbeac32039aaa3e8fea82efcb3ba4f740f20c76df5e97109b57370ae32d9b70d256a98942e5806065", "Testing BLS signing");
-    assert_eq!(keypair1.seckey.to_hex(), "022fb42c08c12de3a6af053880199806532e79515f94e83461612101f9412f9e", "Testing BLS private key");
+    assert_eq!(signature1.to_lower_hex_string(), "93eb2e1cb5efcfb31f2c08b235e8203a67265bc6a13d9f0ab77727293b74a357ff0459ac210dc851fcb8a60cb7d393a419915cfcf83908ddbeac32039aaa3e8fea82efcb3ba4f740f20c76df5e97109b57370ae32d9b70d256a98942e5806065", "Testing BLS signing");
+    assert_eq!(keypair1.seckey.to_lower_hex_string(), "022fb42c08c12de3a6af053880199806532e79515f94e83461612101f9412f9e", "Testing BLS private key");
     let signature2 = keypair2.sign_data_single_sha256(&message1);
-    assert_eq!(signature2.to_hex(), "975b5daa64b915be19b5ac6d47bc1c2fc832d2fb8ca3e95c4805d8216f95cf2bdbb36cc23645f52040e381550727db420b523b57d494959e0e8c0c6060c46cf173872897f14d43b2ac2aec52fc7b46c02c5699ff7a10beba24d3ced4e89c821e", "Testing BLS signing");
+    assert_eq!(signature2.to_lower_hex_string(), "975b5daa64b915be19b5ac6d47bc1c2fc832d2fb8ca3e95c4805d8216f95cf2bdbb36cc23645f52040e381550727db420b523b57d494959e0e8c0c6060c46cf173872897f14d43b2ac2aec52fc7b46c02c5699ff7a10beba24d3ced4e89c821e", "Testing BLS signing");
 }
 
 #[test]
@@ -773,11 +781,11 @@ fn test_bls_verify() {
     let seed1 = vec![1u8,2,3,4,5];
     let message1: Vec<u8> = vec![7, 8, 9];
     let mut key_pair1 = BLSKey::key_with_seed_data(&seed1, true);
-    assert_eq!(key_pair1.public_key_data().to_hex(), "02a8d2aaa6a5e2e08d4b8d406aaf0121a2fc2088ed12431e6b0663028da9ac5922c9ea91cde7dd74b7d795580acc7a61");
-    assert_eq!(key_pair1.private_key_data().unwrap().to_hex(), "022fb42c08c12de3a6af053880199806532e79515f94e83461612101f9412f9e");
+    assert_eq!(key_pair1.public_key_data().to_lower_hex_string(), "02a8d2aaa6a5e2e08d4b8d406aaf0121a2fc2088ed12431e6b0663028da9ac5922c9ea91cde7dd74b7d795580acc7a61");
+    assert_eq!(key_pair1.private_key_data().unwrap().to_lower_hex_string(), "022fb42c08c12de3a6af053880199806532e79515f94e83461612101f9412f9e");
     let signature1 = key_pair1.sign_data(&message1);
-    assert_eq!(signature1.to_hex(), "023f5c750f402c69dab304e5042a7419722536a38d58ce46ba045be23e99d4f9ceeffbbc6796ebbdab6e9813c411c78f07167a3b76bef2262775a1e9f95ff1a80c5fa9fe8daa220d4d9da049a96e8932d5071aaf48fbff27a920bc4aa7511fd4");
-    assert!(key_pair1.verify(&sha256d::Hash::hash(&message1).into_inner().to_vec(), &signature1).is_ok(), "Testing BLS signature verification");
+    assert_eq!(signature1.to_lower_hex_string(), "023f5c750f402c69dab304e5042a7419722536a38d58ce46ba045be23e99d4f9ceeffbbc6796ebbdab6e9813c411c78f07167a3b76bef2262775a1e9f95ff1a80c5fa9fe8daa220d4d9da049a96e8932d5071aaf48fbff27a920bc4aa7511fd4");
+    assert!(key_pair1.verify(&sha256d::Hash::hash(&message1).to_byte_array(), &signature1).is_ok(), "Testing BLS signature verification");
 }
 
 #[test]

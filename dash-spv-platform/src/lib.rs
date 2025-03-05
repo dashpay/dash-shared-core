@@ -43,16 +43,12 @@ use dpp::errors::ProtocolError;
 use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0, IdentityFacade, KeyID};
 use dpp::document::Document;
 use dpp::document::document_factory::DocumentFactory;
-use dpp::errors::consensus::basic::BasicError;
-use dpp::errors::consensus::ConsensusError;
 use dpp::identity::core_script::CoreScript;
 use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
 use dpp::native_bls::NativeBlsModule;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
-use dpp::state_transition::document::documents_batch_transition::DocumentsBatchTransition;
-use dpp::state_transition::document::documents_batch_transition::methods::v0::DocumentsBatchTransitionMethodsV0;
-use dpp::state_transition::state_transitions::document::documents_batch_transition::document_transition::action_type::DocumentTransitionActionType;
+use dpp::state_transition::state_transitions::document::batch_transition::batched_transition::document_transition_action_type::DocumentTransitionActionType;
 use dpp::state_transition::state_transition_factory::StateTransitionFactory;
 use dpp::state_transition::StateTransition;
 use dpp::state_transition::state_transitions::identity::public_key_in_creation::IdentityPublicKeyInCreation;
@@ -372,7 +368,7 @@ impl PlatformSDK {
         let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
         let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
             .map_err(Error::from)?;
-        Self::sign_transition(StateTransition::DocumentsBatch, transition, private_key)
+        Self::sign_transition(StateTransition::Batch, transition, private_key)
     }
 
     #[cfg(feature = "state-transitions")]
@@ -390,7 +386,7 @@ impl PlatformSDK {
         let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
         let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
             .map_err(Error::from)?;
-        Self::sign_transition(StateTransition::DocumentsBatch, transition, private_key)
+        Self::sign_transition(StateTransition::Batch, transition, private_key)
     }
     #[cfg(feature = "state-transitions")]
     pub fn document_batch_signed_transition<'a>(
@@ -401,7 +397,7 @@ impl PlatformSDK {
         let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
         let transition = self.documents.create_state_transition(documents, &mut nonce_counter)
             .map_err(Error::from)?;
-        Self::sign_transition(StateTransition::DocumentsBatch, transition, private_key)
+        Self::sign_transition(StateTransition::Batch, transition, private_key)
     }
 
     /// Publish state transition
@@ -497,14 +493,12 @@ impl PlatformSDK {
     #[cfg(feature = "state-transitions")]
     pub async fn document_single2(
         &self,
-        action_type: DocumentTransitionActionType,
         document_type: DocumentType,
         document: Document,
         entropy: [u8; 32],
         identity_public_key: IdentityPublicKey,
-        private_key: OpaqueKey,
     ) -> Result<Document, Error> {
-        println!("document_single2: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
+        println!("document_single2: {document_type:?} -- {document:?} -- {}", entropy.to_hex());
         document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
             .map_err(Error::from)
     }
@@ -577,9 +571,9 @@ impl PlatformSDK {
             (Value::Text("accountReference".to_string()), Value::U32(account_reference)),
         ]));
 
-        let document_type = contract.document_type_for_name(table_name)
-            .map_err(ProtocolError::from)?;
         let owner_id = Identifier::from(identity_id);
+        let document_type = contract.document_type_for_name(table_name)
+            .map_err(Error::from)?;
         document_type.create_document_from_data(dict, owner_id, 1000, 1000, entropy, self.sdk.version())
             .map_err(Error::from)
     }
@@ -677,8 +671,6 @@ impl PlatformSDK {
             documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
         }
 
-        // Document::put_to_platform_and_wait_for_response(self.sdk.as_ref(), )
-
         let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
         save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
 
@@ -689,44 +681,61 @@ impl PlatformSDK {
             })
     }
 
-    pub async fn register_preordered_salted_domain_hashes_for_username_full_paths2<
-        SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
-    >(
-        &self,
+    pub async fn register_preordered_salted_domain_hash_for_username_full_path(
+        &self, 
         contract: DataContract,
-        identity_id: [u8; 32],
-        salted_domain_hashes: Vec<Vec<u8>>,
-        entropy: [u8; 32],
-        private_key: OpaqueKey,
-        save_context: *const std::os::raw::c_void,
-        save_callback: SUC,
-    ) -> Result<StateTransitionProofResult, Error> {
+        identity_id: [u8; 32], 
+        identity_public_key: IdentityPublicKey, 
+        salted_domain_hash: Vec<u8>, 
+        entropy: [u8; 32]
+    ) -> Result<Document, Error> {
+        println!("register_preordered_salted_domain_hash_for_username_full_path: {} -- {identity_public_key:?} -- {} -- {}", identity_id.to_hex(), salted_domain_hash.to_hex(), entropy.to_hex());
+        let map = Value::Map(ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]));
         let document_type = contract.document_type_for_name("preorder")
-            .map_err(ProtocolError::from)?;
-        let owner_id = Identifier::from(identity_id);
-        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
-        for salted_domain_hash in salted_domain_hashes.into_iter() {
-            let map = ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]);
-            let document = document_type.create_document_from_data(Value::Map(map), owner_id, 1000, 1000, entropy, self.sdk.version())
-                .map_err(Error::from)?;
-            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
-        }
-
-        // Document::put_to_platform_and_wait_for_response(self.sdk.as_ref(), )
-
-        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
-        save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
-
-        self.publish_state_transition(signed_transition).await
-            .map(|result| {
-                save_callback(save_context, UsernameStatus::Preordered);
-                result
-            })
-
-        // document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
-        //     .map_err(Error::from)
-
+            .map_err(Error::from)?;
+        let document = document_type.create_document_from_data(map, Identifier::from(identity_id), 0, 0, entropy, self.sdk.version())
+            .map_err(Error::from)?;
+        self.document_single2(document_type.to_owned_document_type(), document, entropy, identity_public_key).await
     }
+
+    // pub async fn register_preordered_salted_domain_hashes_for_username_full_paths2<
+    //     SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
+    // >(
+    //     &self,
+    //     contract: DataContract,
+    //     identity_id: [u8; 32],
+    //     salted_domain_hashes: Vec<Vec<u8>>,
+    //     entropy: [u8; 32],
+    //     private_key: OpaqueKey,
+    //     save_context: *const std::os::raw::c_void,
+    //     save_callback: SUC,
+    // ) -> Result<StateTransitionProofResult, Error> {
+    //     let document_type = contract.document_type_for_name("preorder")
+    //         .map_err(ProtocolError::from)?;
+    //     let owner_id = Identifier::from(identity_id);
+    //     let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+    //     for salted_domain_hash in salted_domain_hashes.into_iter() {
+    //         let map = Value::Map(ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]));
+    //         let document = document_type.create_document_from_data(map, owner_id, 0, 0, entropy, self.sdk.version())
+    //             .map_err(Error::from)?;
+    //         documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+    //     }
+    //
+    //     Document::put_to_platform_and_wait_for_response(self.sdk.as_ref(), )
+    //
+    //     let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
+    //     save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
+    //
+    //     self.publish_state_transition(signed_transition).await
+    //         .map(|result| {
+    //             save_callback(save_context, UsernameStatus::Preordered);
+    //             result
+    //         })
+    //
+    //     // document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
+    //     //     .map_err(Error::from)
+    //
+    // }
 
     pub async fn sign_and_publish_profile(
         &self,

@@ -1,10 +1,9 @@
 use std::io;
-use std::io::Read;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Serialize, Serializer};
-use crate::consensus::{Decodable, Encodable, encode::Error};
+use dashcore::consensus::{Decodable, Encodable};
 use crate::crypto::byte_util::BytesDecodable;
 
 #[warn(non_camel_case_types)]
@@ -62,14 +61,14 @@ impl From<LLMQVersion> for u16 {
 }
 
 impl Encodable for LLMQVersion {
-    fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
-        u16::consensus_encode(&u16::from(self.clone()), &mut writer)
+    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
+        u16::consensus_encode(&u16::from(self.clone()), writer)
     }
 }
 
 impl Decodable for LLMQVersion {
-    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, Error> {
-        u16::consensus_decode(&mut d)
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        u16::consensus_decode(reader)
             .map(LLMQVersion::from)
     }
 }
@@ -82,9 +81,9 @@ impl<'a> TryRead<'a, Endian> for LLMQVersion {
 }
 
 impl<'a> TryWrite<Endian> for LLMQVersion {
-    fn try_write(self, bytes: &mut [u8], _endian: Endian) -> byte::Result<usize> {
+    fn try_write(self, mut bytes: &mut [u8], _endian: Endian) -> byte::Result<usize> {
         let orig: u16 = self.into();
-        orig.consensus_encode(bytes).unwrap();
+        orig.consensus_encode(&mut bytes).unwrap();
         Ok(2)
     }
 }

@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use dashcore::{Network, PrivateKey};
-use hashes::{sha256, sha256d, Hash};
+use hashes::{sha256, sha256d};
 use crate::derivation::{IIndexPath, IndexPath, index_path::{Extremum, IndexHardSoft}};
-use crate::consensus::Encodable;
+use dashcore::consensus::Encodable;
 use crate::crypto::byte_util::{clone_into_array, Reversed, UInt256, UInt384, UInt768};
 use crate::keys::{BLSKey, DeriveKey, ECDSAKey, ED25519Key, IKey, KeyError};
 use crate::keys::bls_key::g1_element_serialized;
@@ -132,7 +132,7 @@ impl OpaqueKey {
     }
     pub fn create_tx_signature(&self, data: &[u8], tx_input_script: Vec<u8>) -> Vec<u8> {
         let mut sig = Vec::new();
-        let hash = sha256d::Hash::hash(data.as_ref()).into_inner();
+        let hash = sha256d::Hash::hash(data.as_ref()).to_byte_array();
         let signed_data = match self {
             OpaqueKey::ECDSA(key) => key.sign(&hash),
             OpaqueKey::BLS(key) => key.sign(&hash),
@@ -167,7 +167,7 @@ impl OpaqueKey {
 
     pub fn create_identifier(&self) -> Result<[u8; 32], KeyError> {
         self.extended_public_key_data()
-            .map(|ext_pubkey_data| sha256::Hash::hash(&ext_pubkey_data).into_inner())
+            .map(|ext_pubkey_data| sha256::Hash::hash(&ext_pubkey_data).to_byte_array())
     }
 
     pub fn public_derive_to_256_path_with_offset(&mut self, path: &IndexPathU256, offset: usize) -> Result<Self, KeyError> {
@@ -209,9 +209,9 @@ impl OpaqueKey {
     pub fn encrypt_data(&self, public_key: OpaqueKey, data: &[u8]) -> Result<Vec<u8>, KeyError> {
         match (self, public_key) {
             (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
-                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
-                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
-                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let pubkey = dashcore::secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = dashcore::secp256k1::SecretKey::from_byte_array(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = dashcore::secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
                 let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
                 CryptoData::encrypt_with_dh_key(&data.to_vec(), &new_key)
             }
@@ -231,9 +231,9 @@ impl OpaqueKey {
     pub fn encrypt_data_using_iv(&self, public_key: OpaqueKey, data: &[u8], iv: Vec<u8>) -> Result<Vec<u8>, KeyError> {
         match (self, public_key) {
             (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
-                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
-                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
-                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let pubkey = dashcore::secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = dashcore::secp256k1::SecretKey::from_byte_array(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = dashcore::secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
                 let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
                 CryptoData::encrypt_with_dh_key_using_iv(&data.to_vec(), &new_key, iv)
             }
@@ -251,9 +251,9 @@ impl OpaqueKey {
     pub fn decrypt_data(&self, public_key: OpaqueKey, data: &[u8]) -> Result<Vec<u8>, KeyError> {
         match (self, public_key) {
             (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
-                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
-                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
-                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let pubkey = dashcore::secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = dashcore::secp256k1::SecretKey::from_byte_array(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = dashcore::secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
                 let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
                 CryptoData::decrypt_with_dh_key(&data.to_vec(), &new_key)
             }
@@ -274,9 +274,9 @@ impl OpaqueKey {
     pub fn decrypt_data_using_iv_size(&self, public_key: OpaqueKey, data: &[u8], iv_size: usize) -> Result<Vec<u8>, KeyError> {
         match (self, public_key) {
             (OpaqueKey::ECDSA(key), OpaqueKey::ECDSA(public_key)) => {
-                let pubkey = secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
-                let seckey = secp256k1::SecretKey::from_slice(&key.seckey).map_err(KeyError::from)?;
-                let shared_secret = secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
+                let pubkey = dashcore::secp256k1::PublicKey::from_slice(&public_key.public_key_data()).map_err(KeyError::from)?;
+                let seckey = dashcore::secp256k1::SecretKey::from_byte_array(&key.seckey).map_err(KeyError::from)?;
+                let shared_secret = dashcore::secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey);
                 let new_key = ECDSAKey::with_shared_secret(shared_secret, false);
                 CryptoData::decrypt_with_dh_key_using_iv_size(&data.to_vec(), &new_key, iv_size)
             }

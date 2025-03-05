@@ -1,10 +1,9 @@
 use std::io;
-use std::io::{Error, Write};
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use dashcore::{ScriptBuf, TxOut};
-use hashes::hex::ToHex;
-use crate::consensus::{encode, Decodable, Encodable};
+use dashcore::consensus::{Decodable, Encodable};
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use crate::crypto::VarBytes;
 
 #[derive(Clone)]
@@ -28,19 +27,19 @@ impl std::fmt::Debug for TransactionOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransactionOutput")
             .field("amount", &self.amount)
-            .field("script", &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
-            .field("address", &self.address.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
+            .field("script", &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_lower_hex_string())
+            .field("address", &self.address.as_ref().unwrap_or(&Vec::<u8>::new()).to_lower_hex_string())
             .finish()
     }
 }
 
 impl Encodable for TransactionOutput {
     #[inline]
-    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
+    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
         let mut offset = 0;
-        offset += self.amount.consensus_encode(&mut writer)?;
+        offset += self.amount.consensus_encode(writer)?;
         offset += match self.script {
-            Some(ref script) => script.consensus_encode(&mut writer)?,
+            Some(ref script) => script.consensus_encode(writer)?,
             None => 0
         };
         Ok(offset)
@@ -49,9 +48,9 @@ impl Encodable for TransactionOutput {
 
 impl Decodable for TransactionOutput {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let amount = u64::consensus_decode(&mut d)?;
-        let script: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        let amount = u64::consensus_decode(reader)?;
+        let script: Option<Vec<u8>> = Vec::consensus_decode(reader).ok();
         Ok(TransactionOutput { amount, script, address: None })
     }
 }

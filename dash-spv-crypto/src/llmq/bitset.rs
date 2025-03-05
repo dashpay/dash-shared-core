@@ -1,11 +1,14 @@
 use std::fmt::{Display, Formatter};
-use std::io;
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, TryRead};
-use hashes::hex::ToHex;
 use log::warn;
-use crate::consensus::{Decodable, Encodable, encode, encode::VarInt, ReadExt, WriteExt};
+use dashcore::consensus::{Decodable, Encodable, encode::VarInt, ReadExt, WriteExt};
 use crate::crypto::data_ops::Data;
+#[cfg(feature = "std")]
+use std::io;
+#[cfg(not(feature = "std"))]
+use core2::io;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[ferment_macro::export]
@@ -16,7 +19,7 @@ pub struct Bitset {
 
 impl Display for Bitset {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.count, self.bitset.to_hex())
+        write!(f, "{}::{}", self.count, self.bitset.to_lower_hex_string())
     }
 }
 
@@ -53,9 +56,9 @@ impl Bitset {
 }
 
 impl Encodable for Bitset {
-    fn consensus_encode<W: io::Write>(&self, mut writer: W) -> Result<usize, io::Error> {
+    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
         let mut len = 0;
-        len += VarInt(self.count as u64).enc(&mut writer);
+        len += VarInt(self.count as u64).consensus_encode(writer)?;
         writer.emit_slice(&self.bitset)?;
         len += self.bitset.len();
         Ok(len)
@@ -63,10 +66,10 @@ impl Encodable for Bitset {
 }
 
 impl Decodable for Bitset {
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let count = VarInt::consensus_decode(&mut d)?.0 as usize;
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        let count = VarInt::consensus_decode(reader)?.0 as usize;
         let mut bitset = vec![0u8; (count + 7) / 8];
-        d.read_slice(&mut bitset)?;
+        reader.read_slice(&mut bitset)?;
         Ok(Self { count, bitset })
     }
 }
@@ -84,7 +87,7 @@ impl std::fmt::Debug for Bitset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Bitset")
             .field("count", &self.count)
-            .field("bitset", &self.bitset.to_hex())
+            .field("bitset", &self.bitset.to_lower_hex_string())
             .finish()
     }
 }

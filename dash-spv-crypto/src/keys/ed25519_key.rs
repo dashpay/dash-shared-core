@@ -1,12 +1,13 @@
 use byte::BytesExt;
 use byte::ctx::Bytes;
+use dashcore::consensus::Encodable;
+use dashcore::hashes::hex::FromHex;
+use dashcore::hashes::{hash160, sha256, sha256d, Hash};
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
-use hashes::hex::{FromHex, ToHex};
-use hashes::{hash160, sha256, sha256d, Hash};
 use log::warn;
 use crate::crypto::byte_util::{AsBytes, ECPoint, UInt160, UInt256, UInt512, Zeroable};
 use crate::derivation::{IIndexPath, IndexPath};
-use crate::consensus::Encodable;
 use crate::keys::{IKey, KeyKind, dip14::IChildKeyDerivation, KeyError, DeriveKey};
 use crate::network::ChainType;
 use crate::util::address::address;
@@ -60,7 +61,7 @@ impl ED25519Key {
         }
     }
     pub fn key_with_private_key(string: &str) -> Result<Self, KeyError> {
-        Vec::from_hex(string.as_bytes().to_hex().as_str())
+        Vec::from_hex(string.as_bytes().to_lower_hex_string().as_str())
             .map_err(KeyError::from)
             .and_then(|data| Self::key_with_secret_data(&data))
     }
@@ -70,7 +71,7 @@ impl ED25519Key {
             .map(|seckey| Self { seckey: seckey.to_bytes(), ..Default::default() })
     }
     pub fn hash160(&self) -> [u8; 20] {
-        hash160::Hash::hash(&self.public_key_data()).into_inner()
+        hash160::Hash::hash(&self.public_key_data()).to_byte_array()
     }
 
 }
@@ -83,7 +84,7 @@ impl IKey for ED25519Key {
     }
 
     fn secret_key_string(&self) -> String {
-        self.seckey.to_hex()
+        self.seckey.to_lower_hex_string()
     }
 
     fn has_private_key(&self) -> bool {
@@ -159,8 +160,8 @@ impl IKey for ED25519Key {
             true => self.private_key_data().map(|private_key_data| {
                 // TODO: secure allocator
                 let mut writer = SecVec::new();
-                self.fingerprint.enc(&mut writer);
-                self.chaincode.enc(&mut writer);
+                self.fingerprint.consensus_encode(&mut writer).unwrap();
+                self.chaincode.consensus_encode(&mut writer).unwrap();
                 writer.extend(private_key_data);
                 writer
             }),
@@ -172,8 +173,8 @@ impl IKey for ED25519Key {
         match self.is_extended {
             true => {
                 let mut writer = Vec::<u8>::new();
-                self.fingerprint.enc(&mut writer);
-                self.chaincode.enc(&mut writer);
+                self.fingerprint.consensus_encode(&mut writer).unwrap();
+                self.chaincode.consensus_encode(&mut writer).unwrap();
                 writer.extend(self.public_key_data());
                 Ok(writer)
             },
@@ -183,16 +184,23 @@ impl IKey for ED25519Key {
 
     fn serialized_private_key_for_script(&self, chain_prefix: u8) -> String {
         let mut writer = SecVec::with_capacity(33);
-        chain_prefix.enc(&mut writer);
-        self.seckey.enc(&mut writer);
+        chain_prefix.consensus_encode(&mut writer).unwrap();
+        self.seckey.consensus_encode(&mut writer).unwrap();
         // todo: should we add additional byte here ?
         // if self.compressed {
-        //     b'\x01'.enc(&mut writer);
+        //     b'\x01'.consensus_encode(&mut writer).unwrap();
         // }
         base58::check_encode_slice(&writer)
     }
 
     fn hmac_256_data(&self, data: &[u8]) -> [u8; 32] {
+        // let engine = HmacEngine::<sha256::Hash>::new(&self.seckey);
+        // let hmac = Hmac::from_engine(engine);
+        // hmac.input
+        // engine.to_byte_array()
+        // engine.has
+        // Hmac(self.seckey).ha(data)
+        // Hmac::new(&self.seckey).hash::<sha256::Hash>(data).0
         UInt256::hmac::<sha256::Hash>(&self.seckey, data).0
     }
 

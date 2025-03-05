@@ -1,6 +1,6 @@
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use secp256k1::Scalar;
-use crate::consensus::encode::Encodable;
+use dashcore::consensus::encode::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array, UInt256, UInt512};
 use crate::derivation::{BIP32_HARD, IIndexPath};
 use crate::keys::{ECDSAKey, ED25519Key};
@@ -43,7 +43,7 @@ impl IChildKeyDerivationData<[u8; 32], [u8; 32], [u8; 33]> for ECDSAKey {
         let i_is_31_bits = index.is_31_bits();
         let mut writer = Vec::<u8>::new();
         if is_hardened {
-            0u8.enc(&mut writer);
+            0u8.consensus_encode(&mut writer).unwrap();
             writer.extend_from_slice(key);
         } else {
             writer.extend_from_slice(&secp256k1_point_from_bytes(key));
@@ -53,9 +53,9 @@ impl IChildKeyDerivationData<[u8; 32], [u8; 32], [u8; 33]> for ECDSAKey {
             if is_hardened {
                 small_i |= BIP32_HARD;
             }
-            small_i.swap_bytes().enc(&mut writer);
+            small_i.swap_bytes().consensus_encode(&mut writer).unwrap();
         } else {
-            index.enc(&mut writer);
+            index.consensus_encode(&mut writer).unwrap();
         };
         writer
     }
@@ -109,7 +109,7 @@ impl IChildKeyDerivationData<[u8; 32], SigningKey, [u8; 32]> for ED25519Key {
         let i_is_31_bits = index.is_31_bits();
         let mut writer = Vec::<u8>::new();
         if is_hardened {
-            0u8.enc(&mut writer);
+            0u8.consensus_encode(&mut writer).unwrap();
             writer.extend_from_slice(&key.to_bytes());
         } else {
             panic!("For ED25519 only hardened derivation is supported");
@@ -119,9 +119,9 @@ impl IChildKeyDerivationData<[u8; 32], SigningKey, [u8; 32]> for ED25519Key {
             if is_hardened {
                 small_i |= BIP32_HARD;
             }
-            small_i.swap_bytes().enc(&mut writer);
+            small_i.swap_bytes().consensus_encode(&mut writer).unwrap();
         } else {
-            index.enc(&mut writer);
+            index.consensus_encode(&mut writer).unwrap();
         };
         writer
     }

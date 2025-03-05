@@ -812,7 +812,7 @@ pub extern "C" fn ecdsa_public_key_unique_id_from_derived_key_data(data: *const 
         .map_or(0, |public_key| {
             let data = public_key.public_key_data();
             let mut writer = SecVec::new();
-            chain_type.genesis_hash().enc(&mut writer);
+            chain_type.genesis_hash().consensus_encode(&mut writer).unwrap();
             writer.extend(data);
             // one way injective function?
             UInt256::sha256(writer.as_slice()).u64_le()

@@ -1,6 +1,6 @@
-use hashes::{sha256d, Hash};
-use crate::consensus::Encodable;
-use crate::consensus::encode::VarInt;
+use hashes::sha256d;
+use dashcore::consensus::Encodable;
+use dashcore::consensus::encode::VarInt;
 use crate::network::LLMQType;
 
 pub enum LLMQModifierType {
@@ -13,15 +13,15 @@ impl LLMQModifierType {
         let mut writer = vec![];
         match self {
             LLMQModifierType::PreCoreV20(llmq_type, block_hash) => {
-                VarInt(u64::from(llmq_type)).enc(&mut writer);
-                block_hash.enc(&mut writer);
+                VarInt(u64::from(llmq_type)).consensus_encode(&mut writer).unwrap();
+                block_hash.consensus_encode(&mut writer).unwrap();
             },
             LLMQModifierType::CoreV20(llmq_type, block_height, cl_signature) => {
-                VarInt(u64::from(llmq_type)).enc(&mut writer);
-                block_height.enc(&mut writer);
-                cl_signature.enc(&mut writer);
+                VarInt(u64::from(llmq_type)).consensus_encode(&mut writer).unwrap();
+                block_height.consensus_encode(&mut writer).unwrap();
+                cl_signature.consensus_encode(&mut writer).unwrap();
             }
         }
-        sha256d::Hash::hash(writer.as_ref()).into_inner()
+        sha256d::Hash::hash(writer.as_ref()).to_byte_array()
     }
 }

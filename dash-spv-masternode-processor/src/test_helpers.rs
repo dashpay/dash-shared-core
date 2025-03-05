@@ -1,7 +1,7 @@
 use std::{env, fs};
 use std::io::Read;
 use std::num::ParseIntError;
-use dash_spv_crypto::crypto::{VarArray, VarBytes, byte_util::{BytesDecodable, UInt256}};
+use dash_spv_crypto::crypto::byte_util::UInt256;
 use crate::hashes::hex::FromHex;
 
 pub fn load_message<T: ToString>(chain_id: T, filename: &str) -> Vec<u8> {
@@ -79,13 +79,13 @@ pub fn block_hash_to_block_hash(block_hash: String) -> [u8; 32] {
 // }
 
 
-pub fn parse_coinbase_tx_merkle_tree(bytes: &[u8]) -> (u32, VarArray<UInt256>, &[u8], usize) {
-    let offset = &mut 0;
-    let total_transactions = u32::from_bytes(bytes, offset).unwrap();
-    let merkle_hashes = VarArray::<UInt256>::from_bytes(bytes, offset).unwrap();
-    let merkle_flags_var_bytes = VarBytes::from_bytes(bytes, offset).unwrap();
-    (total_transactions, merkle_hashes, merkle_flags_var_bytes.1, merkle_flags_var_bytes.0.0 as usize)
-}
+// pub fn parse_coinbase_tx_merkle_tree(bytes: &[u8]) -> (u32, VarArray<UInt256>, &[u8], usize) {
+//     let offset = &mut 0;
+//     let total_transactions = u32::from_bytes(bytes, offset).unwrap();
+//     let merkle_hashes = VarArray::<UInt256>::from_bytes(bytes, offset).unwrap();
+//     let merkle_flags_var_bytes = VarBytes::from_bytes(bytes, offset).unwrap();
+//     (total_transactions, merkle_hashes, merkle_flags_var_bytes.1, merkle_flags_var_bytes.0.0 as usize)
+// }
 
 
 pub fn decode_hex_to_vec(s: &str) -> Vec<u8> {

@@ -7,7 +7,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-#rs-dapi-client = { git = "https://github.com/pankcuf/platform", branch = "test/ferment", package = "rs-dapi-client" }
+#rs-dapi-client = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "rs-dapi-client" }
 
 [lib]
 name = "dash_spv_event_bus"

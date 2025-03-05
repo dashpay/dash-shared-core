@@ -46,8 +46,8 @@ impl<'a> MerkleTree<'a> {
             |hash, _flag| hash,
             |left, right| {
                 let mut buffer: Vec<u8> = Vec::with_capacity(64);
-                left.enc(&mut buffer);
-                right.unwrap_or(left).enc(&mut buffer);
+                left.consensus_encode(&mut buffer).unwrap();
+                right.unwrap_or(left).consensus_encode(&mut buffer).unwrap();
                 Some(sha256d::Hash::hash(&buffer).into_inner())
             },
         )

@@ -16,7 +16,7 @@
 
 use core::{fmt, str, iter, slice};
 use secp256k1;
-use hashes::{Hash, sha256d};
+use dashcore::hashes::{sha256d, Hash};
 use crate::util::{endian, key};
 
 /// An error that might occur during base58 decoding
@@ -154,7 +154,7 @@ pub fn from_check(data: &str) -> Result<Vec<u8>, Error> {
         return Err(Error::TooShort(ret.len()));
     }
     let ck_start = ret.len() - 4;
-    let expected = endian::slice_to_u32_le(&sha256d::Hash::hash(&ret[..ck_start])[..4]);
+    let expected = endian::slice_to_u32_le(&sha256d::Hash::hash(&ret[..ck_start]).to_byte_array()[..4]);
     let actual = endian::slice_to_u32_le(&ret[ck_start..(ck_start + 4)]);
     if expected != actual {
         return Err(Error::BadChecksum(expected, actual));
@@ -227,14 +227,14 @@ pub fn check_encode_slice(data: &[u8]) -> String {
     encode_iter(
         data.iter()
             .cloned()
-            .chain(checksum[0..4].iter().cloned())
+            .chain(checksum.to_byte_array()[0..4].iter().cloned())
     )
 }
 
 /// Obtain a string with the base58check encoding of a slice
 /// (Tack the first 4 256-digits of the object's Bitcoin hash onto the end.)
 pub fn check_encode_slice_to_fmt(fmt: &mut fmt::Formatter, data: &[u8]) -> fmt::Result {
-    let checksum = sha256d::Hash::hash(data);
+    let checksum = sha256d::Hash::hash(data).to_byte_array();
     let iter = data.iter()
         .cloned()
         .chain(checksum[0..4].iter().cloned());

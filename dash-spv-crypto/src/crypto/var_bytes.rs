@@ -1,10 +1,10 @@
 use byte::{BytesExt, LE, Result, TryRead};
 use byte::ctx::{Bytes, Endian};
-use crate::consensus::encode::VarInt;
+use dashcore::consensus::encode::VarInt;
 use crate::crypto::byte_util::BytesDecodable;
 
 /// A variable-length bytes
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub struct VarBytes<'a>(pub VarInt, pub &'a [u8]);
 
 impl<'a> VarBytes<'a> {
@@ -13,7 +13,7 @@ impl<'a> VarBytes<'a> {
         self.0.len() + self.1.len()
     }
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.0 == 0
     }
 }
 

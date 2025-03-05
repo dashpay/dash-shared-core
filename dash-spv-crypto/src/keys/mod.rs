@@ -14,10 +14,10 @@ pub use self::ed25519_key::ED25519Key;
 pub use self::operator_public_key::OperatorPublicKey;
 
 use std::fmt::Debug;
-use hashes::{sha256d, Hash};
-use crate::consensus::{encode, Encodable};
+use dashcore::hashes::{sha256d, Hash};
+use dashcore::consensus::{encode, Encodable};
+use dashcore::consensus::encode::Error;
 use crate::bip::bip32;
-use crate::consensus::encode::Error;
 use crate::derivation::index_path::{Extremum, IIndexPath, IndexHardSoft};
 use crate::keys::key::KeyKind;
 use crate::network::ChainType;
@@ -80,7 +80,7 @@ pub trait IKey: Send + Sync + Debug {
         // let hash = UInt256::sha256d(tx_data);
         let mut s = self.sign(hash.as_ref());
         let elem = tx_input_script.script_elements();
-        (SIGHASH_ALL as u8).enc(&mut s);
+        (SIGHASH_ALL as u8).consensus_encode(&mut s).unwrap();
         s.append_script_push_data(&mut sig);
         // sig.append_script_push_data(s);
         if elem.len() >= 2 {
@@ -161,10 +161,9 @@ impl From<byte::Error> for KeyError {
         // Self::Bytes(value)
     }
 }
-impl From<secp256k1::Error> for KeyError {
-    fn from(value: secp256k1::Error) -> Self {
+impl From<dashcore::secp256k1::Error> for KeyError {
+    fn from(value: dashcore::secp256k1::Error) -> Self {
         Self::Any(value.to_string())
-        // Self::Secp256k1(value)
     }
 }
 impl From<bls_signatures::BlsError> for KeyError {
@@ -173,8 +172,8 @@ impl From<bls_signatures::BlsError> for KeyError {
         Self::Any(value.to_string())
     }
 }
-impl From<hashes::hex::Error> for KeyError {
-    fn from(value: hashes::hex::Error) -> Self {
+impl From<dashcore::hashes::hex::Error> for KeyError {
+    fn from(value: dashcore::hashes::hex::Error) -> Self {
         Self::Any(value.to_string())
         // Self::Hex(value)
     }

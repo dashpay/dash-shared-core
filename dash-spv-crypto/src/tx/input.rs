@@ -1,11 +1,10 @@
 use std::io;
-use std::io::{Error, Write};
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use dashcore::{OutPoint, ScriptBuf, TxIn, Txid};
 use dashcore::hashes::Hash;
-use hashes::hex::ToHex;
-use crate::consensus::{encode, Decodable, Encodable};
+use dashcore::consensus::{Decodable, Encodable};
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use crate::crypto::{UInt256, VarBytes};
 
 #[derive(Clone)]
@@ -28,6 +27,17 @@ impl From<TransactionInput> for TxIn {
         }
     }
 }
+impl From<TxIn> for TransactionInput {
+    fn from(value: TxIn) -> Self {
+        TransactionInput {
+            input_hash: value.previous_output.txid.to_byte_array(),
+            index: value.previous_output.vout,
+            script: value.script_sig.as_script(),
+            signature: None,
+            sequence: value.sequence,
+        }
+    }
+}
 
 impl std::fmt::Debug for TransactionInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -36,7 +46,7 @@ impl std::fmt::Debug for TransactionInput {
             .field("index", &self.index)
             .field(
                 "script",
-                &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex(),
+                &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_lower_hex_string(),
             )
             .field(
                 "signature",
@@ -44,7 +54,7 @@ impl std::fmt::Debug for TransactionInput {
                     .signature
                     .as_ref()
                     .unwrap_or(&Vec::<u8>::new())
-                    .to_hex(),
+                    .to_lower_hex_string(),
             )
             .field("sequence", &self.sequence)
             .finish()
@@ -53,26 +63,26 @@ impl std::fmt::Debug for TransactionInput {
 
 impl Encodable for TransactionInput {
     #[inline]
-    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
+    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
         let mut offset = 0;
-        offset += self.input_hash.consensus_encode(&mut writer)?;
-        offset += self.index.consensus_encode(&mut writer)?;
+        offset += self.input_hash.consensus_encode(writer)?;
+        offset += self.index.consensus_encode(writer)?;
         offset += match self.signature {
-            Some(ref signature) => signature.consensus_encode(&mut writer)?,
+            Some(ref signature) => signature.consensus_encode(writer)?,
             None => 0
         };
-        offset += self.sequence.consensus_encode(&mut writer)?;
+        offset += self.sequence.consensus_encode(writer)?;
         Ok(offset)
     }
 }
 
 impl Decodable for TransactionInput {
     #[inline]
-    fn consensus_decode<D: io::Read>(mut d: D) -> Result<Self, encode::Error> {
-        let input_hash = <[u8; 32]>::consensus_decode(&mut d)?;
-        let index = u32::consensus_decode(&mut d)?;
-        let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
-        let sequence = u32::consensus_decode(&mut d)?;
+    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+        let input_hash = <[u8; 32]>::consensus_decode(reader)?;
+        let index = u32::consensus_decode(reader)?;
+        let signature: Option<Vec<u8>> = Vec::consensus_decode(reader).ok();
+        let sequence = u32::consensus_decode(reader)?;
         Ok(Self { input_hash, index, signature, sequence, script: None })
     }
 }

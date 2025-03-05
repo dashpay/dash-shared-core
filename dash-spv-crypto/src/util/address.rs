@@ -1,8 +1,9 @@
 pub mod address {
-    use hashes::{Hash, hash160, sha256d};
-    use hashes::hex::{FromHex, ToHex};
+    use dashcore::hashes::{Hash, hash160, sha256d};
+    use dashcore::hashes::hex::FromHex;
     use crate::util::params::{BITCOIN_PUBKEY_ADDRESS, BITCOIN_SCRIPT_ADDRESS, ScriptMap};
-    use crate::consensus::Encodable;
+    use dashcore::consensus::Encodable;
+    use dashcore::secp256k1::hashes::hex::DisplayHex;
     use crate::crypto::byte_util::{clone_into_array, UInt160};
     use crate::network::ChainType;
     use crate::util::base58;
@@ -12,10 +13,10 @@ pub mod address {
 
     pub fn from_hash160_for_script_map(hash: &[u8; 20], map: &ScriptMap) -> String {
         let mut writer: Vec<u8> = Vec::new();
-        map.pubkey.enc(&mut writer);
-        hash.enc(&mut writer);
-        let val = u32::from_le_bytes(clone_into_array(&sha256d::Hash::hash(&writer).into_inner()[..4]));
-        val.enc(&mut writer);
+        map.pubkey.consensus_encode(&mut writer).unwrap();
+        hash.consensus_encode(&mut writer).unwrap();
+        let val = u32::from_le_bytes(clone_into_array(&sha256d::Hash::hash(&writer).to_byte_array()[..4]));
+        val.consensus_encode(&mut writer).unwrap();
         base58::encode_slice(&writer)
     }
 
@@ -26,8 +27,8 @@ pub mod address {
     #[ferment_macro::export]
     pub fn with_public_key_data_and_script_pub_key(data: &[u8], script_pub_key: u8) -> String {
         let mut writer = SecVec::with_capacity(21);
-        script_pub_key.enc(&mut writer);
-        UInt160::hash160(data).enc(&mut writer);
+        script_pub_key.consensus_encode(&mut writer).unwrap();
+        UInt160::hash160(data).consensus_encode(&mut writer).unwrap();
         base58::check_encode_slice(&writer)
     }
 
@@ -56,7 +57,7 @@ pub mod address {
                 Some([&[map.script], data].concat()),
             // pay-to-pubkey scriptPubKey
             [ScriptElement::Data(data, _len @ 33u8 | _len @ 65u8), ScriptElement::Number(0xac/*OP_CHECKSIG*/)] =>
-                Some([&[map.pubkey] as &[u8], &hash160::Hash::hash(data).into_inner()].concat()),
+                Some([&[map.pubkey] as &[u8], &hash160::Hash::hash(data).to_byte_array()].concat()),
             // unknown script type
             _ => None
         }.map(|data| base58::check_encode_slice(&data))
@@ -66,10 +67,10 @@ pub mod address {
         match script.script_elements()[..] {
             // pay-to-pubkey-hash scriptSig
             [.., ScriptElement::Data(.., 0..=0x4e), ScriptElement::Data(data, _len @ 33 | _len @ 65)] =>
-                Some([&[map.pubkey] as &[u8], &hash160::Hash::hash(data).into_inner()].concat()),
+                Some([&[map.pubkey] as &[u8], &hash160::Hash::hash(data).to_byte_array()].concat()),
             // pay-to-script-hash scriptSig
             [.., ScriptElement::Data(.., 0..=0x4e), ScriptElement::Data(data, _len @ 0..=0x4e)] =>
-                Some([&[map.script] as &[u8], &hash160::Hash::hash(data).into_inner()].concat()),
+                Some([&[map.script] as &[u8], &hash160::Hash::hash(data).to_byte_array()].concat()),
             // pay-to-pubkey scriptSig
             // TODO: implement Peter Wullie's pubKey recovery from signature
             [.., ScriptElement::Data(.., 0..=0x4e)] => None,
@@ -122,7 +123,7 @@ pub mod address {
                 d[0] == map.privkey
             } else {
                 // hex encoded key
-                let hex_key = address.as_bytes().to_hex();
+                let hex_key = address.as_bytes().to_lower_hex_string();
                 if let Ok(data) = Vec::from_hex(hex_key.as_str()) {
                     data.len() == 32
                 } else {

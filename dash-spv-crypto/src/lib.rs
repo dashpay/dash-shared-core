@@ -17,10 +17,10 @@ pub mod network;
 pub mod tx;
 pub mod util;
 
-#[cfg(feature = "std")]
-use std::io;
-#[cfg(not(feature = "std"))]
-use core2::io;
+// #[cfg(feature = "std")]
+// use std::io;
+// #[cfg(not(feature = "std"))]
+// use core2::io;
 use crate::network::DevnetType;
 use crate::util::data_append::DataAppend;
 

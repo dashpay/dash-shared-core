@@ -1,4 +1,4 @@
-use hashes::hex::FromHex;
+use dashcore::hashes::hex::FromHex;
 use crate::crypto::byte_util::{Reversable, UInt256};
 use crate::network::{ChainType, DevnetType};
 
