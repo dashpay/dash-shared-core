@@ -1,17 +1,23 @@
-mod current_masternode_list;
-// mod block_hashes_and_heights;
-// mod quorum_entries;
-mod process;
-mod processing_error;
+pub mod processing_error;
 
+use std::collections::BTreeSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use dashcore::{Network};
+use dashcore::{BlockHash, Network, ProTxHash};
+use dashcore::bls_sig_utils::BLSSignature;
+use dashcore::consensus::deserialize;
+use dashcore::hashes::Hash;
+use dashcore::network::message_qrinfo::QRInfo;
+use dashcore::network::message_sml::MnListDiff;
+use dashcore::sml::llmq_type::LLMQType;
+use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_engine::MasternodeListEngine;
-use dash_spv_crypto::crypto::byte_util::{Reversed, Zeroable};
+use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
+use dashcore::sml::quorum_validation_error::{ClientDataRetrievalError, QuorumValidationError};
+use dash_spv_crypto::crypto::byte_util::Zeroable;
 use dash_spv_crypto::network::IHaveChainSettings;
 use crate::processing::core_provider::CoreProvider;
-// use crate::util::formatter::CustomFormatter;
+use crate::processing::processor::processing_error::ProcessingError;
 
 pub const QUORUM_VALIDATION_WINDOW: u32 = 4 * 576 + 100;
 
@@ -36,9 +42,131 @@ impl MasternodeProcessor {
             masternode_lists: Default::default(),
             known_chain_locks: Default::default(),
             known_snapshots: Default::default(),
-            last_commitment_entries: vec![],
+            rotated_quorums_per_cycle: Default::default(),
+            quorum_statuses: Default::default(),
             network,
         } }
+    }
+}
+
+#[ferment_macro::export]
+impl MasternodeProcessor {
+    pub fn current_masternode_list(&self) -> Option<MasternodeList> {
+        self.engine.latest_masternode_list().cloned()
+    }
+
+    pub fn has_current_masternode_list(&self) -> bool {
+        self.engine.latest_masternode_list().is_some()
+    }
+
+    pub fn current_masternode_list_masternode_with_pro_reg_tx_hash(&self, hash: &ProTxHash) -> Option<QualifiedMasternodeListEntry> {
+        let list = self.current_masternode_list();
+        list.and_then(|list| list.masternodes.get(hash).cloned())
+    }
+    pub fn current_masternode_list_masternode_count(&self) -> usize {
+        let list = self.current_masternode_list();
+        list.map(|list| list.masternodes.len())
+            .unwrap_or_default()
+    }
+    pub fn current_masternode_list_quorum_count(&self) -> usize {
+        let list = self.current_masternode_list();
+        list.map(|list| list.quorums_count() as usize)
+            .unwrap_or_default()
+    }
+    /// Processes a serialized `QRInfo` message received from the network.
+    ///
+    /// This function deserializes the given message, processes the QRInfo data,
+    /// and determines the set of `mn_list_diff` block hashes required to verify
+    /// the current and previous masternode list non-rotated quorums.
+    ///
+    /// The client should query and retrieve these `mn_list_diff` messages from the network
+    /// and feed them back into the system using [`process_mn_list_diff_result_from_message`].
+    ///
+    /// The client should only verify the last two `mn_list_diff` messages to maintain efficiency.
+    ///
+    /// # Arguments
+    /// * `message` - A byte slice containing the serialized `QRInfo` message.
+    /// * `verify_rotated_quorums` - A boolean indicating whether rotated quorums should be verified.
+    ///
+    /// # Returns
+    /// * `Ok(BTreeSet<BlockHash>)` - A set of block hashes for which `mn_list_diff` data is required.
+    /// * `Err(ProcessingError)` - If deserialization fails or if any internal processing error occurs.
+    ///
+    /// # Errors
+    /// This function will return an error if:
+    /// * The provided message cannot be deserialized into a valid `QRInfo` object.
+    /// * There is an issue fetching the required data from the provider.
+    ///
+    pub fn process_qr_info_result_from_message(
+        &mut self,
+        message: &[u8], verify_rotated_quorums: bool) -> Result<BTreeSet<BlockHash>, ProcessingError> {
+
+        let qr_info: QRInfo = deserialize(message)?;
+
+        let get_height_fn = {
+            |block_hash: &BlockHash| {
+                let height = self.provider.lookup_block_height_by_hash(block_hash.to_byte_array());
+                if height == u32::MAX {
+                    Err(ClientDataRetrievalError::RequiredBlockNotPresent(*block_hash))
+                } else {
+                    Ok(height)
+                }
+            }
+        };
+
+        let get_chain_lock_sig_fn = {
+            |block_hash: &BlockHash| {
+                match self.provider.lookup_cl_signature_by_block_hash(block_hash.to_byte_array()) {
+                    Ok(sig) => {
+                        if sig.is_zero() {
+                            Ok(None)
+                        } else {
+                            Ok(Some(BLSSignature::from(sig)))
+                        }
+                    },
+                    Err(_) => Err(ClientDataRetrievalError::RequiredBlockNotPresent(*block_hash)),
+                }
+            }
+        };
+
+        self.engine.feed_qr_info(
+            qr_info,
+            verify_rotated_quorums,
+            Some(get_height_fn),
+            Some(get_chain_lock_sig_fn),
+        )?;
+
+        let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(&[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85], false);
+        Ok(hashes)
+    }
+
+    /// Processes a serialized `MnListDiff` message received from the network.
+    ///
+    /// This function deserializes the `MnListDiff` message, applies the masternode list
+    /// difference to the internal state, and optionally verifies quorums.
+    ///
+    /// # Arguments
+    /// * `message` - A byte slice containing the serialized `MnListDiff` message.
+    /// * `diff_block_height` - An optional block height corresponding to the `MnListDiff`.
+    /// * `verify_quorums` - A boolean indicating whether the quorums should be verified.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the masternode list difference was successfully applied.
+    /// * `Err(ProcessingError)` - If deserialization or quorum validation fails.
+    ///
+    /// # Errors
+    /// This function will return an error if:
+    /// * The provided message cannot be deserialized into a valid `MnListDiff` object.
+    /// * There is an issue applying the masternode list difference.
+    pub fn process_mn_list_diff_result_from_message(
+        &mut self,
+        message: &[u8], diff_block_height: Option<u32>, verify_quorums: bool) -> Option<ProcessingError> {
+        let mn_list_diff : MnListDiff = match deserialize(message) {
+            Ok(mn_list_diff) => mn_list_diff,
+            Err(err) => return Some(err.into()),
+        };
+        self.engine
+            .apply_diff(mn_list_diff, diff_block_height, verify_quorums).map_err(|e| ProcessingError::QuorumValidationError(QuorumValidationError::SMLError(e))).err()
     }
 }
 //

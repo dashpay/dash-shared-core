@@ -1,6 +1,7 @@
 use dashcore::consensus;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dashcore::sml::quorum_validation_error::QuorumValidationError;
-use hashes::hex::ToHex;
+// use hashes::hex::ToHex;
 use crate::processing::CoreProviderError;
 
 #[warn(non_camel_case_types)]
@@ -48,8 +49,8 @@ impl From<secp256k1::Error> for ProcessingError {
     }
 }
 
-impl From<hashes::hex::Error> for ProcessingError {
-    fn from(value: hashes::hex::Error) -> Self {
+impl From<dashcore::hashes::hex::Error> for ProcessingError {
+    fn from(value: dashcore::hashes::hex::Error) -> Self {
         ProcessingError::ParseError(format!("{value}"))
     }
 }
@@ -115,15 +116,15 @@ impl ProcessingError {
     pub fn string_value(&self) -> String {
         match self {
             ProcessingError::PersistInRetrieval(base_block_hash, block_hash) =>
-                format!("PersistInRetrieval({}..{})", base_block_hash.to_hex(), block_hash.to_hex()),
+                format!("PersistInRetrieval({}..{})", base_block_hash.to_lower_hex_string(), block_hash.to_lower_hex_string()),
             ProcessingError::LocallyStored(block_height, block_hash) =>
-                format!("LocallyStored({}: {})", block_height, block_hash.to_hex()),
+                format!("LocallyStored({}: {})", block_height, block_hash.to_lower_hex_string()),
             ProcessingError::ParseError(message) =>
                 format!("ParseError({message})"),
             ProcessingError::HasNoBaseBlockHash(block_hash) =>
-                format!("HasNoBaseBlockHash({}", block_hash.to_hex()),
+                format!("HasNoBaseBlockHash({}", block_hash.to_lower_hex_string()),
             ProcessingError::UnknownBlockHash(block_hash) =>
-                format!("UnknownBlockHash({})", block_hash.to_hex()),
+                format!("UnknownBlockHash({})", block_hash.to_lower_hex_string()),
             ProcessingError::InvalidResult(message) =>
                 format!("InvalidResult({message})"),
             ProcessingError::CoreProvider(err) =>

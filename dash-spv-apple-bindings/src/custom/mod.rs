@@ -8,7 +8,6 @@ pub mod regex;
 pub mod serde_json;
 pub mod std;
 pub mod sdk;
-pub mod bitcoin_hashes;
 pub mod versioned_feature_core;
 
 #[macro_export]

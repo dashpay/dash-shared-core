@@ -15,7 +15,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 use std::sync::Arc;
-use bitcoin_hashes::hex::ToHex;
 use dapi_grpc::core::v0::GetTransactionRequest;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::{dpp, RequestSettings, Sdk, SdkBuilder};
@@ -31,6 +30,7 @@ use dash_sdk::platform::transition::put_settings::PutSettings;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dashcore::consensus::Decodable;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dashcore::Transaction;
 use data_contracts::SystemDataContract;
 use dpp::data_contract::{DataContract, DataContractFacade};
@@ -228,7 +228,7 @@ impl PlatformSDK {
     }
 
     pub async fn get_transaction_with_hash(&self, hash: [u8; 32]) -> Result<Transaction, Error> {
-        let request = GetTransactionRequest { id: hash.reversed().to_hex() };
+        let request = GetTransactionRequest { id: hash.reversed().to_lower_hex_string() };
         self.sdk.execute(request, RequestSettings::default()).await
             .map_err(Error::from)
             .map(|response| {
@@ -438,12 +438,12 @@ impl PlatformSDK {
     }
 
     pub async fn identity_topup(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("identity_topup: {} -- {proof:?} -- {private_key:?}", identity_id.to_hex());
+        println!("identity_topup: {} -- {proof:?} -- {private_key:?}", identity_id.to_lower_hex_string());
         let signed_transition = self.identity_topup_signed_transition(identity_id, proof, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
     pub async fn identity_withdraw(&self, identity_id: [u8; 32], amount: u64, fee: u32, pooling: Pooling, private_key: OpaqueKey, script: Option<Vec<u8>>, nonce: u64) -> Result<StateTransitionProofResult, Error> {
-        println!("identity_withdraw: {} -- {amount} {fee} {pooling:?} {private_key:?} -- {} -- {nonce}", identity_id.to_hex(), script.as_ref().map_or("None".to_string(), |s| s.to_hex()));
+        println!("identity_withdraw: {} -- {amount} {fee} {pooling:?} {private_key:?} -- {} -- {nonce}", identity_id.to_lower_hex_string(), script.as_ref().map_or("None".to_string(), |s| s.to_lower_hex_string()));
         let signed_transition = self.identity_withdraw_signed_transition(identity_id, amount, fee, pooling, private_key, script, nonce)?;
         self.publish_state_transition(signed_transition).await
     }
@@ -454,18 +454,18 @@ impl PlatformSDK {
         self.publish_state_transition(signed_transition).await
     }
     pub async fn identity_transfer(&self, identity: Identity, recipient_id: [u8; 32], amount: u64, nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("identity_transfer: {identity:?} -- {} -- {amount} -- {nonce} -- {private_key:?}", recipient_id.to_hex());
+        println!("identity_transfer: {identity:?} -- {} -- {amount} -- {nonce} -- {private_key:?}", recipient_id.to_lower_hex_string());
         let signed_transition = self.identity_transfer_signed_transition(identity, recipient_id, amount, nonce, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
 
     pub async fn data_contract_create(&self, owner_id: [u8; 32], nonce: u64, documents: Value, config: Option<Value>, definitions: Option<Value>, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("data_contract_create: {} -- {nonce} -- {documents:?} -- {config:?} -- {definitions:?} -- {private_key:?}", owner_id.to_hex());
+        println!("data_contract_create: {} -- {nonce} -- {documents:?} -- {config:?} -- {definitions:?} -- {private_key:?}", owner_id.to_lower_hex_string());
         let signed_transition = self.data_contract_create_signed_transition(owner_id, nonce, documents, config, definitions, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
     pub async fn data_contract_create2(&self, system_contract: SystemDataContract, owner_id: [u8; 32], nonce: u64, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("data_contract_create2: {system_contract:?} {} -- {nonce} -- {private_key:?} ", owner_id.to_hex());
+        println!("data_contract_create2: {system_contract:?} {} -- {nonce} -- {private_key:?} ", owner_id.to_lower_hex_string());
         let signed_transition = self.data_contract_create_signed_transition2(system_contract, owner_id, nonce, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
@@ -486,7 +486,7 @@ impl PlatformSDK {
     ) -> Result<StateTransitionProofResult, Error> {
         // TODO: switch onto DocumentsBatchTransition::new_document_creation_transition_from_document
         // DocumentsBatchTransition::DocumentsBatchTransition::new_document_creation_transition_from_document()
-        println!("document_single: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
+        println!("document_single: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_lower_hex_string());
         let signed_transition = self.document_single_signed_transition(action_type, document_type, document, entropy, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
@@ -498,7 +498,7 @@ impl PlatformSDK {
         entropy: [u8; 32],
         identity_public_key: IdentityPublicKey,
     ) -> Result<Document, Error> {
-        println!("document_single2: {document_type:?} -- {document:?} -- {}", entropy.to_hex());
+        println!("document_single2: {document_type:?} -- {document:?} -- {}", entropy.to_lower_hex_string());
         document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
             .map_err(Error::from)
     }
@@ -513,7 +513,7 @@ impl PlatformSDK {
         entropy: [u8; 32],
         private_key: OpaqueKey
     ) -> Result<StateTransitionProofResult, Error> {
-        println!("document_single_on_table: {data_contract:?} -- {action_type:?} -- {table_name} -- {document:?} -- {} -- {private_key:?}", entropy.to_hex());
+        println!("document_single_on_table: {data_contract:?} -- {action_type:?} -- {table_name} -- {document:?} -- {} -- {private_key:?}", entropy.to_lower_hex_string());
         let signed_transition = self.document_single_on_table_signed_transition(data_contract, action_type, table_name, document, entropy, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
@@ -689,7 +689,7 @@ impl PlatformSDK {
         salted_domain_hash: Vec<u8>, 
         entropy: [u8; 32]
     ) -> Result<Document, Error> {
-        println!("register_preordered_salted_domain_hash_for_username_full_path: {} -- {identity_public_key:?} -- {} -- {}", identity_id.to_hex(), salted_domain_hash.to_hex(), entropy.to_hex());
+        println!("register_preordered_salted_domain_hash_for_username_full_path: {} -- {identity_public_key:?} -- {} -- {}", identity_id.to_lower_hex_string(), salted_domain_hash.to_lower_hex_string(), entropy.to_lower_hex_string());
         let map = Value::Map(ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]));
         let document_type = contract.document_type_for_name("preorder")
             .map_err(Error::from)?;
@@ -836,9 +836,9 @@ impl PlatformSDK {
         let mut state_transition = f(transition);
         let data = state_transition.signable_bytes().map_err(Error::from)?;
         let key_type = key_type_from_opaque_key(private_key).map_err(Error::KeyError)?;
-        println!("transition signable bytes: {}", data.to_hex());
+        println!("transition signable bytes: {}", data.to_lower_hex_string());
         state_transition.sign_by_private_key(&private_key_data, key_type, &NativeBlsModule).map_err(Error::from)?;
-        println!("transition signature: {}", state_transition.signature().0.to_hex());
+        println!("transition signature: {}", state_transition.signature().0.to_lower_hex_string());
         Ok(state_transition)
     }
 
@@ -985,7 +985,7 @@ async fn search_identity_by_name() {
 #[tokio::test]
 async fn test_testnet_get_identities_for_wallets_public_keys() {
     async fn testnet_get_identities_for_wallets_public_keys() -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
-        use bitcoin_hashes::hex::{FromHex, ToHex};
+        use dashcore::hashes::hex::FromHex;
         // let key_hashes =
         //     [[61, 109, 200, 109, 172, 74, 46, 253, 71, 179, 136, 237, 252, 103, 3, 212, 243, 105, 230, 114],
         //         [138, 75, 20, 232, 201, 81, 135, 207, 206, 176, 233, 200, 155, 226, 11, 43, 69, 218, 235, 100],
@@ -1006,8 +1006,8 @@ async fn test_testnet_get_identities_for_wallets_public_keys() {
             Err(ContextProviderError::Generic("get_data_contract: DDDDD".to_string()))
         };
         let get_quorum_public_key = Arc::new(|quorum_type: u32, quorum_hash: [u8; 32], core_chain_locked_height: u32| {
-            println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash.to_hex(), core_chain_locked_height);
-            Ok(dash_spv_crypto::crypto::UInt384::from_hex("90bfc37734097f59401a45554a7ddcf0e846e333b74bcd70c8f973a3d932697bdaf5671d0e4a4961a7d2c9a853833429").unwrap().0)
+            println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash.to_lower_hex_string(), core_chain_locked_height);
+            Ok(<[u8; 48]>::from_hex("90bfc37734097f59401a45554a7ddcf0e846e333b74bcd70c8f973a3d932697bdaf5671d0e4a4961a7d2c9a853833429").unwrap())
         });
         let get_platform_activation_height = |_ctx| {
             println!("get_platform_activation_height");

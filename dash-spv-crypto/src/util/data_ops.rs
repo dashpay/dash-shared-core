@@ -44,7 +44,7 @@ pub fn merkle_root_from_hashes(hashes: Vec<[u8; 32]>) -> Option<[u8; 32]> {
                 for pair in level.chunks(2) {
                     let mut buffer = Vec::with_capacity(64);
                     pair[0].consensus_encode(&mut buffer).unwrap();
-                    (pair.get(1).unwrap_or(&pair[0])).consensus_encode(&mut buffer);
+                    (pair.get(1).unwrap_or(&pair[0])).consensus_encode(&mut buffer).unwrap();
                     higher_level.push(sha256d::Hash::hash(buffer.as_ref()).to_byte_array());
                 }
                 level = higher_level;

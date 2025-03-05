@@ -1,11 +1,6 @@
-use std::io;
-use byte::ctx::Endian;
-use byte::{BytesExt, TryRead, LE};
 use dashcore::{OutPoint, ScriptBuf, TxIn, Txid};
 use dashcore::hashes::Hash;
-use dashcore::consensus::{Decodable, Encodable};
 use dashcore::secp256k1::hashes::hex::DisplayHex;
-use crate::crypto::{UInt256, VarBytes};
 
 #[derive(Clone)]
 #[ferment_macro::export]
@@ -27,17 +22,17 @@ impl From<TransactionInput> for TxIn {
         }
     }
 }
-impl From<TxIn> for TransactionInput {
-    fn from(value: TxIn) -> Self {
-        TransactionInput {
-            input_hash: value.previous_output.txid.to_byte_array(),
-            index: value.previous_output.vout,
-            script: value.script_sig.as_script(),
-            signature: None,
-            sequence: value.sequence,
-        }
-    }
-}
+// impl From<TxIn> for TransactionInput {
+//     fn from(value: TxIn) -> Self {
+//         TransactionInput {
+//             input_hash: value.previous_output.txid.to_byte_array(),
+//             index: value.previous_output.vout,
+//             script: value.script_sig.as_script(),
+//             signature: None,
+//             sequence: value.sequence,
+//         }
+//     }
+// }
 
 impl std::fmt::Debug for TransactionInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -61,50 +56,50 @@ impl std::fmt::Debug for TransactionInput {
     }
 }
 
-impl Encodable for TransactionInput {
-    #[inline]
-    fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
-        let mut offset = 0;
-        offset += self.input_hash.consensus_encode(writer)?;
-        offset += self.index.consensus_encode(writer)?;
-        offset += match self.signature {
-            Some(ref signature) => signature.consensus_encode(writer)?,
-            None => 0
-        };
-        offset += self.sequence.consensus_encode(writer)?;
-        Ok(offset)
-    }
-}
-
-impl Decodable for TransactionInput {
-    #[inline]
-    fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
-        let input_hash = <[u8; 32]>::consensus_decode(reader)?;
-        let index = u32::consensus_decode(reader)?;
-        let signature: Option<Vec<u8>> = Vec::consensus_decode(reader).ok();
-        let sequence = u32::consensus_decode(reader)?;
-        Ok(Self { input_hash, index, signature, sequence, script: None })
-    }
-}
-
-
-impl<'a> TryRead<'a, Endian> for TransactionInput {
-    fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let input_hash = bytes.read_with::<UInt256>(offset, LE)?.0;
-        let index = bytes.read_with::<u32>(offset, LE)?;
-        let signature = match bytes.read_with::<VarBytes>(offset, LE) {
-            Ok(data) => Some(data.1.to_vec()),
-            Err(_err) => None,
-        };
-        let sequence = bytes.read_with::<u32>(offset, LE)?;
-        let input = TransactionInput {
-            input_hash,
-            index,
-            script: None,
-            signature,
-            sequence,
-        };
-        Ok((input, *offset))
-    }
-}
+// impl Encodable for TransactionInput {
+//     #[inline]
+//     fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
+//         let mut offset = 0;
+//         offset += self.input_hash.consensus_encode(writer)?;
+//         offset += self.index.consensus_encode(writer)?;
+//         offset += match self.signature {
+//             Some(ref signature) => signature.consensus_encode(writer)?,
+//             None => 0
+//         };
+//         offset += self.sequence.consensus_encode(writer)?;
+//         Ok(offset)
+//     }
+// }
+//
+// impl Decodable for TransactionInput {
+//     #[inline]
+//     fn consensus_decode<R: io::Read + ?Sized>(reader: &mut R) -> Result<Self, dashcore::consensus::encode::Error> {
+//         let input_hash = <[u8; 32]>::consensus_decode(reader)?;
+//         let index = u32::consensus_decode(reader)?;
+//         let signature: Option<Vec<u8>> = Vec::consensus_decode(reader).ok();
+//         let sequence = u32::consensus_decode(reader)?;
+//         Ok(Self { input_hash, index, signature, sequence, script: None })
+//     }
+// }
+//
+//
+// impl<'a> TryRead<'a, Endian> for TransactionInput {
+//     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let input_hash = bytes.read_with::<UInt256>(offset, LE)?.0;
+//         let index = bytes.read_with::<u32>(offset, LE)?;
+//         let signature = match bytes.read_with::<VarBytes>(offset, LE) {
+//             Ok(data) => Some(data.1.to_vec()),
+//             Err(_err) => None,
+//         };
+//         let sequence = bytes.read_with::<u32>(offset, LE)?;
+//         let input = TransactionInput {
+//             input_hash,
+//             index,
+//             script: None,
+//             signature,
+//             sequence,
+//         };
+//         Ok((input, *offset))
+//     }
+// }

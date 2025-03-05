@@ -1,6 +1,5 @@
 #[cfg(feature = "test-helpers")]
 use std::collections::BTreeMap;
-use dashcore::BlockHash;
 #[cfg(feature = "test-helpers")]
 use dash_spv_crypto::network::{ChainType, DevnetType, IHaveChainSettings};
 #[cfg(feature = "test-helpers")]

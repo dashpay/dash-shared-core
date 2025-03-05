@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use bitcoin_hashes::hex::DisplayHex;
 use dpp::identity::{Identity, IdentityPublicKey, identity_public_key::key_type::KeyType};
 use dash_sdk::platform::Fetch;
 use dash_sdk::platform::types::identity::PublicKeyHash;
@@ -16,8 +17,7 @@ use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::{BinaryData, Identifier};
 use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
-use dash_spv_crypto::hashes::{hash160, Hash};
-use dash_spv_crypto::hashes::hex::ToHex;
+use dash_spv_crypto::hashes::hash160;
 use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use dash_spv_crypto::keys::key::KeyKind;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
@@ -120,14 +120,14 @@ impl IdentitiesManager {
                 let identity_result = Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), DEFAULT_SETTINGS).await;
                 match identity_result {
                     Ok(Some(identity)) => {
-                        println!("{self:?} Ok::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: {}", wallet_id, key_hash.to_hex(), identity.id().to_buffer().to_hex());
+                        println!("{self:?} Ok::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: {}", wallet_id, key_hash.to_lower_hex_string(), identity.id().to_buffer().to_lower_hex_string());
                         identities.insert(key_hash, identity);
                     },
                     Ok(None) => {
-                        println!("{self:?} None::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: None", wallet_id, key_hash.to_hex());
+                        println!("{self:?} None::get_identities_for_wallets -> wallet_id: {}: index: {}: identity_id: None", wallet_id, key_hash.to_lower_hex_string());
                     }
                     Err(error) => {
-                        println!("{self:?} Error::get_identities_for_wallets -> wallet_id: {}: index: {}: error: {}", wallet_id, key_hash.to_hex(), error.to_string());
+                        println!("{self:?} Error::get_identities_for_wallets -> wallet_id: {}: index: {}: error: {}", wallet_id, key_hash.to_lower_hex_string(), error.to_string());
                     }
                 }
             }
@@ -143,14 +143,14 @@ impl IdentitiesManager {
         for key_hash in key_hashes.into_iter() {
             match Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), DEFAULT_SETTINGS).await {
                 Ok(Some(identity)) => {
-                    println!("{self:?} Ok::get_identities_for_wallets -> key_hash: {}: identity_id: {}", key_hash.to_hex(), identity.id().to_buffer().to_hex());
+                    println!("{self:?} Ok::get_identities_for_wallets -> key_hash: {}: identity_id: {}", key_hash.to_lower_hex_string(), identity.id().to_buffer().to_lower_hex_string());
                     identities.insert(key_hash, identity);
                 },
                 Ok(None) => {
-                    println!("{self:?} None::get_identities_for_wallets -> key_hash: {}: identity_id: None", key_hash.to_hex());
+                    println!("{self:?} None::get_identities_for_wallets -> key_hash: {}: identity_id: None", key_hash.to_lower_hex_string());
                 }
                 Err(error) => {
-                    println!("{self:?} Error::get_identities_for_wallets -> key_hash: {}: error: {}", key_hash.to_hex(), error.to_string());
+                    println!("{self:?} Error::get_identities_for_wallets -> key_hash: {}: error: {}", key_hash.to_lower_hex_string(), error.to_string());
                 }
             }
         }
@@ -168,7 +168,7 @@ impl IdentitiesManager {
             let index_key = extended_public_key.public_key_from_extended_public_key_data_at_index_path(&index_path)
                 .map_err(Error::KeyError)?;
             let pub_key_data = index_key.public_key_data();
-            if let Some(identity) = Identity::fetch(&self.sdk, PublicKeyHash(hash160::Hash::hash(&pub_key_data).into_inner()))
+            if let Some(identity) = Identity::fetch(&self.sdk, PublicKeyHash(hash160::Hash::hash(&pub_key_data).to_byte_array()))
                 .await? {
                 identities.insert(i, identity);
             }
@@ -200,20 +200,20 @@ impl IdentitiesManager {
                         let debug_key = format!("[id: {}, key_type: {}, purpose: {}, security_level: {}, contract_bounds: {}, read_only: {}, data: {}, disabled_at: {}]",
                                                 pub_key.id(), pub_key.key_type(), pub_key.purpose(), pub_key.security_level(),
                                                 pub_key.contract_bounds().map_or("None".to_string(), |b| match b {
-                                                    ContractBounds::SingleContract { id } => format!("SingleContract({})", id.to_buffer().to_hex()),
-                                                    ContractBounds::SingleContractDocumentType { id,  document_type_name} => format!("SingleContractDocumentType({}, {})", id.to_buffer().to_hex(), document_type_name),
-                                                }), pub_key.read_only(), pub_key.data().0.to_hex(), pub_key.disabled_at().map_or("None".to_string(), |p| p.to_string()));
+                                                    ContractBounds::SingleContract { id } => format!("SingleContract({})", id.to_buffer().to_lower_hex_string()),
+                                                    ContractBounds::SingleContractDocumentType { id,  document_type_name} => format!("SingleContractDocumentType({}, {})", id.to_buffer().to_lower_hex_string(), document_type_name),
+                                                }), pub_key.read_only(), pub_key.data().0.to_lower_hex_string(), pub_key.disabled_at().map_or("None".to_string(), |p| p.to_string()));
                         acc.push_str(format!("{}:{}", *key_id, debug_key).as_str());
                         acc
                     });
-                    println!("{self:?} Ok::monitor_for_key_hashes -> key_hash: {}: identity: [id: {}, balance: {}, revision: {}, public_keys: {}]", key_hash.to_hex(), identity.balance(), identity.revision(), identity_id.to_buffer().to_hex(), debug_keys);
+                    println!("{self:?} Ok::monitor_for_key_hashes -> key_hash: {}: identity: [id: {}, balance: {}, revision: {}, public_keys: {}]", key_hash.to_lower_hex_string(), identity.balance(), identity.revision(), identity_id.to_buffer().to_lower_hex_string(), debug_keys);
                     identities.insert(key_hash, identity);
                 },
                 Ok(None) => {
-                    println!("{self:?} None::monitor_for_key_hashes -> key_hash: {}: identity: None", key_hash.to_hex());
+                    println!("{self:?} None::monitor_for_key_hashes -> key_hash: {}: identity: None", key_hash.to_lower_hex_string());
                 }
                 Err(error) => {
-                    println!("{self:?} Error::monitor_for_key_hashes -> key_hash: {}: error: {:?}", key_hash.to_hex(), error);
+                    println!("{self:?} Error::monitor_for_key_hashes -> key_hash: {}: error: {:?}", key_hash.to_lower_hex_string(), error);
                 }
             }
         }

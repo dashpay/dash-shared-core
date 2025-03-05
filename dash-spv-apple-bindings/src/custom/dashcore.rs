@@ -200,3 +200,37 @@ impl_hash_ferment!(
     dashcore_hash_types_QuorumCommitmentHash_destroy,
     dashcore_hash_types_QuorumCommitmentHash_inner);
 
+#[allow(non_camel_case_types)]
+#[derive(Clone)]
+#[ferment_macro::register(dashcore::hashes::hex::Error)]
+pub enum hashes_hex_Error_FFI {
+    InvalidChar(u8),
+    OddLengthString(usize),
+    InvalidLength(usize, usize),
+}
+// use
+
+impl ferment::FFIConversionFrom<dashcore::hashes::hex::Error> for hashes_hex_Error_FFI {
+    unsafe fn ffi_from_const(ffi: *const hashes_hex_Error_FFI) -> dashcore::hashes::hex::Error {
+        let ffi_ref = &*ffi;
+        match ffi_ref {
+            hashes_hex_Error_FFI::InvalidChar(o_0) => dashcore::hashes::hex::Error::InvalidChar(*o_0),
+            hashes_hex_Error_FFI::OddLengthString(o_0) => dashcore::hashes::hex::Error::OddLengthString(*o_0),
+            hashes_hex_Error_FFI::InvalidLength(o_0, o_1) => dashcore::hashes::hex::Error::InvalidLength(*o_0, *o_1),
+        }
+    }
+}
+impl ferment::FFIConversionTo<dashcore::hashes::hex::Error> for hashes_hex_Error_FFI {
+    unsafe fn ffi_to_const(obj: dashcore::hashes::hex::Error) -> *const hashes_hex_Error_FFI {
+        ferment::boxed(match obj {
+            dashcore::hashes::hex::Error::InvalidChar(o_0) => hashes_hex_Error_FFI::InvalidChar(o_0),
+            dashcore::hashes::hex::Error::OddLengthString(o_0) => hashes_hex_Error_FFI::OddLengthString(o_0),
+            dashcore::hashes::hex::Error::InvalidLength(o_0, o_1) => hashes_hex_Error_FFI::InvalidLength(o_0, o_1),
+        })
+    }
+}
+impl ferment::FFIConversionDestroy<dashcore::hashes::hex::Error> for hashes_hex_Error_FFI {
+    unsafe fn destroy(ffi: *mut hashes_hex_Error_FFI) {
+        ferment::unbox_any(ffi);
+    }
+}

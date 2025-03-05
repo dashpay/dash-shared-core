@@ -5,7 +5,6 @@ use dpp::errors::consensus::ConsensusError;
 use dash_spv_crypto::keys::KeyError;
 use dpp::errors::ProtocolError;
 use http::uri::InvalidUri;
-use dash_spv_crypto::consensus::encode;
 use crate::util::{MaxRetryError, ValidationError};
 
 #[derive(Clone, Debug)]
@@ -57,11 +56,6 @@ impl From<ExecutionError<DapiClientError>> for Error {
 }
 impl From<DataContractError> for Error {
     fn from(value: DataContractError) -> Self {
-        Error::DashSDKError(value.to_string())
-    }
-}
-impl From<encode::Error> for Error {
-    fn from(value: encode::Error) -> Self {
         Error::DashSDKError(value.to_string())
     }
 }

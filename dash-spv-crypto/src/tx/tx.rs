@@ -1,12 +1,8 @@
 use std::io;
-use byte::ctx::Endian;
-use byte::{BytesExt, TryRead};
-use hashes::{sha256d, Hash};
 use dashcore::consensus::{Decodable, Encodable, encode::VarInt};
 use crate::crypto::byte_util::UInt256;
 use crate::network::protocol::SIGHASH_ALL;
 use crate::tx::{TransactionInput, TransactionOutput};
-use crate::util::params::TX_UNCONFIRMED;
 
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq)]
@@ -236,42 +232,42 @@ impl Transaction {
 //     }
 // }
 // impl_vec!(crate::tx::TransactionInput);
-impl<'a> TryRead<'a, Endian> for Transaction {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
-        let offset = &mut 0;
-        let version = bytes.read_with::<u16>(offset, endian)?;
-        let tx_type_uint = bytes.read_with::<u16>(offset, endian)?;
-        let tx_type = TransactionType::from(tx_type_uint);
-        let is_classic = tx_type.is_classic();
-        let count_var = bytes.read_with::<VarInt>(offset, endian)?;
-        let count = count_var.0;
-        // at least one input is required
-        if count == 0 && tx_type.requires_inputs() {
-            return Err(byte::Error::Incomplete);
-        }
-        let mut inputs: Vec<TransactionInput> = Vec::new();
-        for _i in 0..count {
-            inputs.push(bytes.read_with::<TransactionInput>(offset, endian)?);
-        }
-        let mut outputs: Vec<TransactionOutput> = Vec::new();
-        let count_var = bytes.read_with::<VarInt>(offset, endian)?;
-        let count = count_var.0;
-        for _i in 0..count {
-            outputs.push(bytes.read_with::<TransactionOutput>(offset, endian)?);
-        }
-        let lock_time = bytes.read_with::<u32>(offset, endian)?;
-        let mut tx = Self {
-            inputs,
-            outputs,
-            version,
-            tx_type,
-            lock_time,
-            payload_offset: *offset,
-            tx_hash: None,
-            block_height: TX_UNCONFIRMED as u32,
-        };
-        tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(tx.to_data().as_ref()).to_byte_array());
-        Ok((tx, *offset))
-    }
-}
+// impl<'a> TryRead<'a, Endian> for Transaction {
+//     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let version = bytes.read_with::<u16>(offset, endian)?;
+//         let tx_type_uint = bytes.read_with::<u16>(offset, endian)?;
+//         let tx_type = TransactionType::from(tx_type_uint);
+//         let is_classic = tx_type.is_classic();
+//         let count_var = bytes.read_with::<VarInt>(offset, endian)?;
+//         let count = count_var.0;
+//         // at least one input is required
+//         if count == 0 && tx_type.requires_inputs() {
+//             return Err(byte::Error::Incomplete);
+//         }
+//         let mut inputs: Vec<TransactionInput> = Vec::new();
+//         for _i in 0..count {
+//             inputs.push(bytes.read_with::<TransactionInput>(offset, endian)?);
+//         }
+//         let mut outputs: Vec<TransactionOutput> = Vec::new();
+//         let count_var = bytes.read_with::<VarInt>(offset, endian)?;
+//         let count = count_var.0;
+//         for _i in 0..count {
+//             outputs.push(bytes.read_with::<TransactionOutput>(offset, endian)?);
+//         }
+//         let lock_time = bytes.read_with::<u32>(offset, endian)?;
+//         let mut tx = Self {
+//             inputs,
+//             outputs,
+//             version,
+//             tx_type,
+//             lock_time,
+//             payload_offset: *offset,
+//             tx_hash: None,
+//             block_height: TX_UNCONFIRMED as u32,
+//         };
+//         tx.tx_hash = is_classic.then(|| sha256d::Hash::hash(tx.to_data().as_ref()).to_byte_array());
+//         Ok((tx, *offset))
+//     }
+// }
 

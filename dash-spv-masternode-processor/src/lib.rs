@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-pub extern crate bitcoin_hashes as hashes;
+// pub extern crate bitcoin_hashes as hashes;
 pub extern crate secp256k1;
-// #[macro_use] extern crate log;
 extern crate simplelog;
 
 // #[cfg(test)]

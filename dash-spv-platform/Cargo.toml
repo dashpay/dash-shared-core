@@ -17,7 +17,7 @@ anyhow = "1.0.95"
 #platform-value = { path = "../../platform/packages/rs-platform-value" }
 #platform-version = { path = "../../platform/packages/rs-platform-version" }
 bitcoin_hashes = { version = "0.16.0", default-features = false }
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "quorum_validation", "bincode"], default-features = false, branch = "feat/ferment" }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "message_verification", "quorum_validation", "bincode"], default-features = false, branch = "feat/ferment" }
 dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-macro = { path = "../dash-spv-macro" }

@@ -74,6 +74,7 @@ prefix_with_name = true
 "feature = json" = "PLATFORM_VALUE_SERDE_JSON"
 "feature = json-object" = "DPP_JSON_OBJECT"
 "feature = json-schema-validation" = "DPP_JSON_SCHEMA_VALIDATION"
+"feature = message_verification" = "DASHCORE_MESSAGE_VERIFICATION"
 "feature = message-signing" = "DPP_MESSAGE_SIGNING"
 "feature = mocks" = "DASH_SDK_MOCKS"
 "feature = mock-versions" = "PLATFORM_VERSION_MOCK_VERSIONS"

@@ -1,6 +1,5 @@
 use std::fmt::Display;
-use dashcore::BlockHash;
-use hashes::hex::ToHex;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 
 #[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 #[ferment_macro::export]
@@ -25,7 +24,7 @@ impl std::fmt::Debug for Block {
 }
 impl Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Block(height: {}, hash: {})", self.height, self.hash.to_hex())
+        write!(f, "Block(height: {}, hash: {})", self.height, self.hash.to_lower_hex_string())
     }
 }
 impl std::fmt::Debug for MBlock {
@@ -39,7 +38,7 @@ impl std::fmt::Debug for MBlock {
 }
 impl Display for MBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MBlock(height: {}, hash: {}, merkle_root: {})", self.height, self.hash.to_hex(), self.merkle_root.to_hex())
+        write!(f, "MBlock(height: {}, hash: {}, merkle_root: {})", self.height, self.hash.to_lower_hex_string(), self.merkle_root.to_lower_hex_string())
     }
 }
 

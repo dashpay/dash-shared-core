@@ -9,12 +9,11 @@ publish = true
 
 [dependencies]
 anyhow = { version = "1.0.75" }
-#bitcoin_hashes = "0.16.0"
 byte = "0.2"
 dash-spv-crypto = { path = "../dash-spv-crypto", features = ["default"] }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default"] }
 dash-spv-platform = { path = "../dash-spv-platform" }
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "quorum_validation", "bincode"], default-features = false, branch = "feat/ferment" }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "message_verification", "quorum_validation", "bincode"], default-features = false, branch = "feat/ferment" }
 
 #dash-sdk = { path = "../../platform/packages/rs-sdk", package = "dash-sdk" }
 #data-contracts = { path = "../../platform/packages/data-contracts", package = "data-contracts" }
@@ -60,7 +59,7 @@ ferment-sys = { git = "https://github.com/dashpay/ferment", package = "ferment-s
 #ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }
 
 [features]
-default = ["state-transitions"]
+default = ["state-transitions", "std"]
 bls-signatures = ["dpp/bls-signatures"]
 blsful = ["dashcore/blsful"]
 cbor = ["platform-value/cbor", "dpp/cbor", "dpp/ciborium"]
@@ -83,6 +82,7 @@ json = ["platform-value/serde_json"]
 json-object = ["dpp/json-object"]
 json-schema-validation = ["dpp/json-schema-validation"]
 message-signing = ["dpp/message-signing"]
+message_verification = ["dashcore/message_verification"]
 mocks = ["dash-sdk/mocks"]
 mock-versions = ["platform-version/mock-versions"]
 objc = ["ferment-sys/objc"]
@@ -92,7 +92,7 @@ state-transitions = ["dpp/state-transitions", "dash-spv-platform/state-transitio
 state-transition-json-conversion = ["dpp/state-transition-json-conversion"]
 state-transition-validation = ["dpp/state-transition-validation"]
 state-transition-signing = ["dpp/state-transition-signing"]
-std = ["platform-value/std"]
+std = ["platform-value/std", "dash-spv-crypto/std", "dash-spv-masternode-processor/std", "dashcore/std"]
 system_contracts = ["dpp/system_contracts"]
 test-helpers = ["dash-spv-masternode-processor/test-helpers"]
 use_serde = ["serde", "dash-spv-masternode-processor/use_serde", "dash-spv-crypto/use_serde"]
