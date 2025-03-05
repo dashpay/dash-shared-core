@@ -1,5 +1,6 @@
 #[cfg(feature = "test-helpers")]
 use std::collections::BTreeMap;
+use dashcore::BlockHash;
 #[cfg(feature = "test-helpers")]
 use dash_spv_crypto::network::{ChainType, DevnetType, IHaveChainSettings};
 #[cfg(feature = "test-helpers")]
@@ -40,17 +41,17 @@ impl FFIContext {
         self.blocks.iter().find(|block| hash.eq(&block.hash.0))
     }
     pub fn get_tip_height(&self) -> u32 {
-        self.blocks.iter().map(MerkleBlock::height).max().unwrap_or(u32::MAX)
+        self.blocks.iter().map(|block| block.height).max().unwrap_or(u32::MAX)
     }
     pub fn block_height_for_hash(&self, block_hash: [u8; 32]) -> u32 {
         self.block_for_hash(block_hash)
-            .map(MerkleBlock::height)
+            .map(|block| block.height)
             .unwrap_or(u32::MAX)
 
     }
     pub fn block_hash_for_height(&self, block_height: u32) -> Result<[u8; 32], CoreProviderError> {
         self.block_for_height(block_height)
-            .map(MerkleBlock::hash)
+            .map(|block| block.hash.0)
             .ok_or(CoreProviderError::BlockHashNotFoundAt(block_height))
     }
 

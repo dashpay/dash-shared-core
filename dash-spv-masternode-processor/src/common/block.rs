@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use dashcore::BlockHash;
 use hashes::hex::ToHex;
 
 #[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]

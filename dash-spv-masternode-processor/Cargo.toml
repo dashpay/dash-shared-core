@@ -41,6 +41,17 @@ ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment
 #ferment = { path = "../../ferment/ferment" }
 #ferment-macro = { path = "../../ferment/ferment-macro" }
 
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = [
+    "std",
+    "secp-recovery",
+    "rand",
+    "signer",
+    "serde",
+    "bls",
+    "quorum_validation",
+    "bincode",
+], default-features = false, branch = "feat/ferment" }
+
 rs-x11-hash = "0.1.8"
 secp256k1 = { version = "0.26.0", features = [ "recovery", "rand-std", "bitcoin_hashes" ] }
 serde = { version = "1.0.215", features = ["derive"], optional = true }

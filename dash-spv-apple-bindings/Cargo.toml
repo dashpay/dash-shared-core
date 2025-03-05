@@ -14,7 +14,7 @@ byte = "0.2"
 dash-spv-crypto = { path = "../dash-spv-crypto", features = ["default"] }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default"] }
 dash-spv-platform = { path = "../dash-spv-platform" }
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple"], default-features = false, branch = "feat/ferment" }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "quorum_validation", "bincode"], default-features = false, branch = "feat/ferment" }
 
 #dash-sdk = { path = "../../platform/packages/rs-sdk", package = "dash-sdk" }
 #data-contracts = { path = "../../platform/packages/data-contracts", package = "data-contracts" }

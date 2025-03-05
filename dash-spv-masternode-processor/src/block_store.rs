@@ -16,13 +16,6 @@ impl MerkleBlock {
             hash: UInt256::from_hex(hash).unwrap(),
             merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
     }
-
-    pub fn hash(&self) -> [u8; 32] {
-        self.hash.0
-    }
-    pub fn height(&self) -> u32 {
-        self.height
-    }
     pub fn merkle_root_reversed(&self) -> [u8; 32] {
         self.merkleroot.reversed().0
     }
@@ -43,7 +36,7 @@ impl From<&MerkleBlock> for Block {
     fn from(value: &MerkleBlock) -> Self {
         Block {
             height: value.height,
-            hash: value.hash(),
+            hash: value.hash.0,
         }
     }
 }
@@ -51,7 +44,7 @@ impl From<&MerkleBlock> for MBlock {
     fn from(value: &MerkleBlock) -> Self {
         MBlock {
             height: value.height,
-            hash: value.hash(),
+            hash: value.hash.0,
             merkle_root: value.merkle_root_reversed()
         }
     }

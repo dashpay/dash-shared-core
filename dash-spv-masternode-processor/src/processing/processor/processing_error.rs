@@ -1,3 +1,5 @@
+use dashcore::consensus;
+use dashcore::sml::quorum_validation_error::QuorumValidationError;
 use hashes::hex::ToHex;
 use crate::processing::CoreProviderError;
 
@@ -13,6 +15,8 @@ pub enum ProcessingError {
     InvalidResult(String),
     CoreProvider(CoreProviderError),
     MissingLists(String),
+    EncodeError(String),
+    QuorumValidationError(QuorumValidationError),
 }
 impl std::fmt::Display for ProcessingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -55,6 +59,19 @@ impl From<CoreProviderError> for ProcessingError {
         ProcessingError::CoreProvider(value)
     }
 }
+
+impl From<QuorumValidationError> for ProcessingError {
+    fn from(value: QuorumValidationError) -> Self {
+        ProcessingError::QuorumValidationError(value)
+    }
+}
+
+impl From<consensus::encode::Error> for ProcessingError {
+    fn from(value: consensus::encode::Error) -> Self {
+        ProcessingError::EncodeError(value.to_string())
+    }
+}
+
 //
 // impl From<u8> for ProcessingError {
 //     fn from(orig: u8) -> Self {
@@ -113,6 +130,10 @@ impl ProcessingError {
                 format!("CoreProvider({err})"),
             ProcessingError::MissingLists(message) =>
                 format!("MissingLists({message})"),
+            ProcessingError::QuorumValidationError(quorum_validation_error) =>
+                format!("QuorumValidationError({quorum_validation_error})"),
+            ProcessingError::EncodeError(encode_error) =>
+                format!("EncodeError({encode_error})"),
         }
     }
 }
