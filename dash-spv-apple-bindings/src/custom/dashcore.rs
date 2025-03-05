@@ -201,6 +201,16 @@ impl_hash_ferment!(
     dashcore_hash_types_QuorumCommitmentHash_inner);
 
 #[allow(non_camel_case_types)]
+#[ferment_macro::register(dashcore::hash_types::Sha256dHash)]
+pub struct dashcore_hash_types_Sha256dHash(pub *mut [u8; dashcore::hash_types::Sha256dHash::LEN]);
+impl_hash_ferment!(
+    dashcore::hash_types::Sha256dHash,
+    dashcore_hash_types_Sha256dHash,
+    dashcore_hash_types_Sha256dHash_ctor,
+    dashcore_hash_types_Sha256dHash_destroy,
+    dashcore_hash_types_Sha256dHash_inner);
+
+#[allow(non_camel_case_types)]
 #[derive(Clone)]
 #[ferment_macro::register(dashcore::hashes::hex::Error)]
 pub enum hashes_hex_Error_FFI {
