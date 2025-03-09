@@ -100,10 +100,6 @@ impl CoinJoinClientSession {
     }
 
     pub fn do_automatic_denominating(&mut self, client_manager: &mut CoinJoinClientManager, dry_run: bool, balance_info: Balance) -> bool {
-        if self.outpoints_locked.len() > 0 {
-            println!("[RUST] do_automatic_denominating, session: {}, outpoints_locked.len(): {}", self.id, self.outpoints_locked.len());
-        }
-
         if self.base_session.state != PoolState::Idle || !self.options.borrow().enable_coinjoin {
             return false;
         }
@@ -263,7 +259,6 @@ impl CoinJoinClientSession {
 
         // if !self.options.coinjoin_multi_session && balance_denominated_unconf > 0 {
         //     self.str_auto_denom_result = "Found unconfirmed denominated outputs, will wait till they confirm to continue.".to_string();
-        //     println!("[RUST] CoinJoin: {}", self.str_auto_denom_result);
         //     return false;
         // }
 
@@ -294,9 +289,7 @@ impl CoinJoinClientSession {
                 for txin in &collateral.inputs {
                     let outpoint = TxOutPoint::new(txin.input_hash, txin.index);
                     self.mixing_wallet.borrow_mut().lock_coin(outpoint.clone());
-                    println!("[RUST] CoinJoin: locked coin by session {:?}: {:?}", self.id, outpoint);
                     self.outpoints_locked.push(outpoint);
-                    println!("[RUST] CoinJoin: session outpoints_locked: {:?}", self.outpoints_locked.iter().map(|x| x.hash.reversed().to_string()).collect::<Vec<String>>());
                 }
             }
         }
@@ -321,28 +314,29 @@ impl CoinJoinClientSession {
     }
 
     pub fn process_pending_dsa_request(&mut self) -> bool {
+        let mut message_sent = false;
+
         if let Some(pending_request) = &self.pending_dsa_request {
             let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             self.base_session.time_last_successful_step = current_time;
             let mut buffer = vec![];
             pending_request.dsa.consensus_encode(&mut buffer).unwrap();
-            let message_sent = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr, false);
+            message_sent = self.mixing_wallet.borrow_mut().send_message(buffer, pending_request.dsa.get_message_type(), &pending_request.addr, false);
             
             if message_sent {
                 log_info!(target: "CoinJoin", "sent dsa to {}", pending_request.addr);
                 log_debug!(target: "CoinJoin", "dsa={}", pending_request.dsa);
                 self.pending_dsa_request = None;
+                self.set_status(PoolStatus::Mixing);
             } else if pending_request.is_expired() {
                 log_warn!(target: "CoinJoin", "failed to connect to {}; reason: cannot find peer", pending_request.addr);
                 self.set_status(PoolStatus::ConnectionTimeout);
                 self.queue_session_lifecycle_listeners(true, self.base_session.state, PoolMessage::ErrConnectionTimeout, PoolStatus::ConnectionTimeout);
                 self.set_null();
             }
-    
-            return message_sent;
         }
 
-        return false;
+        return message_sent;
     }
 
     fn create_denominated(&mut self, client_manager: &mut CoinJoinClientManager, balance_to_denominate: u64, dry_run: bool) -> bool {
@@ -818,14 +812,11 @@ impl CoinJoinClientSession {
         }
 
         // TODO (DashJ): should we wait here? check Dash Core code
-
         for outpoint in &self.outpoints_locked {
-            println!("[RUST] CoinJoin: unlock_coin by session: {:?}: {:?}", self.id, outpoint);
             self.mixing_wallet.borrow_mut().unlock_coin(outpoint);
         }
 
         self.outpoints_locked.clear();
-        println!("[RUST] CoinJoin: session outpoints_locked: {:?}", self.outpoints_locked.iter().map(|x| x.hash.reversed().to_string()).collect::<Vec<String>>());
     }
 
     fn set_null(&mut self) {
@@ -1080,6 +1071,7 @@ impl CoinJoinClientSession {
 
     /// As a client, submit part of a future mixing transaction to a Masternode to start the process
     pub fn submit_denominate(&mut self) -> bool {
+        self.set_status(PoolStatus::Connected);
         let mut str_error = String::new();
         let mut vec_tx_dsin = Vec::new();
         let mut vec_psin_out_pairs_tmp = Vec::new();
@@ -1216,8 +1208,6 @@ impl CoinJoinClientSession {
             for pair in vec_psin_out_pairs_ret.iter() {
                 self.mixing_wallet.borrow_mut().lock_coin(pair.0.outpoint());
                 self.outpoints_locked.push(pair.0.outpoint());
-                println!("[RUST] CoinJoin: locked coin by session {:?}: {:?}", self.id, pair.0.outpoint());
-                println!("[RUST] CoinJoin: session outpoints_locked: {:?}", self.outpoints_locked.iter().map(|x| x.hash.reversed().to_string()).collect::<Vec<String>>());
             }
         }
 
@@ -1606,10 +1596,6 @@ impl CoinJoinClientSession {
     fn queue_session_lifecycle_listeners(&self, is_complete: bool, state: PoolState, pool_message: PoolMessage, pool_status: PoolStatus) {
         if is_complete {
             log_debug!(target: "CoinJoin", "session completed: {}, pool_status: {:?}", self.id, pool_status);
-            log_debug!(target: "CoinJoin", "outpoints_locked");
-            for coin in self.outpoints_locked.iter() {
-                log_debug!(target: "CoinJoin", "outpoint_locked: {:?}", coin);
-            }
         }
 
         unsafe {

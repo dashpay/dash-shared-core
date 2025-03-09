@@ -174,7 +174,6 @@ pub unsafe extern "C" fn finish_automatic_denominating(
     manager: *mut CoinJoinClientManager,
     client_session_id: *mut [u8; 32]
 ) -> bool {
-    println!("[RUST] CoinJoin: session.finish_automatic_denominating");
     return (*manager).finish_automatic_denominating(UInt256(*(client_session_id)));
 }
 
@@ -187,7 +186,6 @@ pub unsafe extern "C" fn destroy_transaction(
 
 #[no_mangle]
 pub unsafe extern "C" fn unregister_client_manager(client_manager: *mut CoinJoinClientManager) {
-    println!("[RUST] CoinJoin 💀 unregister_client_manager");
     let unboxed = unbox_any(client_manager);
 }
 
@@ -238,23 +236,6 @@ pub unsafe extern "C" fn is_locked_coin(
     index: u32,
 ) -> bool {
     return (*wallet_ex).locked_coins_set.contains(&TxOutPoint::new(UInt256(*(prevout_hash)), index));
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn has_locked_coins(
-    client_manager: *mut CoinJoinClientManager,
-) -> u32 {
-    return (*client_manager).wallet_ex.borrow().locked_coins_set.len() as u32;
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn print_locked_coins(
-    client_manager: *mut CoinJoinClientManager
-) {
-    println!("[RUST] CoinJoin: print_locked_coins");
-    for outpoint in (*client_manager).wallet_ex.borrow().locked_coins_set.iter() {
-        println!("[RUST] CoinJoin: {:?}", outpoint);
-    }
 }
 
 #[no_mangle]
@@ -412,6 +393,25 @@ pub unsafe extern "C" fn get_coinjoin_tx_type(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn lock_outputs(
+    client_manager: *mut CoinJoinClientManager,
+    tx_hash: *mut [u8; 32],
+    incicies: *const u32,
+    incicies_len: usize
+) {
+    let indices: Vec<u32> = (0..incicies_len).map(|i| *(incicies.add(i))).collect();
+    (*client_manager).lock_outputs(UInt256(*(tx_hash)), indices);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn unlock_outputs(
+    client_manager: *mut CoinJoinClientManager,
+    tx: *mut types::Transaction
+) {
+    (*client_manager).unlock_outputs(&(*tx).decode());
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn process_used_scripts(
     client_manager: *mut CoinJoinClientManager,
     coinjoin_keys: *mut CoinJoinKeys
@@ -526,3 +526,16 @@ pub unsafe extern "C" fn stop_and_reset_coinjoin(
     }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn initiate_shutdown(
+    client_manager: *mut CoinJoinClientManager
+) {
+    (*client_manager).initiate_shutdown();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn session_amount(
+    client_manager: *mut CoinJoinClientManager
+) -> i32 {
+    return (*client_manager).session_amount() as i32;
+}

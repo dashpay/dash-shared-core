@@ -24,7 +24,7 @@ pub struct CoinJoin {
     pub get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
     pub has_chain_lock: HasChainLock,
     pub destroy_input_value: DestroyInputValue,
-    map_dstx: HashMap<UInt256, CoinJoinBroadcastTx>, // TODO: thread safety?
+    map_dstx: HashMap<UInt256, CoinJoinBroadcastTx>,
 }
 
 impl CoinJoin {

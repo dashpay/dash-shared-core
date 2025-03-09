@@ -1,4 +1,4 @@
-use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::{byte_util::Reversable, UInt256}, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}};
+use dash_spv_masternode_processor::{common::{Block, SocketAddress}, crypto::UInt256, ffi::{boxer::boxed_vec, from::FromFFI, unboxer::unbox_vec_ptr}, models::{MasternodeEntry, MasternodeList}, secp256k1::rand::{self, seq::SliceRandom, thread_rng, Rng}, tx::Transaction};
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
 use tracing::{info, warn, debug, error};
 use logging::*;
@@ -15,6 +15,7 @@ pub struct CoinJoinClientManager {
     tick: i32,
     do_auto_next_run: i32,
     pub is_mixing: bool,
+    is_shutting_down: bool,
     deq_sessions: VecDeque<CoinJoinClientSession>,
     continue_mixing_on_status: Vec<PoolStatus>,
     str_auto_denom_result: String,
@@ -53,6 +54,7 @@ impl CoinJoinClientManager {
             tick: 0,
             do_auto_next_run: COINJOIN_AUTO_TIMEOUT_MIN,
             is_mixing: false,
+            is_shutting_down: false,
             deq_sessions: VecDeque::new(),
             continue_mixing_on_status: vec![],
             str_auto_denom_result: String::new(),
@@ -101,6 +103,7 @@ impl CoinJoinClientManager {
         
         if !self.is_mixing {
             self.is_mixing = true;
+            self.is_shutting_down = false;
             return true;
         }
 
@@ -113,6 +116,7 @@ impl CoinJoinClientManager {
 
     pub fn stop_mixing(&mut self) {
         self.is_mixing = false;
+        self.is_shutting_down = false;
         self.queue_mixing_lifecycle_listeners(self.mixing_finished, true);
     }
 
@@ -134,7 +138,7 @@ impl CoinJoinClientManager {
         self.check_timeout();
         self.process_pending_dsa_request();
 
-        if self.do_auto_next_run >= self.tick {
+        if self.do_auto_next_run >= self.tick && !self.is_shutting_down {
             self.do_automatic_denominating(balance_info, false);
             let mut rng = rand::thread_rng();
             self.do_auto_next_run = self.tick + COINJOIN_AUTO_TIMEOUT_MIN + rng.gen_range(0..COINJOIN_AUTO_TIMEOUT_MAX - COINJOIN_AUTO_TIMEOUT_MIN);
@@ -152,13 +156,25 @@ impl CoinJoinClientManager {
         
         // if all sessions idle, then trigger stop mixing
         if is_idle {
-            let statuses = self.get_sessions_status(); 
+            let statuses = self.get_sessions_status();
             
             for status in statuses {
                 if status == PoolStatus::Finished || (status.is_error() && !self.continue_mixing_on_status.contains(&status)) {
                     self.trigger_mixing_finished();
                 }
             }
+        }
+    }
+
+    pub fn initiate_shutdown(&mut self) {
+        if self.is_shutting_down {
+            return;
+        }
+
+        self.is_shutting_down = true;
+
+        if let Some(queue_manager) = &self.queue_queue_manager {
+            queue_manager.borrow_mut().set_null();
         }
     }
 
@@ -400,13 +416,37 @@ impl CoinJoinClientManager {
     }
 
     pub fn reset_pool(&mut self) {
-        println!("[RUST] CoinJoin: reset_pool, self.deq_sessions.len(): {}", self.deq_sessions.len());
         self.masternodes_used.clear();
 
         for session in &mut self.deq_sessions {
             session.reset_pool();
         }
         self.deq_sessions.clear();
+        self.tick = 0;
+        self.do_auto_next_run = COINJOIN_AUTO_TIMEOUT_MIN;
+    }
+
+    pub fn lock_outputs(&mut self, tx_hash: UInt256, indices: Vec<u32>) {
+        for index in indices {
+            self.wallet_ex.borrow_mut().lock_coin(TxOutPoint::new(tx_hash, index));
+        }
+    }
+
+    pub fn unlock_outputs(&mut self, tx: &Transaction) {
+        for input in tx.inputs.iter() {
+            self.wallet_ex.borrow_mut().unlock_coin(&TxOutPoint::new(input.input_hash, input.index));
+        }
+    }
+
+    pub fn session_amount(&self) -> usize {
+        let mut len = self.deq_sessions.len();
+
+        println!("[RUST] CoinJoin: sessions {:?}", len);
+        for session in self.deq_sessions.iter() {
+            println!("[RUST] CoinJoin: session status: {:?}", session.base_session.status);
+        }
+
+        return len;
     }
 
     fn get_valid_mns_count(&self, mn_list: &MasternodeList) -> usize {
@@ -418,10 +458,33 @@ impl CoinJoinClientManager {
             return;
         }
 
-        for session in self.deq_sessions.iter_mut() {
+        let mut indices_to_remove = Vec::new();
+        
+        for (index, session) in self.deq_sessions.iter_mut().enumerate() {
             if session.check_timeout() {
                 self.str_auto_denom_result = "Session timed out.".to_string();
+                
+                if self.is_shutting_down {
+                    indices_to_remove.push(index);
+                }
             }
+
+            if self.is_shutting_down && 
+                (session.base_session.status == PoolStatus::Complete || 
+                 session.base_session.status == PoolStatus::Finished || 
+                 session.base_session.status == PoolStatus::Timeout ||
+                 session.base_session.status == PoolStatus::ConnectionTimeout ||
+                 session.base_session.status.is_error()) {
+                indices_to_remove.push(index);
+            }
+        }
+        
+        for index in indices_to_remove.into_iter().rev() {
+            self.deq_sessions.remove(index);
+        }
+
+        if self.is_shutting_down && self.deq_sessions.len() == 0 {
+            self.trigger_mixing_finished();
         }
     }
 
@@ -433,12 +496,6 @@ impl CoinJoinClientManager {
     }
 
     fn queue_mixing_lifecycle_listeners(&self, is_complete: bool, is_interrupted: bool) {
-        println!("[RUST] CoinJoin: queue_mixing_lifecycle_listeners, self.deq_sessions.len(): {}", self.deq_sessions.len());
-        for session in &self.deq_sessions {
-            println!("[RUST] CoinJoin: session {:?} status {:?}", session.id, session.base_session.status);
-            println!("[RUST] CoinJoin: session outpoints_locked: {:?}", session.outpoints_locked.iter().map(|x| x.hash.reversed().to_string()).collect::<Vec<String>>());
-        }
-
         let statuses: Vec<PoolStatus> = self.deq_sessions.iter().map(|x| x.base_session.status).collect();
         let length = statuses.len();
 
