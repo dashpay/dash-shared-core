@@ -8,30 +8,20 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.95"
-#ferment = { path = "../../ferment/ferment" }
-#ferment-macro = { path = "../../ferment/ferment-macro" }
-#dapi-grpc = { path = "../../platform/packages/dapi-grpc" }
-#dash-sdk = { path = "../../platform/packages/rs-sdk" }
-#drive = { path = "../../platform/packages/rs-drive" }
-#drive-proof-verifier = { path = "../../platform/packages/rs-drive-proof-verifier" }
-#platform-value = { path = "../../platform/packages/rs-platform-value" }
-#platform-version = { path = "../../platform/packages/rs-platform-version" }
-bitcoin_hashes = { version = "0.16.0", default-features = false }
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "message_verification", "quorum_validation", "bincode"], default-features = false, branch = "feat/ferment" }
+
 dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-macro = { path = "../dash-spv-macro" }
 
-dapi-grpc = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dapi-grpc" }
-
-
-dash-sdk = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dash-sdk", features = ["apple"] }
-data-contracts = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "data-contracts", features = ["apple"] }
-dpp = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dpp", default-features = false, features = ["dash-sdk-features", "apple", "system_contracts"] }
-drive = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive", default-features = false, features = ["verify"] }
-drive-proof-verifier = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive-proof-verifier", features = ["apple"] }
-platform-value = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-value", features = ["apple"] }
-platform-version = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-version", features = ["apple"] }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "message_verification", "quorum_validation"], default-features = false, branch = "feat/ferment" }
+dapi-grpc = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dapi-grpc", default-features = false, features = ["client"] }
+dash-sdk = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dash-sdk", default-features = false, features = ["apple"] }
+data-contracts = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "data-contracts", default-features = false, features = ["apple"] }
+dpp = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dpp", default-features = false, features = ["apple"] }
+drive = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive", default-features = false }
+drive-proof-verifier = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive-proof-verifier", default-features = false, features = ["apple"] }
+platform-value = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-value", default-features = false, features = ["apple"] }
+platform-version = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-version", default-features = false, features = ["apple"] }
 
 ferment = { git = "https://github.com/dashpay/ferment", package = "ferment" }
 ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
@@ -39,9 +29,7 @@ ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment
 http = { version = "0.2.12" }
 indexmap = "2.7.0"
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
-base64 = "0.22.1"
-[dev-dependencies]
-base64 = "0.22.1"
+
 [features]
 default = ["state-transitions"]
 state-transitions = ["dpp/state-transitions"]

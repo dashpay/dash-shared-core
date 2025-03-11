@@ -27,6 +27,37 @@ pub enum UsernameStatus {
     Locked = 8,
 }
 
+#[ferment_macro::export]
+impl UsernameStatus {
+    pub fn is_not_present(&self) -> bool {
+        matches!(self, UsernameStatus::NotPresent)
+    }
+    pub fn is_initial(&self) -> bool {
+        matches!(self, UsernameStatus::Initial)
+    }
+    pub fn is_preorder_registration_pending(&self) -> bool {
+        matches!(self, UsernameStatus::PreorderRegistrationPending)
+    }
+    pub fn is_preordered(&self) -> bool {
+        matches!(self, UsernameStatus::Preordered)
+    }
+    pub fn is_registration_pending(&self) -> bool {
+        matches!(self, UsernameStatus::RegistrationPending)
+    }
+    pub fn is_confirmed(&self) -> bool {
+        matches!(self, UsernameStatus::Confirmed)
+    }
+    pub fn is_taken_on_network(&self) -> bool {
+        matches!(self, UsernameStatus::TakenOnNetwork)
+    }
+    pub fn is_voting_period(&self) -> bool {
+        matches!(self, UsernameStatus::VotingPeriod)
+    }
+    pub fn is_locked(&self) -> bool {
+        matches!(self, UsernameStatus::Locked)
+    }
+}
+
 impl From<u8> for UsernameStatus {
     fn from(value: u8) -> Self {
         match value {

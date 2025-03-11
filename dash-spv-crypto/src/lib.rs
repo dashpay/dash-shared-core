@@ -1,5 +1,3 @@
-pub extern crate bitcoin_hashes as hashes;
-pub extern crate secp256k1;
 extern crate simplelog;
 
 pub mod bip;
@@ -17,10 +15,6 @@ pub mod network;
 pub mod tx;
 pub mod util;
 
-// #[cfg(feature = "std")]
-// use std::io;
-// #[cfg(not(feature = "std"))]
-// use core2::io;
 use crate::network::DevnetType;
 use crate::util::data_append::DataAppend;
 

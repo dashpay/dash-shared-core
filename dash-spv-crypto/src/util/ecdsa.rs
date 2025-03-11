@@ -19,7 +19,7 @@
 use core::{ops, str::FromStr};
 use core::fmt::{self, Write as _fmtWrite};
 use std::io;
-use secp256k1::{self, Secp256k1};
+use dashcore::secp256k1::{self, Secp256k1};
 
 use dashcore::hash_types::{PubkeyHash, WPubkeyHash};
 use dashcore::hashes::{Hash, hash160};
@@ -92,17 +92,7 @@ impl PublicKey {
         };
 
         reader.read_exact(&mut bytes[1..])?;
-        Self::from_slice(bytes).map_err(|e|{
-            // Need a static string for core2
-            #[cfg(feature = "std")]
-            let reason = e;
-            #[cfg(not(feature = "std"))]
-            let reason = match e {
-                Error::Base58(_) => "base58 error",
-                Error::Secp256k1(_) => "secp256k1 error",
-            };
-            io::Error::new(io::ErrorKind::InvalidData, reason)
-        })
+        Self::from_slice(bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     /// Serialize the public key to bytes

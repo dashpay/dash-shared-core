@@ -17,6 +17,7 @@ pub enum ProcessingError {
     CoreProvider(CoreProviderError),
     MissingLists(String),
     EncodeError(String),
+    DecodeError(String),
     QuorumValidationError(QuorumValidationError),
 }
 impl std::fmt::Display for ProcessingError {
@@ -43,8 +44,8 @@ impl From<bls_signatures::BlsError> for ProcessingError {
     }
 }
 
-impl From<secp256k1::Error> for ProcessingError {
-    fn from(value: secp256k1::Error) -> Self {
+impl From<dashcore::secp256k1::Error> for ProcessingError {
+    fn from(value: dashcore::secp256k1::Error) -> Self {
         ProcessingError::ParseError(format!("{value}"))
     }
 }
@@ -135,6 +136,8 @@ impl ProcessingError {
                 format!("QuorumValidationError({quorum_validation_error})"),
             ProcessingError::EncodeError(encode_error) =>
                 format!("EncodeError({encode_error})"),
+            ProcessingError::DecodeError(encode_error) =>
+                format!("DecodeError({encode_error})"),
         }
     }
 }

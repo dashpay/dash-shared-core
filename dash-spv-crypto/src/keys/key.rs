@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use dashcore::{Network, PrivateKey};
-use hashes::{sha256, sha256d};
+use dashcore::hashes::{sha256, sha256d, Hash};
 use crate::derivation::{IIndexPath, IndexPath, index_path::{Extremum, IndexHardSoft}};
 use dashcore::consensus::Encodable;
 use crate::crypto::byte_util::{clone_into_array, Reversed, UInt256, UInt384, UInt768};

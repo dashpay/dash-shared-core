@@ -1,21 +1,16 @@
 use byte::{BytesExt, ctx::Endian, LE, TryRead, TryWrite};
 use std::{io::Write, mem, net::{IpAddr, Ipv4Addr}, slice};
+use dashcore::consensus::{Decodable, Encodable, ReadExt, WriteExt};
+use dashcore::hashes::{Hash, hash160, HashEngine, hex::FromHex, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
+use dashcore::secp256k1::{hashes::hex::DisplayHex, rand::{Rng, thread_rng}};
 use ed25519_dalek::{SigningKey, VerifyingKey};
-use dashcore::hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
-use secp256k1::rand::{Rng, thread_rng};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use dashcore::consensus::{Decodable, Encodable, ReadExt, WriteExt};
-use dashcore::hashes::hex::FromHex;
-use dashcore::secp256k1::hashes::hex::DisplayHex;
 use crate::util::base58;
 use crate::util::data_ops::short_hex_string_from;
 use crate::util::params::{BIP32_SEED_KEY, ED25519_SEED_KEY};
 
-#[cfg(feature = "std")]
 use std::io;
-#[cfg(not(feature = "std"))]
-use core2::io;
 
 pub trait AsBytes {
     fn as_bytes(&self) -> &[u8];
@@ -869,12 +864,6 @@ impl UInt256 {
         let mut engine = HmacEngine::<T>::new(key);
         engine.input(input);
         Self(Hmac::<T>::from_engine(engine).to_byte_array())
-    }
-}
-
-impl secp256k1::ThirtyTwoByteHash for UInt256 {
-    fn into_32(self) -> [u8; 32] {
-        self.0
     }
 }
 

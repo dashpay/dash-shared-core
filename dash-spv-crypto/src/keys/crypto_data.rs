@@ -13,10 +13,8 @@ where K: IKey + Clone,
       Vec<u8>: CryptoData<K> {
     #[inline]
     fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
-        use secp256k1::rand;
-        use secp256k1::rand::distributions::Uniform;
-        use secp256k1::rand::Rng;
-        let mut rng = rand::thread_rng();
+        use dashcore::secp256k1::rand::{distributions::Uniform, Rng, thread_rng};
+        let mut rng = thread_rng();
         let range = Uniform::new(0, 255);
         (0..size).map(|_| rng.sample(&range)).collect()
     }

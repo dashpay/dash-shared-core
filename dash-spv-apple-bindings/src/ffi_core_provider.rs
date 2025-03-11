@@ -1,9 +1,6 @@
-use std::collections::BTreeMap;
 use std::sync::Arc;
-use dashcore::network::message_qrinfo::QuorumSnapshot;
 #[cfg(test)]
 use dashcore::secp256k1::hashes::hex::DisplayHex;
-use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::common::block::{Block, MBlock};
@@ -26,10 +23,10 @@ pub struct FFICoreProvider {
     pub get_block_by_height_or_last_terminal: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError>>,
     pub add_insight: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32])>,
     pub get_cl_signature_by_block_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 96], CoreProviderError>>,
-    pub load_masternode_list_from_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MasternodeList, CoreProviderError>>,
-    pub save_masternode_list_into_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], BTreeMap<[u8; 32], QualifiedMasternodeListEntry>) -> Result<bool, CoreProviderError>>,
-    pub load_llmq_snapshot_from_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<QuorumSnapshot, CoreProviderError>>,
-    pub save_llmq_snapshot_into_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], QuorumSnapshot) -> Result<bool, CoreProviderError>>,
+    // pub load_masternode_list_from_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MasternodeList, CoreProviderError>>,
+    // pub save_masternode_list_into_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], BTreeMap<[u8; 32], QualifiedMasternodeListEntry>) -> Result<bool, CoreProviderError>>,
+    // pub load_llmq_snapshot_from_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<QuorumSnapshot, CoreProviderError>>,
+    // pub save_llmq_snapshot_into_db: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], QuorumSnapshot) -> Result<bool, CoreProviderError>>,
     pub update_address_usage_of_masternodes: Arc<dyn Fn(*const std::os::raw::c_void, Vec<QualifiedMasternodeListEntry>)>,
     pub remove_request_in_retrieval: Arc<dyn Fn(*const std::os::raw::c_void, bool, [u8; 32], [u8; 32]) -> bool>,
     pub issue_with_masternode_list_from_peer: Arc<dyn Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void)>,
@@ -76,19 +73,19 @@ impl CoreProvider for FFICoreProvider {
     fn remove_request_in_retrieval(&self, is_dip24: bool, base_block_hash: [u8; 32], block_hash: [u8; 32]) -> bool {
         (self.remove_request_in_retrieval)(self.context, is_dip24, base_block_hash, block_hash)
     }
-    fn load_masternode_list_from_db(&self, block_hash: [u8; 32]) -> Result<MasternodeList, CoreProviderError> {
-        (self.load_masternode_list_from_db)(self.context, block_hash)
-    }
-    fn save_masternode_list_into_db(&self, list_block_hash: [u8; 32], modified_masternodes: BTreeMap<[u8; 32], QualifiedMasternodeListEntry>) -> Result<bool, CoreProviderError> {
-        (self.save_masternode_list_into_db)(self.context, list_block_hash, modified_masternodes)
-    }
-    fn load_llmq_snapshot_from_db(&self, block_hash: [u8; 32]) -> Result<QuorumSnapshot, CoreProviderError> {
-        (self.load_llmq_snapshot_from_db)(self.context, block_hash)
-    }
-
-    fn save_llmq_snapshot_into_db(&self, block_hash: [u8; 32], llmq_snapshot: QuorumSnapshot) -> Result<bool, CoreProviderError> {
-        (self.save_llmq_snapshot_into_db)(self.context, block_hash, llmq_snapshot)
-    }
+    // fn load_masternode_list_from_db(&self, block_hash: [u8; 32]) -> Result<MasternodeList, CoreProviderError> {
+    //     (self.load_masternode_list_from_db)(self.context, block_hash)
+    // }
+    // fn save_masternode_list_into_db(&self, list_block_hash: [u8; 32], modified_masternodes: BTreeMap<[u8; 32], QualifiedMasternodeListEntry>) -> Result<bool, CoreProviderError> {
+    //     (self.save_masternode_list_into_db)(self.context, list_block_hash, modified_masternodes)
+    // }
+    // fn load_llmq_snapshot_from_db(&self, block_hash: [u8; 32]) -> Result<QuorumSnapshot, CoreProviderError> {
+    //     (self.load_llmq_snapshot_from_db)(self.context, block_hash)
+    // }
+    //
+    // fn save_llmq_snapshot_into_db(&self, block_hash: [u8; 32], llmq_snapshot: QuorumSnapshot) -> Result<bool, CoreProviderError> {
+    //     (self.save_llmq_snapshot_into_db)(self.context, block_hash, llmq_snapshot)
+    // }
 
     fn update_address_usage_of_masternodes(&self, masternodes: Vec<QualifiedMasternodeListEntry>) {
         (self.update_address_usage_of_masternodes)(self.context, masternodes)
@@ -128,10 +125,10 @@ impl FFICoreProvider  {
         LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         INS: Fn(*const std::os::raw::c_void, [u8; 32]) + Send + Sync + 'static,
         CLSBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 96], CoreProviderError> + Send + Sync + 'static,
-        SML: Fn(*const std::os::raw::c_void, [u8; 32], BTreeMap<[u8; 32], QualifiedMasternodeListEntry>) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
-        LML: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MasternodeList, CoreProviderError> + Send + Sync + 'static,
-        SLS: Fn(*const std::os::raw::c_void, [u8; 32], QuorumSnapshot) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
-        LLS: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<QuorumSnapshot, CoreProviderError> + Send + Sync + 'static,
+        // SML: Fn(*const std::os::raw::c_void, [u8; 32], BTreeMap<[u8; 32], QualifiedMasternodeListEntry>) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
+        // LML: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MasternodeList, CoreProviderError> + Send + Sync + 'static,
+        // SLS: Fn(*const std::os::raw::c_void, [u8; 32], QuorumSnapshot) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
+        // LLS: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<QuorumSnapshot, CoreProviderError> + Send + Sync + 'static,
         UMU: Fn(*const std::os::raw::c_void, Vec<QualifiedMasternodeListEntry>) + Send + Sync + 'static,
         RRIR: Fn(*const std::os::raw::c_void, bool, [u8; 32], [u8; 32]) -> bool + Send + Sync + 'static,
         IWMLFP: Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void) + Send + Sync + 'static,
@@ -147,10 +144,10 @@ impl FFICoreProvider  {
         get_tip_height: TIPBH,
         add_insight: INS,
         get_cl_signature_by_block_hash: CLSBH,
-        load_masternode_list_from_db: LML,
-        save_masternode_list_into_db: SML,
-        load_llmq_snapshot_from_db: LLS,
-        save_llmq_snapshot_into_db: SLS,
+        // load_masternode_list_from_db: LML,
+        // save_masternode_list_into_db: SML,
+        // load_llmq_snapshot_from_db: LLS,
+        // save_llmq_snapshot_into_db: SLS,
         update_address_usage_of_masternodes: UMU,
         remove_request_in_retrieval: RRIR,
         issue_with_masternode_list_from_peer: IWMLFP,
@@ -169,10 +166,10 @@ impl FFICoreProvider  {
             last_block_for_block_hash: Arc::new(last_block_for_block_hash),
             add_insight: Arc::new(add_insight),
             get_cl_signature_by_block_hash: Arc::new(get_cl_signature_by_block_hash),
-            load_masternode_list_from_db: Arc::new(load_masternode_list_from_db),
-            save_masternode_list_into_db: Arc::new(save_masternode_list_into_db),
-            load_llmq_snapshot_from_db: Arc::new(load_llmq_snapshot_from_db),
-            save_llmq_snapshot_into_db: Arc::new(save_llmq_snapshot_into_db),
+            // load_masternode_list_from_db: Arc::new(load_masternode_list_from_db),
+            // save_masternode_list_into_db: Arc::new(save_masternode_list_into_db),
+            // load_llmq_snapshot_from_db: Arc::new(load_llmq_snapshot_from_db),
+            // save_llmq_snapshot_into_db: Arc::new(save_llmq_snapshot_into_db),
             update_address_usage_of_masternodes: Arc::new(update_address_usage_of_masternodes),
             remove_request_in_retrieval: Arc::new(remove_request_in_retrieval),
             issue_with_masternode_list_from_peer: Arc::new(issue_with_masternode_list_from_peer),
@@ -302,10 +299,10 @@ impl FFICoreProvider {
                 result
             }),
             add_insight: Arc::new(|context, block_hash| {}),
-            load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
-            save_masternode_list_into_db: Arc::new(|context, list_block_hash, modified_masternodes| Ok(true)),
-            load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
-            save_llmq_snapshot_into_db: Arc::new(|context, block_hash, snapshot| Ok(true)),
+            // load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
+            // save_masternode_list_into_db: Arc::new(|context, list_block_hash, modified_masternodes| Ok(true)),
+            // load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
+            // save_llmq_snapshot_into_db: Arc::new(|context, block_hash, snapshot| Ok(true)),
             update_address_usage_of_masternodes: Arc::new(|context, modified_masternodes| {}),
             remove_request_in_retrieval: Arc::new(|context, is_dip24, base_block_hash, block_hash| true),
             issue_with_masternode_list_from_peer: Arc::new(|context, is_dip24, peer| {}),

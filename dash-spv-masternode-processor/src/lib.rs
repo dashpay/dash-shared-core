@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-// pub extern crate bitcoin_hashes as hashes;
-pub extern crate secp256k1;
 extern crate simplelog;
 
 // #[cfg(test)]
@@ -11,11 +9,6 @@ pub mod tests;
 pub mod block_store;
 #[cfg(feature = "test-helpers")]
 pub mod test_helpers;
-
-// #[cfg(feature = "std")]
-// use std::io;
-// #[cfg(not(feature = "std"))]
-// use core2::io;
 
 #[macro_use]
 pub mod internal_macros;

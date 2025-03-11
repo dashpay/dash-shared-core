@@ -24,19 +24,7 @@ macro_rules! mangle_path {
 
 #[macro_export]
 macro_rules! impl_hash_ferment {
-    ($hashtype:path, $ffitype:ident, $ctor_name:ident, $dtor_name:ident, $getter_name:ident) => {
-        #[no_mangle]
-        pub unsafe extern "C" fn $ctor_name(hash: *mut [u8; <$hashtype>::LEN]) -> $ffitype {
-            $ffitype(hash)
-        }
-        #[no_mangle]
-        pub unsafe extern "C" fn $dtor_name(ptr: *mut $ffitype) {
-            ferment::unbox_any(ptr);
-        }
-        #[no_mangle]
-        pub unsafe extern "C" fn $getter_name(ptr: *mut $ffitype) -> *mut [u8; <$hashtype>::LEN] {
-            (&*ptr).0
-        }
+    ($hashtype:path, $ffitype:ident) => {
         impl ferment::FFIConversionFrom<$hashtype> for $ffitype {
             unsafe fn ffi_from_const(ffi: *const Self) -> $hashtype {
                 <$hashtype>::from_slice(&*(&*ffi).0).expect("Invalid hash type")

@@ -1,12 +1,11 @@
-use secp256k1::rand;
-use secp256k1::rand::Rng;
-use std::fmt::Write;
+use dashcore::secp256k1::rand::{Rng, thread_rng};
 use dashcore::consensus::Encodable;
-use hashes::sha256d;
+use dashcore::hashes::{sha256d, Hash};
+use std::fmt::Write;
 
 #[inline]
 pub fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
     (0..size).map(|_| rng.gen_range(0..=255)).collect()
 }
 

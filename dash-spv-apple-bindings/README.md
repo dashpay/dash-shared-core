@@ -6,3 +6,5 @@ To release it as cocoapod don't forget to
 - tag commit with version 
 - and push it to spec repo:
 - pod trunk push DashSharedCore.podspec --allow-warnings
+
+- if the bls fails to compile, try to remove git cache (rm -rf  /Users/$USER/.cargo/git/checkouts/bls-signatures-*) and try again:

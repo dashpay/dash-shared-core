@@ -15,7 +15,7 @@
 //! Base58 encoder and decoder
 
 use core::{fmt, str, iter, slice};
-use secp256k1;
+use dashcore::secp256k1;
 use dashcore::hashes::{sha256d, Hash};
 use crate::util::{endian, key};
 
@@ -54,8 +54,6 @@ impl fmt::Display for Error {
     }
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl ::std::error::Error for Error {}
 
 /// Vector-like object that holds the first 100 elements on the stack. If more space is needed it
@@ -253,7 +251,7 @@ impl From<key::Error> for Error {
 
 #[cfg(test)]
 mod tests {
-    use hashes::hex::FromHex;
+    use dashcore::hashes::hex::FromHex;
     use super::*;
 
     #[test]

@@ -19,8 +19,6 @@ use dapi_grpc::core::v0::GetTransactionRequest;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::{dpp, RequestSettings, Sdk, SdkBuilder};
 use dash_sdk::dapi_client::{Address, AddressListError, DapiRequestExecutor};
-use dash_sdk::dpp::dashcore::secp256k1::rand;
-use dash_sdk::dpp::dashcore::secp256k1::rand::SeedableRng;
 use dash_sdk::platform::FetchUnproved;
 use dash_sdk::platform::transition::put_contract::PutContract;
 use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
@@ -40,7 +38,7 @@ use dpp::data_contract::document_type::{DocumentType, DocumentTypeRef};
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dpp::data_contracts;
 use dpp::errors::ProtocolError;
-use dpp::identity::{Identity, identity_public_key::{accessors::v0::IdentityPublicKeyGettersV0, contract_bounds::ContractBounds, IdentityPublicKey, KeyType, Purpose, SecurityLevel, v0::IdentityPublicKeyV0}, v0::IdentityV0, IdentityFacade, KeyID};
+use dpp::identity::{Identity, IdentityPublicKey, v0::IdentityV0, IdentityFacade, KeyID};
 use dpp::document::Document;
 use dpp::document::document_factory::DocumentFactory;
 use dpp::identity::core_script::CoreScript;
@@ -58,7 +56,6 @@ use drive::query::{OrderClause, WhereClause};
 use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use drive_proof_verifier::types::EvoNodeStatus;
 use indexmap::IndexMap;
-use platform_version::version::LATEST_PLATFORM_VERSION;
 use platform_value::{BinaryData, Bytes32, Identifier, Value, ValueMap};
 use tokio::runtime::Runtime;
 use dash_spv_crypto::crypto::byte_util::Reversed;
@@ -154,6 +151,18 @@ pub fn ip_from_bytes(address: [u8; 16]) -> Result<Address, AddressListError> {
 
     Address::from_str(addr.as_str())
 }
+
+fn friend_request_value(to_user_id: [u8; 32], created_at: u64, encrypted_extended_public_key_data: Vec<u8>, sender_key_index: u32, recipient_key_index: u32, account_reference: u32) -> Value {
+    Value::Map(Vec::from_iter([
+        (Value::Text("$createdAt".to_string()), Value::U64(created_at)),
+        (Value::Text("toUserId".to_string()), Value::Identifier(to_user_id.into())),
+        (Value::Text("encryptedPublicKey".to_string()), Value::Bytes(encrypted_extended_public_key_data)),
+        (Value::Text("senderKeyIndex".to_string()), Value::U32(sender_key_index)),
+        (Value::Text("recipientKeyIndex".to_string()), Value::U32(recipient_key_index)),
+        (Value::Text("accountReference".to_string()), Value::U32(account_reference)),
+    ]))
+}
+
 
 impl DAPIAddressHandler for PlatformSDK {
     fn add_node(&self, _address: [u8; 16]) {
@@ -543,37 +552,10 @@ impl PlatformSDK {
         account_reference: u32,
         entropy: [u8; 32]
     ) -> Result<Document, Error> {
-        // uint64_t createAtMs = (self.createdAt) * 1000;
-        // DSStringValueDictionary *data = @{
-        //     @"$createdAt": @(createAtMs),
-        //     @"toUserId": uint256_data([self destinationIdentityUniqueId]),
-        //     @"encryptedPublicKey": self.encryptedExtendedPublicKeyData,
-        //     @"senderKeyIndex": @(self.sourceKeyIndex),
-        //     @"recipientKeyIndex": @(self.destinationKeyIndex),
-        //     @"accountReference": @([self createAccountReference])
-        // };
-        // DPDocument *contact = [self.sourceIdentity.dashpayDocumentFactory documentOnTable:@"contactRequest" withDataDictionary:data usingEntropy:entropyData error:&error];
-
-        // json[@"$type"] = self.tableName;
-        // json[@"$dataContractId"] = uint256_data(self.contractId);
-        // json[@"$id"] = uint256_data(self.documentId);
-        // json[@"$action"] = @(self.currentLocalDocumentState.documentStateType >> 1);
-        // if (!(self.currentLocalDocumentState.documentStateType >> 1)) {
-        //     json[@"$entropy"] = self.entropy;
-        // }
-
-        let dict = Value::Map(Vec::from_iter([
-            (Value::Text("$createdAt".to_string()), Value::U64(created_at)),
-            (Value::Text("toUserId".to_string()), Value::Identifier(to_user_id.into())),
-            (Value::Text("encryptedPublicKey".to_string()), Value::Bytes(encrypted_extended_public_key_data)),
-            (Value::Text("senderKeyIndex".to_string()), Value::U32(sender_key_index)),
-            (Value::Text("recipientKeyIndex".to_string()), Value::U32(recipient_key_index)),
-            (Value::Text("accountReference".to_string()), Value::U32(account_reference)),
-        ]));
-
         let owner_id = Identifier::from(identity_id);
         let document_type = contract.document_type_for_name(table_name)
             .map_err(Error::from)?;
+        let dict = friend_request_value(to_user_id, created_at, encrypted_extended_public_key_data, sender_key_index, recipient_key_index, account_reference);
         document_type.create_document_from_data(dict, owner_id, 1000, 1000, entropy, self.sdk.version())
             .map_err(Error::from)
     }
@@ -591,14 +573,7 @@ impl PlatformSDK {
         entropy: [u8; 32],
         private_key: OpaqueKey
     ) -> Result<StateTransitionProofResult, Error> {
-        let dict = Value::Map(Vec::from_iter([
-            (Value::Text("$createdAt".to_string()), Value::U64(created_at)),
-            (Value::Text("toUserId".to_string()), Value::Identifier(to_user_id.into())),
-            (Value::Text("encryptedPublicKey".to_string()), Value::Bytes(encrypted_extended_public_key_data)),
-            (Value::Text("senderKeyIndex".to_string()), Value::U32(sender_key_index)),
-            (Value::Text("recipientKeyIndex".to_string()), Value::U32(recipient_key_index)),
-            (Value::Text("accountReference".to_string()), Value::U32(account_reference)),
-        ]));
+        let dict = friend_request_value(to_user_id, created_at, encrypted_extended_public_key_data, sender_key_index, recipient_key_index, account_reference);
         self.send_friend_request_with_value(contract, identity_id, dict, entropy, private_key).await
     }
     pub async fn send_friend_request_with_value(
@@ -848,35 +823,35 @@ impl PlatformSDK {
     }
 }
 
-pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {
-    let mut rng = rand::rngs::StdRng::from_entropy();
-    let ipk1 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
-    let ipk2 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
-    let public_keys = BTreeMap::from_iter([(1, IdentityPublicKey::V0(
-        IdentityPublicKeyV0 {
-            id: ipk1.id(),
-            purpose: Purpose::AUTHENTICATION,
-            security_level: SecurityLevel::MASTER,
-            contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
-            key_type: KeyType::ECDSA_SECP256K1,
-            read_only: false,
-            data: ipk1.data().clone(),
-            disabled_at: Some(1)
-        }
-    )), (2, IdentityPublicKey::V0(
-        IdentityPublicKeyV0 {
-            id: ipk2.id(),
-            purpose: Purpose::AUTHENTICATION,
-            security_level: SecurityLevel::MASTER,
-            contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
-            key_type: KeyType::ECDSA_SECP256K1,
-            read_only: ipk2.read_only(),
-            data: ipk2.data().clone(),
-            disabled_at: Some(1)
-        }
-    ))]);
-    Ok(Identity::V0(IdentityV0 { id, public_keys, balance: 2, revision: 1 }))
-}
+// pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {
+//     let mut rng = rand::rngs::StdRng::from_entropy();
+//     let ipk1 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
+//     let ipk2 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
+//     let public_keys = BTreeMap::from_iter([(1, IdentityPublicKey::V0(
+//         IdentityPublicKeyV0 {
+//             id: ipk1.id(),
+//             purpose: Purpose::AUTHENTICATION,
+//             security_level: SecurityLevel::MASTER,
+//             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
+//             key_type: KeyType::ECDSA_SECP256K1,
+//             read_only: false,
+//             data: ipk1.data().clone(),
+//             disabled_at: Some(1)
+//         }
+//     )), (2, IdentityPublicKey::V0(
+//         IdentityPublicKeyV0 {
+//             id: ipk2.id(),
+//             purpose: Purpose::AUTHENTICATION,
+//             security_level: SecurityLevel::MASTER,
+//             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
+//             key_type: KeyType::ECDSA_SECP256K1,
+//             read_only: ipk2.read_only(),
+//             data: ipk2.data().clone(),
+//             disabled_at: Some(1)
+//         }
+//     ))]);
+//     Ok(Identity::V0(IdentityV0 { id, public_keys, balance: 2, revision: 1 }))
+// }
 
 // #[tokio::test]
 // async fn test_mainnet_get_identities_for_wallets_public_keys() {

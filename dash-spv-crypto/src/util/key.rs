@@ -20,9 +20,9 @@
 //pub use util::ecdsa::{PrivateKey, PublicKey};
 
 use core::fmt;
-#[cfg(feature = "std")] use std::error;
+use std::error;
 
-use secp256k1;
+use dashcore::secp256k1;
 use crate::util::base58;
 
 /// A key-related error.
@@ -44,8 +44,6 @@ impl fmt::Display for Error {
     }
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl ::std::error::Error for Error {
     fn cause(&self) -> Option<&dyn error::Error> {
         match *self {

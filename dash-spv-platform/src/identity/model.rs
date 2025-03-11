@@ -157,11 +157,12 @@
 // }
 
 use std::collections::HashMap;
-use dpp::identity::Identity;
+use dpp::identity::{Identity, IdentityPublicKey};
 use dpp::identity::identity_public_key::{Purpose, SecurityLevel};
 use dash_spv_crypto::keys::key::KeyKind;
 use dash_spv_crypto::keys::{IKey, OpaqueKey};
 use crate::document::usernames::UsernameStatus;
+use crate::identity::manager::identity_public_key;
 
 #[ferment_macro::export]
 #[derive(Clone, PartialEq, Eq)]
@@ -218,6 +219,22 @@ impl IdentityKeyStatus {
     pub fn string_description(&self) -> String {
         format!("Status of Key or Username is {}", self.string())
     }
+
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, IdentityKeyStatus::Unknown)
+    }
+    pub fn is_registered(&self) -> bool {
+        matches!(self, IdentityKeyStatus::Registered)
+    }
+    pub fn is_registering(&self) -> bool {
+        matches!(self, IdentityKeyStatus::Registering)
+    }
+    pub fn is_not_registered(&self) -> bool {
+        matches!(self, IdentityKeyStatus::NotRegistered)
+    }
+    pub fn is_revoked(&self) -> bool {
+        matches!(self, IdentityKeyStatus::Revoked)
+    }
 }
 
 
@@ -260,6 +277,27 @@ impl IdentityRegistrationStatus {
     pub fn from_index(index: u8) -> IdentityRegistrationStatus {
         IdentityRegistrationStatus::from(index)
     }
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, IdentityRegistrationStatus::Unknown)
+    }
+    pub fn is_registered(&self) -> bool {
+        matches!(self, IdentityRegistrationStatus::Registered)
+    }
+    pub fn is_registering(&self) -> bool {
+        matches!(self, IdentityRegistrationStatus::Registering)
+    }
+    pub fn is_not_registered(&self) -> bool {
+        matches!(self, IdentityRegistrationStatus::NotRegistered)
+    }
+
+    pub fn string(&self) -> String {
+        match self {
+            IdentityRegistrationStatus::Unknown => "Unknown",
+            IdentityRegistrationStatus::Registered => "Registered",
+            IdentityRegistrationStatus::Registering => "Registering",
+            IdentityRegistrationStatus::NotRegistered => "Not Registered",
+        }.to_string()
+    }
 }
 #[ferment_macro::export]
 #[derive(Clone)]
@@ -289,6 +327,11 @@ impl UsernameStatusInfo {
             salt: vec![],
         }
     }
+    pub fn confirmed(&self) -> Self {
+        let mut s = self.clone();
+        s.status = UsernameStatus::Confirmed;
+        s
+    }
 }
 #[ferment_macro::opaque]
 pub struct IdentityModel {
@@ -311,9 +354,22 @@ impl IdentityModel {
             username_domains: Default::default(),
             username_salts: Default::default(),
             username_statuses: Default::default()
-            ,
         }
     }
+
+    pub fn set_registration_status(&mut self, status: IdentityRegistrationStatus) {
+        self.identity_registration_status = status;
+    }
+    pub fn registration_status(&self) -> IdentityRegistrationStatus {
+        self.identity_registration_status.clone()
+    }
+    pub fn set_identity(&mut self, identity: Identity) {
+        self.identity = Some(identity);
+    }
+    pub fn identity(&self) -> Option<Identity> {
+        self.identity.clone()
+    }
+
     pub fn add_username(&mut self, username: String, domain: String, status: UsernameStatus) {
         let full_path = Self::full_path_for_username(&username, &domain);
         self.username_statuses.insert(full_path, UsernameStatusInfo {
@@ -321,6 +377,15 @@ impl IdentityModel {
             domain: Some(domain),
             status,
             salt: Default::default(),
+        });
+    }
+    pub fn add_username_with_salt(&mut self, username: String, domain: String, status: UsernameStatus, salt: Vec<u8>)  {
+        let full_path = Self::full_path_for_username(&username, &domain);
+        self.username_statuses.insert(full_path, UsernameStatusInfo {
+            proper: Some(username),
+            domain: Some(domain),
+            status,
+            salt,
         });
     }
 
@@ -349,6 +414,16 @@ impl IdentityModel {
     pub fn unregistered_username_full_paths(&self) -> Vec<String> {
         self.username_full_paths_with_status(UsernameStatus::Initial)
     }
+    pub fn confirmed_username_full_paths(&self) -> Vec<String> {
+        self.username_full_paths_with_status(UsernameStatus::Confirmed)
+    }
+
+    pub fn unregistered_username_full_paths_count(&self) -> usize {
+        self.unregistered_username_full_paths().len()
+    }
+    pub fn confirmed_username_full_paths_count(&self) -> usize {
+        self.confirmed_username_full_paths().len()
+    }
 
     pub fn status_of_username(&self, username: &str, domain: &str) -> Option<UsernameStatus> {
         self.status_of_username_full_path(Self::full_path_for_username(username, domain))
@@ -360,6 +435,12 @@ impl IdentityModel {
     pub fn status_of_username_full_path(&self, username_full_path: String) -> Option<UsernameStatus> {
         self.username_statuses.get(&username_full_path).map(|s| s.status.clone())
     }
+    pub fn status_index_of_username_full_path(&self, username_full_path: String) -> Option<u8> {
+        self.username_statuses.get(&username_full_path).map(|s| s.status.clone().into())
+    }
+    pub fn status_of_username_full_path_is_initial(&self, username_full_path: String) -> bool {
+        self.username_statuses.get(&username_full_path).map(|s| s.status == UsernameStatus::Initial).unwrap_or_default()
+    }
     pub fn username_of_username_full_path(&self, username_full_path: &str) -> Option<String> {
         self.username_statuses.get(username_full_path).and_then(|s| s.proper.clone())
     }
@@ -370,26 +451,84 @@ impl IdentityModel {
     pub fn dashpay_username_full_paths(&self) -> Vec<String> {
         self.username_statuses.keys().cloned().collect()
     }
+    pub fn username_statuses(&self) -> HashMap<String, UsernameStatusInfo> {
+        self.username_statuses.clone()
+    }
+
+    pub fn usernames_and_domains(&self, username_full_paths: Vec<String>) -> Vec<(String, String)> {
+        username_full_paths.iter().filter_map(|username_full_path| {
+            if let Some(UsernameStatusInfo { proper, domain, .. }) = self.username_statuses.get(username_full_path) {
+                match (proper, domain) {
+                    (Some(proper), Some(domain)) => Some((proper.clone(), domain.clone())),
+                    _ => None
+                }
+            } else {
+                None
+            }
+        }).collect()
+    }
 
     pub fn dashpay_usernames(&self) -> Vec<String> {
         self.username_statuses.iter().filter_map(|(full_path, _)| self.username_of_username_full_path(full_path)).collect()
     }
 
     pub fn set_username_full_paths(&mut self, username_full_paths: Vec<String>, status: UsernameStatus) {
-        username_full_paths.into_iter().for_each(|full_path | {
-            if let Some(status_info) = self.username_statuses.get_mut(&full_path) {
-                status_info.status = status.clone();
-            } else {
-                self.username_statuses.insert(full_path, UsernameStatusInfo::with_status(status.clone()));
-            }
-        });
+        username_full_paths.into_iter().for_each(|full_path | self.set_username_status(full_path, status.clone()));
     }
+
+    pub fn set_username_status(&mut self, username_full_path: String, status: UsernameStatus) {
+        if let Some(status_info) = self.username_statuses.get_mut(&username_full_path) {
+            status_info.status = status;
+        } else {
+            self.username_statuses.insert(username_full_path, UsernameStatusInfo::with_status(status));
+        }
+    }
+    pub fn set_username_status_confirmed(&mut self, username: String, normalized_parent_domain_name: String, label: String) -> bool {
+        // TODO: check it (migrated as is, but it maybe wrong)
+        let full_path_username = Self::full_path_for_username(&username, "dash");
+        let maybe_status = self.username_statuses.get(&username);
+        let is_new = maybe_status.is_none();
+        let status_info = if let Some(status_info) = maybe_status {
+            status_info.confirmed()
+        } else {
+            UsernameStatusInfo {
+                proper: Some(label),
+                domain: Some(normalized_parent_domain_name),
+                status: UsernameStatus::Confirmed,
+                salt: vec![],
+            }
+        };
+        self.username_statuses.insert(full_path_username, status_info);
+        is_new
+    }
+    pub fn set_username_status_confirmed2(&mut self, username: String, domain: String, lowercase_username: String) -> bool {
+        // TODO: check it (migrated as is, but it maybe wrong)
+        let full_path_username = Self::full_path_for_username(&username, &domain);
+        let maybe_status = self.username_statuses.get(&Self::full_path_for_username(&lowercase_username, &domain));
+        let is_new = maybe_status.is_none();
+        let status_info = if let Some(status_info) = maybe_status {
+            status_info.confirmed()
+        } else {
+            UsernameStatusInfo {
+                proper: Some(username),
+                domain: Some(domain),
+                status: UsernameStatus::Confirmed,
+                salt: vec![],
+            }
+        };
+        self.username_statuses.insert(full_path_username, status_info);
+        is_new
+    }
+
 
     pub fn active_key_count(&self) -> usize {
         self.key_info_dictionaries.values().filter(|KeyInfo { key_status, .. }| IdentityKeyStatus::Registered.eq(key_status)).count()
     }
     pub fn total_key_count(&self) -> usize {
         self.key_info_dictionaries.len()
+    }
+    pub fn key_info_dictionaries(&self) -> HashMap<u32, KeyInfo> {
+        self.key_info_dictionaries.clone()
     }
 
     pub fn active_keys_for_key_type(&self, kind: KeyKind) -> Vec<OpaqueKey> {
@@ -407,12 +546,28 @@ impl IdentityModel {
         false
     }
 
+    pub fn key_info_at_index(&self, index: u32) -> Option<KeyInfo> {
+        self.key_info_dictionaries.get(&index).map(|info| info.clone())
+    }
+
     pub fn status_of_key_at_index(&self, index: u32) -> Option<IdentityKeyStatus> {
         self.key_info_dictionaries.get(&index).map(|info| info.key_status.clone())
     }
 
     pub fn key_at_index(&self, index: u32) -> Option<OpaqueKey> {
         self.key_info_dictionaries.get(&index).map(|info| info.key.clone())
+    }
+
+
+    pub fn first_identity_public_key(&self, security_level: SecurityLevel, purpose: Purpose) -> Option<IdentityPublicKey> {
+        self.key_info_dictionaries.iter().find_map(|(index, KeyInfo { key, security_level: level, purpose: p, .. })| {
+            if security_level.eq(level) && purpose.eq(p) {
+                Some(identity_public_key(*index, key.clone(), security_level, purpose))
+            } else {
+                None
+            }
+        })
+
     }
 
 }

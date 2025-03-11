@@ -1,5 +1,5 @@
 use ed25519_dalek::{SigningKey, VerifyingKey};
-use secp256k1::Scalar;
+use dashcore::secp256k1::Scalar;
 use dashcore::consensus::encode::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array, UInt256, UInt512};
 use crate::derivation::{BIP32_HARD, IIndexPath};
@@ -156,9 +156,9 @@ pub trait IChildKeyDerivation<T, SK, PK> where SK: SignKey + ?Sized {
 }
 
 pub fn secp256k1_point_from_bytes(data: &[u8]) -> [u8; 33] {
-    let sec = secp256k1::SecretKey::from_slice(data).unwrap();
-    let s = secp256k1::Secp256k1::new();
-    let pub_key = secp256k1::PublicKey::from_secret_key(&s, &sec);
+    let sec = dashcore::secp256k1::SecretKey::from_slice(data).unwrap();
+    let s = dashcore::secp256k1::Secp256k1::new();
+    let pub_key = dashcore::secp256k1::PublicKey::from_secret_key(&s, &sec);
     pub_key.serialize()
 }
 
@@ -167,7 +167,7 @@ impl<T> IChildKeyDerivation<T, [u8; 32], [u8; 33]> for ECDSAKey where Self: IChi
     fn derive_child_private_key<PATH>(key: &mut [u8; 32], chaincode: &mut [u8; 32], path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
         let i = UInt512::hmac(chaincode.as_ref(), Self::private_key_data_input(key, path, position).as_ref());
-        let mut sec_key = secp256k1::SecretKey::from_slice(key).expect("invalid private key");
+        let mut sec_key = dashcore::secp256k1::SecretKey::from_byte_array(key).expect("invalid private key");
         let tweak = Scalar::from_be_bytes(clone_into_array(&i.0[..32])).expect("invalid tweak");
         sec_key = sec_key.add_tweak(&tweak).expect("failed to add tweak");
         key.copy_from_slice(&sec_key.secret_bytes());
@@ -177,8 +177,8 @@ impl<T> IChildKeyDerivation<T, [u8; 32], [u8; 33]> for ECDSAKey where Self: IChi
     fn derive_child_public_key<PATH>(key: &mut [u8; 33], chaincode: &mut [u8; 32], path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
         let i = UInt512::hmac(chaincode.as_ref(), Self::public_key_data_input(key, path, position).as_ref());
-        let s = secp256k1::Secp256k1::new();
-        let mut pub_key = secp256k1::PublicKey::from_slice(key).expect("invalid public key");
+        let s = dashcore::secp256k1::Secp256k1::new();
+        let mut pub_key = dashcore::secp256k1::PublicKey::from_slice(key).expect("invalid public key");
         let tweak = Scalar::from_be_bytes(clone_into_array(&i.0[..32])).expect("invalid tweak");
         pub_key = pub_key.add_exp_tweak(&s, &tweak).expect("failed to add exp tweak");
         chaincode.copy_from_slice(&i.0[32..]);
