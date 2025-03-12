@@ -128,20 +128,12 @@ impl WalletEx {
     }
 
     pub fn lock_coin(&mut self, outpoint: TxOutPoint) {
-        let joined_hashes = self.locked_coins_set.iter().map(|coin| coin.hash.reversed().to_string()).collect::<Vec<String>>();
-        println!("[RUST] CoinJoin: WalletEx: lock_coin, before: {}: {:?}", self.locked_coins_set.len(), joined_hashes);
         self.locked_coins_set.insert(outpoint);
-        let joined_hashes_after = self.locked_coins_set.iter().map(|coin| coin.hash.reversed().to_string()).collect::<Vec<String>>();
-        println!("[RUST] CoinJoin: WalletEx: lock_coin, after: {}: {:?}", self.locked_coins_set.len(), joined_hashes_after);
         self.clear_anonymizable_caches();
     }
 
     pub fn unlock_coin(&mut self, outpoint: &TxOutPoint) {
-        let joined_hashes = self.locked_coins_set.iter().map(|coin| coin.hash.reversed().to_string()).collect::<Vec<String>>();
-        println!("[RUST] CoinJoin: WalletEx: unlock_coin, before: {}: {:?}", self.locked_coins_set.len(), joined_hashes);
-        let removed = self.locked_coins_set.remove(outpoint);
-        let joined_hashes_after = self.locked_coins_set.iter().map(|coin| coin.hash.reversed().to_string()).collect::<Vec<String>>();
-        println!("[RUST] CoinJoin: WalletEx: unlock_coin, removed: {}, after: {}: {:?}", removed, self.locked_coins_set.len(), joined_hashes_after);
+        self.locked_coins_set.remove(outpoint);
         self.clear_anonymizable_caches();
     }
 
