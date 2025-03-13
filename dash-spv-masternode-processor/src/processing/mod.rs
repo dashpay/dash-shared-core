@@ -24,12 +24,42 @@ pub fn instant_lock_to_message(lock: &InstantLock) -> Vec<u8> {
     serialize(lock)
 }
 #[ferment_macro::export]
+pub fn instant_lock_signature(lock: &InstantLock) -> [u8; 96] {
+    lock.signature.to_bytes()
+}
+#[ferment_macro::export]
+pub fn instant_lock_cycle_hash(lock: &InstantLock) -> [u8; 32] {
+    lock.cyclehash.to_byte_array()
+}
+
+#[ferment_macro::export]
+pub fn instant_lock_tx_hash(lock: &InstantLock) -> [u8; 32] {
+    lock.txid.to_byte_array()
+}
+#[ferment_macro::export]
+pub fn instant_lock_outpoints(lock: &InstantLock) -> Vec<OutPoint> {
+    lock.inputs.to_vec()
+}
+#[ferment_macro::export]
+pub fn instant_lock_outpoint_at_index(lock: &InstantLock, index: usize) -> Option<OutPoint> {
+    lock.inputs.get(index).cloned()
+}
+
+#[ferment_macro::export]
 pub fn chain_lock_from_message(message: &[u8]) -> Option<ChainLock> {
     deserialize(message).ok()
 }
 #[ferment_macro::export]
 pub fn chain_lock_to_message(lock: &ChainLock) -> Vec<u8> {
     serialize(lock)
+}
+#[ferment_macro::export]
+pub fn chain_lock_block_hash(chain_lock: &ChainLock) -> [u8; 32] {
+    chain_lock.block_hash.to_byte_array()
+}
+#[ferment_macro::export]
+pub fn chain_lock_signature(chain_lock: &ChainLock) -> [u8; 96] {
+    chain_lock.signature.to_bytes()
 }
 
 #[ferment_macro::export]

@@ -63,6 +63,13 @@ impl MasternodeProcessor {
         self.engine.latest_masternode_list().cloned()
     }
 
+    pub fn used_block_hashes(&self) -> Vec<[u8; 32]> {
+        self.engine.block_hashes
+            .values()
+            .map(|hash| hash.to_byte_array())
+            .collect()
+    }
+
     pub fn known_masternode_lists_count(&self) -> usize {
         self.engine.masternode_lists.len()
     }
