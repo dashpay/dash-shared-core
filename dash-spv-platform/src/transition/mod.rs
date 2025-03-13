@@ -1,6 +1,4 @@
 use dashcore::{signer, InstantLock, OutPoint, Transaction, TxIn, TxOut, Txid};
-use dashcore::bls_sig_utils::BLSSignature;
-use dashcore::hash_types::CycleHash;
 use dashcore::hashes::Hash;
 #[cfg(test)]
 use dashcore::hashes::hex::FromHex;
@@ -37,18 +35,12 @@ use dash_spv_crypto::tx::{TransactionInput, TransactionOutput};
 #[ferment_macro::export]
 pub fn instant_proof(
     output_index: u32,
-    lock_version: u8, lock_inputs: Vec<[u8; 36]>, txid: [u8; 32], cycle_hash: [u8; 32], signature: [u8; 96],
+    instant_lock: InstantLock,
     tx_version: u16, lock_time: u32, input: Vec<TransactionInput>, output: Vec<TransactionOutput>,
     asset_lock_payload_version: u8, credit_outputs: Vec<TransactionOutput>
 ) -> AssetLockProof {
     AssetLockProof::Instant(InstantAssetLockProof {
-        instant_lock: InstantLock {
-            version: lock_version,
-            inputs: Vec::from_iter(lock_inputs.into_iter().map(OutPoint::from)),
-            txid: Txid::from_byte_array(txid),
-            cyclehash: CycleHash::from_byte_array(cycle_hash),
-            signature: BLSSignature::from(signature),
-        },
+        instant_lock,
         transaction: Transaction {
             version: tx_version,
             lock_time,

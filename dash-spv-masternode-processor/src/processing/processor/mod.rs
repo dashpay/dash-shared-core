@@ -9,7 +9,9 @@ use dashcore::{ephemerealdata::{chain_lock::ChainLock, instant_lock::InstantLock
 use dashcore::bls_sig_utils::BLSSignature;
 use dashcore::consensus::deserialize;
 use dashcore::hashes::Hash;
-use dashcore::network::message_qrinfo::{QRInfo, QuorumSnapshot};
+#[cfg(feature = "std")]
+use dashcore::network::message_qrinfo::QuorumSnapshot;
+use dashcore::network::message_qrinfo::QRInfo;
 use dashcore::network::message_sml::MnListDiff;
 use dashcore::prelude::CoreBlockHeight;
 use dashcore::sml::llmq_type::LLMQType;
@@ -17,7 +19,6 @@ use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_engine::MasternodeListEngine;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dashcore::sml::quorum_validation_error::{ClientDataRetrievalError, QuorumValidationError};
-use dash_spv_crypto::crypto::byte_util::Zeroable;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::processing::core_provider::CoreProvider;
 use crate::processing::processor::processing_error::ProcessingError;
@@ -179,10 +180,10 @@ impl MasternodeProcessor {
             |block_hash: &BlockHash| {
                 match self.provider.lookup_cl_signature_by_block_hash(block_hash.to_byte_array()) {
                     Ok(sig) => {
-                        if sig.is_zero() {
+                        if sig.is_zeroed() {
                             Ok(None)
                         } else {
-                            Ok(Some(BLSSignature::from(sig)))
+                            Ok(Some(sig))
                         }
                     },
                     Err(_) => Err(ClientDataRetrievalError::RequiredBlockNotPresent(*block_hash)),

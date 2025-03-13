@@ -55,7 +55,7 @@ serde = { version = "1.0.209", features = ["derive"] }
 
 [build-dependencies]
 cbindgen = "0.28.0"
-#ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["cbindgen_only"] }
+#ferment-sys = { git = "https://github.com/dashpay/ferment", package = "ferment-sys", features = ["cbindgen_only"] }
 ferment-sys = { git = "https://github.com/dashpay/ferment", package = "ferment-sys" }
 #ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["objc"] }
 #ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }

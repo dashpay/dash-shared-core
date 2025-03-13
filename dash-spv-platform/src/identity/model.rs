@@ -239,7 +239,7 @@ impl IdentityKeyStatus {
 
 
 #[ferment_macro::export]
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum IdentityRegistrationStatus {
     Unknown = 0,
     Registered = 1,
@@ -363,6 +363,12 @@ impl IdentityModel {
     pub fn registration_status(&self) -> IdentityRegistrationStatus {
         self.identity_registration_status.clone()
     }
+    pub fn registration_status_index(&self) -> u8 {
+        u8::from(&self.identity_registration_status)
+    }
+    pub fn is_registered(&self) -> bool {
+        self.identity_registration_status == IdentityRegistrationStatus::Registered
+    }
     pub fn set_identity(&mut self, identity: Identity) {
         self.identity = Some(identity);
     }
@@ -395,6 +401,10 @@ impl IdentityModel {
 
     pub fn add_salt(&mut self, username: String, salt: Vec<u8>) {
         self.username_salts.insert(username, salt);
+    }
+
+    pub fn salt_for_username(&self, username: &str) -> Option<Vec<u8>> {
+        self.username_salts.get(username).cloned()
     }
 
     pub fn full_path_for_username(username: &str, domain: &str) -> String {
@@ -470,6 +480,15 @@ impl IdentityModel {
 
     pub fn dashpay_usernames(&self) -> Vec<String> {
         self.username_statuses.iter().filter_map(|(full_path, _)| self.username_of_username_full_path(full_path)).collect()
+    }
+    pub fn has_dashpay_username(&self, username: &str) -> bool {
+        self.username_statuses.iter().any(|(full_path, _)| {
+            if let Some(u) = self.username_of_username_full_path(full_path) {
+                u.eq(username)
+            } else {
+                false
+            }
+        })
     }
 
     pub fn set_username_full_paths(&mut self, username_full_paths: Vec<String>, status: UsernameStatus) {

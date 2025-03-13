@@ -19,6 +19,7 @@ pub extern crate merk;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use dashcore::{Network, QuorumHash};
+use dashcore::bls_sig_utils::BLSSignature;
 use dashcore::hashes::Hash;
 use dashcore::sml::llmq_type::LLMQType;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
@@ -68,14 +69,8 @@ impl DashSPVCore {
         BORLT: Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError> + Send + Sync + 'static,
         BBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
-        INS: Fn(*const std::os::raw::c_void, [u8; 32]) + Send + Sync + 'static,
-        CLSBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<[u8; 96], CoreProviderError> + Send + Sync + 'static,
-        // SML: Fn(*const std::os::raw::c_void, [u8; 32], BTreeMap<[u8; 32], QualifiedMasternodeListEntry>) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
-        // LML: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MasternodeList, CoreProviderError> + Send + Sync + 'static,
-        // SLS: Fn(*const std::os::raw::c_void, [u8; 32], QuorumSnapshot) -> Result<bool, CoreProviderError> + Send + Sync + 'static,
-        // LLS: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<QuorumSnapshot, CoreProviderError> + Send + Sync + 'static,
+        CLSBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<BLSSignature, CoreProviderError> + Send + Sync + 'static,
         UMU: Fn(*const std::os::raw::c_void, Vec<QualifiedMasternodeListEntry>) + Send + Sync + 'static,
-        RRIR: Fn(*const std::os::raw::c_void, bool, [u8; 32], [u8; 32]) -> bool + Send + Sync + 'static,
         IWMLFP: Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void) + Send + Sync + 'static,
         NSS: Fn(*const std::os::raw::c_void, CacheState) + Send + Sync + 'static,
         DML: Fn(*const std::os::raw::c_void, bool) + Send + Sync + 'static,
@@ -83,7 +78,6 @@ impl DashSPVCore {
         chain_type: ChainType,
         address_list: Option<Vec<&'static str>>,
 
-        // get_quorum_public_key: QP,
         get_data_contract: DC,
         get_platform_activation_height: AH,
         callback_signer: CS,
@@ -95,14 +89,8 @@ impl DashSPVCore {
         block_by_hash: BBH,
         last_block_for_block_hash: LBBBH,
         get_tip_height: TIPBH,
-        add_insight: INS,
         get_cl_signature_by_block_hash: CLSBH,
-        // load_masternode_list_from_db: LML,
-        // save_masternode_list_into_db: SML,
-        // load_llmq_snapshot_from_db: LLS,
-        // save_llmq_snapshot_into_db: SLS,
         update_address_usage_of_masternodes: UMU,
-        remove_request_in_retrieval: RRIR,
         issue_with_masternode_list_from_peer: IWMLFP,
         notify_sync_state: NSS,
         dequeue_masternode_list: DML,
@@ -116,14 +104,8 @@ impl DashSPVCore {
             block_by_hash,
             last_block_for_block_hash,
             get_tip_height,
-            add_insight,
             get_cl_signature_by_block_hash,
-            // load_masternode_list_from_db,
-            // save_masternode_list_into_db,
-            // load_llmq_snapshot_from_db,
-            // save_llmq_snapshot_into_db,
             update_address_usage_of_masternodes,
-            remove_request_in_retrieval,
             issue_with_masternode_list_from_peer,
             notify_sync_state,
             dequeue_masternode_list,
@@ -138,8 +120,6 @@ impl DashSPVCore {
             processor_arc_clone.engine.find_quorum_public_key(&llmq_type, &llmq_hash)
                 .map(|key| key.0)
                 .ok_or(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {}", llmq_type, llmq_hash.to_string())))
-            // processor_arc_clone.cache.find_llmq_entry_public_key(llmq_type, llmq_hash.reversed())
-            //     .ok_or(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {} ({})", llmq_type, llmq_hash.to_lower_hex_string(), llmq_hash.reversed().to_lower_hex_string())))
         });
         let platform = Arc::new(PlatformSDK::new(
             Arc::new(PlatformCache::default()),
@@ -162,9 +142,6 @@ impl DashSPVCore {
         }
     }
 
-    // pub fn cache(&self) -> Arc<MasternodeProcessorCache> {
-    //     Arc::clone(&self.processor.cache)
-    // }
     pub fn platform_cache(&self) -> Arc<PlatformCache> {
         Arc::clone(&self.platform.cache)
     }
