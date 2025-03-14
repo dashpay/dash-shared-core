@@ -19,8 +19,8 @@ homepage = "https://github.com/dashpay/dash-shared-core"
 license = "MIT"
 keywords = ["crypto", "dash", "spv"]
 
-[profile.test]
-default = ["use_serde", "test-helpers"]
+#[profile.test]
+#default = ["use_serde", "test-helpers"]
 
 [profile.dev]
 opt-level = 0
