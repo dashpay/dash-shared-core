@@ -19,9 +19,20 @@ homepage = "https://github.com/dashpay/dash-shared-core"
 license = "MIT"
 keywords = ["crypto", "dash", "spv"]
 
+#[profile.release]
+#lto = "thin"
+#opt-level = 3
+##debug = true
+##[profile.test]
+##default = ["use_serde", "test-helpers"]
+#
+[profile.dev]
+opt-level = 0
+debug = true        # Generates DWARF debug symbols that LLDB can read
+lto = false         # Disables LTO to preserve function boundaries
+#incremental = true  # Enable incremental builds for faster rebuilds
+
 [profile.release]
-lto = "thin"
-opt-level = 3
-#debug = true
-#[profile.test]
-#default = ["use_serde", "test-helpers"]
+opt-level = 1
+debug = true
+lto = false

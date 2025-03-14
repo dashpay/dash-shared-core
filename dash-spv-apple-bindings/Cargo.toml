@@ -116,13 +116,3 @@ ios-deployment-target = "12.0"  # Set to a common minimum target (e.g., 12.0)
 #[profile.test]
 #default = ["use_serde", "test-helpers"]
 
-[profile.dev]
-opt-level = 0
-debug = true        # Generates DWARF debug symbols that LLDB can read
-lto = false         # Disables LTO to preserve function boundaries
-incremental = true  # Enable incremental builds for faster rebuilds
-
-[profile.release]
-opt-level = 1
-debug = true
-lto = false

@@ -1,6 +1,12 @@
 #!/bin/bash
 
 set -ex
+BUILD_TYPE=${1:-release}  # Default to "release", override with "debug" if passed
+if [[ "$BUILD_TYPE" == "release" ]]; then
+    BUILD_FLAG="--release"
+else
+    BUILD_FLAG=""
+fi
 
 echo "Building Dash Shared Core..."
 pwd
@@ -49,8 +55,7 @@ for target in "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-apple-ios" "a
 done
 
 rm -rf target/{framework,include,lib}
-cargo lipo
-#cargo lipo --release
+cargo lipo $BUILD_FLAG
 build_targets=(
     "x86_64-apple-ios"
     "aarch64-apple-ios"
@@ -60,20 +65,20 @@ build_targets=(
 
 )
 for target in "${build_targets[@]}"; do
-    if [ ! -f "../../target/$target/release/lib${LIB_NAME}.a" ]; then
-        cargo build --target="$target" --features=objc &
-#        cargo build --target="$target" --features=objc --release &
+    if [ ! -f "../../target/$target/$BUILD_TYPE/lib${LIB_NAME}.a" ]; then
+        cargo build --target="$target" --features=objc --"$BUILD_FLAG" &
     fi
 done
 wait
 mkdir -p target/{framework,include,lib/{ios,ios-simulator,macos}}
 
-lipo -create ../target/x86_64-apple-darwin/release/lib${LIB_NAME}.a \
-  ../target/aarch64-apple-darwin/release/lib${LIB_NAME}.a \
-  -output target/lib/macos/lib${LIB_NAME}_macos.a &
-cp -r -p ../target/aarch64-apple-ios/release/lib${LIB_NAME}.a target/lib/ios/lib${LIB_NAME}_ios.a &
-lipo -create ../target/x86_64-apple-ios/release/lib${LIB_NAME}.a  \
-  ../target/aarch64-apple-ios-sim/release/lib${LIB_NAME}.a \
+lipo -create ../target/x86_64-apple-darwin/"$BUILD_TYPE"/lib${LIB_NAME}.a \
+  ../target/aarch64-apple-darwin/"$BUILD_TYPE"/lib${LIB_NAME}.a \
+  -output target/lib/macos/lib${LIB_NAME}_macos.a
+
+cp -r -p ../target/aarch64-apple-ios/"$BUILD_TYPE"/lib${LIB_NAME}.a target/lib/ios/lib${LIB_NAME}_ios.a &
+lipo -create ../target/x86_64-apple-ios/"$BUILD_TYPE"/lib${LIB_NAME}.a  \
+  ../target/aarch64-apple-ios-sim/"$BUILD_TYPE"/lib${LIB_NAME}.a \
   -output target/lib/ios-simulator/lib${LIB_NAME}_ios.a &
 wait
 wait
