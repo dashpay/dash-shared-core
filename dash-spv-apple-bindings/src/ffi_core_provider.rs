@@ -4,7 +4,8 @@ use dashcore::bls_sig_utils::BLSSignature;
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dash_spv_crypto::network::ChainType;
-use dash_spv_masternode_processor::common::block::{Block, MBlock};
+#[cfg(test)]
+use dash_spv_masternode_processor::common::block::MBlock;
 use dash_spv_masternode_processor::processing::core_provider::{CoreProvider, CoreProviderError};
 #[cfg(test)]
 use dash_spv_masternode_processor::{processing::MasternodeProcessor, tests::FFIContext};
@@ -17,16 +18,11 @@ pub struct FFICoreProvider {
     pub chain_type: ChainType,
 
     pub get_block_height_by_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> u32>,
-    pub block_by_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError>>,
-    pub last_block_for_block_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError>>,
     pub get_block_hash_by_height: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> Option<[u8; 32]>>,
-    pub get_tip_height: Arc<dyn Fn(*const std::os::raw::c_void) -> u32>,
-    pub get_block_by_height_or_last_terminal: Arc<dyn Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError>>,
     pub get_cl_signature_by_block_hash: Arc<dyn Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<BLSSignature, CoreProviderError>>,
     pub update_address_usage_of_masternodes: Arc<dyn Fn(*const std::os::raw::c_void, Vec<QualifiedMasternodeListEntry>)>,
     pub issue_with_masternode_list_from_peer: Arc<dyn Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void)>,
     pub notify_sync_state: Arc<dyn Fn(*const std::os::raw::c_void, CacheState)>,
-    pub dequeue_masternode_list: Arc<dyn Fn(*const std::os::raw::c_void, bool)>
 }
 
 unsafe impl Send for FFICoreProvider {}
@@ -45,6 +41,10 @@ impl CoreProvider for FFICoreProvider {
     fn chain_type(&self) -> ChainType {
         self.chain_type.clone()
     }
+    fn lookup_cl_signature_by_block_hash(&self, block_hash: [u8; 32]) -> Result<BLSSignature, CoreProviderError> {
+        (self.get_cl_signature_by_block_hash)(self.context, block_hash)
+    }
+
     fn lookup_block_hash_by_height(&self, block_height: u32) -> Option<[u8; 32]> {
         (self.get_block_hash_by_height)(self.context, block_height)
     }
@@ -53,13 +53,6 @@ impl CoreProvider for FFICoreProvider {
         (self.get_block_height_by_hash)(self.context, block_hash)
     }
 
-    fn lookup_block_by_height_or_last_terminal(&self, block_height: u32) -> Result<Block, CoreProviderError> {
-        (self.get_block_by_height_or_last_terminal)(self.context, block_height)
-    }
-
-    fn get_tip_height(&self) -> u32 {
-        (self.get_tip_height)(self.context)
-    }
     fn update_address_usage_of_masternodes(&self, masternodes: Vec<QualifiedMasternodeListEntry>) {
         (self.update_address_usage_of_masternodes)(self.context, masternodes)
     }
@@ -67,23 +60,8 @@ impl CoreProvider for FFICoreProvider {
     fn issue_with_masternode_list_from_peer(&self, is_dip24: bool, peer: *const std::os::raw::c_void) {
         (self.issue_with_masternode_list_from_peer)(self.context, is_dip24, peer)
     }
-
-    fn block_by_hash(&self, block_hash: [u8; 32]) -> Result<MBlock, CoreProviderError> {
-        (self.block_by_hash)(self.context, block_hash)
-    }
-
-    fn last_block_for_block_hash(&self, block_hash: [u8; 32], peer: *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> {
-        (self.last_block_for_block_hash)(self.context, block_hash, peer)
-    }
-
-    fn lookup_cl_signature_by_block_hash(&self, block_hash: [u8; 32]) -> Result<BLSSignature, CoreProviderError> {
-        (self.get_cl_signature_by_block_hash)(self.context, block_hash)
-    }
     fn notify_sync_state(&self, state: CacheState) {
         (self.notify_sync_state)(self.context, state)
-    }
-    fn dequeue_masternode_list(&self, is_dip24: bool) {
-        (self.dequeue_masternode_list)(self.context, is_dip24)
     }
 }
 
@@ -92,28 +70,18 @@ impl FFICoreProvider  {
     pub fn new<
         BHT: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32 + Send + Sync + 'static,
         BHH: Fn(*const std::os::raw::c_void, u32) -> Option<[u8; 32]> + Send + Sync + 'static,
-        TIPBH: Fn(*const std::os::raw::c_void) -> u32 + Send + Sync + 'static,
-        BORLT: Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError> + Send + Sync + 'static,
-        BBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
-        LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         CLSBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<BLSSignature, CoreProviderError> + Send + Sync + 'static,
         UMU: Fn(*const std::os::raw::c_void, Vec<QualifiedMasternodeListEntry>) + Send + Sync + 'static,
         IWMLFP: Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void) + Send + Sync + 'static,
         NSS: Fn(*const std::os::raw::c_void, CacheState) + Send + Sync + 'static,
-        DML: Fn(*const std::os::raw::c_void, bool) + Send + Sync + 'static,
     >(
         chain_type: ChainType,
         get_block_height_by_hash: BHT,
         get_block_hash_by_height: BHH,
-        get_block_by_height_or_last_terminal: BORLT,
-        block_by_hash: BBH,
-        last_block_for_block_hash: LBBBH,
-        get_tip_height: TIPBH,
         get_cl_signature_by_block_hash: CLSBH,
         update_address_usage_of_masternodes: UMU,
         issue_with_masternode_list_from_peer: IWMLFP,
         notify_sync_state: NSS,
-        dequeue_masternode_list: DML,
         context: *const std::os::raw::c_void,
     ) -> Self {
         Self {
@@ -121,15 +89,10 @@ impl FFICoreProvider  {
             context,
             get_block_height_by_hash: Arc::new(get_block_height_by_hash),
             get_block_hash_by_height: Arc::new(get_block_hash_by_height),
-            get_block_by_height_or_last_terminal: Arc::new(get_block_by_height_or_last_terminal),
-            block_by_hash: Arc::new(block_by_hash),
-            get_tip_height: Arc::new(get_tip_height),
-            last_block_for_block_hash: Arc::new(last_block_for_block_hash),
             get_cl_signature_by_block_hash: Arc::new(get_cl_signature_by_block_hash),
             update_address_usage_of_masternodes: Arc::new(update_address_usage_of_masternodes),
             issue_with_masternode_list_from_peer: Arc::new(issue_with_masternode_list_from_peer),
             notify_sync_state: Arc::new(notify_sync_state),
-            dequeue_masternode_list: Arc::new(dequeue_masternode_list),
         }
     }
 }
@@ -142,54 +105,6 @@ impl FFICoreProvider {
         Self {
             context: context_raw,
             chain_type: chain_type.clone(),
-            block_by_hash: {
-                let clone_chain = chain_type.clone();
-                Arc::new(move |context, block_hash| unsafe {
-                    let context = Arc::from_raw(context as *const FFIContext);
-                    let result = context.block_for_hash(block_hash)
-                        .map(MBlock::from)
-                        .ok_or(CoreProviderError::NullResult(format!("Block for block_hash: {} ({}) not found", block_hash.to_lower_hex_string(), block_hash.reversed().to_lower_hex_string())));
-                    std::mem::forget(context);
-                    #[cfg(feature = "use_serde")]
-                    if result.is_err() {
-                        return clone_chain.insight_url()
-                            .ok_or(CoreProviderError::NullResult(format!("No insight for chain {:?}", clone_chain)))
-                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_hash(url, &dash_spv_crypto::crypto::byte_util::Reversed::reversed(&block_hash))
-                            .map(MBlock::from)
-                            .map_err(|e| CoreProviderError::NullResult(format!("Block for block_hash: {} ({}) not found", block_hash.to_lower_hex_string(), block_hash.reversed().to_lower_hex_string()))));
-                    }
-                    result
-                })
-            },
-            get_tip_height: {
-                let clone_chain = chain_type.clone();
-                Arc::new(move |context| unsafe {
-                    let context = Arc::from_raw(context as *const FFIContext);
-                    let result = context.get_tip_height();
-                    std::mem::forget(context);
-                    result
-                })
-
-            },
-            last_block_for_block_hash: {
-                let clone_chain = chain_type.clone();
-                Arc::new(move |context, block_hash, peer| unsafe {
-                    let context = Arc::from_raw(context as *const FFIContext);
-                    let result = context.block_for_hash(block_hash)
-                        .map(MBlock::from)
-                        .ok_or(CoreProviderError::NullResult(format!("Last block for block_hash: {} ({}) not found", block_hash.to_lower_hex_string(), block_hash.reversed().to_lower_hex_string())));
-                    std::mem::forget(context);
-                    #[cfg(feature = "use_serde")]
-                    if result.is_err() {
-                        return clone_chain.insight_url()
-                            .ok_or(CoreProviderError::NullResult(format!("No insight for chain {:?}", clone_chain)))
-                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_hash(url, &block_hash.reversed())
-                                .map(MBlock::from)
-                                .map_err(|e| CoreProviderError::NullResult(e.to_string())));
-                    }
-                    result
-                })
-            },
             get_block_height_by_hash: {
                 let clone_chain = chain_type.clone();
                 Arc::new(move |context, block_hash| unsafe {
@@ -226,25 +141,6 @@ impl FFICoreProvider {
                     result.ok()
                 })
             },
-            get_block_by_height_or_last_terminal: {
-                let clone_chain = chain_type.clone();
-                Arc::new(move |context, block_height| unsafe {
-                    let context = Arc::from_raw(context as *const FFIContext);
-                    let result = context.block_for_height(block_height)
-                        .map(Block::from)
-                        .ok_or(CoreProviderError::NullResult(format!("No block or last terminal by height {} ", block_height)));
-                    std::mem::forget(context);
-                    #[cfg(feature = "use_serde")]
-                    if result.is_err() {
-                        return clone_chain.insight_url()
-                            .ok_or(CoreProviderError::NullResult(format!("No insight for chain {:?}", clone_chain)))
-                            .and_then(|url| dash_spv_masternode_processor::util::insight::insight_block_by_block_height(url, block_height)
-                                .map(|b| Block::from(b))
-                                .map_err(|e| CoreProviderError::NullResult(e.to_string())));
-                    }
-                    result
-                })
-            },
             get_cl_signature_by_block_hash: Arc::new(move |context, block_hash| unsafe {
                 let context = Arc::from_raw(context as *const FFIContext);
                 let result = context.cl_signature_by_block_hash(&block_hash)
@@ -256,7 +152,6 @@ impl FFICoreProvider {
             update_address_usage_of_masternodes: Arc::new(|context, modified_masternodes| {}),
             issue_with_masternode_list_from_peer: Arc::new(|context, is_dip24, peer| {}),
             notify_sync_state: Arc::new(|context, state| {}),
-            dequeue_masternode_list: Arc::new(|context, is_dip24| {}),
         }
     }
     pub fn default_processor(context: Arc<FFIContext>, chain_type: ChainType) -> MasternodeProcessor {

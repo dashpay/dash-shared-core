@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 use std::io;
 use std::io::Write;
 use hashes::hex::ToHex;
-use secp256k1::rand::{Rng, thread_rng};
-use crate::chain::common::{ChainType, DevnetType, LLMQType};
-use crate::crypto::byte_util::{Reversable, Zeroable, UInt256, UInt768};
+use dashcore::secp256k1::rand::{Rng, thread_rng};
+use dashcore::sml::llmq_type::LLMQType;
+use dashcore::sml::quorum_entry::qualified_quorum_entry::QualifiedQuorumEntry;
+use dash_spv_crypto::network::{ChainType, DevnetType};
 use crate::models::{LLMQEntry, LLMQSnapshot, MasternodeEntry, MasternodeList};
 use crate::processing::{MNListDiffResult, QRInfoResult};
 use crate::util::file::save_java_class;
@@ -69,7 +70,7 @@ pub fn generate_qr_test<F: Fn(&mut W), W: Write>(contents: F, writer: &mut W) ->
 }
 
 pub fn setup_context<W: Write>(chain_type: ChainType, writer: &mut W) -> io::Result<()> {
-    writer.write_all(format!("Context context = new Context({}.get());\n", match chain_type {
+    writer.write_all(format!("Context context = new Context({}.get());\n", match &chain_type {
         ChainType::MainNet => "MainNetParams",
         ChainType::TestNet => "TestNet3Params",
         ChainType::DevNet(devnet) => "DevNetParams",
@@ -79,7 +80,7 @@ pub fn setup_context<W: Write>(chain_type: ChainType, writer: &mut W) -> io::Res
     writer.write_all(format!("params.setBasicBLSSchemeActivationHeight({});\n", chain_type.core19_activation_height()).as_bytes())
 }
 
-pub fn generate_final_commitment<W: Write>(quorum: &LLMQEntry, writer: &mut W) -> io::Result<()> {
+pub fn generate_final_commitment<W: Write>(quorum: &QualifiedQuorumEntry, writer: &mut W) -> io::Result<()> {
     writer.write_all(format!("FinalCommitment finalCommitment = new FinalCommitment(params, (short) {}, {}, \
             Sha256Hash.wrap(\"{}\"), \
             {}, \
@@ -90,11 +91,11 @@ pub fn generate_final_commitment<W: Write>(quorum: &LLMQEntry, writer: &mut W) -
             new BLSLazySignature(params, Utils.HEX.decode(\"{}\"), 0, {}), \
             new BLSLazySignature(params, Utils.HEX.decode(\"{}\"), 0, {})\
             );",
-             u16::from(quorum.version),
-             u8::from(quorum.llmq_type),
-             quorum.llmq_hash.reversed(),
-             quorum.index.unwrap_or(0),
-             quorum.signers_count.0,
+             u16::from(quorum.quorum_entry.version),
+             u8::from(quorum.quorum_entry.llmq_type),
+             quorum.quorum_entry.quorum_hash.reverse(),
+             quorum.quorum_entry.quorum_index.unwrap_or(0),
+             quorum.quorum_entry.0,
              quorum.signers_bitset.to_hex(),
              quorum.valid_members_count.0,
              quorum.valid_members_bitset.to_hex(),

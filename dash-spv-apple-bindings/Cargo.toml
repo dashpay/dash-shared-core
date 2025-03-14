@@ -99,8 +99,6 @@ system_contracts = ["dpp/system_contracts"]
 test-helpers = ["dash-spv-masternode-processor/test-helpers"]
 use_serde = ["serde", "dash-spv-masternode-processor/use_serde", "dash-spv-crypto/use_serde"]
 validation = ["dpp/validation"]
-#[profile.test]
-#default = ["use_serde", "test-helpers"]
 
 [lib]
 name = "dash_spv_apple_bindings"
@@ -113,4 +111,18 @@ ios-deployment-target = "12.0"  # Set to a common minimum target (e.g., 12.0)
 #lto = "thin"
 #opt-level = 3
 #debug = true
+#
 
+#[profile.test]
+#default = ["use_serde", "test-helpers"]
+
+[profile.dev]
+opt-level = 0
+debug = true        # Generates DWARF debug symbols that LLDB can read
+lto = false         # Disables LTO to preserve function boundaries
+incremental = true  # Enable incremental builds for faster rebuilds
+
+[profile.release]
+opt-level = 1
+debug = true
+lto = false

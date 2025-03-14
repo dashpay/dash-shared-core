@@ -49,7 +49,8 @@ for target in "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-apple-ios" "a
 done
 
 rm -rf target/{framework,include,lib}
-cargo lipo --release
+cargo lipo
+#cargo lipo --release
 build_targets=(
     "x86_64-apple-ios"
     "aarch64-apple-ios"
@@ -60,7 +61,8 @@ build_targets=(
 )
 for target in "${build_targets[@]}"; do
     if [ ! -f "../../target/$target/release/lib${LIB_NAME}.a" ]; then
-        cargo build --target="$target" --features=objc --release &
+        cargo build --target="$target" --features=objc &
+#        cargo build --target="$target" --features=objc --release &
     fi
 done
 wait

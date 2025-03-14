@@ -30,7 +30,6 @@ use dpp::prelude::CoreBlockHeight;
 use dpp::errors::ProtocolError;
 use drive_proof_verifier::error::ContextProviderError;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
-use dash_spv_masternode_processor::common::block::{Block, MBlock};
 use dash_spv_masternode_processor::processing::core_provider::CoreProviderError;
 use dash_spv_masternode_processor::processing::MasternodeProcessor;
 use dash_spv_platform::PlatformSDK;
@@ -57,7 +56,6 @@ impl DashSPVCore {
 
     pub fn with_callbacks<
         // platform
-        // QP: Fn(*const std::os::raw::c_void, u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
         DC: Fn(*const std::os::raw::c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
         AH: Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
         CS: Fn(*const std::os::raw::c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
@@ -65,15 +63,10 @@ impl DashSPVCore {
         // masternode
         BHT: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32 + Send + Sync + 'static,
         BHH: Fn(*const std::os::raw::c_void, u32) -> Option<[u8; 32]> + Send + Sync + 'static,
-        TIPBH: Fn(*const std::os::raw::c_void) -> u32 + Send + Sync + 'static,
-        BORLT: Fn(*const std::os::raw::c_void, u32) -> Result<Block, CoreProviderError> + Send + Sync + 'static,
-        BBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
-        LBBBH: Fn(*const std::os::raw::c_void, [u8; 32], *const std::os::raw::c_void) -> Result<MBlock, CoreProviderError> + Send + Sync + 'static,
         CLSBH: Fn(*const std::os::raw::c_void, [u8; 32]) -> Result<BLSSignature, CoreProviderError> + Send + Sync + 'static,
         UMU: Fn(*const std::os::raw::c_void, Vec<QualifiedMasternodeListEntry>) + Send + Sync + 'static,
         IWMLFP: Fn(*const std::os::raw::c_void, bool, *const std::os::raw::c_void) + Send + Sync + 'static,
         NSS: Fn(*const std::os::raw::c_void, CacheState) + Send + Sync + 'static,
-        DML: Fn(*const std::os::raw::c_void, bool) + Send + Sync + 'static,
     >(
         chain_type: ChainType,
         address_list: Option<Vec<&'static str>>,
@@ -85,30 +78,20 @@ impl DashSPVCore {
 
         get_block_height_by_hash: BHT,
         get_block_hash_by_height: BHH,
-        get_block_by_height_or_last_terminal: BORLT,
-        block_by_hash: BBH,
-        last_block_for_block_hash: LBBBH,
-        get_tip_height: TIPBH,
         get_cl_signature_by_block_hash: CLSBH,
         update_address_usage_of_masternodes: UMU,
         issue_with_masternode_list_from_peer: IWMLFP,
         notify_sync_state: NSS,
-        dequeue_masternode_list: DML,
 
         context: *const std::os::raw::c_void) -> Self {
         let provider = Arc::new(FFICoreProvider::new(
             chain_type.clone(),
             get_block_height_by_hash,
             get_block_hash_by_height,
-            get_block_by_height_or_last_terminal,
-            block_by_hash,
-            last_block_for_block_hash,
-            get_tip_height,
             get_cl_signature_by_block_hash,
             update_address_usage_of_masternodes,
             issue_with_masternode_list_from_peer,
             notify_sync_state,
-            dequeue_masternode_list,
             context));
         let network = Network::from(chain_type.clone());
         let processor = MasternodeProcessor::new(provider.clone(), network);

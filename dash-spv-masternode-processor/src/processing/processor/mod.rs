@@ -125,6 +125,12 @@ impl MasternodeProcessor {
     pub fn known_chain_locks(&self) -> BTreeMap<BlockHash, BLSSignature> {
         self.engine.known_chain_locks.clone()
     }
+    pub fn known_block_hashes(&self) -> BTreeMap<u32, [u8; 32]> {
+        self.engine.block_hashes.iter().map(|(h, hash)| (*h, hash.to_byte_array())).collect()
+    }
+    pub fn known_block_heights(&self) -> BTreeMap<[u8; 32], u32> {
+        self.engine.block_heights.iter().map(|(hash, h)| (hash.to_byte_array(), *h)).collect()
+    }
 
     #[cfg(feature = "std")]
     pub fn known_snapshots(&self) -> BTreeMap<BlockHash, QuorumSnapshot> {
