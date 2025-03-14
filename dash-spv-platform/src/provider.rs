@@ -5,6 +5,7 @@ use dash_sdk::platform::DataContract;
 use drive_proof_verifier::ContextProvider;
 use drive_proof_verifier::error::ContextProviderError;
 use platform_value::Identifier;
+use platform_version::version::PlatformVersion;
 use crate::FFIThreadSafeContext;
 
 
@@ -40,9 +41,14 @@ impl ContextProvider for PlatformProvider {
     fn get_quorum_public_key(&self, quorum_type: u32, quorum_hash: [u8; 32], core_chain_locked_height: u32) -> Result<[u8; 48], ContextProviderError> {
         (self.get_quorum_public_key)(quorum_type, quorum_hash, core_chain_locked_height)
     }
-    fn get_data_contract(&self, id: &Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> {
+    fn get_data_contract(
+        &self,
+        id: &Identifier,
+        _platform_version: &PlatformVersion,
+    ) -> Result<Option<Arc<DataContract>>, ContextProviderError> {
         (self.get_data_contract)(self.context.get(), id.clone())
     }
+
 
     fn get_platform_activation_height(&self) -> Result<CoreBlockHeight, ContextProviderError> {
         (self.get_platform_activation_height)(self.context.get())

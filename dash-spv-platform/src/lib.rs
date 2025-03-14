@@ -54,7 +54,7 @@ use dpp::state_transition::proof_result::StateTransitionProofResult;
 use dpp::withdrawal::Pooling;
 use drive::query::{OrderClause, WhereClause};
 use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
-use drive_proof_verifier::types::EvoNodeStatus;
+use drive_proof_verifier::types::evonode_status::EvoNodeStatus;
 use indexmap::IndexMap;
 use platform_value::{BinaryData, Bytes32, Identifier, Value, ValueMap};
 use tokio::runtime::Runtime;

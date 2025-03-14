@@ -226,7 +226,7 @@ impl MasternodeProcessor {
     /// * `verify_quorums` - A boolean indicating whether the quorums should be verified.
     ///
     /// # Returns
-    /// * `Ok(())` - If the masternode list difference was successfully applied.
+    /// * `Ok((BlockHash, BlockHash))` - If the masternode list difference was successfully applied returns pair (base_block_hash, block_hash).
     /// * `Err(ProcessingError)` - If deserialization or quorum validation fails.
     ///
     /// # Errors
