@@ -1,6 +1,6 @@
 [package]
 name = "dash-spv-coinjoin"
-version = "0.5.0"
+version = "0.5.1"
 description = "Library for processing coinjoin messages"
 
 edition = "2021"
