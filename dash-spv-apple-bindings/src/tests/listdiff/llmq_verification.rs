@@ -1,7 +1,7 @@
-use std::ptr::{null, null_mut};
+use std::ptr::null_mut;
 use std::sync::Arc;
-use hashes::hex::FromHex;
-use dash_spv_crypto::crypto::UInt256;
+use dashcore::hashes::Hash;
+use dashcore::hashes::hex::FromHex;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::block_store::init_testnet_store;
 use dash_spv_masternode_processor::test_helpers::load_message;
@@ -26,10 +26,10 @@ fn testnet_llmq_verification() {
     let use_insight_as_backup = false;
     let base_masternode_list_hash: *const u8 = null_mut();
     let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
+    let mut processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     // let mut ctx = context.write().unwrap();
     // let processor = MasternodeProcessor::new(Arc::new(provider));
-    let result_119064 = processor.mn_list_diff_result_from_message(&bytes, true, 70221, false, null())
+    let result_119064 = processor.process_mn_list_diff_result_from_message(&bytes, None, true)
         .expect("Unable to process mn_list_diff");
     // assert_diff_result(&ctx, &result_119064);
 
@@ -37,11 +37,11 @@ fn testnet_llmq_verification() {
     // println!("is_valid: {}", is_valid);
     let bytes = load_message(chain.identifier(), "MNL_122928_123000__70221.dat");
     let block_hash_119064 = &result_119064.0;
-    // let block_hash_119064 = UInt256(unsafe { *result_119064.block_hash });
+    // let block_hash_119064 = unsafe { *result_119064.block_hash };
     // let masternode_list_119064 = unsafe { &*result_119064.masternode_list };
     // let masternode_list_119064_decoded = unsafe { masternode_list_119064.decode() };
     // let masternode_list_119064_encoded = masternode_list_119064_decoded.encode();
-    let result_119200 = processor.mn_list_diff_result_from_message(&bytes, true, 70221, false, null())
+    let result_119200 = processor.process_mn_list_diff_result_from_message(&bytes, None, true)
         .expect("Unable to process mn_list_diff");
     // assert_diff_result(&ctx, &result_119200);
 
@@ -54,7 +54,7 @@ fn testnet_llmq_verification() {
     //             .insert(entry.llmq_hash, entry.clone());
     //         acc
     //     });
-    // let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums
+    // let hmm: BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>> = added_quorums
     //     .into_iter()
     //     .filter(|(_, map)| map.contains_key(block_hash_119064))
     //     .collect();
@@ -71,24 +71,24 @@ fn testnet_llmq_verification_using_processor_and_cache() {
     //testTestnetQuorumVerification
     let chain = ChainType::TestNet;
     let context = Arc::new(FFIContext::create_default_context_and_cache(chain.clone(), false));
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
+    let mut processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     let use_insight_as_backup = false;
     let bytes = load_message(chain.identifier(), "MNL_0_122928__70221.dat");
-    let result_119064 = processor.mn_list_diff_result_from_message(&bytes, false, 70221, false, null())
+    let result_119064 = processor.process_mn_list_diff_result_from_message(&bytes, None, true)
         .expect("Unable to process mn_list_diff");
     let block_hash_119064 = result_119064.0;
-    let bb1 = UInt256::from_hex("23b8cd5303c892c0b140152f256c7ff27645890e04f93dc7df75d90100000000").unwrap().0;
-    // let hash_119024 = UInt256::from_hex("2cbcf83b62913d56f605c0e581a48872839428c92e5eb76cd7ad94bcaf0b0000").unwrap().0;
+    let bb1 = <[u8; 32]>::from_hex("23b8cd5303c892c0b140152f256c7ff27645890e04f93dc7df75d90100000000").unwrap();
+    // let hash_119024 = <[u8; 32]>::from_hex("2cbcf83b62913d56f605c0e581a48872839428c92e5eb76cd7ad94bcaf0b0000").unwrap();
     let list_119064 = processor.masternode_list_for_block_hash(bb1).unwrap();
-    processor.cache.add_masternode_list(block_hash_119064, list_119064);
-    let masternode_list_119064 = processor.masternode_list_for_block_hash(block_hash_119064)
+    // processor.cache.add_masternode_list(block_hash_119064, list_119064);
+    let masternode_list_119064 = processor.masternode_list_for_block_hash(block_hash_119064.to_byte_array())
         .expect("MasternodeList");
     // let masternode_list_119064 = result_119064.masternode_list;
     // let masternode_list_119064_decoded = unsafe { masternode_list_119064.decode() };
     // let masternode_list_119064_encoded = masternode_list_119064_decoded.encode();
 
     let bytes = load_message(chain.identifier(), "MNL_122928_123000__70221.dat");
-    let result_119200 = processor.mn_list_diff_result_from_message(&bytes, false, 70221, false, null())
+    let result_119200 = processor.process_mn_list_diff_result_from_message(&bytes, None, true)
         .expect("Unable to process mn_list_diff");
     // let result = process_mnlistdiff(bytes, processor, &mut context, 70221, use_insight_as_backup, false);
     // let result_119200 = unsafe { &*result };
@@ -96,13 +96,13 @@ fn testnet_llmq_verification_using_processor_and_cache() {
 
 
     // let masternode_list_119200 = result_119200.masternode_list;
-    let masternode_list_119200 = processor.masternode_list_for_block_hash(result_119200.0)
+    let masternode_list_119200 = processor.masternode_list_for_block_hash(result_119200.0.to_byte_array())
         .expect("MasternodeList");
 
     // let masternode_list_119200_decoded = unsafe { masternode_list_119200.decode() };
     // let added_quorums = result_119200.added_quorums.iter().fold(BTreeMap::new(), |mut acc, entry| {
     //     // let llmq_type = map.llmq_type;
-    //     // let llmq_hash = UInt256(*map.llmq_hash);
+    //     // let llmq_hash = map.llmq_hash;
     //     acc.entry(entry.llmq_type)
     //         .or_insert_with(BTreeMap::new)
     //         .insert(entry.llmq_hash, entry.clone());
@@ -113,13 +113,13 @@ fn testnet_llmq_verification_using_processor_and_cache() {
     //     .fold(BTreeMap::new(), |mut acc, i| unsafe {
     //         let map = &*(*(result_119200.added_quorums.add(i)));
     //         let llmq_type = map.llmq_type;
-    //         let llmq_hash = UInt256(*map.llmq_hash);
+    //         let llmq_hash = *map.llmq_hash;
     //         acc.entry(llmq_type)
     //             .or_insert_with(BTreeMap::new)
     //             .insert(llmq_hash, map.decode());
     //         acc
     //     });
-    // let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums
+    // let hmm: BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>> = added_quorums
     //     .into_iter()
     //     .filter(|(_, map)| map.contains_key(&block_hash_119064))
     //     .collect();

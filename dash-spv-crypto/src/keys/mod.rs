@@ -6,8 +6,8 @@ pub mod ecdsa_key;
 pub mod key;
 pub mod operator_public_key;
 
+use std::convert::Infallible;
 pub use self::key::OpaqueKey;
-// pub use self::key::KeyKind;
 pub use self::bls_key::BLSKey;
 pub use self::ecdsa_key::ECDSAKey;
 pub use self::ed25519_key::ED25519Key;
@@ -57,19 +57,6 @@ pub trait IKey: Send + Sync + Debug {
     fn extended_private_key_data(&self) -> Result<SecVec, KeyError>;
     fn extended_public_key_data(&self) -> Result<Vec<u8>, KeyError>;
 
-    // fn private_derive_to_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-    //     where Self: Sized, PATH: IIndexPath<Item = u32>;
-    // fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Result<Self, KeyError>
-    //     where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-    //     self.private_derive_to_path(&path.base_index_path())
-    // }
-    // fn public_derive_to_256bit_derivation_path<PATH>(&mut self, path: &PATH) -> Result<Self, KeyError>
-    //     where Self: Sized, PATH: IIndexPath<Item = UInt256> {
-    //     self.public_derive_to_256bit_derivation_path_with_offset(path, 0)
-    // }
-    // fn public_derive_to_256bit_derivation_path_with_offset<PATH>(&mut self, path: &PATH, offset: usize) -> Result<Self, KeyError>
-    //     where Self: Sized, PATH: IIndexPath<Item = UInt256>;
-
     fn serialized_private_key_for_script(&self, chain_prefix: u8) -> String;
     fn hmac_256_data(&self, data: &[u8]) -> [u8; 32];
     fn forget_private_key(&mut self);
@@ -77,7 +64,6 @@ pub trait IKey: Send + Sync + Debug {
     fn create_signature(&self, tx_input_script: &Vec<u8>, tx_data: &Vec<u8>) -> Vec<u8> {
         let mut sig = Vec::<u8>::new();
         let hash = sha256d::Hash::hash(tx_data);
-        // let hash = UInt256::sha256d(tx_data);
         let mut s = self.sign(hash.as_ref());
         let elem = tx_input_script.script_elements();
         (SIGHASH_ALL as u8).consensus_encode(&mut s).unwrap();
@@ -130,6 +116,13 @@ impl std::error::Error for KeyError {}
 
 impl From<std::array::TryFromSliceError> for KeyError {
     fn from(value: std::array::TryFromSliceError) -> Self {
+        // Self::TryFromSliceError(value)
+        Self::Any(value.to_string())
+    }
+}
+
+impl From<Infallible> for KeyError {
+    fn from(value: Infallible) -> Self {
         // Self::TryFromSliceError(value)
         Self::Any(value.to_string())
     }

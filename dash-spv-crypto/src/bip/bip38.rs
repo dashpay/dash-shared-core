@@ -1,6 +1,5 @@
 use bip38::{Decrypt, Encrypt};
 use byte::BytesExt;
-use crate::crypto::byte_util::UInt256;
 use crate::keys::{ECDSAKey, KeyError};
 use crate::network::ChainType;
 use crate::util::{base58, is_valid_dash_address_for_script_map, is_valid_dash_private_key, ScriptMap};
@@ -34,7 +33,7 @@ impl BIP38 for ECDSAKey {
     fn key_with_bip38_key(key: &str, passphrase: &str, script: &ScriptMap) -> Result<Self, KeyError> where Self: Sized {
         key.decrypt(passphrase, script.pubkey)
             .map_err(KeyError::from)
-            .and_then(|(secret, compressed)| ECDSAKey::init_with_secret(UInt256(secret), compressed))
+            .and_then(|(secret, compressed)| ECDSAKey::init_with_secret(secret, compressed))
     }
 
     fn bip38_key_with_passphrase(&self, passphrase: &str, script: &ScriptMap) -> Result<String, KeyError> {

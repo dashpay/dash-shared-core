@@ -1,8 +1,7 @@
-use hashes::hex::{FromHex, ToHex};
-use hashes::{sha256, Hash};
-
+use dashcore::hashes::{sha256, sha256d, Hash};
+use dashcore::hashes::hex::FromHex;
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dash_spv_crypto::network::ChainType;
-use dash_spv_crypto::crypto::UInt256;
 use dash_spv_crypto::derivation::{IIndexPath, IndexPath};
 use dash_spv_crypto::keys::{ECDSAKey, IKey};
 use dash_spv_crypto::keys::key::{IndexPathU256, KeyKind};
@@ -15,7 +14,7 @@ use dash_spv_crypto::util::data_append::DataAppend;
 fn test_sign_key(secret: &str, message: &str, compressed: bool, test_signature: &str) {
     match ECDSAKey::key_with_secret_hex(secret, compressed) {
         Ok(mut key) => {
-            let message_digest = sha256::Hash::hash(message.as_bytes()).into_inner().to_vec();
+            let message_digest = sha256::Hash::hash(message.as_bytes()).to_byte_array();
             let sig = key.sign(&message_digest);
             let test_sig = Vec::from_hex(test_signature).unwrap();
             assert_eq!(sig, test_sig, "Signature don't match");
@@ -35,8 +34,8 @@ fn test_compact_signature_recovery(signature: &[u8], md: [u8; 32], test_data: Ve
 fn test_compact_signature_key(secret: &str, message: &str, compressed: bool) {
     match ECDSAKey::key_with_secret_hex(secret, compressed) {
         Ok(key) => {
-            let message_digest = UInt256::sha256_str(message).0;
-            let sig = key.compact_sign(message_digest);
+            let message_digest = sha256::Hash::hash(message.as_bytes()).to_byte_array();
+            let sig = key.compact_sign(&message_digest);
             test_compact_signature_recovery(&sig, message_digest, key.public_key_data());
         },
         Err(err) => panic!("key_with_secret_hex: Key is invalid {}", err)
@@ -46,7 +45,7 @@ fn test_compact_signature_key(secret: &str, message: &str, compressed: bool) {
 fn test_restore_compact_signatures_from_base58(signature: &str, message: &str, test_key: &str) {
     match (base58::from(signature),
            base58::from(test_key)) {
-        (Ok(sig), Ok(data)) => test_compact_signature_recovery(&sig, UInt256::sha256d_str(message).0, data),
+        (Ok(sig), Ok(data)) => test_compact_signature_recovery(&sig, sha256d::Hash::hash(message.as_bytes()).to_byte_array(), data),
         _ => panic!("Bad base58")
     }
 }
@@ -211,11 +210,11 @@ fn private_key_with_non_base_string() {
     let script4 = Vec::<u8>::script_pub_key_for_address(&ia4, &script_map);
     let script5 = Vec::<u8>::script_pub_key_for_address(&ia5, &script_map);
 
-    assert_eq!(script1.to_hex(), "76a9149a01e1b57808ed4f14553fc4624de20c13c9e97e88ac");
-    assert_eq!(script2.to_hex(), "76a914ea12f5467a2351e842fcf6124435273039fe185e88ac");
-    assert_eq!(script3.to_hex(), "76a91462dc3919f49e95fe2e81af07d96149d0fd77353588ac");
-    assert_eq!(script4.to_hex(), "76a914cb28bc5238bf5fcb97ddc7763ccc8c8a34fb38cd88ac");
-    assert_eq!(script5.to_hex(), "76a9145ca1190f85fb51c702f6ee97e8871c7a6b14bc7788ac");
+    assert_eq!(script1.to_lower_hex_string(), "76a9149a01e1b57808ed4f14553fc4624de20c13c9e97e88ac");
+    assert_eq!(script2.to_lower_hex_string(), "76a914ea12f5467a2351e842fcf6124435273039fe185e88ac");
+    assert_eq!(script3.to_lower_hex_string(), "76a91462dc3919f49e95fe2e81af07d96149d0fd77353588ac");
+    assert_eq!(script4.to_lower_hex_string(), "76a914cb28bc5238bf5fcb97ddc7763ccc8c8a34fb38cd88ac");
+    assert_eq!(script5.to_lower_hex_string(), "76a9145ca1190f85fb51c702f6ee97e8871c7a6b14bc7788ac");
 }
 
 #[test]

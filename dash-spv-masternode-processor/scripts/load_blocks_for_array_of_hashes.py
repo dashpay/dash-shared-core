@@ -22,7 +22,7 @@ for i in hashes:
     block_hash = block["hash"]
     block_height = block["height"]
     merkle_root = block["merkleroot"]
-    # print('MerkleBlock {{ hash: UInt256::from_hex("{}").unwrap().reverse(), height: {}, merkleroot: UInt256::from_hex("{}").unwrap() }},'.format(
+    # print('MerkleBlock {{ hash: UInt256::from_hex("{}").unwrap().reverse(), height: {}, merkleroot: <[u8; 32]>::from_hex("{}").unwrap() }},'.format(
     #         block_hash, block_height, merkle_root))
     print('MerkleBlock::reversed({}, "{}", "{}"), '.format(block_height, block_hash, merkle_root))
     # print('store.put(new StoredBlock(new Block(params, {}, '

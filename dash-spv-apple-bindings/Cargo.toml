@@ -13,6 +13,7 @@ bincode_derive = "=2.0.0-rc.3"
 
 byte = "0.2"
 dash-spv-crypto = { path = "../dash-spv-crypto", features = ["default"] }
+dash-spv-keychain = { path = "../dash-spv-keychain" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor", features = ["default"] }
 dash-spv-platform = { path = "../dash-spv-platform" }
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "message_verification", "quorum_validation"], default-features = false, branch = "feat/ferment" }

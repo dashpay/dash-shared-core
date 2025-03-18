@@ -1,13 +1,11 @@
-use bls_signatures::bip32::{ChainCode, ExtendedPrivateKey, ExtendedPublicKey};
+use bls_signatures::bip32::{ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
-#[cfg(test)]
-use byte::BytesExt;
 use dashcore::consensus::Encodable;
-use dashcore::hashes::{hex::FromHex, sha256, sha256d, Hash};
+use dashcore::hashes::{hash160, hex::FromHex, sha256, sha256d, Hash};
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 #[cfg(test)]
 use dashcore::secp256k1::rand::{thread_rng, Rng};
-use crate::crypto::byte_util::{AsBytes, Zeroable, UInt160, UInt256, UInt384, UInt768};
+use crate::crypto::byte_util::{Zeroable, hmac};
 #[cfg(test)]
 use crate::crypto::byte_util::Random;
 use crate::keys::OperatorPublicKey;
@@ -46,9 +44,9 @@ impl BLSKey {
     pub fn key_with_seed_data(seed: &[u8], use_legacy: bool) -> Self {
         let bls_private_key = PrivateKey::from_bip32_seed(seed);
         let bls_public_key = bls_private_key.g1_element().unwrap();
-        let seckey = UInt256::from(&*bls_private_key.to_bytes());
+        let seckey = TryInto::<[u8; 32]>::try_into(bls_private_key.to_bytes().as_slice()).map_err(KeyError::from).unwrap();
         let pubkey = g1_element_serialized(&bls_public_key, use_legacy);
-        Self { seckey: seckey.0, pubkey, use_legacy, chaincode: [0u8; 32], extended_public_key_data: Default::default(), extended_private_key_data: Default::default() }
+        Self { seckey, pubkey, use_legacy, chaincode: [0u8; 32], extended_public_key_data: Default::default(), extended_private_key_data: Default::default() }
     }
 
     pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Result<BLSKey, dashcore::hashes::hex::Error> {
@@ -83,6 +81,10 @@ impl BLSKey {
     pub fn key_with_public_key(pubkey: [u8; 48], use_legacy: bool) -> Self {
         Self { pubkey, use_legacy, seckey: [0u8; 32], chaincode: [0u8; 32], extended_public_key_data: Default::default(), extended_private_key_data: Default::default() }
     }
+    pub fn key_with_public_key_data(data: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
+        let pubkey = TryInto::<[u8; 48]>::try_into(data).map_err(KeyError::from)?;
+        Ok(Self::key_with_public_key(pubkey, use_legacy))
+    }
     pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Result<Self, KeyError> {
         ExtendedPrivateKey::from_bytes(bytes)
             .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
@@ -90,30 +92,32 @@ impl BLSKey {
     }
 
     pub fn migrate_from_legacy_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
-        //ExtendedPubKey::fr
-        ExtendedPublicKey::from_bytes_legacy(bytes)
-            .map_err(KeyError::from)
-            .map(|extended_public_key| Self {
-                pubkey: g1_element_serialized(&extended_public_key.public_key(), false),
-                chaincode: UInt256::from(extended_public_key.chain_code()).0,
-                extended_public_key_data: extended_public_key_serialized(&extended_public_key, false).to_vec(),
-                seckey: [0u8; 32],
-                extended_private_key_data: Default::default(),
-                use_legacy: false,
-            })
+        let extended_public_key = ExtendedPublicKey::from_bytes_legacy(bytes)
+            .map_err(KeyError::from)?;
+        let chaincode = *extended_public_key.chain_code().serialize();
+        Ok(Self {
+            pubkey: g1_element_serialized(&extended_public_key.public_key(), false),
+            chaincode,
+            extended_public_key_data: extended_public_key_serialized(&extended_public_key, false).to_vec(),
+            seckey: [0u8; 32],
+            extended_private_key_data: Default::default(),
+            use_legacy: false,
+        })
     }
 
     pub fn migrate_from_basic_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
-        ExtendedPublicKey::from_bytes(bytes)
-            .map_err(KeyError::from)
-            .map(|extended_public_key| Self {
-                pubkey: g1_element_serialized(&extended_public_key.public_key(), true),
-                chaincode: UInt256::from(extended_public_key.chain_code()).0,
-                extended_public_key_data: extended_public_key_serialized(&extended_public_key, true).to_vec(),
-                seckey: [0u8; 32],
-                extended_private_key_data: Default::default(),
-                use_legacy: false
-            })
+        let extended_public_key = ExtendedPublicKey::from_bytes(bytes)
+            .map_err(KeyError::from)?;
+        let chaincode = *extended_public_key.chain_code().serialize();
+
+        Ok(Self {
+            pubkey: g1_element_serialized(&extended_public_key.public_key(), true),
+            chaincode,
+            extended_public_key_data: extended_public_key_serialized(&extended_public_key, true).to_vec(),
+            seckey: [0u8; 32],
+            extended_private_key_data: Default::default(),
+            use_legacy: false
+        })
     }
 
     pub fn product(&self, public_key: &BLSKey) -> Result<[u8; 48], KeyError> {
@@ -145,7 +149,7 @@ impl BLSKey {
             .map_err(KeyError::from)
     }
     pub fn hash160(&self) -> [u8; 20] {
-        UInt160::hash160(&self.public_key_data()).0
+        hash160::Hash::hash(&self.public_key_data()).to_byte_array()
     }
 
     pub fn public_key_serialized(&self, use_legacy: bool) -> Result<String, KeyError> {
@@ -180,7 +184,15 @@ impl IKey for BLSKey {
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
-        self.sign_digest(UInt256::from(data).0).to_vec()
+
+        if self.seckey.is_zero() && self.extended_private_key_data.is_empty() {
+            Vec::new()
+        } else if let Ok(bls_private_key) = self.bls_private_key() {
+            self.sign_message(&bls_private_key, data).to_vec()
+        } else {
+            Vec::new()
+        }
+
     }
 
     fn hash_and_sign(&self, data: Vec<u8>) -> Vec<u8> {
@@ -230,8 +242,6 @@ impl IKey for BLSKey {
     }
 
     fn serialized_private_key_for_script(&self, chain_prefix: u8) -> String {
-        // if (uint256_is_zero(self.secretKey)) return nil;
-        // NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
         let mut writer = SecVec::with_capacity(34);
         chain_prefix.consensus_encode(&mut writer).unwrap();
         self.seckey.consensus_encode(&mut writer).unwrap();
@@ -240,8 +250,7 @@ impl IKey for BLSKey {
     }
 
     fn hmac_256_data(&self, data: &[u8]) -> [u8; 32] {
-        // Hmac::<sha256::Hash>::hash()
-        UInt256::hmac::<sha256::Hash>(&self.seckey, data).0
+        hmac::<sha256::Hash>(&self.seckey, data)
     }
 
     fn forget_private_key(&mut self) {
@@ -341,9 +350,11 @@ impl BLSKey {
 
     pub fn init_with_bls_extended_public_key(bls_extended_public_key: &ExtendedPublicKey, use_legacy: bool) -> Self {
         let bls_public_key = bls_extended_public_key.public_key();
+        let chaincode = *bls_extended_public_key.chain_code().serialize();
+
         Self {
             extended_public_key_data: extended_public_key_serialized(bls_extended_public_key, use_legacy).to_vec(),
-            chaincode: UInt256::from(bls_extended_public_key.chain_code()).0,
+            chaincode,
             pubkey: g1_element_serialized(&bls_public_key, use_legacy),
             use_legacy,
             seckey: [0u8; 32],
@@ -354,14 +365,15 @@ impl BLSKey {
     pub fn init_with_bls_extended_private_key(bls_extended_private_key: &ExtendedPrivateKey, use_legacy: bool) -> Result<Self, BlsError> {
         let extended_public_key = extended_public_key_from_extended_private_key(bls_extended_private_key, use_legacy)?;
         let extended_public_key_data = extended_public_key_serialized(&extended_public_key, use_legacy);
-        let chaincode = UInt256::from(bls_extended_private_key.chain_code()).0;
+        let chaincode = *bls_extended_private_key.chain_code().serialize();
         let bls_private_key = bls_extended_private_key.private_key();
         let bls_public_key = bls_private_key.g1_element()?;
+        let seckey = TryInto::<[u8; 32]>::try_into(bls_private_key.to_bytes().as_slice()).unwrap();
         Ok(Self {
             extended_private_key_data: SecVec::from(bls_extended_private_key),
             extended_public_key_data: extended_public_key_data.to_vec(),
             chaincode,
-            seckey: UInt256::from(bls_private_key).0,
+            seckey,
             pubkey: g1_element_serialized(&bls_public_key, use_legacy),
             use_legacy,
         })
@@ -517,17 +529,14 @@ impl BLSKey {
         }
     }
 
-    fn verify_message_with_key(key: &BLSKey, message: &[u8], signature: [u8; 96]) -> bool {
-        key.bls_public_key()
-            .map_or(false, |public_key| Self::verify_message(&public_key, message, signature, key.use_legacy))
-    }
-
-    pub fn verify_uint768(&self, digest: [u8; 32], signature: [u8; 96]) -> bool {
-        Self::verify_message_with_key(self, digest.as_slice(), signature)
+    fn verify_message_with_key(&self, message: &[u8], signature: [u8; 96]) -> bool {
+        self.bls_public_key()
+            .map_or(false, |public_key| Self::verify_message(&public_key, message, signature, self.use_legacy))
     }
 
     pub fn verify_with_public_key(digest: [u8; 32], signature: [u8; 96], public_key: [u8; 48], use_legacy: bool) -> bool {
-        Self::verify_message_with_key(&BLSKey::key_with_public_key(public_key, use_legacy), &digest, signature)
+        let key = BLSKey::key_with_public_key(public_key, use_legacy);
+        key.verify_message_with_key(&digest, signature)
     }
 
     pub fn verify_secure_aggregated(commitment_hash: [u8; 32], signature: [u8; 96], operator_keys: Vec<OperatorPublicKey>, use_legacy: bool) -> bool {
@@ -554,12 +563,12 @@ impl BLSKey {
         }
     }
 
-    pub fn verify_aggregated_signature(signature: UInt768, keys: Vec<BLSKey>, messages: Vec<Vec<u8>>, use_legacy: bool) -> bool {
+    pub fn verify_aggregated_signature(signature: [u8; 96], keys: Vec<BLSKey>, messages: Vec<Vec<u8>>, use_legacy: bool) -> bool {
         let bls_public_keys = keys.iter().filter_map(|key| key.bls_public_key().ok()).collect::<Vec<_>>();
         let public_keys = bls_public_keys.iter().collect::<Vec<&G1Element>>();
         let messages = messages.iter().map(|m| m.as_slice()).collect::<Vec<_>>();
-        let bytes = signature.as_bytes();
-        match g2_element_from_bytes(use_legacy, bytes) {
+        // let bytes = signature.as_bytes();
+        match g2_element_from_bytes(use_legacy, &signature) {
             Ok(signature) if use_legacy =>
                 LegacySchemeMPL::new().aggregate_verify(public_keys, messages, &signature),
             Ok(signature) =>
@@ -577,9 +586,10 @@ impl BLSKey {
 
     pub fn public_key_from_extended_public_key_data_at_u32_path(&self, index_path: Vec<u32>) -> Result<Self, KeyError> {
         let index_path = IndexPath::from(index_path);
-        self.extended_public_key_data()
-            .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, &index_path, self.use_legacy))
-            .map(|pub_key_data| Self::key_with_public_key(UInt384::from(pub_key_data).0, self.use_legacy))
+        let ext_pk_data = self.extended_public_key_data()?;
+        let pub_key_data = Self::public_key_from_extended_public_key_data(&ext_pk_data, &index_path, self.use_legacy)?;
+        let pub_key = TryInto::<[u8; 48]>::try_into(pub_key_data.as_slice()).map_err(KeyError::from)?;
+        Ok(Self::key_with_public_key(pub_key, self.use_legacy))
     }
 
 }
@@ -588,9 +598,10 @@ impl BLSKey {
 impl BLSKey {
     pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(&self, index_path: &PATH) -> Result<Self, KeyError>
         where Self: Sized + DeriveKey<PATH>, PATH: IIndexPath<Item=u32> {
-        self.extended_public_key_data()
-            .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path, self.use_legacy))
-            .map(|pub_key_data| Self::key_with_public_key(UInt384::from(pub_key_data).0, self.use_legacy))
+        let ext_pk_data = self.extended_public_key_data()?;
+        let pub_key_data = Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path, self.use_legacy)?;
+        let pub_key = TryInto::<[u8; 48]>::try_into(pub_key_data.as_slice()).map_err(KeyError::from)?;
+        Ok(Self::key_with_public_key(pub_key, self.use_legacy))
     }
 }
 
@@ -615,7 +626,7 @@ impl CryptoData<BLSKey> for Vec<u8> {
             .map(|key_data: [u8; 32]| {
                 let mut destination = initialization_vector.clone();
                 let iv: [u8; 16] = initialization_vector[..16].try_into().unwrap();
-                let encrypted_data = <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv).unwrap();
+                let encrypted_data = <Self as CryptoData::<BLSKey>>::encrypt(self, key_data, iv).unwrap();
                 destination.extend(encrypted_data.clone());
                 destination
             })
@@ -713,18 +724,6 @@ fn extended_public_key_serialized(public_key: &ExtendedPublicKey, use_legacy: bo
     }
 }
 
-impl From<ChainCode> for UInt256 {
-    fn from(value: ChainCode) -> Self {
-        UInt256(*value.serialize())
-    }
-}
-
-impl From<PrivateKey> for UInt256 {
-    fn from(value: PrivateKey) -> Self {
-        UInt256::from(value.to_bytes().as_slice())
-    }
-}
-
 impl From<&OperatorPublicKey> for Result<G1Element, BlsError> {
     fn from(value: &OperatorPublicKey) -> Self {
         g1_element_from_bytes(value.is_legacy(), &value.data)
@@ -751,7 +750,7 @@ fn bls_chaincode() {
 fn bls_operator_key() {
     let key = BLSKey::key_with_private_key("0fc63f4e6d7572a6c33465525b5c3323f57036873dd37c98c393267c58b50533", true)
         .expect("Failed to derive key");
-    assert_eq!(key.pubkey, UInt384::from_hex("139b654f0b1c031e1cf2b934c2d895178875cfe7c6a4f6758f02bc66eea7fc292d0040701acbe31f5e14a911cb061a2f").unwrap().0);
+    assert_eq!(key.pubkey, <[u8; 48]>::from_hex("139b654f0b1c031e1cf2b934c2d895178875cfe7c6a4f6758f02bc66eea7fc292d0040701acbe31f5e14a911cb061a2f").unwrap());
 }
 
 #[test]
@@ -792,15 +791,15 @@ fn test_bls_verify() {
 fn test_bls_multiplication() {
     let private_key_data = Vec::from_hex("46891c2cec49593c81921e473db7480029e0fc1eb933c6b93d81f5370eb19fbd").unwrap();
     let public_key_data = Vec::from_hex("0e2f9055c17eb13221d8b41833468ab49f7d4e874ddf4b217f5126392a608fd48ccab3510548f1da4f397c1ad4f8e01a").unwrap();
-    let expected_data = UInt256::from_hex("03fd387c4d4c66ec9dcdb31ef0c08ad881090dcda13d4b2c9cbc5ef264ff4dc7").unwrap();
-    println!("private_key: {:?}", private_key_data.as_slice());
-    println!("public_key: {:?}", public_key_data.as_slice());
-    println!("expected_data: {:?}", expected_data.0);
+    let expected_data = <[u8; 32]>::from_hex("03fd387c4d4c66ec9dcdb31ef0c08ad881090dcda13d4b2c9cbc5ef264ff4dc7").unwrap();
+    println!("private_key: {:?}", private_key_data);
+    println!("public_key: {:?}", public_key_data);
+    println!("expected_data: {:?}", expected_data);
     let private_key = PrivateKey::from_bytes(&private_key_data, false).unwrap();
     let public_key = G1Element::from_bytes_legacy(&public_key_data).unwrap();
     let result = private_key * public_key;
-    let result_serialize = result.unwrap().serialize_legacy().read_with::<UInt256>(&mut 0, byte::LE).unwrap();
-    assert_eq!(result_serialize, expected_data);
+    let result_serialize = &result.unwrap().serialize_legacy()[..32];
+    assert_eq!(result_serialize.to_lower_hex_string(), expected_data.to_lower_hex_string());
 }
 
 #[test]
@@ -902,10 +901,10 @@ fn test_bls_signature_verify_secure_aggregated() {
         "0eda3c087f9a593efe4c8fa7fd4ce02c587952b1bc20a49b2d21d573213c4f47a6db3494b1a33a0749518ba3bc0002d0",
         "022a15f6c1f3af9376cadbf2e99684de157ddcdd0966fac9fddb9772867213b867994bdcb55c8ea30e41b19c385f9fe4"
     ];
-    let members_signature = UInt768::from_hex("052f62455ad81786528a2c7b7ab4c22f812982ed99c0799e6cbf9a719a76e9cff2eaca9aefd41f29922c2f85e3c3d70a1100b35bc0d7d25bd54291d99234bf556a5649e8cccf4fddb040ebaca5fa401b0ec409cbd285f6c58a8dc17b521b2093").unwrap().0;
-    let commitment_hash = UInt256::from_hex("656e3b2e895b155da40860ad4c09d48204d0847f1eb20bd1ebbe9416bfbd7961").unwrap().0;
+    let members_signature = <[u8; 96]>::from_hex("052f62455ad81786528a2c7b7ab4c22f812982ed99c0799e6cbf9a719a76e9cff2eaca9aefd41f29922c2f85e3c3d70a1100b35bc0d7d25bd54291d99234bf556a5649e8cccf4fddb040ebaca5fa401b0ec409cbd285f6c58a8dc17b521b2093").unwrap();
+    let commitment_hash = <[u8; 32]>::from_hex("656e3b2e895b155da40860ad4c09d48204d0847f1eb20bd1ebbe9416bfbd7961").unwrap();
     let operator_keys = public_keys.iter()
-        .map(|s| OperatorPublicKey { data: UInt384::from_hex(s).unwrap().0, version: 1})
+        .map(|s| OperatorPublicKey { data: <[u8; 48]>::from_hex(s).unwrap(), version: 1})
         .collect::<Vec<_>>();
     assert!(BLSKey::verify_secure_aggregated(commitment_hash, members_signature, operator_keys, true));
 }
@@ -917,9 +916,9 @@ fn test_bls_verify_random_signature_using_scheme<S: Scheme>(schema: S) {
     let len: usize = thread_rng().gen_range(0..30);
     let mut vec_pks = Vec::with_capacity(len);
     let mut vec_sigs = Vec::with_capacity(len);
-    let hash = UInt256::random().0;
+    let hash = <[u8; 32]>::random();
     for _i in 0..len {
-        let private_key = PrivateKey::from_bip32_seed(&UInt256::random().0);
+        let private_key = PrivateKey::from_bip32_seed(&<[u8; 32]>::random());
         let signature = schema.sign(&private_key, &hash);
         let public_key = private_key.g1_element().unwrap();
         vec_sigs.push(signature);
@@ -940,58 +939,58 @@ fn test_bls_basic_signature_verify_secure_aggregated() {
 fn test_bls_llmq_50_60() {
     // LLMQ::verify at 871584: Llmqtype50_60
     let commitment_hash = <[u8; 32]>::from_hex("0f602593b3ea2d71d14728edce3e92a29d800e6745baf7de5ac3c3a2a2c627f5").unwrap();
-    let signature = UInt768::from_hex("a97b10b1b24fd6aa0f958f73dcbab59e4bfca46647189cf0e186e25e355d74752a3069f6d030118860717068c611fcf513c6b1aafb75c1010bd76085f43e32401a1e58ba7f20acc99aefc7c00f9b04ce346767804095b7e014a68192614da077").unwrap().0;
+    let signature = <[u8; 96]>::from_hex("a97b10b1b24fd6aa0f958f73dcbab59e4bfca46647189cf0e186e25e355d74752a3069f6d030118860717068c611fcf513c6b1aafb75c1010bd76085f43e32401a1e58ba7f20acc99aefc7c00f9b04ce346767804095b7e014a68192614da077").unwrap();
     let operator_keys = vec![
-        OperatorPublicKey { data: UInt384::from_hex("a2fea620ee07107d6611b7ccf5726e0e8247a131a3f129eb2b3195fe0fc1a91044af42a839915161e2105944252c59aa").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("890f1ca955443740346b5b4b0bfb8251f040074b5a2feb77e54add831bf34aaf1d84207691f6f5aa5e702152a496fadc").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("9130b42d6eb505e811dfb18ff87c4bcacde56b76a7d47a8db88ca26e75f5c2eebdd767d440f375784f9d1f127f57c977").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("94e81203caa5c0cc305b5e0f3ae7a388b974a629358e4e83e50a25b2c2a387e3d114c7c82e2b23c25b65585220e63c99").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("99c6bb8f02fe03ebfe9f3c8900dd764e6f379ca1061b8dbd8ce6b6b139489c9083a84ee60f2aca4ae114797abc07d945").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("ac290b31d2e878c2d7235efb0c61f423aa37742a31318e61f8bb0bd6c110a892dc244512fec12a8b0fe7cbb08e12be28").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("a42c53c3aa11ae4b985a52ae6a3170bdb58f88ec04c62013f9322bd5fda4417939836b6f41741dd864c348103a1155d3").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("96ca29d03ef4897a22fe467bb58c52448c63bb29534502305e8ff142ac03907fae0851ff2528e4878ef51bfa3d5a1f22").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("852057284a7a9dbccb97fbaea3425104901dc661b69294a55c7ca800ed18d37df7ccc02367b5d6836ee4f6b052249a1d").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("97596d7a72b65531fffd5f610752422d6e286c975f30d026092f7900f8015073bd6f6d1b85dd3981814c093910e7dac6").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b05caab51ff07a2f8d69972fd6ec09f6f9893cf6dfc49775f5a2db2ea7a8a525bbaf4e7e369d06590f6f2e8e4658d4dc").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("8aeb5c2757211202b3afd2033ec1b4ef2dfe376ba5c6c07b45e6a7460afa4086423c4a704eb9a781514fbc513e190a62").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("8c9bf080a96d13b356b01e734618a77225f03b3e92684f252ccbd313764a9fd9247bde6b00d92f6b5669043e77860453").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("94e199beb2a2a59166a12a851ef158928bc5efc25b39eb78b3a428b25384609d8c03548a94e77c0c941c90c68a4187d8").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b2823797ad456d53ce1e6bde84e8a19164ff88a73ccd242ec48d9c6a479f2a049e214c7e8ec2243b7ea74ca6144ab2c5").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("8196970badc74d068ec1226ffd4a656313decef59d792237a32e6ff56cd4e43030c436025831a4a3d0306a616f033810").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("adeed4d18add0ef5a7dff743a206786ab2dcc1b4aff679a61577dea99b62fb24dd56e3fe7ff65fa0be964dc5d7967c3e").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("95a577f51dc6fd7fa4621f0a4601e48fd65418a89c2af2afef725fb4f053a8ee5841cd3fdae39ebdf5a202e0c4deca23").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("82ce863d0843ca66b4a64d94c0d84ec15980ea04e4444ac4d4188f38cc0da4d6d2360b8a2046725b682862255af6a48c").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("a26fc7f30c49215b98d5cb47a350f888a306c52fa42c77e765b55288e622f03859273cae7e1cac99e67f7a9a96a6aa2c").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b37befcc17d16d4154ea8bbe82e9bd52e2ecd825dd9a43f58730d594d87cceebcb41e11461319fd71bfc08d0a0545200").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("84c0ca8535c114f8f1b369f339b2653e7126610f5170b223970f4e63ad7b55ea2f61a08e263b51fb03f6940d655690f9").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b3ea90ebcf0d8e332e37e5ac3c676653bb1203e8db7604bb0ac64a9b655b553de514e9bff5eeb86bb3ef9178375392f9").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("875b907b6d6c12aa111da0e102186b9d06f4e065969b60732207f18c2c5d0deb8ecba47cb4c0929647db0e2fae6f08ca").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("a42d732a03847819b1e2675ac48b9af4a1c92b310ecacc42c428ff902099cc47d08ecd4616da55d185463855aee99f79").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("ac9c5c77fe321ff0a115d1ba5bf7462063ef21a82ba796415f4ee538bf9e8a6a49707530c72cbb6b60026c46ff1b9443").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("8e9855b2ee991f988e446b60dcd637f33a782baf1e755785ca058f0398133bf3a95e4e77d4168c13c47d7e3fb1e3ecfc").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("93146b3252f408f1cffc875b12b61f56c1ae02113b24c0b5aaedcda4a9b509332c8c4587450074f3e0906aaf3ceca754").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b9d1a6a4f7f817d2e004134d96fa0c831433e9c649726ba8567f447d1b2394209bc1ef184a93c707054fb6816790de30").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b888fe437eab3af5a7fee4e0164705458a6fda97ae390d69721a5f1d3830ec330fb53c6a29588f1f94f69adcff04ca09").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("90d4c6a24d00d70fe961b77d58eff318bb6cd00c122bcfa20f92d65d03b9fd3afa5a0effc90810103a53d53ab155f764").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("8fa5377eb256323aace31b45c3e48ea110404b053cb80e8043bd1e44de1705130548e4ab28738816251ea57a7fc10324").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b2cafe1870e043973b2f1fded8de3d5a66dac5ade46aa0995157077efee92d852857bc7f03ed69c92723a58f8bd2926e").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("aa0ede82d78a0a8f4c2332d431c7be496c3aa09349ed3b2db30f7eb7dcc7b6e580a9d71f7d76bdaca1b3670e0cf4cd3c").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("97f78abcee6d2ed68bf2c82afbf56ef9af67313e2eb655ea5178850907cb3057cae0bb5a1d09f161057bf62f9d4890c6").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("80ea87eef15f38c1a844d77348e687794c601277011c933026cdfdb649524632b055feea3539abc48472cb447d281d65").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("8ad4f577d067630f6fd15f4d2aefdb9456d648b71cb7253d47511acc81dd5ddb69a03c848322aa11e5242f66afde5a2a").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("92730062f122f937b29f69536db3ad36980b88004eadc2ca341425d432723d67e53a4f55786c54017d77c1bd1df6b310").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("81f24418ec73b09b00514dba8fb18d6d8af1dc2ff93d594bf987911f3b98d659eb43286cd450b7e1ee5978b361660d73").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b0051db915bd86bd938746c14440b11ee3b2801cbc6d6c1c912e8b41ea5eb1d8f852abf220ae91ecdb6da094846c1ba8").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("80a2e66a810493a91b5ed1a8ef8ac4be41543598f5b4765a6f5d6339078ab88030817dc9c9bdb60c7c7a02d7787d6f2e").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("95f9da603c572257802a689964ca8f4d96f9b94f33ab75968c9cb6c730a28d50b7bb72ac2cfceee6ab0755ead9cb53cd").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("90e3caa7ae519505a6e1f3b56d3a99865f70e48f772ac431c3964a33cce7fe1e736d43ec3343ad843faaaa2b2bb3a921").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b7d5f022c3b6c314bde5171ead1616e4c27f0e9a48a9a9dc3a7227a62d42213b93c8a4c32af18bd8ff931b7732782e09").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b32f6fc90c9dcaacdf9d836a2a7e60d090fe5e55b0b02f5a4f608a4b8235ba5aa7abc4e05f9387d1d942adc57c87f5b7").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("911a30e0a5f2f5135dcc5f09498e4ba5de22c7680f396599f7f29b91ac569c3d4336bc157443cf8c06682bfb5abb2271").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("b4a637afe3810d73e3402b5d6a398e45222ba846a339f1c3570aa8e3f7f5b9d7acef08ac234cce4f706671498330a599").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("8dc75e865b89e96560b38fae96f1d0a5438795778e68b705a506046245ca5dbbedb09e2379eea4c9bde0d0fd4fe05080").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("882cbd9118474316f40b800e43f94a121928f256fd340098ff0ad81a902c4326dda4b42737d52739482f2baa80c487cc").unwrap().0, version: 2 },
-        OperatorPublicKey { data: UInt384::from_hex("92fa57a5676925e8dfe3b340df2132f5844ad9f89594b04efa28fb4fb884fe21f411fa49120ed7a60ce9381a54232a10").unwrap().0, version: 2 }
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("a2fea620ee07107d6611b7ccf5726e0e8247a131a3f129eb2b3195fe0fc1a91044af42a839915161e2105944252c59aa").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("890f1ca955443740346b5b4b0bfb8251f040074b5a2feb77e54add831bf34aaf1d84207691f6f5aa5e702152a496fadc").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("9130b42d6eb505e811dfb18ff87c4bcacde56b76a7d47a8db88ca26e75f5c2eebdd767d440f375784f9d1f127f57c977").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("94e81203caa5c0cc305b5e0f3ae7a388b974a629358e4e83e50a25b2c2a387e3d114c7c82e2b23c25b65585220e63c99").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("99c6bb8f02fe03ebfe9f3c8900dd764e6f379ca1061b8dbd8ce6b6b139489c9083a84ee60f2aca4ae114797abc07d945").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("ac290b31d2e878c2d7235efb0c61f423aa37742a31318e61f8bb0bd6c110a892dc244512fec12a8b0fe7cbb08e12be28").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("a42c53c3aa11ae4b985a52ae6a3170bdb58f88ec04c62013f9322bd5fda4417939836b6f41741dd864c348103a1155d3").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("96ca29d03ef4897a22fe467bb58c52448c63bb29534502305e8ff142ac03907fae0851ff2528e4878ef51bfa3d5a1f22").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("852057284a7a9dbccb97fbaea3425104901dc661b69294a55c7ca800ed18d37df7ccc02367b5d6836ee4f6b052249a1d").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("97596d7a72b65531fffd5f610752422d6e286c975f30d026092f7900f8015073bd6f6d1b85dd3981814c093910e7dac6").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b05caab51ff07a2f8d69972fd6ec09f6f9893cf6dfc49775f5a2db2ea7a8a525bbaf4e7e369d06590f6f2e8e4658d4dc").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("8aeb5c2757211202b3afd2033ec1b4ef2dfe376ba5c6c07b45e6a7460afa4086423c4a704eb9a781514fbc513e190a62").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("8c9bf080a96d13b356b01e734618a77225f03b3e92684f252ccbd313764a9fd9247bde6b00d92f6b5669043e77860453").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("94e199beb2a2a59166a12a851ef158928bc5efc25b39eb78b3a428b25384609d8c03548a94e77c0c941c90c68a4187d8").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b2823797ad456d53ce1e6bde84e8a19164ff88a73ccd242ec48d9c6a479f2a049e214c7e8ec2243b7ea74ca6144ab2c5").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("8196970badc74d068ec1226ffd4a656313decef59d792237a32e6ff56cd4e43030c436025831a4a3d0306a616f033810").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("adeed4d18add0ef5a7dff743a206786ab2dcc1b4aff679a61577dea99b62fb24dd56e3fe7ff65fa0be964dc5d7967c3e").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("95a577f51dc6fd7fa4621f0a4601e48fd65418a89c2af2afef725fb4f053a8ee5841cd3fdae39ebdf5a202e0c4deca23").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("82ce863d0843ca66b4a64d94c0d84ec15980ea04e4444ac4d4188f38cc0da4d6d2360b8a2046725b682862255af6a48c").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("a26fc7f30c49215b98d5cb47a350f888a306c52fa42c77e765b55288e622f03859273cae7e1cac99e67f7a9a96a6aa2c").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b37befcc17d16d4154ea8bbe82e9bd52e2ecd825dd9a43f58730d594d87cceebcb41e11461319fd71bfc08d0a0545200").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("84c0ca8535c114f8f1b369f339b2653e7126610f5170b223970f4e63ad7b55ea2f61a08e263b51fb03f6940d655690f9").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b3ea90ebcf0d8e332e37e5ac3c676653bb1203e8db7604bb0ac64a9b655b553de514e9bff5eeb86bb3ef9178375392f9").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("875b907b6d6c12aa111da0e102186b9d06f4e065969b60732207f18c2c5d0deb8ecba47cb4c0929647db0e2fae6f08ca").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("a42d732a03847819b1e2675ac48b9af4a1c92b310ecacc42c428ff902099cc47d08ecd4616da55d185463855aee99f79").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("ac9c5c77fe321ff0a115d1ba5bf7462063ef21a82ba796415f4ee538bf9e8a6a49707530c72cbb6b60026c46ff1b9443").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("8e9855b2ee991f988e446b60dcd637f33a782baf1e755785ca058f0398133bf3a95e4e77d4168c13c47d7e3fb1e3ecfc").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("93146b3252f408f1cffc875b12b61f56c1ae02113b24c0b5aaedcda4a9b509332c8c4587450074f3e0906aaf3ceca754").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b9d1a6a4f7f817d2e004134d96fa0c831433e9c649726ba8567f447d1b2394209bc1ef184a93c707054fb6816790de30").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b888fe437eab3af5a7fee4e0164705458a6fda97ae390d69721a5f1d3830ec330fb53c6a29588f1f94f69adcff04ca09").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("90d4c6a24d00d70fe961b77d58eff318bb6cd00c122bcfa20f92d65d03b9fd3afa5a0effc90810103a53d53ab155f764").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("8fa5377eb256323aace31b45c3e48ea110404b053cb80e8043bd1e44de1705130548e4ab28738816251ea57a7fc10324").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b2cafe1870e043973b2f1fded8de3d5a66dac5ade46aa0995157077efee92d852857bc7f03ed69c92723a58f8bd2926e").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("aa0ede82d78a0a8f4c2332d431c7be496c3aa09349ed3b2db30f7eb7dcc7b6e580a9d71f7d76bdaca1b3670e0cf4cd3c").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("97f78abcee6d2ed68bf2c82afbf56ef9af67313e2eb655ea5178850907cb3057cae0bb5a1d09f161057bf62f9d4890c6").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("80ea87eef15f38c1a844d77348e687794c601277011c933026cdfdb649524632b055feea3539abc48472cb447d281d65").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("8ad4f577d067630f6fd15f4d2aefdb9456d648b71cb7253d47511acc81dd5ddb69a03c848322aa11e5242f66afde5a2a").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("92730062f122f937b29f69536db3ad36980b88004eadc2ca341425d432723d67e53a4f55786c54017d77c1bd1df6b310").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("81f24418ec73b09b00514dba8fb18d6d8af1dc2ff93d594bf987911f3b98d659eb43286cd450b7e1ee5978b361660d73").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b0051db915bd86bd938746c14440b11ee3b2801cbc6d6c1c912e8b41ea5eb1d8f852abf220ae91ecdb6da094846c1ba8").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("80a2e66a810493a91b5ed1a8ef8ac4be41543598f5b4765a6f5d6339078ab88030817dc9c9bdb60c7c7a02d7787d6f2e").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("95f9da603c572257802a689964ca8f4d96f9b94f33ab75968c9cb6c730a28d50b7bb72ac2cfceee6ab0755ead9cb53cd").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("90e3caa7ae519505a6e1f3b56d3a99865f70e48f772ac431c3964a33cce7fe1e736d43ec3343ad843faaaa2b2bb3a921").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b7d5f022c3b6c314bde5171ead1616e4c27f0e9a48a9a9dc3a7227a62d42213b93c8a4c32af18bd8ff931b7732782e09").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b32f6fc90c9dcaacdf9d836a2a7e60d090fe5e55b0b02f5a4f608a4b8235ba5aa7abc4e05f9387d1d942adc57c87f5b7").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("911a30e0a5f2f5135dcc5f09498e4ba5de22c7680f396599f7f29b91ac569c3d4336bc157443cf8c06682bfb5abb2271").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("b4a637afe3810d73e3402b5d6a398e45222ba846a339f1c3570aa8e3f7f5b9d7acef08ac234cce4f706671498330a599").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("8dc75e865b89e96560b38fae96f1d0a5438795778e68b705a506046245ca5dbbedb09e2379eea4c9bde0d0fd4fe05080").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("882cbd9118474316f40b800e43f94a121928f256fd340098ff0ad81a902c4326dda4b42737d52739482f2baa80c487cc").unwrap(), version: 2 },
+        OperatorPublicKey { data: <[u8; 48]>::from_hex("92fa57a5676925e8dfe3b340df2132f5844ad9f89594b04efa28fb4fb884fe21f411fa49120ed7a60ce9381a54232a10").unwrap(), version: 2 }
     ];
     let use_legacy = false;
 

@@ -1,7 +1,7 @@
 use byte::{BytesExt, TryRead};
 use dashcore::hashes::{sha256d, Hash};
 use dashcore::consensus::Encodable;
-use crate::crypto::byte_util::{clone_into_array, UInt256};
+use crate::crypto::byte_util::{clone_into_array, from_u32, Is31Bits, UInt256};
 use crate::derivation::BIP32_HARD;
 use crate::keys::KeyError;
 use crate::network::ChainType;
@@ -107,27 +107,40 @@ impl<'a> TryRead<'a, ChainType> for Key {
                 let depth = data.read_with::<u8>(&mut offset, byte::LE)?;
                 let fingerprint = data.read_with::<u32>(&mut offset, byte::LE)?;
                 let child_32 = data.read_with::<u32>(&mut offset, byte::BE)?;
-                let chain = data.read_with::<UInt256>(&mut offset, byte::LE)?.0;
+                let chaincode = data.read_with::<UInt256>(&mut offset, byte::LE)?.0;
                 if chain_type.bip32_script_map().xprv.eq(&header) {
                     *offset += 1;
                 }
                 let hardened = (child_32 & BIP32_HARD) > 0;
-                let child = UInt256::from(child_32 & !BIP32_HARD).0;
-                Ok((Key { depth, fingerprint, child, chaincode: chain, data: Vec::from(&data[*offset..]), hardened }, len))
+                let child = from_u32(child_32 & !BIP32_HARD);
+                let data = Vec::from(&data[*offset..]);
+                Ok((Key { depth, fingerprint, child, chaincode, data, hardened }, len))
             },
             (true, 111) /* 256 */ => {
                 if chain_type.dip14_script_map().dps.ne(&header) && chain_type.dip14_script_map().dpp.ne(&header) {
                     return Err(Error::InvalidAddress(header).into());
                 }
-                let depth = data.read_with::<u8>(&mut offset, byte::LE)?;
-                let fingerprint = data.read_with::<u32>(&mut offset, byte::LE)?;
-                let hardened = data.read_with::<u8>(&mut offset, byte::LE)? > 0;
-                let child = data.read_with::<UInt256>(&mut offset, byte::LE)?.0;
-                let chain = data.read_with::<UInt256>(&mut offset, byte::LE)?.0;
-                if data.eq(&if chain_type.is_mainnet() { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }) {
-                    *offset += 1;
-                }
-                Ok((Key { depth, fingerprint, child, chaincode: chain, data: Vec::from(&data[*offset..]), hardened }, len))
+                let depth = data[4];
+                let fingerprint = u32::from_le_bytes(clone_into_array(&data[5..9]));
+                let hardened = data[9] > 0;
+                let child = TryInto::<[u8; 32]>::try_into(&data[10..42]).unwrap();
+                let chaincode = TryInto::<[u8; 32]>::try_into(&data[42..74]).unwrap();
+                let data = Vec::from(if data.eq(&if chain_type.is_mainnet() { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }) {
+                    &data[75..]
+                } else {
+                    &data[74..]
+                });
+
+                // let depth = data.read_with::<u8>(&mut offset, byte::LE)?;
+                // let fingerprint = data.read_with::<u32>(&mut offset, byte::LE)?;
+                // let hardened = data.read_with::<u8>(&mut offset, byte::LE)? > 0;
+                // let child = data.read_with::<UInt256>(&mut offset, byte::LE)?.0;
+                // let chaincode = data.read_with::<UInt256>(&mut offset, byte::LE)?.0;
+                // if data.eq(&if chain_type.is_mainnet() { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }) {
+                //     *offset += 1;
+                // }
+                // let data = Vec::from(&data[*offset..]);
+                Ok((Key { depth, fingerprint, child, chaincode, data, hardened }, len))
             },
             (true, _) => Err(Error::InvalidLength(len).into()),
             _ => Err(Error::BadChecksum(expected, actual).into()),
@@ -137,15 +150,13 @@ impl<'a> TryRead<'a, ChainType> for Key {
 
 impl Key {
     pub fn serialize(&self, chain_type: ChainType) -> String {
-        if UInt256(self.child).is_31_bits() {
+        if self.child.is_31_bits() {
             let mut child = u32::from_le_bytes(clone_into_array(&self.child[..4]));
             if self.hardened {
                 child |= BIP32_HARD;
             }
             child = child.swap_bytes();
-            // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:14 + key.length + sizeof(chain)])
-            // let mut writer = Vec::<u8>::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
-            let mut writer = SecVec::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
+            let mut writer = SecVec::with_capacity(14 + self.data.len() + size_of::<[u8; 32]>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub }); // 4
             self.depth.consensus_encode(&mut writer).unwrap();                // 5
@@ -158,9 +169,7 @@ impl Key {
             writer.extend_from_slice(&self.data); // 78 (prv) / 78 (pub)
             base58::check_encode_slice(&writer)
         } else {
-            // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
-            // let mut writer = Vec::<u8>::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
-            let mut writer = SecVec::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
+            let mut writer = SecVec::with_capacity(47 + self.data.len() + size_of::<[u8; 32]>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp }); // 4
             self.depth.consensus_encode(&mut writer).unwrap();                // 5

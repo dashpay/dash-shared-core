@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
-use dash_spv_crypto::crypto::{byte_util::Random, UInt256};
+use dash_spv_crypto::crypto::byte_util::Random;
 use dash_spv_crypto::derivation::{IIndexPath, UInt256IndexPath};
 
 fn generate_random_indexes_for_length(length: usize) -> Vec<[u8; 32]> {
-    (0..length).into_iter().map(|i| UInt256::random().0).collect()
+    (0..length).into_iter().map(|i| <[u8; 32]>::random()).collect()
 }
 
 fn perform_tests_for_indexes(indexes: Vec<[u8; 32]>) {
@@ -17,7 +17,7 @@ fn perform_tests_for_indexes(indexes: Vec<[u8; 32]>) {
     // todo: impl Serialization test
 
     // Methods
-    let index = UInt256::random().0;
+    let index = <[u8; 32]>::random();
     let mut new_index_path = index_path.index_path_by_adding_index(index);
     let returned_index = new_index_path.index_at_position(length);
     assert_eq!(returned_index, index, "Failed for length {}", length);
@@ -45,7 +45,7 @@ pub fn test_empty_index_path() {
     assert_eq!(index_path.length(), 0, "Non-zero index path length");
     let index = index_path.index_at_position(1);
     assert_eq!(index_path.index_at_position(1), [!0u8; 32], "Non-existed index should be ::MAX");
-    index_path = index_path.index_path_by_adding_index(UInt256::from([1,2,3,4]).0);
+    index_path = index_path.index_path_by_adding_index(from_u64_4_to_u8_32([1,2,3,4]));
     assert_eq!(index_path.length(), 1, "Non-existed index should be ::MAX");
 }
 
@@ -59,8 +59,17 @@ pub fn test_many_elements() {
 
 #[test]
 pub fn test_compare_elements() {
-    let first_path = UInt256IndexPath::index_path_with_indexes(vec![UInt256::from([1,2,3,4]).0, UInt256::from([2,3,4,5]).0]);
-    let second_path = UInt256IndexPath::index_path_with_indexes(vec![UInt256::from([5,6,7,8]).0, UInt256::from([6,7,8,9]).0]);
+    let first_path = UInt256IndexPath::index_path_with_indexes(vec![from_u64_4_to_u8_32([1,2,3,4]), from_u64_4_to_u8_32([2,3,4,5])]);
+    let second_path = UInt256IndexPath::index_path_with_indexes(vec![from_u64_4_to_u8_32([5,6,7,8]), from_u64_4_to_u8_32([6,7,8,9])]);
     assert_eq!(first_path.cmp(&second_path), Ordering::Less);
     assert_eq!(second_path.cmp(&first_path), Ordering::Greater);
+}
+
+fn from_u64_4_to_u8_32(value: [u64; 4]) -> [u8; 32] {
+    let mut r = [0u8; 32];
+    r[..8].copy_from_slice(&value[0].to_le_bytes());
+    r[8..16].copy_from_slice(&value[1].to_le_bytes());
+    r[16..24].copy_from_slice(&value[2].to_le_bytes());
+    r[24..].copy_from_slice(&value[3].to_le_bytes());
+    r
 }

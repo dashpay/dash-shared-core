@@ -4,7 +4,7 @@ pub mod address {
     use crate::util::params::{BITCOIN_PUBKEY_ADDRESS, BITCOIN_SCRIPT_ADDRESS, ScriptMap};
     use dashcore::consensus::Encodable;
     use dashcore::secp256k1::hashes::hex::DisplayHex;
-    use crate::crypto::byte_util::{clone_into_array, UInt160};
+    use crate::crypto::byte_util::clone_into_array;
     use crate::network::ChainType;
     use crate::util::base58;
     use crate::util::data_append::DataAppend;
@@ -28,7 +28,7 @@ pub mod address {
     pub fn with_public_key_data_and_script_pub_key(data: &[u8], script_pub_key: u8) -> String {
         let mut writer = SecVec::with_capacity(21);
         script_pub_key.consensus_encode(&mut writer).unwrap();
-        UInt160::hash160(data).consensus_encode(&mut writer).unwrap();
+        hash160::Hash::hash(data).consensus_encode(&mut writer).unwrap();
         base58::check_encode_slice(&writer)
     }
 

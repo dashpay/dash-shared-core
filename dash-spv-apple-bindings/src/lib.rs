@@ -50,6 +50,7 @@ impl Debug for DashSPVCore {
         f.write_str(format!("[{}] [SPVCore]", self.processor.provider.chain_type().name()).as_str())
     }
 }
+// AnyOther by_value: Type(Dictionary(NonPrimitiveFermentable(SmartPointer(Arc($Ty(std :: sync :: Arc < dyn Fn (* const std :: os :: raw :: c_void , u32) -> Option < [u8 ; 32] > >, [Object(Type(Dictionary(LambdaFn($Ty(dyn Fn (* const std :: os :: raw :: c_void , u32) -> Option < [u8 ; 32] >, [])))))]))))))
 
 #[ferment_macro::export]
 impl DashSPVCore {

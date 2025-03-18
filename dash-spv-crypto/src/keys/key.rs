@@ -3,7 +3,7 @@ use dashcore::{Network, PrivateKey};
 use dashcore::hashes::{sha256, sha256d, Hash};
 use crate::derivation::{IIndexPath, IndexPath, index_path::{Extremum, IndexHardSoft}};
 use dashcore::consensus::Encodable;
-use crate::crypto::byte_util::{clone_into_array, Reversed, UInt256, UInt384, UInt768};
+use crate::crypto::byte_util::{clone_into_array, Reversed};
 use crate::keys::{BLSKey, DeriveKey, ECDSAKey, ED25519Key, IKey, KeyError};
 use crate::keys::bls_key::g1_element_serialized;
 use crate::keys::crypto_data::CryptoData;
@@ -203,6 +203,21 @@ impl OpaqueKey {
                     .and_then(|data| ED25519Key::public_key_data_from_extended_public_key_data(&data, &index_path)),
         }
     }
+
+    // pub fn public_key_data_at_index_path_u32(&self, index_path: IndexPath<u32>) -> Result<Vec<u8>, KeyError> {
+    //     match self {
+    //         OpaqueKey::ECDSA(key) =>
+    //             key.extended_public_key_data()
+    //                 .and_then(|data| ECDSAKey::public_key_from_extended_public_key_data(&data, &index_path)),
+    //         OpaqueKey::BLS(key) =>
+    //             key.extended_public_key_data()
+    //                 .and_then(|data| BLSKey::public_key_from_extended_public_key_data(&data, &index_path, key.use_legacy)),
+    //
+    //         OpaqueKey::ED25519(key) =>
+    //             key.extended_public_key_data()
+    //                 .and_then(|data| ED25519Key::public_key_data_from_extended_public_key_data(&data, &index_path)),
+    //     }
+    // }
 
 
     // Encryption
@@ -532,7 +547,7 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::key_with_public_key_data(data).map(OpaqueKey::ECDSA),
             KeyKind::ED25519 => ED25519Key::key_with_public_key_data(data).map(OpaqueKey::ED25519),
-            _ => Ok(OpaqueKey::BLS(BLSKey::key_with_public_key(UInt384::from(data).0, *self == KeyKind::BLS))),
+            _ => BLSKey::key_with_public_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS),
         }
     }
 
@@ -540,7 +555,9 @@ impl KeyKind {
         match self {
             KeyKind::ECDSA => ECDSAKey::init_with_extended_public_key_data(data).map(OpaqueKey::ECDSA),
             KeyKind::ED25519 => ED25519Key::init_with_extended_public_key_data(data).map(OpaqueKey::ED25519),
-            _ => BLSKey::init_with_extended_public_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
+            _ => BLSKey::init_with_extended_public_key_data(data, *self == KeyKind::BLS)
+                .map(OpaqueKey::BLS)
+                .map_err(KeyError::from)
         }
     }
     pub fn key_with_extended_public_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
@@ -658,7 +675,7 @@ impl IKey for OpaqueKey {
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         match self {
-            OpaqueKey::ECDSA(key) => key.compact_sign(UInt256::from(data).0).to_vec(),
+            OpaqueKey::ECDSA(key) => key.compact_sign(data).to_vec(),
             OpaqueKey::BLS(key) => key.sign(data),
             OpaqueKey::ED25519(key) => key.sign(data)
         }
@@ -672,7 +689,7 @@ impl IKey for OpaqueKey {
     fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> Result<bool, KeyError> {
         match self {
             OpaqueKey::ECDSA(key) => key.verify(message_digest, signature),
-            OpaqueKey::BLS(key) => Ok(key.verify_uint768(UInt256::from(message_digest).0, UInt768::from(signature).0)),
+            OpaqueKey::BLS(key) => key.verify(message_digest, signature),
             OpaqueKey::ED25519(key) => key.verify(message_digest, signature),
         }
     }

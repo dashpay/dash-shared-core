@@ -1,22 +1,28 @@
-use byte::BytesExt;
-use byte::ctx::Bytes;
+use std::array::TryFromSliceError;
 use dashcore::consensus::Encodable;
 use dashcore::hashes::hex::FromHex;
-use dashcore::hashes::{hash160, sha256, sha256d, Hash};
+use dashcore::hashes::{hash160, sha256, sha256d, sha512, Hash};
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use log::warn;
-use crate::crypto::byte_util::{AsBytes, ECPoint, UInt160, UInt256, UInt512, Zeroable};
+use crate::crypto::byte_util::{clone_into_array, hmac, Zeroable, U32LE};
 use crate::derivation::{IIndexPath, IndexPath};
 use crate::keys::{IKey, KeyKind, dip14::IChildKeyDerivation, KeyError, DeriveKey};
 use crate::network::ChainType;
 use crate::util::address::address;
 use crate::util::base58;
+use crate::util::params::ED25519_SEED_KEY;
 use crate::util::sec_vec::SecVec;
 
 // TODO: check we need to use ECPoint here
-const EXT_PUBKEY_SIZE: usize = 4 + size_of::<UInt256>() + size_of::<UInt256>();
+const EXT_PUBKEY_SIZE: usize = 4 + size_of::<[u8; 32]>() + size_of::<[u8; 32]>();
 
+pub fn seed_key(seed: &[u8]) -> Result<([u8; 32], [u8; 32]), TryFromSliceError> {
+    let i = hmac::<sha512::Hash>(ED25519_SEED_KEY.as_bytes(), seed);
+    let seckey = TryInto::<[u8; 32]>::try_into(&i[..32])?;
+    let chaincode = TryInto::<[u8; 32]>::try_into(&i[32..])?;
+    Ok((seckey, chaincode))
+}
 #[derive(Clone, Debug, Default)]
 #[ferment_macro::opaque]
 pub struct ED25519Key {
@@ -27,20 +33,21 @@ pub struct ED25519Key {
     pub is_extended: bool,
 }
 
+
+
 #[ferment_macro::export]
 impl ED25519Key {
     pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
         match bytes.len() {
             // if len == 68 || len == 69 {
             68 => {
-                let offset = &mut 0;
-                let fingerprint = bytes.read_with::<u32>(offset, byte::LE)?;
-                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE)?.0;
+                let fingerprint = u32::from_le_bytes(clone_into_array(&bytes[0..4]));
+                let chaincode = TryInto::<[u8; 32]>::try_into(&bytes[4..36])?;
+                let data = &bytes[36..68];
                 // if len == 69 {
                 //     // skip 1st byte as pub key was padded with 0x00
                 //     *offset += 1;
                 // }
-                let data: &[u8] = bytes.read_with(offset, Bytes::Len(32))?;
                 Self::public_key_from_bytes(data)
                     .map_err(KeyError::from)
                     .map(|pubkey| Self::init_with_extended_public_parts(pubkey.as_bytes().to_vec(), chaincode, fingerprint))
@@ -51,10 +58,9 @@ impl ED25519Key {
     pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Result<Self, KeyError> {
         match bytes.len() {
             69 => {
-                let offset = &mut 0;
-                let fingerprint = bytes.read_with::<u32>(offset, byte::LE)?;
-                let chaincode = bytes.read_with::<UInt256>(offset, byte::LE)?.0;
-                let seckey = bytes.read_with::<UInt256>(offset, byte::LE)?.0;
+                let fingerprint = u32::from_le_bytes(clone_into_array(&bytes[0..4]));
+                let chaincode = TryInto::<[u8; 32]>::try_into(&bytes[4..36])?;
+                let seckey = TryInto::<[u8; 32]>::try_into(&bytes[36..68])?;
                 Ok(Self::init_with_extended_private_parts(seckey, chaincode, fingerprint))
             },
             len => Err(KeyError::WrongLength(len))
@@ -194,14 +200,7 @@ impl IKey for ED25519Key {
     }
 
     fn hmac_256_data(&self, data: &[u8]) -> [u8; 32] {
-        // let engine = HmacEngine::<sha256::Hash>::new(&self.seckey);
-        // let hmac = Hmac::from_engine(engine);
-        // hmac.input
-        // engine.to_byte_array()
-        // engine.has
-        // Hmac(self.seckey).ha(data)
-        // Hmac::new(&self.seckey).hash::<sha256::Hash>(data).0
-        UInt256::hmac::<sha256::Hash>(&self.seckey, data).0
+        hmac::<sha256::Hash>(&self.seckey, data)
     }
 
     fn forget_private_key(&mut self) {
@@ -235,7 +234,9 @@ impl DeriveKey<IndexPath<u32>> for ED25519Key {
             .into_iter()
             .for_each(|position| {
                 if position + 1 == length {
-                    fingerprint = UInt160::hash160u32le(ECPoint::from(signing_key.verifying_key()).as_bytes());
+                    let mut data = [0u8; 33];
+                    data[1..33].copy_from_slice(signing_key.verifying_key().as_bytes());
+                    fingerprint = hash160::Hash::hash(&data).to_byte_array().u32_le()
                 }
                 Self::derive_child_private_key(&mut signing_key, &mut chaincode, path, position);
             });
@@ -257,7 +258,9 @@ impl DeriveKey<IndexPath<[u8; 32]>> for ED25519Key {
             .into_iter()
             .for_each(|position| {
                 if position + 1 == length {
-                    fingerprint = UInt160::hash160u32le(ECPoint::from(signing_key.verifying_key()).as_bytes());
+                    let mut data = [0u8; 33];
+                    data[1..33].copy_from_slice(signing_key.verifying_key().as_bytes());
+                    fingerprint = hash160::Hash::hash(&data).to_byte_array().u32_le()
                 }
                 Self::derive_child_private_key(&mut signing_key, &mut chaincode, path, position);
             });
@@ -266,26 +269,29 @@ impl DeriveKey<IndexPath<[u8; 32]>> for ED25519Key {
 
     fn public_derive_to_path_with_offset(&self, path: &IndexPath<[u8; 32]>, offset: usize) -> Result<Self, KeyError> {
         let mut chaincode = self.chaincode.clone();
-        let mut data = UInt256::from(&self.public_key_data());
+        let pub_key_data = self.public_key_data();
+        let mut data = TryInto::<[u8; 32]>::try_into(pub_key_data.as_slice()).map_err(KeyError::from)?;
         let mut fingerprint = 0u32;
         let length = path.length();
         (offset..length)
             .into_iter()
             .for_each(|position| {
                 if position + 1 == length {
-                    fingerprint = UInt160::hash160u32le(&ECPoint::from(data.as_bytes()).0);
+                    fingerprint = hash160::Hash::hash(&data).to_byte_array().u32_le();
+                    // fingerprint = hash160::Hash::hash(&ECPoint::from(data.as_slice()).0).to_byte_array().u32_le();
                 }
-                Self::derive_child_public_key(&mut data.0, &mut chaincode, path, position);
+                Self::derive_child_public_key(&mut data, &mut chaincode, path, position);
             });
-        Ok(Self::init_with_extended_public_parts(data.0.to_vec(), chaincode, fingerprint))
+        Ok(Self::init_with_extended_public_parts(data.to_vec(), chaincode, fingerprint))
     }
 }
 
 impl ED25519Key {
 
     pub fn init_with_seed_data(seed: &[u8]) -> Result<Self, KeyError> {
-        let i = UInt512::ed25519_seed_key(seed);
-        Ok(Self { seckey: UInt256::from(&i.0[..32]).0, chaincode: UInt256::from(&i.0[32..]).0, ..Default::default() })
+        let (seckey, chaincode) = seed_key(seed)
+            .map_err(KeyError::from)?;
+        Ok(Self { seckey, chaincode, ..Default::default() })
     }
 
     fn init_with_extended_private_parts(seckey: [u8; 32], chaincode: [u8; 32], fingerprint: u32) -> Self {
@@ -330,8 +336,8 @@ impl ED25519Key {
             assert!(false, "Extended public key is wrong size");
             return Err(KeyError::WrongLength(data.len()));
         }
-        let mut chaincode = UInt256::from(&data[4..36]).0;
-        let mut key = UInt256::from(&data[36..68]).0;
+        let mut chaincode = TryInto::<[u8; 32]>::try_into(&data[4..36]).map_err(KeyError::from)?;
+        let mut key = TryInto::<[u8; 32]>::try_into(&data[36..68]).map_err(KeyError::from)?;
         (0..path.length())
             .into_iter()
             .for_each(|position| Self::derive_child_public_key(&mut key, &mut chaincode, path, position));

@@ -1,8 +1,6 @@
 use std::io;
 use bls_signatures::G1Element;
-use byte::{BytesExt, TryRead};
 use dashcore::consensus::{Decodable, Encodable};
-use crate::crypto::byte_util::UInt384;
 use crate::keys::BLSKey;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -39,12 +37,12 @@ impl Decodable for OperatorPublicKey {
 
 
 // Ctx: (version, protocol_version)
-impl<'a> TryRead<'a, u16> for OperatorPublicKey {
-    fn try_read(bytes: &'a [u8], version: u16) -> byte::Result<(Self, usize)> {
-        let data = bytes.read_with::<UInt384>(&mut 0, byte::LE)?.0;
-        Ok((OperatorPublicKey { data, version }, 48))
-    }
-}
+// impl<'a> TryRead<'a, u16> for OperatorPublicKey {
+//     fn try_read(bytes: &'a [u8], version: u16) -> byte::Result<(Self, usize)> {
+//         let data = bytes.read_with::<UInt384>(&mut 0, byte::LE)?.0;
+//         Ok((OperatorPublicKey { data, version }, 48))
+//     }
+// }
 
 impl From<OperatorPublicKey> for Option<G1Element> {
     fn from(value: OperatorPublicKey) -> Self {

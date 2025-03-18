@@ -1,7 +1,8 @@
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use dashcore::secp256k1::Scalar;
 use dashcore::consensus::encode::Encodable;
-use crate::crypto::byte_util::{AsBytes, clone_into_array, UInt256, UInt512};
+use dashcore::hashes::sha512;
+use crate::crypto::byte_util::{clone_into_array, hmac, Is31Bits, U32LE};
 use crate::derivation::{BIP32_HARD, IIndexPath};
 use crate::keys::{ECDSAKey, ED25519Key};
 
@@ -17,9 +18,9 @@ impl IChildKeyDerivationData<u32, [u8; 32], [u8; 33]> for ECDSAKey {
         if index & BIP32_HARD != 0 {
             buf[1..33].copy_from_slice(key);
         } else {
-            buf[..33].copy_from_slice(&secp256k1_point_from_bytes(key));
+            buf[..33].copy_from_slice(&secp256k1_point_from_byte_array(key));
         }
-        buf[33..37].copy_from_slice(index.to_be_bytes().as_slice());
+        buf[33..37].copy_from_slice(&index.to_be_bytes());
         buf.to_vec()
     }
 
@@ -38,7 +39,6 @@ impl IChildKeyDerivationData<u32, [u8; 32], [u8; 33]> for ECDSAKey {
 impl IChildKeyDerivationData<[u8; 32], [u8; 32], [u8; 33]> for ECDSAKey {
     fn private_key_data_input<PATH>(key: &[u8; 32], path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=[u8; 32]> {
         let index = path.index_at_position(position);
-        let index = UInt256(index);
         let is_hardened = path.hardened_at_position(position);
         let i_is_31_bits = index.is_31_bits();
         let mut writer = Vec::<u8>::new();
@@ -46,7 +46,7 @@ impl IChildKeyDerivationData<[u8; 32], [u8; 32], [u8; 33]> for ECDSAKey {
             0u8.consensus_encode(&mut writer).unwrap();
             writer.extend_from_slice(key);
         } else {
-            writer.extend_from_slice(&secp256k1_point_from_bytes(key));
+            writer.extend_from_slice(&secp256k1_point_from_byte_array(key));
         };
         if i_is_31_bits {
             let mut small_i = index.u32_le();
@@ -62,7 +62,6 @@ impl IChildKeyDerivationData<[u8; 32], [u8; 32], [u8; 33]> for ECDSAKey {
 
     fn public_key_data_input<PATH>(key: &[u8; 33], path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=[u8; 32]> {
         let index = path.index_at_position(position);
-        let index = UInt256(index);
         let is_hardened = path.hardened_at_position(position);
         if is_hardened {
             panic!("can't derive private child key from public parent key");
@@ -71,7 +70,7 @@ impl IChildKeyDerivationData<[u8; 32], [u8; 32], [u8; 33]> for ECDSAKey {
         if index.is_31_bits() {
             writer.extend_from_slice(&index.u32_le().to_be_bytes());
         } else {
-            writer.extend_from_slice(index.as_bytes());
+            writer.extend_from_slice(&index);
         };
         writer
     }
@@ -103,7 +102,6 @@ impl IChildKeyDerivationData<u32, SigningKey, [u8; 32]> for ED25519Key {
 impl IChildKeyDerivationData<[u8; 32], SigningKey, [u8; 32]> for ED25519Key {
     fn private_key_data_input<PATH>(key: &SigningKey, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=[u8; 32]> {
         let index = path.index_at_position(position);
-        let index = UInt256(index);
         let is_hardened = path.hardened_at_position(position);
 
         let i_is_31_bits = index.is_31_bits();
@@ -128,7 +126,6 @@ impl IChildKeyDerivationData<[u8; 32], SigningKey, [u8; 32]> for ED25519Key {
 
     fn public_key_data_input<PATH>(key: &[u8; 32], path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=[u8; 32]> {
         let index = path.index_at_position(position);
-        let index = UInt256(index);
         let is_hardened = path.hardened_at_position(position);
         if is_hardened {
             panic!("can't derive private child key from public parent key");
@@ -137,7 +134,7 @@ impl IChildKeyDerivationData<[u8; 32], SigningKey, [u8; 32]> for ED25519Key {
         if index.is_31_bits() {
             writer.extend_from_slice(&index.u32_le().to_be_bytes());
         } else {
-            writer.extend_from_slice(index.as_bytes());
+            writer.extend_from_slice(&index);
         };
         writer
     }
@@ -155,8 +152,8 @@ pub trait IChildKeyDerivation<T, SK, PK> where SK: SignKey + ?Sized {
     fn derive_child_public_key<PATH>(key: &mut PK, chaincode: &mut [u8; 32], path: &PATH, position: usize) where PATH: IIndexPath<Item = T>;
 }
 
-pub fn secp256k1_point_from_bytes(data: &[u8]) -> [u8; 33] {
-    let sec = dashcore::secp256k1::SecretKey::from_slice(data).unwrap();
+pub fn secp256k1_point_from_byte_array(data: &[u8; 32]) -> [u8; 33] {
+    let sec = dashcore::secp256k1::SecretKey::from_byte_array(data).unwrap();
     let s = dashcore::secp256k1::Secp256k1::new();
     let pub_key = dashcore::secp256k1::PublicKey::from_secret_key(&s, &sec);
     pub_key.serialize()
@@ -166,22 +163,24 @@ pub fn secp256k1_point_from_bytes(data: &[u8]) -> [u8; 33] {
 impl<T> IChildKeyDerivation<T, [u8; 32], [u8; 33]> for ECDSAKey where Self: IChildKeyDerivationData<T, [u8; 32], [u8; 33]> {
     fn derive_child_private_key<PATH>(key: &mut [u8; 32], chaincode: &mut [u8; 32], path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
-        let i = UInt512::hmac(chaincode.as_ref(), Self::private_key_data_input(key, path, position).as_ref());
+        let input = Self::private_key_data_input(key, path, position);
+        let i = hmac::<sha512::Hash>(chaincode.as_ref(), input.as_ref());
         let mut sec_key = dashcore::secp256k1::SecretKey::from_byte_array(key).expect("invalid private key");
-        let tweak = Scalar::from_be_bytes(clone_into_array(&i.0[..32])).expect("invalid tweak");
+        let tweak = Scalar::from_be_bytes(clone_into_array(&i[..32])).expect("invalid tweak");
         sec_key = sec_key.add_tweak(&tweak).expect("failed to add tweak");
         key.copy_from_slice(&sec_key.secret_bytes());
-        chaincode.copy_from_slice(&i.0[32..]);
+        chaincode.copy_from_slice(&i[32..]);
     }
 
     fn derive_child_public_key<PATH>(key: &mut [u8; 33], chaincode: &mut [u8; 32], path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
-        let i = UInt512::hmac(chaincode.as_ref(), Self::public_key_data_input(key, path, position).as_ref());
+        let input = Self::public_key_data_input(key, path, position);
+        let i = hmac::<sha512::Hash>(chaincode.as_ref(), input.as_ref());
         let s = dashcore::secp256k1::Secp256k1::new();
         let mut pub_key = dashcore::secp256k1::PublicKey::from_slice(key).expect("invalid public key");
-        let tweak = Scalar::from_be_bytes(clone_into_array(&i.0[..32])).expect("invalid tweak");
+        let tweak = Scalar::from_be_bytes(clone_into_array(&i[..32])).expect("invalid tweak");
         pub_key = pub_key.add_exp_tweak(&s, &tweak).expect("failed to add exp tweak");
-        chaincode.copy_from_slice(&i.0[32..]);
+        chaincode.copy_from_slice(&i[32..]);
         key.copy_from_slice(pub_key.serialize().as_slice())
     }
 }
@@ -189,21 +188,23 @@ impl<T> IChildKeyDerivation<T, [u8; 32], [u8; 33]> for ECDSAKey where Self: IChi
 impl<T> IChildKeyDerivation<T, SigningKey, [u8; 32]> for ED25519Key where Self: IChildKeyDerivationData<T, SigningKey, [u8; 32]> {
     fn derive_child_private_key<PATH>(key: &mut SigningKey, chaincode: &mut [u8; 32], path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
-        let i = UInt512::hmac(chaincode.as_ref(), Self::private_key_data_input(key, path, position).as_ref());
-        let scalar: [u8; 32] = i.0[..32].try_into().unwrap();
+        let input = Self::private_key_data_input(key, path, position);
+        let i = hmac::<sha512::Hash>(chaincode.as_ref(), input.as_ref());
+        let scalar: [u8; 32] = i[..32].try_into().unwrap();
         let signing_key = SigningKey::from(&scalar);
         key.clone_from(&signing_key);
-        chaincode.copy_from_slice(&i.0[32..]);
+        chaincode.copy_from_slice(&i[32..]);
     }
 
     fn derive_child_public_key<PATH>(key: &mut [u8; 32], chaincode: &mut [u8; 32], path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
-        let i = UInt512::hmac(chaincode.as_ref(), Self::public_key_data_input(key, path, position).as_ref());
-        let scalar: [u8; 32] = i.0[..32].try_into().unwrap();
+        let input = Self::public_key_data_input(key, path, position);
+        let i = hmac::<sha512::Hash>(chaincode.as_ref(), input.as_ref());
+        let scalar: [u8; 32] = i[..32].try_into().unwrap();
         match VerifyingKey::from_bytes(&scalar) {
             Ok(pub_key) => {
                 key.copy_from_slice(pub_key.as_bytes());
-                chaincode.copy_from_slice(&i.0[32..]);
+                chaincode.copy_from_slice(&i[32..]);
             },
             Err(err) => panic!("{}", err)
         }

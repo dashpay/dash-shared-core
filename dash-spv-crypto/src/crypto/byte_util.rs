@@ -1,20 +1,13 @@
 use byte::{BytesExt, ctx::Endian, LE, TryRead, TryWrite};
-use std::{io::Write, mem, net::{IpAddr, Ipv4Addr}, slice};
+use std::{io::Write, mem, slice};
 use dashcore::consensus::{Decodable, Encodable, ReadExt, WriteExt};
-use dashcore::hashes::{Hash, hash160, HashEngine, hex::FromHex, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
+use dashcore::hashes::{Hash, HashEngine, hex::FromHex, Hmac, HmacEngine};
 use dashcore::secp256k1::{hashes::hex::DisplayHex, rand::{Rng, thread_rng}};
-use ed25519_dalek::{SigningKey, VerifyingKey};
 #[cfg(feature = "generate-dashj-tests")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use crate::util::base58;
-use crate::util::data_ops::short_hex_string_from;
-use crate::util::params::{BIP32_SEED_KEY, ED25519_SEED_KEY};
 
 use std::io;
-
-pub trait AsBytes {
-    fn as_bytes(&self) -> &[u8];
-}
+use dashcore::secp256k1::rand::random;
 
 pub trait Reversable {
     fn reverse(&mut self) -> Self;
@@ -41,28 +34,9 @@ pub trait ConstDecodable<'a, T: TryRead<'a, Endian>> {
 pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> byte::Result<T>;
 }
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[ferment_macro::export]
-pub struct UInt128(pub [u8; 16]);
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[ferment_macro::export]
-pub struct UInt160(pub [u8; 20]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[ferment_macro::export]
 pub struct UInt256(pub [u8; 32]);
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[ferment_macro::export]
-pub struct UInt384(pub [u8; 48]);
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[ferment_macro::export]
-pub struct UInt512(pub [u8; 64]);
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[ferment_macro::export]
-pub struct UInt768(pub [u8; 96]);
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ECPoint(pub [u8; 33]);
 
 #[macro_export]
 macro_rules! impl_from_const_ptr {
@@ -175,17 +149,6 @@ macro_rules! define_try_read_to_big_uint {
                 Ok(($uint_type(data), $byte_len))
             }
         }
-        // impl<'a> TryRead<'a, Endian> for [u8; $byte_len] {
-        //     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-        //         // Ok(($uint_type(bytes[..$byte_len].try_into().unwrap_or([0u8; $byte_len])), $byte_len))
-        //         let mut offset = 0usize;
-        //         let mut data: [u8; $byte_len] = [0u8; $byte_len];
-        //         for i in 0..$byte_len {
-        //             data[i] = bytes.read_with::<u8>(&mut offset, endian)?;
-        //         }
-        //         Ok((data, $byte_len))
-        //     }
-        // }
     }
 }
 
@@ -220,6 +183,19 @@ macro_rules! define_try_write_from_big_uint {
         }
     }
 }
+#[macro_export]
+macro_rules! define_zeroable {
+    ($byte_len: expr) => {
+        impl Zeroable for [u8; $byte_len] {
+            fn is_zero(&self) -> bool {
+                !self.iter().any(|&byte| byte > 0)
+            }
+        }
+    }
+}
+define_zeroable!(32);
+define_zeroable!(48);
+define_zeroable!(96);
 
 #[macro_export]
 macro_rules! define_bytes_to_big_uint {
@@ -247,13 +223,6 @@ macro_rules! define_bytes_to_big_uint {
                 Ok(())
             }
         }
-        // Used for code generation sometime while debugging
-        // impl std::fmt::Debug for $uint_type {
-        //     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        //         write!(f, "{}::from_hex(\"{}\").unwrap()", stringify!($uint_type), self.0.to_hex())?;
-        //         Ok(())
-        //     }
-        // }
         impl std::fmt::Debug for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "{}", self.0.to_lower_hex_string())?;
@@ -263,7 +232,7 @@ macro_rules! define_bytes_to_big_uint {
         impl Encodable for $uint_type {
             #[inline]
             fn consensus_encode<W: io::Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
-                writer.emit_slice(&self.as_bytes())?;
+                writer.emit_slice(self.as_ref())?;
                 Ok($byte_len)
             }
         }
@@ -320,22 +289,11 @@ macro_rules! define_bytes_to_big_uint {
                 !self.0.iter().any(|&byte| byte > 0)
             }
         }
-        impl Zeroable for [u8; $byte_len] {
-            fn is_zero(&self) -> bool {
-                !self.iter().any(|&byte| byte > 0)
-            }
-        }
 
         impl $uint_type {
             pub const MIN: Self = $uint_type([0; $byte_len]);
             pub const MAX: Self = $uint_type([!0; $byte_len]);
             pub const SIZE: usize = $byte_len;
-        }
-
-        impl AsBytes for $uint_type {
-            fn as_bytes(&self) -> &[u8] {
-                &self.0[..]
-            }
         }
     }
 }
@@ -352,14 +310,49 @@ impl_decodable!(i64, 8);
 impl_decodable!(isize, mem::size_of::<isize>());
 
 
-define_bytes_to_big_uint!(UInt128, 16);
-define_bytes_to_big_uint!(UInt160, 20);
 define_bytes_to_big_uint!(UInt256, 32);
-define_bytes_to_big_uint!(UInt384, 48);
-define_bytes_to_big_uint!(UInt512, 64);
-define_bytes_to_big_uint!(UInt768, 96);
 
-define_bytes_to_big_uint!(ECPoint, 33);
+pub trait U32LE {
+    fn u32_le(&self) -> u32;
+
+}
+
+pub trait Is31Bits {
+    fn is_31_bits(&self) -> bool;
+}
+
+impl Is31Bits for [u8; 32] {
+    fn is_31_bits(&self) -> bool {
+        let u64_1 = u64::from_le_bytes(clone_into_array(&self[8..16]));
+        let u64_2 = u64::from_le_bytes(clone_into_array(&self[16..24]));
+        let u64_3 = u64::from_le_bytes(clone_into_array(&self[24..]));
+        let u32_1 = u32::from_le_bytes(clone_into_array(&self[4..8]));
+        let u32_0 = u32::from_le_bytes(clone_into_array(&self[..4]));
+        (u64_1 | u64_2 | u64_3) == 0 && u32_1 == 0 && u32_0 & 0x80000000 == 0
+    }
+
+}
+impl U32LE for [u8; 32] {
+    fn u32_le(&self) -> u32 {
+        u32::from_le_bytes(clone_into_array(&self[..4]))
+    }
+}
+
+impl U32LE for [u8; 20] {
+    fn u32_le(&self) -> u32 {
+        u32::from_le_bytes(clone_into_array(&self[..4]))
+    }
+}
+
+impl Random for [u8; 32] {
+    fn random() -> Self where Self: Sized {
+        let mut data: [u8; 32] = [0u8; 32];
+        for i in 0..32 {
+            data[i] = random();
+        }
+        data
+    }
+}
 
 
 
@@ -384,6 +377,18 @@ impl From<u32> for UInt256 {
         r[..4].copy_from_slice(&value.to_le_bytes());
         UInt256(r)
     }
+}
+pub fn from_u32(value: u32) -> [u8; 32] {
+    let mut r = [0u8; 32];
+    r[..4].copy_from_slice(&value.to_le_bytes());
+    r
+
+}
+pub fn from_u64(value: u64) -> [u8; 32] {
+    let mut r = [0u8; 32];
+    r[..8].copy_from_slice(&value.to_le_bytes());
+    r
+
 }
 
 impl From<u64> for UInt256 {
@@ -431,50 +436,50 @@ impl std::ops::Shl<usize> for UInt256 {
     }
 }
 
-pub fn add_one_le(a: UInt256) -> UInt256 {
+pub fn add_one_le(a: [u8; 32]) -> [u8; 32] {
     let mut r = [0u8; 32];
     r[0..8].clone_from_slice(&1u64.to_le_bytes());
-    add_le(a, UInt256(r))
+    add_le(a, r)
 }
 
-pub fn add_le(x: UInt256, a: UInt256) -> UInt256 {
+pub fn add_le(x: [u8; 32], a: [u8; 32]) -> [u8; 32] {
     let mut carry = 0u64;
     let mut r = [0u8; 32];
     for i in 0..8 {
         let len = i + 4;
-        let xb: [u8; 4] = clone_into_array(&x.0[i..len]);
-        let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
+        let xb: [u8; 4] = clone_into_array(&x[i..len]);
+        let ab: [u8; 4] = clone_into_array(&a[i..len]);
         let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
         r[i..len].clone_from_slice(&(sum as u32).to_le_bytes());
         carry = sum >> 32;
     }
-    UInt256(r)
+    r
 }
 
 
 
 #[allow(unused)]
-fn multiply_u32_le(mut a: UInt256, b: u32) -> UInt256 {
+fn multiply_u32_le(mut a: [u8; 32], b: u32) -> [u8; 32] {
     let mut carry = 0u64;
     for i in 0..8 {
         let len = i + 4;
-        let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
+        let ab: [u8; 4] = clone_into_array(&a[i..len]);
         let n = carry + (b as u64) * (u32::from_le_bytes(ab) as u64);
-        a.0[i..len].clone_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
+        a[i..len].clone_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
         carry = n >> 32;
     }
     a
 }
 
 #[allow(unused)]
-pub fn shift_left_le(a: UInt256, bits: u8) -> UInt256 {
+pub fn shift_left_le(a: [u8; 32], bits: u8) -> [u8; 32] {
     let mut r = [0u8; 32];
     let k = bits / 8;
     let bits = bits % 8;
     for i in 0..32 {
         let ik = i + k as usize;
         let ik1 = ik + 1;
-        let u8s = a.0[i];
+        let u8s = a[i];
         if ik1 < 32 && bits != 0 {
             r[ik1] |= u8s >> (8 - bits);
         }
@@ -482,18 +487,18 @@ pub fn shift_left_le(a: UInt256, bits: u8) -> UInt256 {
             r[ik] |= u8s << bits;
         }
     }
-    UInt256(r)
+    r
 }
 
 #[allow(unused)]
-fn shift_right_le(a: UInt256, bits: u8) -> UInt256 {
+fn shift_right_le(a: [u8; 32], bits: u8) -> [u8; 32] {
     let mut r = [0u8; 32];
     let k = bits / 8;
     let bits = bits % 8;
     for i in 0..32 {
         let ik = i - k as isize;
         let ik1 = ik - 1;
-        let u8s = a.0[i as usize];
+        let u8s = a[i as usize];
         if ik1 >= 0 && bits != 0 {
             r[ik1 as usize] |= u8s << (8 - bits);
         }
@@ -501,112 +506,96 @@ fn shift_right_le(a: UInt256, bits: u8) -> UInt256 {
             r[ik as usize] |= u8s >> bits;
         }
     }
-    UInt256(r)
+    r
 }
 
-impl UInt160 {
-    pub fn hash160(data: &[u8]) -> Self {
-        UInt160(hash160::Hash::hash(data).to_byte_array())
-    }
-    pub fn hash160u32le(data: &[u8]) -> u32 {
-        Self::hash160(data).u32_le()
-    }
-    pub fn ripemd160(data: &[u8]) -> Self {
-        UInt160(ripemd160::Hash::hash(data).to_byte_array())
-    }
-    pub fn sha1(data: &[u8]) -> Self {
-        UInt160(sha1::Hash::hash(data).to_byte_array())
-    }
+// impl UInt160 {
+    // pub fn hash160(data: &[u8]) -> Self {
+    //     UInt160(hash160::Hash::hash(data).to_byte_array())
+    // }
+    // pub fn hash160u32le(data: &[u8]) -> u32 {
+    //     Self::hash160(data).u32_le()
+    // }
+    // pub fn sha1(data: &[u8]) -> Self {
+    //     UInt160(sha1::Hash::hash(data).to_byte_array())
+    // }
+    //
+    // pub fn u32_le(&self) -> u32 {
+    //     u32::from_le_bytes(clone_into_array(&self.0[..4]))
+    // }
+// }
 
-    pub fn u32_le(&self) -> u32 {
-        u32::from_le_bytes(clone_into_array(&self.0[..4]))
-    }
-}
+// impl UInt128 {
+    // pub fn ip_address_from_u32(value: u32) -> Self {
+    //     //UInt128 address = {.u32 = {0, 0, CFSwapInt32HostToBig(0xffff), CFSwapInt32HostToBig(self.address)}};
+    //     let mut writer = Vec::<u8>::new();
+    //     0u64.consensus_encode(&mut writer).unwrap();
+    //     0xffffu32.swap_bytes().consensus_encode(&mut writer).unwrap();
+    //     value.swap_bytes().consensus_encode(&mut writer).unwrap();
+    //     UInt128(clone_into_array(&writer))
+    // }
+    //
+    // pub fn ip_address_to_i32(&self) -> i32 {
+    //     // todo: check impl
+    //     // if (p.address.u64[0] != 0 || p.address.u32[2] != CFSwapInt32HostToBig(0xffff)) continue; // skip IPv6 for now
+    //     // CFSwapInt32BigToHost(p.address.u32[3])
+    //     i32::from_be_bytes(clone_into_array(&self.0[12..]))
+    // }
+    //
+    // pub fn to_ip_addr(&self) -> IpAddr {
+    //     IpAddr::from(self.0)
+    // }
+    //
+    // pub fn to_ipv4_addr(&self) -> Ipv4Addr {
+    //     Ipv4Addr::from(self.ip_address_to_i32() as u32)
+    // }
+// }
 
-impl UInt128 {
-    pub fn ip_address_from_u32(value: u32) -> Self {
-        //UInt128 address = {.u32 = {0, 0, CFSwapInt32HostToBig(0xffff), CFSwapInt32HostToBig(self.address)}};
-        let mut writer = Vec::<u8>::new();
-        0u64.consensus_encode(&mut writer).unwrap();
-        0xffffu32.swap_bytes().consensus_encode(&mut writer).unwrap();
-        value.swap_bytes().consensus_encode(&mut writer).unwrap();
-        UInt128(clone_into_array(&writer))
-    }
+// impl From<IpAddr> for UInt128 {
+//     fn from(value: IpAddr) -> Self {
+//         match value {
+//             IpAddr::V4(ipv4) => {
+//                 let mut writer = [0u8; 16];
+//                 writer[8..12].copy_from_slice(&0xffffu32.to_be_bytes());
+//                 writer[12..].copy_from_slice(&ipv4.octets());
+//                 UInt128(writer)
+//             },
+//             IpAddr::V6(ipv6) => UInt128(ipv6.octets())
+//         }
+//     }
+// }
 
-    pub fn ip_address_to_i32(&self) -> i32 {
-        // todo: check impl
-        // if (p.address.u64[0] != 0 || p.address.u32[2] != CFSwapInt32HostToBig(0xffff)) continue; // skip IPv6 for now
-        // CFSwapInt32BigToHost(p.address.u32[3])
-        i32::from_be_bytes(clone_into_array(&self.0[12..]))
-    }
-
-    pub fn to_ip_addr(&self) -> IpAddr {
-        IpAddr::from(self.0)
-    }
-
-    pub fn to_ipv4_addr(&self) -> Ipv4Addr {
-        Ipv4Addr::from(self.ip_address_to_i32() as u32)
-    }
-}
-
-impl From<IpAddr> for UInt128 {
-    fn from(value: IpAddr) -> Self {
-        match value {
-            IpAddr::V4(ipv4) => {
-                let mut writer = [0u8; 16];
-                writer[8..12].copy_from_slice(&0xffffu32.to_be_bytes());
-                writer[12..].copy_from_slice(&ipv4.octets());
-                UInt128(writer)
-            },
-            IpAddr::V6(ipv6) => UInt128(ipv6.octets())
-        }
-    }
-}
-
-impl UInt256 {
-    pub fn sha256(data: &[u8]) -> Self {
-        UInt256(sha256::Hash::hash(data).to_byte_array())
-    }
-    pub fn sha256_str(data: &str) -> Self {
-        UInt256(sha256::Hash::hash(data.as_bytes()).to_byte_array())
-    }
-    pub fn sha256d(data: impl AsRef<[u8]>) -> Self {
-        UInt256(sha256d::Hash::hash(data.as_ref()).to_byte_array())
-    }
-    pub fn sha256d_str(data: &str) -> Self {
-        UInt256(sha256d::Hash::hash(data.as_bytes()).to_byte_array())
-    }
-    pub fn x11_hash(data: &[u8]) -> Self {
-        let hash = rs_x11_hash::get_x11_hash(&data);
-        UInt256(hash)
-    }
-
-    pub fn block_hash_for_dev_net_genesis_block_with_version(version: u32, prev_hash: UInt256, merkle_root: UInt256, timestamp: u32, target: u32, nonce: u32) -> Self {
-        let mut writer = Vec::<u8>::new();
-        version.consensus_encode(&mut writer).unwrap();
-        prev_hash.consensus_encode(&mut writer).unwrap();
-        merkle_root.consensus_encode(&mut writer).unwrap();
-        timestamp.consensus_encode(&mut writer).unwrap();
-        target.consensus_encode(&mut writer).unwrap();
-        nonce.consensus_encode(&mut writer).unwrap();
-        Self::x11_hash(&writer)
-    }
+// impl UInt256 {
+    // pub fn sha256(data: &[u8]) -> Self {
+    //     UInt256(sha256::Hash::hash(data).to_byte_array())
+    // }
+    // pub fn sha256_str(data: &str) -> Self {
+    //     UInt256(sha256::Hash::hash(data.as_bytes()).to_byte_array())
+    // }
+    // pub fn sha256d(data: impl AsRef<[u8]>) -> Self {
+    //     UInt256(sha256d::Hash::hash(data.as_ref()).to_byte_array())
+    // }
+    // pub fn sha256d_str(data: &str) -> Self {
+    //     UInt256(sha256d::Hash::hash(data.as_bytes()).to_byte_array())
+    // }
+    // pub fn x11_hash(data: &[u8]) -> Self {
+    //     let hash = rs_x11_hash::get_x11_hash(&data);
+    //     UInt256(hash)
+    // }
+//
+//}
+pub fn block_hash_for_dev_net_genesis_block_with_version(version: u32, prev_hash: [u8; 32], merkle_root: [u8; 32], timestamp: u32, target: u32, nonce: u32) -> [u8; 32] {
+    let mut writer = Vec::<u8>::new();
+    version.consensus_encode(&mut writer).unwrap();
+    prev_hash.consensus_encode(&mut writer).unwrap();
+    merkle_root.consensus_encode(&mut writer).unwrap();
+    timestamp.consensus_encode(&mut writer).unwrap();
+    target.consensus_encode(&mut writer).unwrap();
+    nonce.consensus_encode(&mut writer).unwrap();
+    rs_x11_hash::get_x11_hash(&writer)
 }
 
 impl UInt256 {
-    pub fn add_le_u32(&self, a: UInt256) -> UInt256 {
-        let mut carry = 0u64;
-        let mut r = [0u8; 32];
-        for i in 0..8 {
-            let len = i + 4;
-            let xb: [u8; 4] = clone_into_array(&self.0[i..len]);
-            let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
-            let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
-            r[i..len].copy_from_slice(&(sum as u32).to_le_bytes());
-            carry = sum >> 32;
-        }
-        UInt256(r)
-    }
 
     pub fn add_le(&self, a: UInt256) -> UInt256 {
         let mut carry = 0u64;
@@ -844,90 +833,130 @@ impl UInt256 {
         u64::from_le_bytes(clone_into_array(&self.0[24..]))
     }
 }
-
-impl UInt256 {
-    pub fn short_hex(&self) -> String {
-        short_hex_string_from(self.as_bytes())
-    }
+pub fn hmac<T: Hash>(key: &[u8], input: &[u8]) -> T::Bytes {
+    let mut engine = HmacEngine::<T>::new(key);
+    engine.input(input);
+    Hmac::<T>::from_engine(engine).to_byte_array()
 }
 
-impl UInt256 {
-    pub fn from_base58_string(data: &str) -> Option<Self> {
-        base58::from(data).ok()
-            .and_then(|d| Self::from_bytes(&d, &mut 0).ok())
-    }
+// impl UInt256 {
+//     pub fn short_hex(&self) -> String {
+//         short_hex_string_from(self.as_bytes())
+//     }
+// }
+//
+// impl UInt256 {
+//     pub fn from_base58_string(data: &str) -> Option<Self> {
+//         base58::from(data).ok()
+//             .and_then(|d| Self::from_bytes(&d, &mut 0).ok())
+//     }
+// }
+//
+//
+// impl UInt256 {
+//     pub fn hmac<T: Hash<Bytes = [u8; 32]>>(key: &[u8], input: &[u8]) -> Self {
+//         let mut engine = HmacEngine::<T>::new(key);
+//         engine.input(input);
+//         Self(Hmac::<T>::from_engine(engine).to_byte_array())
+//     }
+// }
+//
+// impl From<SigningKey> for UInt256 {
+//     fn from(value: SigningKey) -> Self {
+//         UInt256(value.to_bytes())
+//     }
+// }
+//
+// impl From<UInt256> for SigningKey {
+//     fn from(value: UInt256) -> Self {
+//         SigningKey::from_bytes(&value.0)
+//     }
+// }
+//
+// impl From<VerifyingKey> for UInt256 {
+//     fn from(value: VerifyingKey) -> Self {
+//         UInt256(value.to_bytes())
+//         // let mut data = [0u8; 33];
+//         // data[1..33].copy_from_slice(value.as_bytes());
+//         // Self(data)
+//     }
+// }
+// impl From<VerifyingKey> for ECPoint {
+//     fn from(value: VerifyingKey) -> Self {
+//         let mut data = [0u8; 33];
+//         data[1..33].copy_from_slice(value.as_bytes());
+//         Self(data)
+//     }
+// }
+//
+// pub fn hmac(key: &[u8], input: &[u8]) -> [u8; 64] {
+//     let mut engine = HmacEngine::<sha512::Hash>::new(key);
+//     engine.input(input);
+//     Hmac::<sha512::Hash>::from_engine(engine).to_byte_array()
+// }
+// impl UInt512 {
+    // pub fn sha512(data: &[u8]) -> Self {
+    //     UInt512(sha512::Hash::hash(data).to_byte_array())
+    // }
+    // pub fn hmac(key: &[u8], input: &[u8]) -> Self {
+    //     Self(hmac(key, input))
+    // }
+
+    // pub fn bip32_seed_key(input: &[u8]) -> Self {
+    //     Self::hmac(BIP32_SEED_KEY.as_bytes(), input)
+    // }
+
+    // pub fn ed25519_seed_key(input: &[u8]) -> Self {
+    //     Self::hmac(ED25519_SEED_KEY.as_bytes(), input)
+    // }
+    //
+    // pub fn from(a: UInt256, b: UInt256) -> Self {
+    //     let mut result = [0u8; 64];
+    //     result[..32].copy_from_slice(&a.0);
+    //     result[32..].copy_from_slice(&b.0);
+    //     Self(result)
+    // }
+// }
+// pub fn sup(lhs: [u8; 32], rhs: &[u8; 32]) -> bool {
+//     for i in (0..32).rev() {
+//         if lhs[i] > rhs[i] {
+//             return true;
+//         } else if lhs[i] < rhs[i] {
+//             return false;
+//         }
+//     }
+//     // equal
+//     false
+// }
+
+#[test]
+pub fn test_superior_and_equal_uint256() {
+    let big_a = UInt256::from(7u64);
+    let big_b = UInt256::from(5u64);
+    assert!(big_a.sup(&big_b), "A in uint 256 needs to be bigger than B");
+    let big_c = UInt256::from([0,1,0,0]);
+    assert!(big_c.sup(&big_a), "C in uint 256 needs to be bigger than A");
+    let d: u64 = 1 << 30;
+    let big_d = UInt256::from(d);
+    let big_d_left_shifted = big_d.shift_left_le(34);
+    assert!(big_c.eq(&big_d_left_shifted), "C and D should be equal");
+    let e: u32 = 1 << 30;
+    let big_e = UInt256::from(e);
+    let big_e_left_shifted = big_e.shift_left_le(34);
+    assert!(big_e_left_shifted.eq(&big_d_left_shifted), "D and E should be equal");
 }
 
-
-impl UInt256 {
-    pub fn hmac<T: Hash<Bytes = [u8; 32]>>(key: &[u8], input: &[u8]) -> Self {
-        let mut engine = HmacEngine::<T>::new(key);
-        engine.input(input);
-        Self(Hmac::<T>::from_engine(engine).to_byte_array())
+#[test]
+pub fn test_biguints_ops() {
+    let mut x = [0u8; 32];
+    x[0] = 0x32; // 50
+    let a = UInt256(x);
+    for i in 0..=32 {
+        println!("{}", a >> i);
     }
+
+    let a = b"a0fcffffffffffffffffffffffffffffffffffffffffffffffffffffff4ffbff";
+    let b = b"100e000000000000000000000000000000000000000000000000000000000000";
+
 }
 
-impl From<SigningKey> for UInt256 {
-    fn from(value: SigningKey) -> Self {
-        UInt256(value.to_bytes())
-    }
-}
-
-impl From<UInt256> for SigningKey {
-    fn from(value: UInt256) -> Self {
-        SigningKey::from_bytes(&value.0)
-    }
-}
-
-impl From<VerifyingKey> for UInt256 {
-    fn from(value: VerifyingKey) -> Self {
-        UInt256(value.to_bytes())
-        // let mut data = [0u8; 33];
-        // data[1..33].copy_from_slice(value.as_bytes());
-        // Self(data)
-    }
-}
-impl From<VerifyingKey> for ECPoint {
-    fn from(value: VerifyingKey) -> Self {
-        let mut data = [0u8; 33];
-        data[1..33].copy_from_slice(value.as_bytes());
-        Self(data)
-    }
-}
-
-impl UInt512 {
-    pub fn sha512(data: &[u8]) -> Self {
-        UInt512(sha512::Hash::hash(data).to_byte_array())
-    }
-    pub fn hmac(key: &[u8], input: &[u8]) -> Self {
-        let mut engine = HmacEngine::<sha512::Hash>::new(key);
-        engine.input(input);
-        Self(Hmac::<sha512::Hash>::from_engine(engine).to_byte_array())
-    }
-
-    pub fn bip32_seed_key(input: &[u8]) -> Self {
-        Self::hmac(BIP32_SEED_KEY.as_bytes(), input)
-    }
-
-    pub fn ed25519_seed_key(input: &[u8]) -> Self {
-        Self::hmac(ED25519_SEED_KEY.as_bytes(), input)
-    }
-
-    pub fn from(a: UInt256, b: UInt256) -> Self {
-        let mut result = [0u8; 64];
-        result[..32].copy_from_slice(&a.0);
-        result[32..].copy_from_slice(&b.0);
-        Self(result)
-    }
-}
-pub fn sup(lhs: [u8; 32], rhs: &[u8; 32]) -> bool {
-    for i in (0..32).rev() {
-        if lhs[i] > rhs[i] {
-            return true;
-        } else if lhs[i] < rhs[i] {
-            return false;
-        }
-    }
-    // equal
-    false
-}

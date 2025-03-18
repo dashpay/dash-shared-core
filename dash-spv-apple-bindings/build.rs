@@ -18,6 +18,7 @@ fn main() {
         .with_default_mod_name()
         .with_external_crates(vec![
             "dash-spv-crypto",
+            "dash-spv-keychain",
             "dash-spv-masternode-processor",
             "dash-spv-platform",
             "dash-sdk",

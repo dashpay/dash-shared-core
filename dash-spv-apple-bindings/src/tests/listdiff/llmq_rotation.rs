@@ -5,7 +5,6 @@ use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dash_spv_crypto::network::{ChainType, DevnetType};
 use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_masternode_processor::block_store::MerkleBlock;
-use dash_spv_masternode_processor::common::Block;
 use dash_spv_masternode_processor::common::block::MBlock;
 use dash_spv_masternode_processor::processing::{core_provider::CoreProviderError, MasternodeProcessor};
 use dash_spv_masternode_processor::test_helpers::load_message;
@@ -268,24 +267,6 @@ fn processor_devnet_333() {
         false
     );
 }
-// #[test]
-// fn processor_devnet_333_2() {
-//     let chain = ChainType::DevNet(DevnetType::Devnet333);
-//     assert_diff_chain(chain, &["mnlistdiff--1-25480.dat"], &["qrinfo--1-24868.dat"], Some(init_devnet_333_block_store()));
-// }
-
-
-
-// unsafe extern "C" fn get_merkle_root_by_hash_default_333(
-//     block_hash: *mut [u8; 32],
-//     _context: *const std::ffi::c_void,
-// ) -> *mut u8 {
-//     // let h = UInt256(*block_hash);
-//     // println!("get_merkle_root_by_hash_default_333: {}", h);
-//     boxed(UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf")
-//         .unwrap().reverse()
-//         .0) as * mut _
-// }
 
 fn devnet_333_height(hash: &str) -> u32 {
     match hash {
@@ -512,24 +493,6 @@ fn test_processor_devnet_333_2() {
         get_block_height_by_hash: Arc::new(|context, block_hash| {
             devnet_333_height(block_hash.reversed().to_lower_hex_string().as_str())
         }),
-        block_by_hash: Arc::new(move |context, block_hash| unsafe {
-            let context = Arc::from_raw(context as *const FFIContext);
-            let result = context.block_for_hash(block_hash)
-                .map(MBlock::from)
-                .ok_or(CoreProviderError::NullResult(format!("No block for hash {}", block_hash.to_lower_hex_string())));
-            std::mem::forget(context);
-            result
-        }),
-        last_block_for_block_hash: Arc::new(move |context, block_hash, peer| unsafe {
-            let context = Arc::from_raw(context as *const FFIContext);
-            let result = context.block_for_hash(block_hash)
-                .map(MBlock::from)
-                .ok_or(CoreProviderError::NullResult(format!("No last block for block hash {}", block_hash.to_lower_hex_string())));
-
-
-            std::mem::forget(context);
-            result
-        }),
         get_block_hash_by_height: Arc::new(move |context, h| unsafe {
             let context = Arc::from_raw(context as *const FFIContext);
             let result = context.block_for_height(h)
@@ -541,12 +504,6 @@ fn test_processor_devnet_333_2() {
             std::mem::forget(context);
             result.ok()
         }),
-        get_tip_height: Arc::new(move |context| unsafe {
-            let context = Arc::from_raw(context as *const FFIContext);
-            let result = context.get_tip_height();
-            std::mem::forget(context);
-            result
-        }),
         get_cl_signature_by_block_hash: Arc::new(move |context, block_hash| unsafe {
             let context = Arc::from_raw(context as *const FFIContext);
             let result = context.cl_signature_by_block_hash(&block_hash)
@@ -555,22 +512,9 @@ fn test_processor_devnet_333_2() {
             std::mem::forget(context);
             result
         }),
-        get_block_by_height_or_last_terminal: Arc::new(move |context, block_height| unsafe {
-            let context = Arc::from_raw(context as *const FFIContext);
-            let result = context.block_for_height(block_height)
-                .map(Block::from)
-                .ok_or(CoreProviderError::NullResult(format!("No block or last terminal for {}", block_height)));
-            std::mem::forget(context);
-            result
-        }),
-        // load_masternode_list_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
-        // save_masternode_list_into_db: Arc::new(|context, list_block_hash, modified_masternodes| Ok(true)),
-        // load_llmq_snapshot_from_db: Arc::new(|context, block_hash| Err(CoreProviderError::MissedMasternodeListAt(block_hash))),
-        // save_llmq_snapshot_into_db: Arc::new(|context, block_hash, snapshot| Ok(true)),
         update_address_usage_of_masternodes: Arc::new(|context, modified_masternodes| {}),
         issue_with_masternode_list_from_peer: Arc::new(|context, is_dip24, peer| {}),
         notify_sync_state: Arc::new(|context, state| {}),
-        dequeue_masternode_list: Arc::new(|context, is_dip24| {}),
     };
     let provider_arc = Arc::new(provider);
     // let cache = Arc::new(MasternodeProcessorCache::new(provider_arc.clone()));

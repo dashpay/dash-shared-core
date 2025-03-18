@@ -1,4 +1,4 @@
-use crate::crypto::byte_util::{Reversable, Reversed, UInt256};
+use crate::crypto::byte_util::Reversed;
 use crate::util::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::util::params::DUFFS;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -191,16 +191,16 @@ impl DevnetType {
 impl IHaveChainSettings for ChainType {
     fn genesis_hash(&self) -> [u8; 32] {
         match self {
-            ChainType::MainNet => UInt256::from_hex(
+            ChainType::MainNet => <[u8; 32]>::from_hex(
                 "00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6",
             )
             .unwrap()
-            .reversed().0,
-            ChainType::TestNet => UInt256::from_hex(
+            .reversed(),
+            ChainType::TestNet => <[u8; 32]>::from_hex(
                 "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
             )
             .unwrap()
-            .reversed().0,
+            .reversed(),
             ChainType::DevNet(devnet_type) => devnet_type.genesis_hash(),
         }
     }
@@ -264,7 +264,7 @@ impl IHaveChainSettings for ChainType {
 #[ferment_macro::export]
 impl IHaveChainSettings for DevnetType {
     fn genesis_hash(&self) -> [u8; 32] {
-        UInt256::from_hex(match self {
+        <[u8; 32]>::from_hex(match self {
             DevnetType::JackDaniels => {
                 "79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26"
             },
@@ -286,7 +286,7 @@ impl IHaveChainSettings for DevnetType {
             _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
         })
         .unwrap()
-        .reversed().0
+        .reversed()
     }
 
     fn genesis_height(&self) -> u32 {
@@ -433,14 +433,14 @@ impl ChainType {
         !self.is_mainnet()
     }
 
-    pub fn max_proof_of_work(&self) -> UInt256 {
-        UInt256::from_hex(if self.is_devnet_any() {
+    pub fn max_proof_of_work(&self) -> [u8; 32] {
+        <[u8; 32]>::from_hex(if self.is_devnet_any() {
             "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         } else {
             "00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         })
         .unwrap()
-        .reverse()
+        .reversed()
     }
 
     pub fn max_proof_of_work_target(&self) -> u32 {

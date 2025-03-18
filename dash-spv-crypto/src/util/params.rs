@@ -1,6 +1,7 @@
 use dashcore::hashes::hex::FromHex;
-use crate::crypto::byte_util::{Reversable, UInt256};
+use crate::crypto::byte_util::Reversed;
 use crate::network::{ChainType, DevnetType};
+use crate::util::base58;
 
 pub(crate) const DUFFS: u64 = 100000000;
 pub(crate) const MAX_MONEY: u64 = 21000000 * DUFFS;
@@ -122,7 +123,6 @@ pub struct Params {
     /// Mining and Dark Gravity Wave Parameters
 
     /// The lowest amount of work effort required to mine a block on the chain (higher values are less difficult)
-    // pub max_proof_of_work: UInt256,
     pub max_proof_of_work: &'static str,
     /// The lowest amount of work effort required to mine a block on the chain. Here it is represented as the compact target (higher values are less difficult)
     pub max_proof_of_work_target: u32,
@@ -272,17 +272,17 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
 }
 
 impl Params {
-    pub fn max_proof_of_work(&self) -> UInt256 {
-        UInt256::from_hex(self.max_proof_of_work).unwrap().reverse()
+    pub fn max_proof_of_work(&self) -> [u8; 32] {
+        <[u8; 32]>::from_hex(self.max_proof_of_work).unwrap().reversed()
     }
 
     /// Contract Parameters
-    pub fn dpns_contract_id(&self) -> UInt256 {
-        UInt256::from_base58_string(self.dpns_contract_id).unwrap()
+    pub fn dpns_contract_id(&self) -> [u8; 32] {
+        TryInto::<[u8; 32]>::try_into(base58::from(self.dpns_contract_id).unwrap()).unwrap()
     }
 
-    pub fn dashpay_contract_id(&self) -> UInt256 {
-        UInt256::from_base58_string(self.dashpay_contract_id).unwrap()
+    pub fn dashpay_contract_id(&self) -> [u8; 32] {
+        TryInto::<[u8; 32]>::try_into(base58::from(self.dashpay_contract_id).unwrap()).unwrap()
     }
 
     /// Fee Parameters

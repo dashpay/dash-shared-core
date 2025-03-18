@@ -37,7 +37,7 @@ impl Drop for FFIContext {
 #[cfg(feature = "test-helpers")]
 impl FFIContext {
     pub fn block_for_hash(&self, hash: [u8; 32]) -> Option<&MerkleBlock> {
-        self.blocks.iter().find(|block| hash.eq(&block.hash.0))
+        self.blocks.iter().find(|block| hash.eq(&block.hash))
     }
     pub fn get_tip_height(&self) -> u32 {
         self.blocks.iter().map(|block| block.height).max().unwrap_or(u32::MAX)
@@ -50,7 +50,7 @@ impl FFIContext {
     }
     pub fn block_hash_for_height(&self, block_height: u32) -> Result<[u8; 32], CoreProviderError> {
         self.block_for_height(block_height)
-            .map(|block| block.hash.0)
+            .map(|block| block.hash)
             .ok_or(CoreProviderError::BlockHashNotFoundAt(block_height))
     }
 

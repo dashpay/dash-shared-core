@@ -90,7 +90,6 @@ pub fn chain_proof(core_chain_locked_height: u32, txid: [u8; 32], vout: u32) -> 
 //     use platform_value::{BinaryData, Identifier};
 //     use platform_value::string_encoding::Encoding;
 //     use dash_spv_crypto::crypto::byte_util::Reversed;
-//     use dash_spv_crypto::crypto::UInt256;
 //
 //     let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
 //     let mut signature = [0u8; 96];
@@ -378,7 +377,6 @@ fn verify_instant_proof_signed_data() {
 //     use platform_value::{BinaryData, Identifier};
 //     use platform_value::string_encoding::Encoding;
 //     use dash_spv_crypto::crypto::byte_util::Reversed;
-//     use dash_spv_crypto::crypto::UInt256;
 //
 //     let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
 //     let mut signature = [0u8; 96];
@@ -398,7 +396,7 @@ fn verify_instant_proof_signed_data() {
 //         cyclehash: CycleHash::from_raw_hash(sha256d::Hash::from_slice(&[0u8; 32]).unwrap()),
 //         signature: bls_signature,
 //     };
-//     assert_eq!(is_lock.request_id().unwrap().to_hex(), UInt256::from_hex("7bab86a676ac6cd3ab0b8180f37121a36d8ae6fecea59e7c4e7783ce9cb84696").unwrap().reversed().0.to_hex());
+//     assert_eq!(is_lock.request_id().unwrap().to_hex(), <[u8; 32]>::from_hex("7bab86a676ac6cd3ab0b8180f37121a36d8ae6fecea59e7c4e7783ce9cb84696").unwrap().reversed().0.to_hex());
 //
 //     let funding_tx_locked_outpoint = funding_tx.locked_outpoint().unwrap();
 //     let transaction = dashcore::blockdata::transaction::Transaction::consensus_decode(&mut transaction_data).unwrap();

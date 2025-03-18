@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 use std::os::raw::c_ulong;
 use std::slice;
-use byte::{BytesExt, LE, TryRead};
 use dashcore::consensus::Encodable;
-use crate::crypto::byte_util::{clone_into_array, UInt256};
+use crate::crypto::byte_util::clone_into_array;
 use super::BIP32_HARD;
 
 pub trait Extremum {
@@ -230,21 +229,5 @@ impl IndexPath<u32> {
     pub fn from_ffi(indexes: *const c_ulong, length: usize) -> Self {
         let indexes_slice = unsafe { slice::from_raw_parts(indexes, length) };
         IndexPath::new(indexes_slice.iter().map(|&index| index as u32).collect())
-    }
-}
-
-impl<'a> TryRead<'a, usize> for IndexPath<[u8; 32]> {
-    #[inline]
-    fn try_read(bytes: &'a [u8], size: usize) -> byte::Result<(Self, usize)> {
-
-
-        let offset = &mut 0;
-        let mut indexes = Vec::with_capacity(size);
-        let mut hardened = Vec::with_capacity(size);
-        for _i in 0..size {
-            indexes.push(bytes.read_with::<UInt256>(offset, LE)?.0);
-            hardened.push(bytes.read_with::<bool>(offset, ())?);
-        }
-        Ok((Self::new_hardened(indexes, hardened), size))
     }
 }
