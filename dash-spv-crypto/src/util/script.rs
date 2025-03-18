@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ScriptType {
     PayToPubkey,
     PayToPubkeyHash,

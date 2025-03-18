@@ -10,10 +10,11 @@ mod fermented_extended;
 #[cfg(test)]
 mod tests;
 mod ffi_core_provider;
+pub mod coinjoin;
 pub mod custom;
 
 pub extern crate dash_spv_masternode_processor;
-pub extern crate dash_spv_platform;
+pub extern crate dash_spv_coinjoin;
 pub extern crate merk;
 
 use std::fmt::{Debug, Formatter};
