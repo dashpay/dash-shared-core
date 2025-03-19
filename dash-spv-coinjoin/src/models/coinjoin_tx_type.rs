@@ -70,7 +70,7 @@ impl CoinJoinTransactionType {
         let net_value = inputs_value - outputs_value;
         
         // check for the tx with OP_RETURN
-        if outputs_value == 0 && tx.input.len() == 1 && tx.output.len() == 1 && tx.output[0].is_op_return() {
+        if outputs_value == 0 && tx.input.len() == 1 && tx.output.len() == 1 && tx.output[0].script_pubkey.is_op_return() {
             return true;
         }
 

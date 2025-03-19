@@ -35,7 +35,7 @@ pub struct CoinJoinClientManager {
     // destroy_mn_list: DestroyMasternodeList,
     update_success_block: Arc<dyn Fn(*const c_void)>,
     is_waiting_for_new_block: Arc<dyn Fn(*const c_void) -> bool>,
-    session_lifecycle_listener: Arc<dyn Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, bool)>,
+    session_lifecycle_listener: Arc<dyn Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool)>,
     mixing_lifecycle_listener: Arc<dyn Fn(*const c_void, bool, bool, Vec<PoolStatus>)>,
     context: *const c_void
 }
@@ -45,7 +45,7 @@ impl CoinJoinClientManager {
         GML: Fn(*const c_void) -> MasternodeList + 'static,
         USB: Fn(*const c_void) + 'static,
         IWFNB: Fn(*const c_void) -> bool + 'static,
-        SLL: Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, bool) + 'static,
+        SLL: Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool) + 'static,
         MLL: Fn(*const c_void, bool, bool, Vec<PoolStatus>) + 'static,
     >(
         wallet_ex: Rc<RefCell<WalletEx>>,
@@ -328,9 +328,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn updated_success_block(&mut self) {
-        unsafe {
-            (self.update_success_block)(self.context);
-        }
+        (self.update_success_block)(self.context)
     }
 
     pub fn get_mn_list(&self) -> MasternodeList {
@@ -445,7 +443,7 @@ impl CoinJoinClientManager {
     }
 
     pub fn session_amount(&self) -> usize {
-        let mut len = self.deq_sessions.len();
+        let len = self.deq_sessions.len();
 
         println!("[RUST] CoinJoin: sessions {:?}", len);
         for session in self.deq_sessions.iter() {

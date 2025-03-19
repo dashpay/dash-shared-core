@@ -19,7 +19,6 @@ use logging::*;
 use dash_spv_crypto::crypto::byte_util::{Random, Reversed};
 use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
 use dash_spv_crypto::util::params::DUFFS;
-use dash_spv_crypto::util::script::ScriptType;
 use crate::coinjoin::CoinJoin;
 use crate::coinjoin_client_manager::CoinJoinClientManager;
 use crate::coinjoin_client_queue_manager::CoinJoinClientQueueManager;
@@ -75,14 +74,12 @@ pub struct CoinJoinClientSession {
 }
 
 impl CoinJoinClientSession {
-    pub fn new<
-        SLL: Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool) + 'static
-    >(
+    pub fn new(
         coinjoin: Rc<RefCell<CoinJoin>>,
         options: Rc<RefCell<CoinJoinClientOptions>>,
         wallet_ex: Rc<RefCell<WalletEx>>,
         client_queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>,
-        session_lifecycle_listener: SLL,
+        session_lifecycle_listener: Arc<dyn Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool) + 'static>,
         context: *const c_void
     ) -> Self {
         Self {
@@ -105,7 +102,7 @@ impl CoinJoinClientSession {
             has_nothing_to_do: false,
             str_auto_denom_result: String::new(),
             str_last_message: String::new(),
-            session_lifecycle_listener: Arc::new(session_lifecycle_listener),
+            session_lifecycle_listener,
             context
         }
     }
@@ -284,7 +281,7 @@ impl CoinJoinClientSession {
                     log_info!(target: "CoinJoin", "invalid collateral, recreating... [id: {}] ", self.id.to_lower_hex_string());
                     let output = &collateral.output[0];
 
-                    if output.script_pub_key_type() == ScriptType::PayToPubkeyHash {
+                    if output.script_pubkey.is_p2pkh() {
                         self.mixing_wallet.borrow_mut().add_unused_key(output.script_pubkey.to_bytes());
                     }
 
@@ -1225,9 +1222,9 @@ impl CoinJoinClientSession {
         }
 
         if !dry_run {
-            for (cj_input, tx_out) in vec_psin_out_pairs_ret.iter() {
+            for (cj_input, _) in vec_psin_out_pairs_ret.iter() {
                 self.mixing_wallet.borrow_mut().lock_coin(cj_input.outpoint());
-                self.outpoints_locked.push(tx_out.clone());
+                self.outpoints_locked.push(cj_input.outpoint());
             }
         }
 

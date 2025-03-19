@@ -428,17 +428,19 @@ impl WalletEx {
             return Some(self.fresh_receive_key(internal));
         }
 
-        if let Some((key, item)) = self.unused_keys.iter().next() {
+        if let Some((&key, item)) = self.unused_keys.iter().next() {
+            let unused = item.clone();
             // let key = *pair.0;
             // let item = pair.1.clone();
-            log_info!(target: "CoinJoin", "WalletEx - reusing key - is this key used: {}, unused key count: {}", self.key_usage.get(key).unwrap(), self.unused_keys.len());
+            log_info!(target: "CoinJoin", "WalletEx - reusing key - is this key used: {}, unused key count: {}", self.key_usage.get(&key).unwrap(), self.unused_keys.len());
             // remove the key
-            self.unused_keys.remove(key);
-            self.key_usage.insert(*key, true);
-            Some(item.clone())
+            self.unused_keys.remove(&key);
+            self.key_usage.insert(key, true);
+            Some(unused)
         } else {
             None
         }
+
     }
 
     pub fn add_unused_key(&mut self, destination: Vec<u8>) {

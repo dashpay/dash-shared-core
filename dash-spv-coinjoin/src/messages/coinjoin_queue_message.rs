@@ -5,7 +5,6 @@ use dashcore::consensus::{Decodable, Encodable};
 use dashcore::consensus::encode::Error;
 use dashcore::hashes::{sha256d, Hash};
 use dashcore::prelude::DisplayHex;
-use dashcore::sml::masternode_list_entry::OperatorPublicKey;
 use dashcore::VarInt;
 use logging::*;
 use dash_spv_crypto::crypto::byte_util::Reversed;
@@ -50,14 +49,10 @@ impl CoinJoinQueueMessage {
             (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT;
     }
 
-    pub fn check_signature(&self, key: OperatorPublicKey) -> bool {
+    pub fn check_signature(&self, key: [u8; 48]) -> bool {
         if let Some(ref signature) = self.signature {
             let hash = self.get_signature_hash();
-            let verified = BLSKey::key_with_public_key(
-                key.data.0,
-                key.is_legacy()
-            ).verify_insecure(hash.as_byte_array(), *signature);
-
+            let verified = BLSKey::key_with_public_key(key, false).verify_insecure(hash.as_byte_array(), signature);
             if !verified {
                 log_warn!(target: "CoinJoinQueue", "verifySignature failed");
             }

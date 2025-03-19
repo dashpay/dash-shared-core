@@ -7,8 +7,7 @@ use dash_spv_crypto::network::ChainType;
 use dash_spv_masternode_processor::common::Block;
 
 use logging::*;
-use dash_spv_crypto::util::params::DUFFS;
-use dash_spv_crypto::util::script::ScriptType;
+use dash_spv_crypto::util::params::{DUFFS, MAX_SCRIPT_SIZE};
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
@@ -148,8 +147,8 @@ impl CoinJoin {
     
         for txout in &tx_collateral.output {
             n_value_out = n_value_out + txout.value as i64;
-
-            if txout.script_pub_key_type() != ScriptType::PayToPubkeyHash && !txout.is_script_unspendable() {
+            // TODO: check that i recreated this correctly
+            if !txout.script_pubkey.is_p2pkh() && !txout.script_pubkey.is_op_return() && txout.script_pubkey.len() <= MAX_SCRIPT_SIZE {
                 log_warn!(target: "CoinJoin", "Invalid Script, txCollateral={}", tx_collateral.txid());
                 return false;
             }

@@ -539,6 +539,17 @@ impl BLSKey {
         key.verify_message_with_key(&digest, signature)
     }
 
+    pub fn verify_insecure(&self, message: &[u8], signature: &[u8; 96]) -> bool {
+        self.bls_public_key()
+            .map_or(false, |public_key|
+                match g2_element_from_bytes(false, signature) {
+                    Ok(signature) =>
+                        BasicSchemeMPL::new().verify(&public_key, message, &signature),
+                    _ => false
+                }
+            )
+    }
+
     pub fn verify_secure_aggregated(commitment_hash: [u8; 32], signature: [u8; 96], operator_keys: Vec<OperatorPublicKey>, use_legacy: bool) -> bool {
         let message = commitment_hash.as_slice();
         let public_keys = operator_keys

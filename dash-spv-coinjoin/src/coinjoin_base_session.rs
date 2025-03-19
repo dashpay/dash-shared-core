@@ -4,7 +4,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use dashcore::{Transaction, TxIn, TxOut};
 use dashcore::hashes::Hash;
 use logging::*;
-use dash_spv_crypto::util::script::ScriptType;
 use crate::coinjoin::CoinJoin;
 use crate::messages::{coinjoin_entry::CoinJoinEntry, pool_state::PoolState, pool_status::PoolStatus, pool_message::PoolMessage};
 use crate::models::valid_in_outs::ValidInOuts;
@@ -75,7 +74,7 @@ impl CoinJoinBaseSession {
             let out_script = tx_out.script_pubkey.to_hex_string();
             // let hex = tx_out.script_pubkey.as_ref().unwrap_or(&vec![]).to_hex();
 
-            if tx_out.script_pub_key_type() != ScriptType::PayToPubkeyHash {
+            if !tx_out.script_pubkey.is_p2pkh() {
                 log_error!(target: "CoinJoin", "ERROR: invalid scriptPubKey={}", out_script);
                 result.message_id = PoolMessage::ErrInvalidScript;
                 result.consume_collateral = true;

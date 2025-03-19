@@ -26,6 +26,8 @@ pub(crate) const MIN_FEE_PER_B: u64 = TX_FEE_PER_B;
 /// slightly higher than a 1000bit fee on a 191byte tx
 pub(crate) const MAX_FEE_PER_B: u64 = 1000;
 
+pub const MAX_SCRIPT_SIZE: usize = 10000;
+
 pub const DASH_PRIVKEY: u8 = 204;
 pub const DASH_PRIVKEY_TEST: u8 = 239;
 pub const DASH_PUBKEY_ADDRESS: u8 = 76;
