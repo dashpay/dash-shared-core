@@ -1,10 +1,8 @@
 use std::io::Cursor;
-use dashcore::bls_sig_utils::BLSPublicKey;
 use dashcore::consensus::{Decodable, Encodable};
 use dashcore::hashes::Hash;
 use dashcore::hashes::hex::FromHex;
 use dashcore::prelude::DisplayHex;
-use dashcore::sml::masternode_list_entry::OperatorPublicKey;
 use dashcore::Transaction;
 use dash_spv_crypto::crypto::byte_util::Reversed;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
@@ -234,11 +232,8 @@ pub fn coinjoin_queue_message_test() {
     assert_eq!(buffer.to_lower_hex_string(), payload.to_lower_hex_string());
     assert_eq!(false, queue_from_ctor.tried);
 
-    let masternode_operator_key = OperatorPublicKey {
-        data: BLSPublicKey::from_hex("066d57a6451b7800c1c2a6c6e04fe73ec2e1c95e492bacae760ad2f79ca3c30727ec9bf0daea43c08ff1ad6c2cf07612").unwrap(),
-        version: 1
-    };
-    println!("op_key raw data: {}", masternode_operator_key.data.0.to_lower_hex_string());
+    let operator_key = <[u8; 48]>::from_hex("066d57a6451b7800c1c2a6c6e04fe73ec2e1c95e492bacae760ad2f79ca3c30727ec9bf0daea43c08ff1ad6c2cf07612").unwrap();
+    println!("op_key raw data: {}", operator_key.to_lower_hex_string());
 
-    assert!(queue_from_ctor.check_signature(masternode_operator_key));
+    assert!(queue_from_ctor.check_signature(operator_key, true));
 }

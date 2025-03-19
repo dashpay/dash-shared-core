@@ -90,7 +90,7 @@ impl CoinJoinClientQueueManager {
         }
 
         if let Some(dmn) = self.get_mn(dsq.pro_tx_hash) {
-            if !dsq.check_signature(dmn.masternode_list_entry.operator_public_key.0) {
+            if !dsq.check_signature(dmn.masternode_list_entry.operator_public_key.0, false) {
                 // add 10 points to ban score
                 return;
             }

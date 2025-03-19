@@ -45,14 +45,14 @@ impl std::fmt::Display for CoinJoinQueueMessage {
 
 impl CoinJoinQueueMessage {
     pub fn is_time_out_of_bounds(&self, current_time: u64) -> bool {
-        return current_time.saturating_sub(self.time as u64) > COINJOIN_QUEUE_TIMEOUT || 
-            (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT;
+        current_time.saturating_sub(self.time as u64) > COINJOIN_QUEUE_TIMEOUT ||
+            (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT
     }
 
-    pub fn check_signature(&self, key: [u8; 48]) -> bool {
+    pub fn check_signature(&self, key: [u8; 48], use_legacy: bool) -> bool {
         if let Some(ref signature) = self.signature {
             let hash = self.get_signature_hash();
-            let verified = BLSKey::key_with_public_key(key, false).verify_insecure(hash.as_byte_array(), signature);
+            let verified = BLSKey::key_with_public_key(key, use_legacy).verify_insecure(hash.as_byte_array(), signature);
             if !verified {
                 log_warn!(target: "CoinJoinQueue", "verifySignature failed");
             }

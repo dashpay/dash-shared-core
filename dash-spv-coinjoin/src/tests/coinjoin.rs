@@ -79,7 +79,7 @@ fn is_collateral_valid_test() {
     let tx = Transaction::consensus_decode(&mut cursor).unwrap();
 
     let coinjoin = CoinJoin::new(
-        |_, _, _| (true, 40000),
+        |_, _| Some((true, 40000)),
         |_, _| true,
         std::ptr::null()
     );
@@ -87,7 +87,7 @@ fn is_collateral_valid_test() {
     assert!(coinjoin.is_collateral_valid(&tx, true));
 
     let coinjoin = CoinJoin::new(
-        |_, _, _| (true, 10000),
+        |_, _| Some((true, 10000)),
         |_, _| true,
         std::ptr::null()
     );
