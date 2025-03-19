@@ -1,8 +1,8 @@
 use dashcore::Transaction;
 use crate::coinjoin::CoinJoin;
 
-#[repr(C)]
 #[derive(Debug, PartialEq)]
+#[ferment_macro::export]
 pub enum CoinJoinTransactionType {
     None,
     CreateDenomination,
@@ -12,8 +12,9 @@ pub enum CoinJoinTransactionType {
     Send,
 }
 
+#[ferment_macro::export]
 impl CoinJoinTransactionType {
-    pub fn from_tx(tx: &Transaction, input_values: &Vec<u64>) -> Self {
+    pub fn from_tx(tx: &Transaction, input_values: &Vec<u64>) -> CoinJoinTransactionType {
         let input_sum: u64 = input_values.iter().sum();
 
         if tx.input.len() == tx.output.len() && tx.output.iter().all(|output| CoinJoin::is_denominated_amount(output.value)) {
@@ -47,20 +48,19 @@ impl CoinJoinTransactionType {
 
         // is this a coinjoin send transaction
         if CoinJoinTransactionType::is_coinjoin_send(tx, &input_values) {
-            return Self::Send;
+            Self::Send
+        } else {
+            Self::None
         }
-
-        return Self::None;
     }
 
-    fn is_coinjoin_send(tx: &Transaction, input_values: &Vec<u64>) -> bool {
+    pub fn is_coinjoin_send(tx: &Transaction, input_values: &Vec<u64>) -> bool {
         let inputs_are_denominated = input_values.iter().all(|input| CoinJoin::is_denominated_amount(*input));
         let fee = CoinJoinTransactionType::get_fee(tx, input_values);
-        
-        return inputs_are_denominated && fee.map_or(false, |f| f != 0);
+        inputs_are_denominated && fee.map_or(false, |f| f != 0)
     }
 
-    fn is_mixing_fee(tx: &Transaction, inputs_value: u64) -> bool {
+    pub fn is_mixing_fee(tx: &Transaction, inputs_value: u64) -> bool {
         let outputs_value = tx.output.iter().map(|output| output.value).sum();
         
         if inputs_value < outputs_value {
@@ -80,7 +80,7 @@ impl CoinJoinTransactionType {
             && CoinJoin::is_collateral_amount(net_value)
     }
 
-    fn get_fee(tx: &Transaction, inputs_values: &Vec<u64>) -> Option<u64> {
+    pub fn get_fee(tx: &Transaction, inputs_values: &Vec<u64>) -> Option<u64> {
         let mut fee: u64 = 0;
 
         if inputs_values.is_empty() || tx.output.is_empty() {

@@ -10,8 +10,8 @@ pub mod masternode_meta_data_manager;
 pub mod wallet_ex;
 // pub mod ffi;
 
-pub(crate) mod coin_selection;
-pub(crate) mod utils;
+pub mod coin_selection;
+pub mod utils;
 
 #[cfg(test)]
 pub mod tests;

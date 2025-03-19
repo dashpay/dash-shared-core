@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
-use dashcore::{Transaction, TxIn, TxOut};
+use dashcore::blockdata::transaction::Transaction;
+use dashcore::blockdata::transaction::txin::TxIn;
+use dashcore::blockdata::transaction::txout::TxOut;
 use dashcore::hashes::Hash;
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 use crate::coinjoin::CoinJoin;
 use crate::messages::{coinjoin_entry::CoinJoinEntry, pool_state::PoolState, pool_status::PoolStatus, pool_message::PoolMessage};
 use crate::models::valid_in_outs::ValidInOuts;

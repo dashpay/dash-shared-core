@@ -1,19 +1,22 @@
 use std::io;
-use std::io::{Read, Write};
-use dashcore::consensus::{Decodable, Encodable};
-use dashcore::consensus::encode::Error;
-use dashcore::Transaction;
+use std::io::{Cursor, Read, Write};
+use dashcore::consensus::{Decodable, Encodable, encode::Error};
+use dashcore::blockdata::transaction::Transaction;
 use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dsa
-#[repr(C)]
 #[derive(Clone, Debug)]
+#[ferment_macro::export]
 pub struct CoinJoinAcceptMessage {
     pub denomination: u32,
     pub tx_collateral: Transaction,
 }
-
+#[ferment_macro::export]
+pub fn from_message(message: &[u8]) -> CoinJoinAcceptMessage {
+    let mut cursor = Cursor::new(message);
+    CoinJoinAcceptMessage::consensus_decode(&mut cursor).unwrap()
+}
 impl std::fmt::Display for CoinJoinAcceptMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         
@@ -29,10 +32,10 @@ impl std::fmt::Display for CoinJoinAcceptMessage {
 
 impl CoinJoinAcceptMessage {
     pub fn new(denomination: u32, tx_collateral: Transaction) -> Self {
-        return Self {
+        Self {
             denomination,
             tx_collateral
-        };
+        }
     }
 }
 

@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 use logging::*;
+#[cfg(target_os = "ios")]
 use tracing::*;
 
 use system_configuration::core_foundation::base::{kCFAllocatorDefault, TCFType};

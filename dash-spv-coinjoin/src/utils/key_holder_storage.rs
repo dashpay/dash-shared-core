@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 use crate::{utils::key_holder::KeyHolder, wallet_ex::WalletEx};
 
 pub(crate) struct KeyHolderStorage {

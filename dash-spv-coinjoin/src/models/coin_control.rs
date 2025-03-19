@@ -1,14 +1,8 @@
 use std::collections::HashSet;
-use dashcore::OutPoint;
-// use dash_spv_masternode_processor::ffi::{boxer::{boxed, boxed_vec}, ByteArray};
-
-// use crate::ffi as ffi;
-
+use dashcore::blockdata::transaction::outpoint::OutPoint;
 use crate::constants::REFERENCE_DEFAULT_MIN_TX_FEE;
-// use super::{tx_destination::TxDestination, tx_outpoint::TxOutPoint};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-// #[repr(C)]
 #[ferment_macro::export]
 pub enum CoinType {
     AllCoins = 0,

@@ -1,7 +1,7 @@
 use std::io;
 use std::io::{Read, Write};
 use dashcore::consensus::{Decodable, Encodable, encode::Error};
-use dashcore::TxIn;
+use dashcore::blockdata::transaction::txin::TxIn;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dss

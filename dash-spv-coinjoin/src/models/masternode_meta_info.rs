@@ -1,6 +1,7 @@
-use dashcore::ProTxHash;
+use dashcore::hash_types::ProTxHash;
 
 #[derive(Debug, Clone)]
+#[ferment_macro::export]
 pub struct MasternodeMetaInfo {
     pub pro_tx_hash: ProTxHash,
     // the dsq count from the last dsq broadcast of this node

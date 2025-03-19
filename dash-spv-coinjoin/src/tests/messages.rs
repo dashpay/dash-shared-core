@@ -1,9 +1,11 @@
 use std::io::Cursor;
+use dashcore::blockdata::transaction::Transaction;
 use dashcore::consensus::{Decodable, Encodable};
 use dashcore::hashes::Hash;
 use dashcore::hashes::hex::FromHex;
+use dashcore::hash_types::ProTxHash;
 use dashcore::prelude::DisplayHex;
-use dashcore::Transaction;
+use dashcore::bls_sig_utils::BLSSignature;
 use dash_spv_crypto::crypto::byte_util::Reversed;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::messages::{CoinJoinAcceptMessage, CoinJoinCompleteMessage, CoinJoinEntry, CoinJoinFinalTransaction, CoinJoinQueueMessage, CoinJoinSignedInputs, CoinJoinStatusUpdate, PoolMessage, PoolState, PoolStatusUpdate};
@@ -212,17 +214,17 @@ pub fn coinjoin_queue_message_test() {
     let queue_from_hex = CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap();
 
     assert_eq!(8, queue_from_hex.denomination);
-    assert_eq!(<[u8; 32]>::from_hex("160120d0aa01ae90e2abb2791a313af326274536f930c95e393959598f29c636").unwrap().reversed(), queue_from_hex.pro_tx_hash);
+    assert_eq!(ProTxHash::from_byte_array(<[u8; 32]>::from_hex("160120d0aa01ae90e2abb2791a313af326274536f930c95e393959598f29c636").unwrap().reversed()), queue_from_hex.pro_tx_hash);
     assert_eq!(1703168338, queue_from_hex.time);
     assert_eq!(false, queue_from_hex.ready);
-    assert_eq!(<[u8; 96]>::from_hex("a4f1ebf98b3b2df98c6375d391c4aba667edbaccb31610a8ded1eaba92c87ce59d2dcbea67fd59d212edd87553fbbeac0041bc514782b3ae5184f6d194c3dbdd8f94b5ce5e0e358aed3557b18188d51cbbcda80fba2ff7dabb808029ba255431").unwrap(), queue_from_hex.signature.unwrap());
+    assert_eq!(BLSSignature::from_hex("a4f1ebf98b3b2df98c6375d391c4aba667edbaccb31610a8ded1eaba92c87ce59d2dcbea67fd59d212edd87553fbbeac0041bc514782b3ae5184f6d194c3dbdd8f94b5ce5e0e358aed3557b18188d51cbbcda80fba2ff7dabb808029ba255431").unwrap(), queue_from_hex.signature.unwrap());
 
     let queue_from_ctor = CoinJoinQueueMessage {
         denomination: 8,
-        pro_tx_hash: <[u8; 32]>::from_hex("160120d0aa01ae90e2abb2791a313af326274536f930c95e393959598f29c636").unwrap().reversed(),
+        pro_tx_hash: ProTxHash::from_byte_array(<[u8; 32]>::from_hex("160120d0aa01ae90e2abb2791a313af326274536f930c95e393959598f29c636").unwrap().reversed()),
         time: 1703168338,
         ready: false,
-        signature: <[u8; 96]>::from_hex("a4f1ebf98b3b2df98c6375d391c4aba667edbaccb31610a8ded1eaba92c87ce59d2dcbea67fd59d212edd87553fbbeac0041bc514782b3ae5184f6d194c3dbdd8f94b5ce5e0e358aed3557b18188d51cbbcda80fba2ff7dabb808029ba255431").ok(),
+        signature: BLSSignature::from_hex("a4f1ebf98b3b2df98c6375d391c4aba667edbaccb31610a8ded1eaba92c87ce59d2dcbea67fd59d212edd87553fbbeac0041bc514782b3ae5184f6d194c3dbdd8f94b5ce5e0e358aed3557b18188d51cbbcda80fba2ff7dabb808029ba255431").ok(),
         tried: false
     };
 

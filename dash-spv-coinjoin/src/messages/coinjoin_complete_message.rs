@@ -1,15 +1,22 @@
 use std::io;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use dashcore::consensus::{Decodable, Encodable, encode::Error};
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dsc
-#[repr(C)]
+// #[repr(C)]
 #[derive(Clone, Debug)]
+#[ferment_macro::export]
 pub struct CoinJoinCompleteMessage {
     pub msg_session_id: i32,
     pub msg_message_id: PoolMessage,
+}
+
+#[ferment_macro::export]
+pub fn from_message(message: &[u8]) -> CoinJoinCompleteMessage {
+    let mut cursor = Cursor::new(message);
+    CoinJoinCompleteMessage::consensus_decode(&mut cursor).unwrap()
 }
 
 impl CoinJoinMessageType for CoinJoinCompleteMessage {

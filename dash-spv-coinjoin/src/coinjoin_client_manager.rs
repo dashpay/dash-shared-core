@@ -1,15 +1,18 @@
 use std::{cell::RefCell, collections::VecDeque, ffi::c_void, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use dashcore::blockdata::transaction::{OutPoint, Transaction};
 use dashcore::hashes::Hash;
+use dashcore::hash_types::{ProTxHash, Txid};
 use dashcore::prelude::DisplayHex;
 use dashcore::secp256k1::rand::{thread_rng, Rng};
 use dashcore::secp256k1::rand::prelude::SliceRandom;
 use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
-use dashcore::{OutPoint, Transaction, Txid};
 use dash_spv_masternode_processor::common::Block;
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 use crate::{coinjoin::CoinJoin, coinjoin_client_queue_manager::CoinJoinClientQueueManager, coinjoin_client_session::CoinJoinClientSession, constants::{COINJOIN_AUTO_TIMEOUT_MAX, COINJOIN_AUTO_TIMEOUT_MIN}, messages::{coinjoin_message::CoinJoinMessage, CoinJoinQueueMessage, PoolState, PoolStatus}, models::{Balance, CoinJoinClientOptions}, wallet_ex::WalletEx};
 use crate::messages::PoolMessage;
 
@@ -19,7 +22,7 @@ pub struct CoinJoinClientManager {
     coinjoin: Rc<RefCell<CoinJoin>>,
     pub queue_queue_manager: Option<Rc<RefCell<CoinJoinClientQueueManager>>>,
     options: Rc<RefCell<CoinJoinClientOptions>>,
-    masternodes_used: Vec<[u8; 32]>,
+    masternodes_used: Vec<ProTxHash>,
     last_masternode_used: usize,
     last_time_report_too_recent: u64,
     tick: i32,
@@ -32,7 +35,6 @@ pub struct CoinJoinClientManager {
     stop_on_nothing_to_do: bool,
     mixing_finished: bool,
     get_masternode_list: Arc<dyn Fn(*const c_void) -> MasternodeList>,
-    // destroy_mn_list: DestroyMasternodeList,
     update_success_block: Arc<dyn Fn(*const c_void)>,
     is_waiting_for_new_block: Arc<dyn Fn(*const c_void) -> bool>,
     session_lifecycle_listener: Arc<dyn Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool)>,
@@ -40,6 +42,7 @@ pub struct CoinJoinClientManager {
     context: *const c_void
 }
 
+// #[ferment_macro::export]
 impl CoinJoinClientManager {
     pub fn new<
         GML: Fn(*const c_void) -> MasternodeList + 'static,
@@ -52,7 +55,6 @@ impl CoinJoinClientManager {
         coinjoin: Rc<RefCell<CoinJoin>>,
         options: Rc<RefCell<CoinJoinClientOptions>>,
         get_masternode_list: GML,
-        // destroy_mn_list: DestroyMasternodeList,
         update_success_block: USB,
         is_waiting_for_new_block: IWFNB,
         session_lifecycle_listener: SLL,
@@ -85,8 +87,13 @@ impl CoinJoinClientManager {
         }
     }
 
-    pub fn set_client_queue_manager(&mut self, queue_queue_manager: Rc<RefCell<CoinJoinClientQueueManager>>) {
-        self.queue_queue_manager = Some(queue_queue_manager);
+    pub fn set_client_queue_manager(&mut self, queue_queue_manager: CoinJoinClientQueueManager) {
+        self.queue_queue_manager = Some(Rc::new(RefCell::new(queue_queue_manager)));
+    }
+
+    pub fn process_raw_message(&mut self, from: SocketAddr, message: &[u8], message_type: &str) {
+        let coinjoin_message = CoinJoinMessage::from_message(message, message_type);
+        self.process_message(from, coinjoin_message);
     }
 
     pub fn process_message(&mut self, from: SocketAddr, message: CoinJoinMessage) {
@@ -290,7 +297,7 @@ impl CoinJoinClientManager {
         finished
     }
 
-    pub fn add_used_masternode(&mut self, pro_tx_hash: [u8; 32]) {
+    pub fn add_used_masternode(&mut self, pro_tx_hash: ProTxHash) {
         self.masternodes_used.push(pro_tx_hash);
     }
 
@@ -315,7 +322,7 @@ impl CoinJoinClientManager {
 
         // loop through
         for dmn in vp_masternodes_shuffled {
-            if self.masternodes_used.contains(&dmn.masternode_list_entry.pro_reg_tx_hash.as_byte_array()) {
+            if self.masternodes_used.contains(&dmn.masternode_list_entry.pro_reg_tx_hash) {
                 continue;
             }
 
@@ -376,7 +383,7 @@ impl CoinJoinClientManager {
     pub fn mark_already_joined_queue_as_tried(&mut self, dsq: &mut CoinJoinQueueMessage) -> bool {
         for session in self.deq_sessions.iter_mut() {
             if let Some(mn_mixing) = &session.mixing_masternode {
-                if dsq.pro_tx_hash.eq(mn_mixing.masternode_list_entry.pro_reg_tx_hash.as_byte_array()) {
+                if dsq.pro_tx_hash.eq(&mn_mixing.masternode_list_entry.pro_reg_tx_hash) {
                     dsq.tried = true;
                     return true;
                 }
@@ -428,6 +435,25 @@ impl CoinJoinClientManager {
         self.deq_sessions.clear();
         self.tick = 0;
         self.do_auto_next_run = COINJOIN_AUTO_TIMEOUT_MIN;
+    }
+
+    pub fn stop_and_reset(&mut self) {
+        if self.is_mixing {
+            self.reset_pool();
+            self.stop_mixing();
+        }
+    }
+
+    pub fn is_fully_mixed(&mut self, outpoint: OutPoint) -> bool {
+        self.wallet_ex.borrow_mut().is_fully_mixed(outpoint)
+    }
+
+    pub fn has_collateral_inputs(&self, only_confirmed: bool) -> bool {
+        self.wallet_ex.borrow().has_collateral_inputs(only_confirmed)
+    }
+
+    pub fn is_locked_coin(&self, outpoint: &OutPoint) -> bool {
+        self.wallet_ex.borrow().locked_coins_set.contains(outpoint)
     }
 
     pub fn lock_outputs(&mut self, tx_hash: Txid, indices: Vec<u32>) {

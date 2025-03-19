@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use dashcore::ProTxHash;
+use dashcore::hash_types::ProTxHash;
 use crate::models::masternode_meta_info::MasternodeMetaInfo;
 
 #[derive(Debug)]

@@ -1,5 +1,6 @@
-#[repr(C)]
+// #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[ferment_macro::export]
 pub enum PoolState {
     Idle = 0,
     Queue = 1,

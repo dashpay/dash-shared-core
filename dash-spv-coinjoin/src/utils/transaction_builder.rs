@@ -2,13 +2,18 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 use dashcore::psbt::serialize::Serialize;
-use dashcore::{ScriptBuf, Transaction, TxIn, TxOut};
+use dashcore::blockdata::transaction::Transaction;
+use dashcore::blockdata::transaction::txin::TxIn;
+use dashcore::blockdata::transaction::txout::TxOut;
+use dashcore::blockdata::script::ScriptBuf;
 use dashcore::consensus::Encodable;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
 use dash_spv_crypto::util::data_append::DataAppend;
 use dash_spv_crypto::util::params::TX_MIN_OUTPUT_AMOUNT;
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::constants::REFERENCE_DEFAULT_MIN_TX_FEE;

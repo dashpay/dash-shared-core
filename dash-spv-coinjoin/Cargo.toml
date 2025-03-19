@@ -12,7 +12,6 @@ unstable = []
 test-helpers = []
 
 [dependencies]
-byte = "0.2"
 dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls"], default-features = false, branch = "feat/ferment" }

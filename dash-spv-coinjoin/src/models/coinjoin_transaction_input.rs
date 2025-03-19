@@ -1,7 +1,5 @@
-use dashcore::{OutPoint, TxIn};
-// use dash_spv_masternode_processor::tx::TransactionInput;
-
-// use super::tx_outpoint::TxOutPoint;
+use dashcore::blockdata::transaction::outpoint::OutPoint;
+use dashcore::blockdata::transaction::txin::TxIn;
 
 // Holds a mixing input
 #[derive(Debug, Clone)]

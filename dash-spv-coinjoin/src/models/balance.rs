@@ -1,7 +1,8 @@
 use std::fmt;
 
-#[repr(C)]
+// #[repr(C)]
 #[derive(Debug, Clone)]
+#[ferment_macro::export]
 pub struct Balance {
     pub my_trusted: u64,           // Trusted, at depth=GetBalance.min_depth or more
     pub my_untrusted_pending: u64, // Untrusted, but in mempool (pending)
@@ -15,7 +16,7 @@ pub struct Balance {
 }
 
 impl Balance {
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         Self {
             my_trusted: 0,
             my_untrusted_pending: 0,

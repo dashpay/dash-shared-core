@@ -8,14 +8,18 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use dashcore::secp256k1::rand;
 use dashcore::secp256k1::rand::Rng;
-use dashcore::{OutPoint, ProTxHash, ScriptBuf, Transaction, TxIn, TxOut, Txid};
+use dashcore::blockdata::transaction::{OutPoint, Transaction, txin::TxIn, txout::TxOut};
+use dashcore::script::owned::ScriptBuf;
 use dashcore::consensus::Encodable;
 use dashcore::hashes::Hash;
+use dashcore::hash_types::Txid;
 use dashcore::opcodes::all::OP_RETURN;
 use dashcore::prelude::DisplayHex;
 use dashcore::script::Builder;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 use dash_spv_crypto::crypto::byte_util::{Random, Reversed};
 use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
 use dash_spv_crypto::util::params::DUFFS;
@@ -58,18 +62,7 @@ pub struct CoinJoinClientSession {
     pub has_nothing_to_do: bool,
     str_auto_denom_result: String,
     str_last_message: String,
-    session_lifecycle_listener: Arc<dyn Fn(
-        /*context: */*const c_void,
-        /*is_complete: */bool,
-        /*base_session_id: */i32,
-        /*client_session_id: */[u8; 32],
-        /*denomination: */u32,
-        /*state: */PoolState,
-        /*message: */PoolMessage,
-        /*status: */PoolStatus,
-        /*ip_address: */Option<SocketAddr>,
-        /*joined: */bool,
-    )>,
+    session_lifecycle_listener: Arc<dyn Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool)>,
     context: *const c_void
 }
 
@@ -844,7 +837,7 @@ impl CoinJoinClientSession {
     fn create_collateral_transaction(&mut self, str_reason: &mut String) -> bool {
         let mut coin_control = CoinControl::new();
         coin_control.coin_type = CoinType::OnlyCoinJoinCollateral;
-        let coins = self.mixing_wallet.borrow_mut().available_coins(true, coin_control);
+        let coins = self.mixing_wallet.borrow().available_coins(true, coin_control);
 
         if coins.is_empty() {
             str_reason.push_str("CoinJoin requires a collateral transaction and could not locate an acceptable input!");
@@ -940,13 +933,13 @@ impl CoinJoinClientSession {
         let mut dsq_option = queue_manager.get_queue_item_and_try();
 
         while let Some(dsq) = dsq_option.clone() {
-            let pro_tx_hash = ProTxHash::from(dsq.pro_tx_hash.reversed());
-            let dmn = mn_list.masternodes.get(&pro_tx_hash);
+            // let pro_tx_hash = ProTxHash::from(dsq.pro_tx_hash.reversed());
+            let dmn = mn_list.masternodes.get(&dsq.pro_tx_hash);
             // let dmn = mn_list.masternode_for(dsq.pro_tx_hash.reversed());
 
             match (dmn, self.tx_my_collateral.clone()) {
                 (None, _) => {
-                    log_info!(target: "CoinJoin", "masternode is not in masternode list, masternode={}", dsq.pro_tx_hash.to_lower_hex_string());
+                    log_info!(target: "CoinJoin", "masternode is not in masternode list, masternode={}", dsq.pro_tx_hash.to_hex());
                     dsq_option = queue_manager.get_queue_item_and_try();
                     continue;
                 },
@@ -972,10 +965,7 @@ impl CoinJoinClientSession {
                     self.mixing_masternode = Some(dmn.clone());
                     self.pending_dsa_request = Some(PendingDsaRequest::new(
                         dmn.masternode_list_entry.service_address,
-                        CoinJoinAcceptMessage::new(
-                                self.base_session.session_denom,
-                                tx
-                            )
+                        CoinJoinAcceptMessage::new(self.base_session.session_denom, tx)
                     ));
                     self.mixing_wallet.borrow_mut().add_pending_masternode(dmn.masternode_list_entry.pro_reg_tx_hash.to_byte_array(), self.id);
                     self.base_session.state = PoolState::Queue;
@@ -1010,7 +1000,7 @@ impl CoinJoinClientSession {
         let mn_count = mn_list.masternodes.values().filter(|x| x.masternode_list_entry.is_valid).count();
         let mut set_amounts = HashSet::new();
 
-        if !self.mixing_wallet.borrow_mut().select_denominated_amounts(balance_needs_anonymized, &mut set_amounts) {
+        if !self.mixing_wallet.borrow().select_denominated_amounts(balance_needs_anonymized, &mut set_amounts) {
             if !self.last_create_denominated_result {
                 self.set_status(PoolStatus::ErrNoInputs);
             }
@@ -1026,7 +1016,7 @@ impl CoinJoinClientSession {
                     false
                 },
                 Some(dmn) => {
-                    client_manager.add_used_masternode(dmn.masternode_list_entry.pro_reg_tx_hash.to_byte_array());
+                    client_manager.add_used_masternode(dmn.masternode_list_entry.pro_reg_tx_hash);
 
                     {
                         let metadata_manager = &mut self.queue_manager.borrow_mut().masternode_metadata_manager;

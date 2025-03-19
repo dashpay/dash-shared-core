@@ -1,16 +1,22 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::os::raw::c_void;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use dashcore::hashes::Hash;
+use dashcore::hash_types::ProTxHash;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 use crate::{coinjoin_client_manager::CoinJoinClientManager, constants::COINJOIN_QUEUE_TIMEOUT, masternode_meta_data_manager::MasternodeMetadataManager, messages::CoinJoinQueueMessage};
 
 pub struct CoinJoinClientQueueManager {
-    client_manager_ptr: *mut CoinJoinClientManager,
+    client_manager: Rc<RefCell<CoinJoinClientManager>>,
     coinjoin_queue: Vec<CoinJoinQueueMessage>,
-    spamming_masternodes: HashMap<[u8; 32], u64>,
+    spamming_masternodes: HashMap<ProTxHash, u64>,
     pub masternode_metadata_manager: MasternodeMetadataManager,
     masternode_by_hash: Arc<dyn Fn(*const c_void, [u8; 32]) -> Option<QualifiedMasternodeListEntry>>,
     // destroy_masternode: DestroyMasternode,
@@ -18,24 +24,23 @@ pub struct CoinJoinClientQueueManager {
     context: *const std::ffi::c_void
 }
 
+// #[ferment_macro::export]
 impl CoinJoinClientQueueManager {
     pub fn new<
         MBH: Fn(*const c_void, [u8; 32]) -> Option<QualifiedMasternodeListEntry> + 'static,
         VMC: Fn(*const c_void) -> u64 + 'static,
     >(
-        client_manager_ptr: *mut CoinJoinClientManager,
+        client_manager: Rc<RefCell<CoinJoinClientManager>>,
         masternode_metadata_manager: MasternodeMetadataManager,
         masternode_by_hash: MBH,
-        // destroy_masternode: DestroyMasternode,
         valid_mns_count: VMC,
         context: *const std::ffi::c_void
     ) -> Self {
         Self {
-            client_manager_ptr,
+            client_manager,
             coinjoin_queue: Vec::new(),
             spamming_masternodes: HashMap::new(),
             masternode_by_hash: Arc::new(masternode_by_hash),
-            // destroy_masternode,
             masternode_metadata_manager,
             valid_mns_count: Arc::new(valid_mns_count),
             context
@@ -89,14 +94,14 @@ impl CoinJoinClientQueueManager {
             return;
         }
 
-        if let Some(dmn) = self.get_mn(dsq.pro_tx_hash) {
+        if let Some(dmn) = self.get_mn(dsq.pro_tx_hash.to_byte_array()) {
             if !dsq.check_signature(dmn.masternode_list_entry.operator_public_key.0, false) {
                 // add 10 points to ban score
                 return;
             }
 
             // if the queue is ready, submit if we can
-            if dsq.ready && self.try_submit_denominate(dmn.masternode_list_entry.service_address.clone()) {
+            if dsq.ready && self.client_manager.borrow_mut().try_submit_denominate(dmn.masternode_list_entry.service_address.clone()) {
                 log_info!(target: "CoinJoin", "CoinJoin queue ({}) is ready on masternode {}", dsq, dmn.masternode_list_entry.service_address);
             } else {
                 if let Some(meta_info) = self.masternode_metadata_manager.get_meta_info(dmn.masternode_list_entry.pro_reg_tx_hash, true) {
@@ -125,7 +130,7 @@ impl CoinJoinClientQueueManager {
                     log_debug!(target: "CoinJoin", "{}", log_msg);
                 }
 
-                self.mark_already_joined_queue_as_tried(&mut dsq);
+                self.client_manager.borrow_mut().mark_already_joined_queue_as_tried(&mut dsq);
                 self.coinjoin_queue.push(dsq);
             }
         }
@@ -159,11 +164,11 @@ impl CoinJoinClientQueueManager {
         (self.valid_mns_count)(self.context)
     }
 
-    fn try_submit_denominate(&mut self, mn_addr: SocketAddr) -> bool {
-        unsafe { (*self.client_manager_ptr).try_submit_denominate(mn_addr) }
-    }
-
-    fn mark_already_joined_queue_as_tried(&mut self, dsq: &mut CoinJoinQueueMessage) -> bool {
-        unsafe { (*self.client_manager_ptr).mark_already_joined_queue_as_tried(dsq) }
-    }
+    // fn try_submit_denominate(&mut self, mn_addr: SocketAddr) -> bool {
+    //     unsafe { (*self.client_manager_ptr).try_submit_denominate(mn_addr) }
+    // }
+    //
+    // fn mark_already_joined_queue_as_tried(&mut self, dsq: &mut CoinJoinQueueMessage) -> bool {
+    //     unsafe { (*self.client_manager_ptr).mark_already_joined_queue_as_tried(dsq) }
+    // }
 }

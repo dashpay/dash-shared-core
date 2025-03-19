@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use dashcore::consensus::{Decodable, Encodable};
 use dashcore::consensus::encode::Error;
 use crate::messages::pool_message::PoolMessage;
@@ -8,8 +8,9 @@ use crate::messages::pool_status_update::PoolStatusUpdate;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dssu
-#[repr(C)]
+// #[repr(C)]
 #[derive(Clone, Debug)]
+#[ferment_macro::export]
 pub struct CoinJoinStatusUpdate {
     pub session_id: i32,
     pub pool_state: PoolState,
@@ -17,9 +18,15 @@ pub struct CoinJoinStatusUpdate {
     pub message_id: PoolMessage,
 }
 
+#[ferment_macro::export]
+pub fn from_message(message: &[u8]) -> CoinJoinStatusUpdate {
+    let mut cursor = Cursor::new(message);
+    CoinJoinStatusUpdate::consensus_decode(&mut cursor).unwrap()
+}
+
 impl CoinJoinMessageType for CoinJoinStatusUpdate {
     fn get_message_type(&self) -> String {
-        return "dssu".to_string();
+        "dssu".to_string()
     }
 }
 

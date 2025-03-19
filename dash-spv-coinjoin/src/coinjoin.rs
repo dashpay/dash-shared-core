@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use dashcore::{Transaction, TxIn};
+use dashcore::blockdata::transaction::Transaction;
+use dashcore::blockdata::transaction::txin::TxIn;
 use dashcore::hashes::Hash;
 use dash_spv_crypto::network::ChainType;
 
 use dash_spv_masternode_processor::common::Block;
 
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 use dash_spv_crypto::util::params::{DUFFS, MAX_SCRIPT_SIZE};
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
@@ -26,6 +29,14 @@ pub struct CoinJoin {
     map_dstx: HashMap<[u8; 32], CoinJoinBroadcastTx>,
 }
 
+impl CoinJoin {
+    pub fn get_standard_denominations() -> &'static [u64] {
+        &Self::STANDARD_DENOMINATIONS
+    }
+
+}
+
+#[ferment_macro::export]
 impl CoinJoin {
     // this list of standard denominations cannot be modified and must remain the same as
     // CoinJoin::vecStandardDenominations in coinjoin.cpp
@@ -55,9 +66,6 @@ impl CoinJoin {
         }
     }
 
-    pub fn get_standard_denominations() -> &'static [u64] {
-        &Self::STANDARD_DENOMINATIONS
-    }
 
     pub fn get_smallest_denomination() -> u64 {
         Self::STANDARD_DENOMINATIONS[Self::STANDARD_DENOMINATIONS.len() - 1]
@@ -218,8 +226,8 @@ impl CoinJoin {
         self.map_dstx.contains_key(&tx_hash)
     }
 
-    pub fn get_dstx(&self, tx_hash: [u8; 32]) -> Option<&CoinJoinBroadcastTx> {
-        self.map_dstx.get(&tx_hash)
+    pub fn get_dstx(&self, tx_hash: [u8; 32]) -> Option<CoinJoinBroadcastTx> {
+        self.map_dstx.get(&tx_hash).cloned()
     }
 
     pub fn update_block_tip(&mut self, block: Block) {
@@ -327,11 +335,11 @@ impl CoinJoin {
         }
     }
 
-    fn get_input_value_by_prevout_hash(&self, tx_in: &TxIn) -> Option<(bool, u64)> {
+    pub fn get_input_value_by_prevout_hash(&self, tx_in: &TxIn) -> Option<(bool, u64)> {
         (self.get_input_value_by_prevout_hash)(self.opaque_context, tx_in)
     }
 
-    fn check_dstxs(&mut self, block: Block) {
+    pub fn check_dstxs(&mut self, block: Block) {
         self.map_dstx.retain(|_, tx| {
             // expire confirmed DSTXes after ~1h since confirmation or chainlocked confirmation
             if tx.confirmed_height == -1 || (block.height as i32) < tx.confirmed_height {

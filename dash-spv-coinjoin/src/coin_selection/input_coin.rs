@@ -1,4 +1,5 @@
-use dashcore::{OutPoint, TxOut};
+use dashcore::blockdata::transaction::OutPoint;
+use dashcore::blockdata::transaction::txout::TxOut;
 
 #[derive(Clone, Debug)]
 #[ferment_macro::export]

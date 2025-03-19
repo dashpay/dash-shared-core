@@ -5,26 +5,14 @@ use std::os::raw::c_void;
 use std::rc::Rc;
 use std::sync::Arc;
 use dashcore::hashes::{sha256, Hash};
-use dashcore::{OutPoint, Transaction, TxIn, TxOut, Txid};
+use dashcore::blockdata::transaction::{OutPoint, Transaction, txin::TxIn, txout::TxOut};
 use dashcore::consensus::Encodable;
+use dashcore::hash_types::Txid;
 use dashcore::secp256k1::rand;
 use dashcore::secp256k1::rand::seq::SliceRandom;
-// use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
-// use dash_spv_masternode_processor::common::SocketAddress;
-// use dash_spv_masternode_processor::ffi::unboxer::{unbox_any, unbox_any_vec, unbox_vec, unbox_vec_ptr};
-// use dash_spv_masternode_processor::ffi::ByteArray;
-// use dash_spv_masternode_processor::types::opaque_key::AsCStringPtr;
-// use rand::seq::SliceRandom;
-// use dash_spv_masternode_processor::consensus::Encodable;
-// use dash_spv_masternode_processor::crypto::UInt256;
-// use dash_spv_masternode_processor::crypto::byte_util::Reversable;
-// use dash_spv_masternode_processor::ffi::boxer::{boxed, boxed_vec};
-// use dash_spv_masternode_processor::ffi::from::FromFFI;
-// use dash_spv_masternode_processor::ffi::to::ToFFI;
-// use dash_spv_masternode_processor::secp256k1::rand;
-// use dash_spv_masternode_processor::tx::{Transaction, TransactionInput};
-// use dash_spv_masternode_processor::util::address::address;
 use logging::*;
+#[cfg(target_os = "ios")]
+use tracing::*;
 use dash_spv_crypto::crypto::byte_util::{Reversed, U32LE};
 use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
 use dash_spv_crypto::util::address::address;
@@ -32,11 +20,9 @@ use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
 use crate::coinjoin::CoinJoin;
 use crate::constants::MAX_COINJOIN_ROUNDS;
-// use crate::ffi::recepient::Recipient;
 use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::tx_destination::TxDestination;
-// use crate::models::tx_outpoint::TxOutPoint;
 use crate::models::CoinJoinClientOptions;
 
 pub struct WalletEx {
@@ -55,20 +41,9 @@ pub struct WalletEx {
     loaded_keys: bool,
     get_wallet_transaction: Arc<dyn Fn(*const c_void, [u8; 32]) -> Option<Transaction>>,
     sign_transaction: Arc<dyn Fn(*const c_void, &Transaction, bool) -> Option<Transaction>>,
-    // destroy_transaction: DestroyWalletTransaction,
     is_mine_input: Arc<dyn Fn(*const c_void, OutPoint) -> bool>,
     available_coins: Arc<dyn Fn(*const c_void, bool, CoinControl, &WalletEx) -> Vec<InputCoin>>,
-    // destroy_gathered_outputs: DestroyGatheredOutputs,
-    // select_coins: SelectCoinsGroupedByAddresses,
     select_coins: Arc<dyn Fn(*const c_void, bool, bool, bool, i32) -> Vec<CompactTallyItem>>,
-    // skip_denominated: bool,
-    // anonymizable: bool,
-    // skip_unconfirmed: bool,
-    // max_oupoints_per_address: i32,
-    // wallet_ex: &mut WalletEx,
-    // context: *const c_void,
-
-    // destroy_selected_coins: DestroySelectedCoins,
     inputs_with_amount: Arc<dyn Fn(*const c_void, u64) -> u32>,
     fresh_coinjoin_address: Arc<dyn Fn(*const c_void , bool) -> Vec<u8>>,
     commit_transaction: Arc<dyn Fn(*const c_void, Vec<TxOut>, CoinControl, bool, [u8; 32]) -> bool>,
@@ -79,9 +54,9 @@ pub struct WalletEx {
     add_pending_masternode: Arc<dyn Fn(*const c_void, [u8; 32], [u8; 32]) -> bool>,
     start_manager_async: Arc<dyn Fn(*const c_void)>,
     get_coinjoin_keys: Arc<dyn Fn(*const c_void, bool) -> Vec<Vec<u8>>>,
-    // destroy_coinjoin_keys: DestroyCoinJoinKeys
 }
 
+// #[ferment_macro::export]
 impl WalletEx {
     pub fn new<
         GetWalletTx: Fn(*const c_void, [u8; 32]) -> Option<Transaction> + 'static,
@@ -117,7 +92,6 @@ impl WalletEx {
         add_pending_masternode: AddPendingMasternode,
         start_manager_async: StartManagerAsync,
         get_coinjoin_keys: GetCoinJoinKeys,
-        // destroy_coinjoin_keys: DestroyCoinJoinKeys
     ) -> Self {
         WalletEx {
             context,
@@ -134,12 +108,9 @@ impl WalletEx {
             key_usage: HashMap::new(),
             get_wallet_transaction: Arc::new(get_wallet_transaction),
             sign_transaction: Arc::new(sign_transaction),
-            // destroy_transaction,
             is_mine_input: Arc::new(is_mine_input),
             available_coins: Arc::new(available_coins),
-            // destroy_gathered_outputs,
             select_coins: Arc::new(select_coins),
-            // destroy_selected_coins,
             inputs_with_amount: Arc::new(inputs_with_amount),
             fresh_coinjoin_address: Arc::new(fresh_coinjoin_address),
             commit_transaction: Arc::new(commit_transaction),
@@ -150,7 +121,6 @@ impl WalletEx {
             add_pending_masternode: Arc::new(add_pending_masternode),
             start_manager_async: Arc::new(start_manager_async),
             get_coinjoin_keys: Arc::new(get_coinjoin_keys),
-            // destroy_coinjoin_keys
         }
     }
 
@@ -162,6 +132,10 @@ impl WalletEx {
     pub fn unlock_coin(&mut self, outpoint: &OutPoint) {
         self.locked_coins_set.remove(outpoint);
         self.clear_anonymizable_caches();
+    }
+
+    pub fn is_locked_coin(&self, outpoint: &OutPoint) -> bool {
+        self.locked_coins_set.contains(outpoint)
     }
 
     pub fn is_fully_mixed(&mut self, outpoint: OutPoint) -> bool {
@@ -280,14 +254,14 @@ impl WalletEx {
         rounds_ref
     }
 
-    pub fn has_collateral_inputs(&mut self, only_confirmed: bool) -> bool {
+    pub fn has_collateral_inputs(&self, only_confirmed: bool) -> bool {
         let mut coin_control = CoinControl::new();
         coin_control.coin_type = CoinType::OnlyCoinJoinCollateral;
         let result = self.available_coins(only_confirmed, coin_control);
         !result.is_empty()
     }
 
-    pub fn available_coins(&mut self, only_safe: bool, coin_control: CoinControl) -> Vec<InputCoin> {
+    pub fn available_coins(&self, only_safe: bool, coin_control: CoinControl) -> Vec<InputCoin> {
         (self.available_coins)(self.context, only_safe, coin_control, self)
         // let mut vec_gathered_outputs: Vec<InputCoin> = Vec::new();
         //
@@ -605,7 +579,7 @@ impl WalletEx {
         value_total > 0
     }
 
-    pub fn select_denominated_amounts(&mut self, value_max: u64, set_amounts_ret: &mut HashSet<u64>) -> bool {
+    pub fn select_denominated_amounts(&self, value_max: u64, set_amounts_ret: &mut HashSet<u64>) -> bool {
         let mut value_total: u64 = 0;
         set_amounts_ret.clear();
 

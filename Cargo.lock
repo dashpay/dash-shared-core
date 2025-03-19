@@ -286,9 +286,9 @@ dependencies = [
 
 [[package]]
 name = "backon"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49fef586913a57ff189f25c9b3d034356a5bf6b3fa9a7f067588fe1698ba1f5d"
+checksum = "970d91570c01a8a5959b36ad7dd1c30642df24b6b3068710066f6809f7033bb7"
 dependencies = [
  "fastrand",
  "tokio",
@@ -503,9 +503,9 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "675f87afced0413c9bb02843499dbbd3882a237645883f71a2b59644a6d2f753"
+checksum = "b17679a8d69b6d7fd9cd9801a536cec9fa5e5970b69f9d4747f70b39b031f5e7"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.6",
@@ -1201,7 +1201,6 @@ dependencies = [
 name = "dash-spv-coinjoin"
 version = "0.5.0"
 dependencies = [
- "byte",
  "cbindgen 0.28.0",
  "dash-spv-crypto",
  "dash-spv-masternode-processor",
@@ -1216,7 +1215,7 @@ name = "dash-spv-crypto"
 version = "0.0.1"
 dependencies = [
  "bip38",
- "blake3 1.6.1",
+ "blake3 1.7.0",
  "bls-signatures",
  "byte",
  "dash-spv-keychain",
@@ -1261,7 +1260,7 @@ version = "0.4.18"
 dependencies = [
  "base64 0.22.1",
  "bincode",
- "blake3 1.6.1",
+ "blake3 1.7.0",
  "bls-signatures",
  "byte",
  "dash-spv-crypto",
@@ -1349,7 +1348,7 @@ dependencies = [
  "bech32",
  "bincode",
  "bitflags 2.9.0",
- "blake3 1.6.1",
+ "blake3 1.7.0",
  "bls-signatures",
  "blsful",
  "core2 0.3.3",
@@ -2241,7 +2240,7 @@ version = "3.0.0"
 source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
 dependencies = [
  "bincode",
- "blake3 1.6.1",
+ "blake3 1.7.0",
  "grovedb-costs",
  "grovedb-merk",
  "grovedb-path",
@@ -2283,7 +2282,7 @@ version = "3.0.0"
 source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
 dependencies = [
  "bincode",
- "blake3 1.6.1",
+ "blake3 1.7.0",
  "byteorder",
  "ed",
  "grovedb-costs",
@@ -4045,9 +4044,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.12.14"
+version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "989e327e510263980e231de548a33e63d34962d29ae61b467389a1a09627a254"
+checksum = "d19c46a6fdd48bc4dab94b6103fccc55d34c67cc0ad04653aad4ea2a07cd7bbb"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -6215,9 +6214,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "2.4.1"
+version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "938cc23ac49778ac8340e366ddc422b2227ea176edb447e23fc0627608dddadd"
+checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
 dependencies = [
  "arbitrary",
  "crc32fast",

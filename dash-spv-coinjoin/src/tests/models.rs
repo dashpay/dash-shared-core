@@ -1,6 +1,7 @@
 use std::io::Cursor;
 use dashcore::hashes::hex::FromHex;
-use dashcore::{OutPoint, Txid};
+use dashcore::hash_types::Txid;
+use dashcore::blockdata::transaction::OutPoint;
 use dashcore::consensus::{Decodable, Encodable};
 use dashcore::prelude::DisplayHex;
 

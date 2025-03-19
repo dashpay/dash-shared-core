@@ -1,5 +1,8 @@
-use dashcore::{OutPoint, ScriptBuf, TxIn, Txid};
+use dashcore::blockdata::script::owned::ScriptBuf;
+use dashcore::blockdata::transaction::outpoint::OutPoint;
+use dashcore::blockdata::transaction::txin::TxIn;
 use dashcore::hashes::Hash;
+use dashcore::hash_types::Txid;
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 
 #[derive(Clone)]

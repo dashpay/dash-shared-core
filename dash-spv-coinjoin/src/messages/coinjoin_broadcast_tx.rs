@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use dashcore::consensus::{Decodable, Encodable};
 use dashcore::consensus::encode::Error;
 use dashcore::Transaction;
@@ -8,6 +8,7 @@ use crate::messages::coinjoin_message::CoinJoinMessageType;
 // dstx
 // #[repr(C)]
 #[derive(Clone, Debug)]
+#[ferment_macro::export]
 pub struct CoinJoinBroadcastTx {
     pub tx: Transaction,
     pub pro_tx_hash: [u8; 32],
@@ -16,6 +17,12 @@ pub struct CoinJoinBroadcastTx {
     // memory only
     // when corresponding tx is 0-confirmed or conflicted, nConfirmedHeight is -1
     pub confirmed_height: i32,
+}
+
+#[ferment_macro::export]
+pub fn from_message(message: &[u8]) -> CoinJoinBroadcastTx {
+    let mut cursor = Cursor::new(message);
+    CoinJoinBroadcastTx::consensus_decode(&mut cursor).unwrap()
 }
 
 impl CoinJoinBroadcastTx {

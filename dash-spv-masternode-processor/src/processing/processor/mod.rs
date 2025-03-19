@@ -3,12 +3,13 @@ pub mod processing_error;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use dashcore::{BlockHash, Network, ProTxHash};
 #[cfg(feature = "message_verification")]
 use dashcore::{ephemerealdata::{chain_lock::ChainLock, instant_lock::InstantLock}, sml::message_verification_error::MessageVerificationError};
 use dashcore::bls_sig_utils::BLSSignature;
 use dashcore::consensus::deserialize;
 use dashcore::hashes::Hash;
+use dashcore::hash_types::{BlockHash, ProTxHash};
+use dashcore::network::constants::Network;
 #[cfg(feature = "std")]
 use dashcore::network::message_qrinfo::QuorumSnapshot;
 use dashcore::network::message_qrinfo::QRInfo;

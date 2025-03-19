@@ -1,7 +1,9 @@
 use std::io;
-use std::io::{Read, Write};
-use dashcore::{Transaction, TxIn, TxOut, VarInt};
-use dashcore::consensus::{Decodable, Encodable, encode::Error};
+use std::io::{Cursor, Read, Write};
+use dashcore::blockdata::transaction::Transaction;
+use dashcore::blockdata::transaction::txin::TxIn;
+use dashcore::blockdata::transaction::txout::TxOut;
+use dashcore::consensus::{Decodable, Encodable, encode::{Error, VarInt}};
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dsi
@@ -13,6 +15,12 @@ pub struct CoinJoinEntry {
     pub mixing_inputs: Vec<TxIn>,
     pub mixing_outputs: Vec<TxOut>,
     pub tx_collateral: Transaction,
+}
+
+#[ferment_macro::export]
+pub fn from_message(message: &[u8]) -> CoinJoinEntry {
+    let mut cursor = Cursor::new(message);
+    CoinJoinEntry::consensus_decode(&mut cursor).unwrap()
 }
 
 impl CoinJoinMessageType for CoinJoinEntry {
