@@ -1,10 +1,8 @@
-use dashcore::hashes::{Hash, sha256d};
-use crate::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, OP_RETURN};
-use crate::network::DevnetType;
-use crate::util::{params::BITCOIN_SCRIPT_ADDRESS, ScriptMap};
+use dashcore::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, OP_RETURN};
 use dashcore::consensus::{Encodable, WriteExt};
-use crate::util::base58;
-use crate::util::script::{op_len, ScriptElement};
+use dashcore::hashes::{Hash, sha256d};
+use crate::network::DevnetType;
+use crate::util::{base58, params::BITCOIN_SCRIPT_ADDRESS, ScriptMap, script::{op_len, ScriptElement}};
 
 pub trait DataAppend: std::io::Write {
     fn from_coinbase_message(message: &String, height: u32) -> Self;
@@ -99,7 +97,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         // todo: check impl base58checkToData
         match base58::from_check(address.as_str()) {
             Ok(d) if d.len() == 21 => {
-                OP_RETURN.into_u8().consensus_encode(&mut writer).unwrap();
+                OP_RETURN.to_u8().consensus_encode(&mut writer).unwrap();
                 // d[1..].to_vec().append_script_push_data(&mut writer);
                 // writer.append_script_push_data(d[1..].to_vec());
                 d[1..].to_vec().append_script_push_data(&mut writer);
@@ -111,7 +109,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
 
     fn append_proposal_info(proposal_info: &[u8], mut writer: Self) -> Self {
         // let hash = sha256d::Hash::hash(proposal_info).into_inner();
-        OP_RETURN.into_u8().consensus_encode(&mut writer).unwrap();
+        OP_RETURN.to_u8().consensus_encode(&mut writer).unwrap();
         // TODO check we need to write varint
         sha256d::Hash::hash(proposal_info).consensus_encode(&mut writer).unwrap();
         // writer.append_script_push_data(hash.to_vec());
@@ -123,18 +121,18 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         match base58::from_check(address) {
             Ok(data) => match &data[..] {
                 [v, data @ ..] if *v == script_map.pubkey => {
-                    OP_DUP.into_u8().consensus_encode(&mut writer).unwrap();
-                    OP_HASH160.into_u8().consensus_encode(&mut writer).unwrap();
+                    OP_DUP.to_u8().consensus_encode(&mut writer).unwrap();
+                    OP_HASH160.to_u8().consensus_encode(&mut writer).unwrap();
                     // writer.append_script_push_data(data.to_vec());
                     data.to_vec().append_script_push_data(&mut writer);
-                    OP_EQUALVERIFY.into_u8().consensus_encode(&mut writer).unwrap();
-                    OP_CHECKSIG.into_u8().consensus_encode(&mut writer).unwrap();
+                    OP_EQUALVERIFY.to_u8().consensus_encode(&mut writer).unwrap();
+                    OP_CHECKSIG.to_u8().consensus_encode(&mut writer).unwrap();
                 },
                 [v, data @ ..] if *v == script_map.script => {
-                    OP_HASH160.into_u8().consensus_encode(&mut writer).unwrap();
+                    OP_HASH160.to_u8().consensus_encode(&mut writer).unwrap();
                     writer.append_script_push_data(data.to_vec());
                     // data.to_vec().append_script_push_data(&mut writer);
-                    OP_EQUAL.into_u8().consensus_encode(&mut writer).unwrap();
+                    OP_EQUAL.to_u8().consensus_encode(&mut writer).unwrap();
                 },
                 _ => {}
             },
@@ -152,15 +150,15 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                 (len as u8).consensus_encode(&mut writer).unwrap();
             }
             0x4c..=0xffff => {
-                OP_PUSHDATA1.into_u8().consensus_encode(&mut writer).unwrap();
+                OP_PUSHDATA1.to_u8().consensus_encode(&mut writer).unwrap();
                 (len as u8).consensus_encode(&mut writer).unwrap();
             },
             0x10000..=0xffffffff => {
-                OP_PUSHDATA2.into_u8().consensus_encode(&mut writer).unwrap();
+                OP_PUSHDATA2.to_u8().consensus_encode(&mut writer).unwrap();
                 (len as u16).consensus_encode(&mut writer).unwrap();
             },
             _ => {
-                OP_PUSHDATA4.into_u8().consensus_encode(&mut writer).unwrap();
+                OP_PUSHDATA4.to_u8().consensus_encode(&mut writer).unwrap();
                 (len as u32).consensus_encode(&mut writer).unwrap();
             },
         }
@@ -181,7 +179,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                     0xb1.consensus_encode(&mut script_push).unwrap();
                 }
                 script_push.extend(d.clone().drain(1..d.len()));
-                OP_RETURN.into_u8().consensus_encode(&mut writer).unwrap();
+                OP_RETURN.to_u8().consensus_encode(&mut writer).unwrap();
                 // writer.append_script_push_data(script_push);
                 script_push.append_script_push_data(&mut writer);
             },
@@ -205,19 +203,19 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                 },
                 0x4c => { // OP_PUSHDATA1
                     i += 1;
-                    if i + std::mem::size_of::<u8>() > len {
+                    if i + size_of::<u8>() > len {
                         break 'outer;
                     }
                     *chunk_size = self[i] as usize;
-                    i += std::mem::size_of::<u8>();
+                    i += size_of::<u8>();
                 },
                 0x4d => { // OP_PUSHDATA2
                     i += 1;
-                    if i + std::mem::size_of::<u16>() > len {
+                    if i + size_of::<u16>() > len {
                         break 'outer;
                     }
                     *chunk_size = (self[i] as u16).swap_bytes() as usize;
-                    i += std::mem::size_of::<u16>();
+                    i += size_of::<u16>();
                 },
                 0x4e => { // OP_PUSHDATA4
                     i += 1;
@@ -225,7 +223,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                         break 'outer;
                     }
                     *chunk_size = (self[i] as u32).swap_bytes() as usize;
-                    i += std::mem::size_of::<u32>();
+                    i += size_of::<u32>();
                 },
                 _ => {
                     *chunk_size = self[i] as usize;

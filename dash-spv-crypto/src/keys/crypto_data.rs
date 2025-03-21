@@ -101,10 +101,3 @@ where K: IKey + Clone,
     }
 }
 
-// impl<K> CryptoData<K> for K where K: IKey + Clone,
-//                                   Vec<u8>: CryptoData<K> {
-//
-// }
-//
-
-

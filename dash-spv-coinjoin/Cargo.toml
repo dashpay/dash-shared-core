@@ -14,7 +14,7 @@ test-helpers = []
 [dependencies]
 dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-masternode-processor = { path = "../dash-spv-masternode-processor" }
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls"], default-features = false, branch = "feat/ferment" }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple"], default-features = false, branch = "feat/ferment" }
 ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
 logging = { path = "../logging" }
 tracing = "0.1.40"

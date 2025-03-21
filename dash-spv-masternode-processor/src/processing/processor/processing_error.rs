@@ -1,7 +1,6 @@
 use dashcore::consensus;
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dashcore::sml::quorum_validation_error::QuorumValidationError;
-// use hashes::hex::ToHex;
 use crate::processing::CoreProviderError;
 
 #[warn(non_camel_case_types)]
@@ -27,16 +26,6 @@ impl std::fmt::Display for ProcessingError {
 }
 
 impl std::error::Error for ProcessingError {}
-
-impl From<byte::Error> for ProcessingError {
-    fn from(value: byte::Error) -> Self {
-        ProcessingError::ParseError(match value {
-            byte::Error::Incomplete => "Incomplete".to_string(),
-            byte::Error::BadOffset(offset) => format!("BadOffset({offset})"),
-            byte::Error::BadInput { err } => format!("BadInput({err})"),
-        })
-    }
-}
 
 impl From<bls_signatures::BlsError> for ProcessingError {
     fn from(value: bls_signatures::BlsError) -> Self {
@@ -74,46 +63,8 @@ impl From<consensus::encode::Error> for ProcessingError {
     }
 }
 
-//
-// impl From<u8> for ProcessingError {
-//     fn from(orig: u8) -> Self {
-//         match orig {
-//             // 0 => ProcessingError::None,
-//             1 => ProcessingError::PersistInRetrieval,
-//             2 => ProcessingError::LocallyStored,
-//             3 => ProcessingError::ParseError,
-//             4 => ProcessingError::HasNoBaseBlockHash,
-//             5 => ProcessingError::UnknownBlockHash,
-//             6 => ProcessingError::InvalidResult,
-//             7 => ProcessingError::CoreProvider,
-//             8 => ProcessingError::MissingLists,
-//             _ => panic!("unknown error type")
-//             // _ => ProcessingError::None,
-//         }
-//     }
-// }
-//
-// impl From<&ProcessingError> for u8 {
-//     fn from(error: &ProcessingError) -> Self {
-//         match error {
-//             // ProcessingError::None => 0,
-//             ProcessingError::PersistInRetrieval => 1,
-//             ProcessingError::LocallyStored => 2,
-//             ProcessingError::ParseError => 3,
-//             ProcessingError::HasNoBaseBlockHash => 4,
-//             ProcessingError::UnknownBlockHash => 5,
-//             ProcessingError::InvalidResult => 6,
-//             ProcessingError::CoreProvider => 7,
-//             ProcessingError::MissingLists => 8,
-//         }
-//     }
-// }
-
 #[ferment_macro::export]
 impl ProcessingError {
-    // pub fn index(&self) -> u8 {
-    //     u8::from(self)
-    // }
     pub fn string_value(&self) -> String {
         match self {
             ProcessingError::PersistInRetrieval(base_block_hash, block_hash) =>

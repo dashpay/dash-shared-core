@@ -822,24 +822,3 @@ pub fn maybe_opaque_key_used_in_tx_input_script(
     }
     None
 }
-
-
-// impl From<OpaqueKey> for PrivateKey {
-//     fn from(value: OpaqueKey) -> Self {
-//         match  {  }
-//     }
-// }
-
-// impl TryFrom<OpaqueKey> for PrivateKey {
-//     type Error = KeyError;
-//
-//     fn try_from(value: OpaqueKey) -> Result<Self, Self::Error> {
-//         match value {
-//             OpaqueKey::ECDSA(key) => {
-//                 value.private_key_data().map(|data| PrivateKey::from_slice(&data, ))
-//                 PrivateKey::from_slice()
-//             }
-//             _ => Err(KeyError::Any("Wrong key type".to_string())),
-//         }
-//     }
-// }

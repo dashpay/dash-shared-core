@@ -13,12 +13,12 @@ dash-spv-crypto = { path = "../dash-spv-crypto" }
 dash-spv-event-bus = { path = "../dash-spv-event-bus" }
 dash-spv-macro = { path = "../dash-spv-macro" }
 
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bls", "message_verification", "quorum_validation"], default-features = false, branch = "feat/ferment" }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "message_verification", "quorum_validation"], default-features = false, branch = "feat/ferment" }
 dapi-grpc = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dapi-grpc", default-features = false, features = ["client"] }
 dash-sdk = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dash-sdk", default-features = false, features = ["apple"] }
 data-contracts = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "data-contracts", default-features = false, features = ["apple"] }
 dpp = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dpp", default-features = false, features = ["apple"] }
-drive = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive", default-features = false }
+drive = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive", default-features = false, features = ["verify"] }
 drive-proof-verifier = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive-proof-verifier", default-features = false, features = ["apple"] }
 platform-value = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-value", default-features = false, features = ["apple"] }
 platform-version = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-version", default-features = false, features = ["apple"] }

@@ -20,7 +20,6 @@ pub trait CoreProvider: std::fmt::Debug + Send + Sync {
 #[ferment_macro::export]
 pub enum CoreProviderError {
     NullResult(String),
-    ByteError(byte::Error),
     BadBlockHash([u8; 32]),
     UnknownBlockHeightForHash([u8; 32]),
     BlockHashNotFoundAt(u32),
@@ -33,8 +32,6 @@ impl std::fmt::Display for CoreProviderError {
         write!(f, "{}", match self {
             CoreProviderError::NullResult(message) =>
                 format!("CoreProviderError::NullResult({message})"),
-            CoreProviderError::ByteError(err) =>
-                format!("CoreProviderError::ByteError({err:?})"),
             CoreProviderError::BadBlockHash(h) =>
                 format!("CoreProviderError::BadBlockHash({})", h.to_lower_hex_string()),
             CoreProviderError::UnknownBlockHeightForHash(h) =>
@@ -52,11 +49,5 @@ impl std::fmt::Display for CoreProviderError {
 }
 
 impl std::error::Error for CoreProviderError {}
-
-impl From<byte::Error> for CoreProviderError {
-    fn from(value: byte::Error) -> Self {
-        CoreProviderError::ByteError(value)
-    }
-}
 
 

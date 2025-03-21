@@ -1,15 +1,12 @@
 extern crate simplelog;
 
 pub mod bip;
-pub mod blockdata;
 pub mod crypto;
 pub mod derivation;
-pub(crate) mod hash_types;
 #[macro_use]
 pub(crate) mod internal_macros;
 pub mod keys;
 pub mod network;
-pub mod tx;
 pub mod util;
 
 use crate::network::DevnetType;

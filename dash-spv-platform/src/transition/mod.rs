@@ -1,18 +1,16 @@
 use dashcore::blockdata::transaction::{OutPoint, Transaction, txin::TxIn, txout::TxOut};
 use dashcore::ephemerealdata::instant_lock::InstantLock;
-use dashcore::signer;
 use dashcore::hashes::Hash;
 #[cfg(test)]
 use dashcore::hashes::hex::FromHex;
 use dashcore::hash_types::Txid;
 #[cfg(test)]
 use dashcore::secp256k1::hashes::hex::DisplayHex;
+use dashcore::signer;
 use dashcore::signer::double_sha;
 use dashcore::transaction::special_transaction::asset_lock::AssetLockPayload;
 use dashcore::transaction::special_transaction::TransactionPayload;
 
-#[cfg(test)]
-use dash_spv_crypto::keys::IKey;
 #[cfg(test)]
 use dpp::{
     identity::{accessors::IdentityGettersV0, Identity, identity_public_key::accessors::v0::IdentityPublicKeyGettersV0, KeyType, v0::IdentityV0},
@@ -30,28 +28,25 @@ use dpp::identity::signer::Signer;
 use dpp::identity::state_transition::asset_lock_proof::{AssetLockProof, InstantAssetLockProof};
 use dpp::identity::state_transition::asset_lock_proof::chain::ChainAssetLockProof;
 use dpp::ProtocolError;
-// use dpp::state_transition::{StateTransition, StateTransitionLike};
 use platform_value::BinaryData;
-// use dash_spv_crypto::crypto::byte_util::Reversed;
-use dash_spv_crypto::tx::{TransactionInput, TransactionOutput};
 
 #[ferment_macro::export]
 pub fn instant_proof(
     output_index: u32,
     instant_lock: InstantLock,
-    tx_version: u16, lock_time: u32, input: Vec<TransactionInput>, output: Vec<TransactionOutput>,
-    asset_lock_payload_version: u8, credit_outputs: Vec<TransactionOutput>
+    tx_version: u16, lock_time: u32, input: Vec<TxIn>, output: Vec<TxOut>,
+    asset_lock_payload_version: u8, credit_outputs: Vec<TxOut>
 ) -> AssetLockProof {
     AssetLockProof::Instant(InstantAssetLockProof {
         instant_lock,
         transaction: Transaction {
             version: tx_version,
             lock_time,
-            input: Vec::from_iter(input.into_iter().map(TxIn::from)),
-            output: Vec::from_iter(output.into_iter().map(TxOut::from)),
+            input,
+            output,
             special_transaction_payload: Some(TransactionPayload::AssetLockPayloadType(AssetLockPayload {
                 version: asset_lock_payload_version,
-                credit_outputs: Vec::from_iter(credit_outputs.into_iter().map(TxOut::from)),
+                credit_outputs,
             })),
         },
         output_index,

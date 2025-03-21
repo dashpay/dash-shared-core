@@ -15,7 +15,6 @@ pub mod custom;
 
 pub extern crate dash_spv_masternode_processor;
 pub extern crate dash_spv_coinjoin;
-pub extern crate merk;
 
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;

@@ -9,7 +9,7 @@ use dashcore::blockdata::script::ScriptBuf;
 use dashcore::consensus::Encodable;
 use dashcore::hashes::Hash;
 use dash_spv_crypto::network::ChainType;
-use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
+use dash_spv_crypto::network::TXIN_SEQUENCE;
 use dash_spv_crypto::util::data_append::DataAppend;
 use dash_spv_crypto::util::params::TX_MIN_OUTPUT_AMOUNT;
 use logging::*;

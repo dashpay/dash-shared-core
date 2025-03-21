@@ -9,7 +9,7 @@ use dashcore::secp256k1::rand;
 use dashcore::secp256k1::rand::seq::SliceRandom;
 use logging::*;
 use dash_spv_crypto::crypto::byte_util::{Reversed, U32LE};
-use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
+use dash_spv_crypto::network::TXIN_SEQUENCE;
 use dash_spv_crypto::util::address::address;
 use dash_spv_crypto::util::data_append::DataAppend;
 use crate::coin_selection::compact_tally_item::CompactTallyItem;

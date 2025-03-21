@@ -17,7 +17,7 @@ use dashcore::prelude::DisplayHex;
 use dashcore::script::Builder;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dash_spv_crypto::crypto::byte_util::{Random, Reversed};
-use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
+use dash_spv_crypto::network::TXIN_SEQUENCE;
 use dash_spv_crypto::util::params::DUFFS;
 use logging::*;
 use crate::coinjoin::CoinJoin;

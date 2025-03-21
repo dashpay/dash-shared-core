@@ -16,12 +16,6 @@ pub trait IHaveChainSettings {
     fn chain_locks_type(&self) -> LLMQType;
     fn platform_type(&self) -> LLMQType;
     fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool;
-    // {
-    //     self.chain_locks_type() == llmq_type
-    //         || self.is_llmq_type() == llmq_type
-    //         || self.platform_type() == llmq_type
-    //         || self.isd_llmq_type() == llmq_type
-    // }
     fn is_evolution_enabled(&self) -> bool;
     fn name(&self) -> String;
 }
