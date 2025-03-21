@@ -7,4 +7,5 @@ To release it as cocoapod don't forget to
 - and push it to spec repo:
 - pod trunk push DashSharedCore.podspec --allow-warnings
 
-- if the bls fails to compile, try to remove git cache (rm -rf  /Users/$USER/.cargo/git/checkouts/bls-signatures-*) and try again:
+- if the bls fails to compile, try to remove git cache (rm -rf  /Users/$USER/.cargo/git/checkouts/bls-signatures-*) and try again
+- To compile in debug mode with lldb support use `cd dash-spv-apple-bindings && ./build.sh debug`
