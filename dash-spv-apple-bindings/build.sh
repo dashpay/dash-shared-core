@@ -3,7 +3,7 @@
 set -ex
 BUILD_TYPE=${1:-release}  # Default to "release", override with "debug" if passed
 if [[ "$BUILD_TYPE" == "release" ]]; then
-    BUILD_FLAG="--release"
+    BUILD_FLAG="release"
 else
     BUILD_FLAG=""
 fi
