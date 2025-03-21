@@ -1,17 +1,14 @@
 #[cfg(target_os = "ios")]
-use tracing::{error, warn, info, debug};
-
-#[cfg(target_os = "ios")]
 use std::sync::Once;
 
-#[cfg(target_os = "ios")]
-use std::path::PathBuf;
+// #[cfg(target_os = "ios")]
+// use std::path::PathBuf;
+//
+// #[cfg(target_os = "ios")]
+// use dirs::document_dir;
 
 #[cfg(target_os = "ios")]
-use dirs::document_dir;
-
-#[cfg(target_os = "ios")]
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 
 #[cfg(target_os = "ios")]
 use std::io::{Write, Result};  // Importing std::io::Result only for iOS
@@ -19,8 +16,8 @@ use std::io::{Write, Result};  // Importing std::io::Result only for iOS
 #[cfg(target_os = "ios")]
 use std::sync::Mutex;
 
-#[cfg(target_os = "ios")]
-use tracing_subscriber::fmt::writer::BoxMakeWriter;
+// #[cfg(target_os = "ios")]
+// use tracing_subscriber::fmt::writer::BoxMakeWriter;
 
 #[cfg(target_os = "ios")]
 use tracing_subscriber::fmt::{MakeWriter, SubscriberBuilder};

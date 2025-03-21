@@ -2,6 +2,7 @@ pub mod processing_error;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Debug, Formatter};
+use std::net::SocketAddr;
 use std::sync::Arc;
 #[cfg(feature = "message_verification")]
 use dashcore::{ephemerealdata::{chain_lock::ChainLock, instant_lock::InstantLock}, sml::message_verification_error::MessageVerificationError};
@@ -78,6 +79,11 @@ impl MasternodeProcessor {
     pub fn has_current_masternode_list(&self) -> bool {
         self.engine.latest_masternode_list().is_some()
     }
+    pub fn valid_masternodes_count(&self) -> usize {
+        self.current_masternode_list()
+            .map(|list| list.masternodes.values().filter(|entry| entry.masternode_list_entry.is_valid).count())
+            .unwrap_or_default()
+    }
 
     pub fn masternode_list_for_block_hash(&self, block_hash: [u8; 32]) -> Option<MasternodeList> {
         let block_hash = BlockHash::from_byte_array(block_hash);
@@ -86,7 +92,13 @@ impl MasternodeProcessor {
 
     pub fn has_masternode_at_location(&self, address: [u8; 16], port: u16) -> bool {
         self.engine.masternode_lists.values()
-            .any(|node| node.has_masternode_at_location(address, port))
+            .any(|list| list.has_masternode_at_location(address, port))
+    }
+
+    pub fn masternode_at_location(&self, location: SocketAddr) -> Option<QualifiedMasternodeListEntry> {
+        self.engine.masternode_lists.values()
+            .find_map(|list| list.masternodes.values().find(|node| location.eq(&node.masternode_list_entry.service_address)))
+            .cloned()
     }
 
     pub fn current_masternode_list_masternode_with_pro_reg_tx_hash(&self, hash: &ProTxHash) -> Option<QualifiedMasternodeListEntry> {

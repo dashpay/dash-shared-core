@@ -9,6 +9,7 @@ pub struct MasternodeMetaInfo {
     pub mixing_tx_count: i32
 }
 
+#[ferment_macro::export]
 impl MasternodeMetaInfo {
     pub fn new(pro_tx_hash: ProTxHash) -> MasternodeMetaInfo {
         Self {

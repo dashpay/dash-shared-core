@@ -130,7 +130,7 @@ impl OpaqueKey {
     pub fn check_payload_signature(&self, key_hash: [u8; 20]) -> bool {
         self.hash160().eq(&key_hash)
     }
-    pub fn create_tx_signature(&self, data: &[u8], tx_input_script: Vec<u8>) -> Vec<u8> {
+    pub fn create_tx_signature(&self, data: &[u8], flags: u8, tx_input_script: Vec<u8>) -> Vec<u8> {
         let mut sig = Vec::new();
         let hash = sha256d::Hash::hash(data.as_ref()).to_byte_array();
         let signed_data = match self {
@@ -140,7 +140,7 @@ impl OpaqueKey {
         };
         let mut s = Vec::new();
         s.extend(signed_data);
-        s.push(0x01);
+        s.push(flags);
         s.append_script_push_data(&mut sig);
         match tx_input_script.script_elements()[..] {
             // pay-to-pubkey-hash scriptSig

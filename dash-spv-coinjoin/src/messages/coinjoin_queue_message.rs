@@ -7,8 +7,6 @@ use dashcore::consensus::encode::{Error, VarInt};
 use dashcore::hashes::{sha256d, Hash};
 use dashcore::hash_types::ProTxHash;
 use logging::*;
-#[cfg(target_os = "ios")]
-use tracing::*;
 use dash_spv_crypto::keys::BLSKey;
 use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;

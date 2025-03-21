@@ -7,13 +7,12 @@ use dashcore::blockdata::transaction::txin::TxIn;
 use dashcore::blockdata::transaction::txout::TxOut;
 use dashcore::blockdata::script::ScriptBuf;
 use dashcore::consensus::Encodable;
+use dashcore::hashes::Hash;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
 use dash_spv_crypto::util::data_append::DataAppend;
 use dash_spv_crypto::util::params::TX_MIN_OUTPUT_AMOUNT;
 use logging::*;
-#[cfg(target_os = "ios")]
-use tracing::*;
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::constants::REFERENCE_DEFAULT_MIN_TX_FEE;
@@ -204,7 +203,7 @@ impl<'a> TransactionBuilder {
 
     fn calculate_maximum_signed_tx_size(wallet_ex: Rc<RefCell<WalletEx>>, tx: &mut Transaction) -> i32 {
         for input in tx.input.iter_mut() {
-            match wallet_ex.borrow().get_wallet_transaction(input.previous_output.txid) {
+            match wallet_ex.borrow().get_wallet_transaction(input.previous_output.txid.to_byte_array()) {
                 Some(transaction) => {
                     assert!(input.previous_output.vout < transaction.output.len() as u32, "Index out of bounds");
                     input.script_sig = transaction.output[input.previous_output.vout as usize].script_pubkey.clone();
@@ -216,7 +215,7 @@ impl<'a> TransactionBuilder {
             }
         }
 
-        if let Some(signed_tx) = wallet_ex.borrow().sign_transaction(&tx, false) {
+        if let Some(signed_tx) = wallet_ex.borrow().sign_transaction(tx.clone(), false) {
             signed_tx.serialize().len() as i32
         } else {
             log_info!(target: "CoinJoin", "TxBuilder: Could not sign transaction");

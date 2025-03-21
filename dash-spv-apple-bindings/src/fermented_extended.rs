@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use ferment::unbox_any;
 use tokio::runtime::Runtime;
+use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use crate::custom::dashcore::{dashcore_hash_types_BlockHash, dashcore_hash_types_ConfirmedHash, dashcore_hash_types_ConfirmedHashHashedWithProRegTx, dashcore_hash_types_CycleHash, dashcore_hash_types_InputsHash, dashcore_hash_types_MerkleRootMasternodeList, dashcore_hash_types_MerkleRootQuorums, dashcore_hash_types_ProTxHash, dashcore_hash_types_PubkeyHash, dashcore_hash_types_QuorumCommitmentHash, dashcore_hash_types_QuorumEntryHash, dashcore_hash_types_QuorumHash, dashcore_hash_types_QuorumSigningRequestId, dashcore_hash_types_QuorumVVecHash, dashcore_hash_types_ScriptHash, dashcore_hash_types_Sha256dHash, dashcore_hash_types_SpecialTransactionPayloadHash, dashcore_hash_types_TxMerkleNode, dashcore_hash_types_Txid};
 use crate::custom::{to_ffi_bytes, to_ffi_hash};
 use crate::DashSPVCore;
@@ -21,6 +22,11 @@ pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_runtime(self_: *mut
 }
 # [no_mangle]
 pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_destroy(self_: *mut DashSPVCore) {
+    ferment::unbox_any(self_);
+}
+
+# [no_mangle]
+pub unsafe extern "C" fn dash_spv_coinjoin_coinjoin_client_manager_CoinJoinClientManager_destroy(self_: *mut CoinJoinClientManager) {
     ferment::unbox_any(self_);
 }
 // #[no_mangle]

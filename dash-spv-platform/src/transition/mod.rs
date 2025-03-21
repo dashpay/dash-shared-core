@@ -1,7 +1,10 @@
-use dashcore::{signer, InstantLock, OutPoint, Transaction, TxIn, TxOut, Txid};
+use dashcore::blockdata::transaction::{OutPoint, Transaction, txin::TxIn, txout::TxOut};
+use dashcore::ephemerealdata::instant_lock::InstantLock;
+use dashcore::signer;
 use dashcore::hashes::Hash;
 #[cfg(test)]
 use dashcore::hashes::hex::FromHex;
+use dashcore::hash_types::Txid;
 #[cfg(test)]
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dashcore::signer::double_sha;

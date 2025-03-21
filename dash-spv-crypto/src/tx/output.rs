@@ -1,4 +1,5 @@
-use dashcore::{ScriptBuf, TxOut};
+use dashcore::blockdata::script::ScriptBuf;
+use dashcore::blockdata::transaction::txout::TxOut;
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 
 #[derive(Clone)]

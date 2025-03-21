@@ -1,42 +1,26 @@
 use std::collections::HashMap;
+use std::os::raw::c_void;
 use std::sync::Arc;
 use dashcore::blockdata::transaction::Transaction;
-use dashcore::blockdata::transaction::txin::TxIn;
 use dashcore::hashes::Hash;
 use dash_spv_crypto::network::ChainType;
-
-use dash_spv_masternode_processor::common::Block;
-
-use logging::*;
-#[cfg(target_os = "ios")]
-use tracing::*;
 use dash_spv_crypto::util::params::{DUFFS, MAX_SCRIPT_SIZE};
+use logging::*;
 use crate::messages::pool_message::PoolMessage;
 use crate::messages::pool_status::PoolStatus;
 use crate::messages::coinjoin_broadcast_tx::CoinJoinBroadcastTx;
 use crate::constants::COINJOIN_ENTRY_MAX_SIZE;
 use crate::utils::coin_format::CoinFormat;
 
-// #[derive(Debug)]
+#[derive(Clone)]
+#[ferment_macro::opaque]
 pub struct CoinJoin {
-    pub opaque_context: *const std::ffi::c_void,
-    // pub get_input_value_by_prevout_hash: GetInputValueByPrevoutHash,
-    pub get_input_value_by_prevout_hash: Arc<dyn Fn(*const std::os::raw::c_void, &TxIn) -> Option<(bool, u64)>>,
-    pub has_chain_lock: Arc<dyn Fn(*const std::os::raw::c_void, Block) -> bool>,
-
-    // pub has_chain_lock: HasChainLock,
-    // pub destroy_input_value: DestroyInputValue,
+    pub opaque_context: *const c_void,
+    pub get_input_value_by_prev_outpoint: Arc<dyn Fn(*const c_void, [u8; 32], u32) -> i64>,
+    pub has_chain_lock: Arc<dyn Fn(*const c_void, u32) -> bool>,
     map_dstx: HashMap<[u8; 32], CoinJoinBroadcastTx>,
 }
 
-impl CoinJoin {
-    pub fn get_standard_denominations() -> &'static [u64] {
-        &Self::STANDARD_DENOMINATIONS
-    }
-
-}
-
-#[ferment_macro::export]
 impl CoinJoin {
     // this list of standard denominations cannot be modified and must remain the same as
     // CoinJoin::vecStandardDenominations in coinjoin.cpp
@@ -48,24 +32,30 @@ impl CoinJoin {
         (DUFFS / 1000) + 1,
     ];
 
+}
+
+#[ferment_macro::export]
+impl CoinJoin {
+
     pub fn new<
-        GIV: Fn(*const std::os::raw::c_void, &TxIn) -> Option<(bool, u64)> + Send + Sync + 'static,
-        HCL: Fn(*const std::os::raw::c_void, Block) -> bool + Send + Sync + 'static,
+        GIV: Fn(*const c_void, [u8; 32], u32) -> i64 + Send + Sync + 'static,
+        HCL: Fn(*const c_void, u32) -> bool + Send + Sync + 'static,
     >(
-        get_input_value_by_prevout_hash: GIV,
+        get_input_value_by_prev_outpoint: GIV,
         has_chain_lock: HCL,
-        // destroy_input_value: DestroyInputValue,
-        context: *const std::ffi::c_void
+        context: *const c_void
     ) -> Self {
         Self {
             opaque_context: context,
-            get_input_value_by_prevout_hash: Arc::new(get_input_value_by_prevout_hash),
+            get_input_value_by_prev_outpoint: Arc::new(get_input_value_by_prev_outpoint),
             has_chain_lock: Arc::new(has_chain_lock),
-            // destroy_input_value,
             map_dstx: HashMap::new()
         }
     }
 
+    pub fn get_standard_denominations() -> [u64; 5] {
+        Self::STANDARD_DENOMINATIONS
+    }
 
     pub fn get_smallest_denomination() -> u64 {
         Self::STANDARD_DENOMINATIONS[Self::STANDARD_DENOMINATIONS.len() - 1]
@@ -164,18 +154,13 @@ impl CoinJoin {
     
         if check_inputs {
             for txin in &tx_collateral.input {
-                if let Some((valid, value)) = self.get_input_value_by_prevout_hash(txin) {
-                    if !valid {
-                        log_warn!(target: "CoinJoin", "spent or non-locked mempool input!");
-                        log_debug!(target: "CoinJoin", "txin={:?}", txin);
-                        return false;
-                    }
-
-                    n_value_in = n_value_in + value as i64;
-                } else {
-                    log_warn!(target: "CoinJoin", "Unknown inputs in collateral transaction, txCollateral={}", tx_collateral.txid());
+                let value = self.get_input_value_by_prev_outpoint(txin.previous_output.txid.to_byte_array(), txin.previous_output.vout);
+                if value == -1 {
+                    log_warn!(target: "CoinJoin", "spent or non-locked mempool input!");
+                    log_debug!(target: "CoinJoin", "txin={:?}", txin);
                     return false;
                 }
+                n_value_in += value;
             }
 
             log_debug!(target: "CoinJoin", "is_collateral_valid, values: n_value_out={}, n_value_in={}", n_value_out, n_value_in);
@@ -201,8 +186,8 @@ impl CoinJoin {
         let mut opt_denom = 0;
 
         for denom in Self::get_standard_denominations() {
-            if input_amount == *denom {
-                opt_denom = *denom;
+            if input_amount == denom {
+                opt_denom = denom;
             }
         }
 
@@ -230,12 +215,12 @@ impl CoinJoin {
         self.map_dstx.get(&tx_hash).cloned()
     }
 
-    pub fn update_block_tip(&mut self, block: Block) {
-        self.check_dstxs(block);
+    pub fn update_block_tip(&mut self, block_height: u32) {
+        self.check_dstxs(block_height);
     }
 
-    pub fn notify_chain_lock(&mut self, block: Block) {
-        self.check_dstxs(block);
+    pub fn notify_chain_lock(&mut self, block_height: u32) {
+        self.check_dstxs(block_height);
     }
 
     pub fn update_dstx_confirmed_height(&mut self, tx_hash: [u8; 32], n_height: i32) {
@@ -335,18 +320,18 @@ impl CoinJoin {
         }
     }
 
-    pub fn get_input_value_by_prevout_hash(&self, tx_in: &TxIn) -> Option<(bool, u64)> {
-        (self.get_input_value_by_prevout_hash)(self.opaque_context, tx_in)
+    pub fn get_input_value_by_prev_outpoint(&self, txid: [u8; 32], vout: u32) -> i64 {
+        (self.get_input_value_by_prev_outpoint)(self.opaque_context, txid, vout)
     }
 
-    pub fn check_dstxs(&mut self, block: Block) {
+    pub fn check_dstxs(&mut self, block_height: u32) {
         self.map_dstx.retain(|_, tx| {
             // expire confirmed DSTXes after ~1h since confirmation or chainlocked confirmation
-            if tx.confirmed_height == -1 || (block.height as i32) < tx.confirmed_height {
+            if tx.confirmed_height == -1 || (block_height as i32) < tx.confirmed_height {
                 return false; // not mined yet
             }
-            let mined_more_than_hour_ago = block.height as i32 - tx.confirmed_height > 24;
-            mined_more_than_hour_ago || (self.has_chain_lock)(self.opaque_context, block.clone())
+            let mined_more_than_hour_ago = block_height as i32 - tx.confirmed_height > 24;
+            mined_more_than_hour_ago || (self.has_chain_lock)(self.opaque_context, block_height)
         });
     }
 }

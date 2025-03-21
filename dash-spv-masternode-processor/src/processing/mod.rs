@@ -2,11 +2,13 @@ pub mod processor;
 pub mod keys_cache;
 pub mod core_provider;
 
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use dashcore::consensus::{deserialize, serialize};
-use dashcore::{ChainLock, InstantLock, blockdata::transaction::outpoint::OutPoint, hash_types::PubkeyHash};
+use dashcore::blockdata::transaction::OutPoint;
+use dashcore::ephemerealdata::{chain_lock::ChainLock, instant_lock::InstantLock};
 use dashcore::bls_sig_utils::BLSPublicKey;
 use dashcore::hashes::Hash;
+use dashcore::hash_types::PubkeyHash;
 use dashcore::sml::masternode_list::MasternodeList;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_crypto::util::{from_hash160_for_script_map, with_public_key_data};
@@ -117,4 +119,9 @@ pub fn socket_addr_ip(socket_addr: SocketAddr) -> [u8; 16] {
         },
         SocketAddr::V6(v6) => v6.ip().octets()
     }
+}
+
+#[ferment_macro::export]
+pub fn socket_addr_v4_ctor(ip: [u8; 16], port: u16) -> SocketAddr {
+    SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(ip[8], ip[8], ip[10], ip[11]), port))
 }

@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::os::raw::c_void;
 use std::net::SocketAddr;
 use std::{ptr, thread};
 use std::sync::{Arc, RwLock};

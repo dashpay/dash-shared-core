@@ -8,7 +8,6 @@ use crate::messages::pool_status_update::PoolStatusUpdate;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dssu
-// #[repr(C)]
 #[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub struct CoinJoinStatusUpdate {

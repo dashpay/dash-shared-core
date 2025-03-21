@@ -8,8 +8,9 @@ pub struct CompactTallyItem {
     pub input_coins: Vec<InputCoin>,
 }
 
+#[ferment_macro::export]
 impl CompactTallyItem {
-    pub fn new(tx_destination: Option<Vec<u8>>) -> Self {
+    pub fn new(tx_destination: Option<Vec<u8>>) -> CompactTallyItem {
         CompactTallyItem {
             tx_destination,
             amount: 0,

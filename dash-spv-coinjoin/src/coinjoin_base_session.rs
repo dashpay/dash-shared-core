@@ -6,14 +6,12 @@ use dashcore::blockdata::transaction::txin::TxIn;
 use dashcore::blockdata::transaction::txout::TxOut;
 use dashcore::hashes::Hash;
 use logging::*;
-#[cfg(target_os = "ios")]
-use tracing::*;
 use crate::coinjoin::CoinJoin;
 use crate::messages::{coinjoin_entry::CoinJoinEntry, pool_state::PoolState, pool_status::PoolStatus, pool_message::PoolMessage};
 use crate::models::valid_in_outs::ValidInOuts;
 
-#[repr(C)]
 #[derive(Debug)]
+#[ferment_macro::export]
 pub struct CoinJoinBaseSession {
     pub entries: Vec<CoinJoinEntry>,
     pub final_mutable_transaction: Option<Transaction>,

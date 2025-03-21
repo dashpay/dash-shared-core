@@ -14,6 +14,28 @@ pub enum CoinJoinTransactionType {
 
 #[ferment_macro::export]
 impl CoinJoinTransactionType {
+
+    pub fn index(&self) -> u8 {
+        match self {
+            Self::None => 0,
+            Self::CreateDenomination => 1,
+            Self::MakeCollateralInputs => 2,
+            Self::MixingFee => 3,
+            Self::Mixing => 4,
+            Self::Send => 5,
+        }
+    }
+    pub fn from_index(index: u8) -> CoinJoinTransactionType {
+        match index {
+            0 => Self::None,
+            1 => Self::CreateDenomination,
+            2 => Self::MakeCollateralInputs,
+            3 => Self::MixingFee,
+            4 => Self::Mixing,
+            5 => Self::Send,
+            _ => panic!("Invalid index {}", index),
+        }
+    }
     pub fn from_tx(tx: &Transaction, input_values: &Vec<u64>) -> CoinJoinTransactionType {
         let input_sum: u64 = input_values.iter().sum();
 

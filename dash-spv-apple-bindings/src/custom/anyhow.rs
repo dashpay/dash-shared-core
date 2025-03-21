@@ -1,7 +1,6 @@
 #[allow(non_camel_case_types)]
-#[ferment_macro::register(anyhow::Error)]
 #[derive(Clone)]
-#[repr(C)]
+#[ferment_macro::register(anyhow::Error)]
 pub struct anyhow_Error(*mut std::os::raw::c_void);
 impl ferment::FFIConversionFrom<anyhow::Error> for anyhow_Error {
     unsafe fn ffi_from_const(ffi: *const Self) -> anyhow::Error {

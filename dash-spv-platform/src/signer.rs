@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::os::raw::c_void;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use dash_sdk::dpp;

@@ -1,21 +1,17 @@
-use std::cell::RefCell;
 use std::collections::{HashSet, HashMap};
 use std::net::SocketAddr;
 use std::os::raw::c_void;
-use std::rc::Rc;
 use std::sync::Arc;
 use dashcore::hashes::{sha256, Hash};
 use dashcore::blockdata::transaction::{OutPoint, Transaction, txin::TxIn, txout::TxOut};
 use dashcore::consensus::Encodable;
-use dashcore::hash_types::Txid;
 use dashcore::secp256k1::rand;
 use dashcore::secp256k1::rand::seq::SliceRandom;
 use logging::*;
-#[cfg(target_os = "ios")]
-use tracing::*;
 use dash_spv_crypto::crypto::byte_util::{Reversed, U32LE};
 use dash_spv_crypto::network::protocol::TXIN_SEQUENCE;
 use dash_spv_crypto::util::address::address;
+use dash_spv_crypto::util::data_append::DataAppend;
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::coin_selection::input_coin::InputCoin;
 use crate::coinjoin::CoinJoin;
@@ -24,10 +20,14 @@ use crate::models::coin_control::{CoinControl, CoinType};
 use crate::models::coinjoin_transaction_input::CoinJoinTransactionInput;
 use crate::models::tx_destination::TxDestination;
 use crate::models::CoinJoinClientOptions;
+use crate::wallet_provider::WalletProvider;
 
+
+#[derive(Clone)]
+#[ferment_macro::opaque]
 pub struct WalletEx {
-    context: *const std::ffi::c_void,
-    options: Rc<RefCell<CoinJoinClientOptions>>,
+    provider: Arc<WalletProvider>,
+    options: Arc<CoinJoinClientOptions>,
     pub locked_coins_set: HashSet<OutPoint>,
     anonymizable_tally_cached_non_denom: bool,
     vec_anonymizable_tally_cached_non_denom: Vec<CompactTallyItem>,
@@ -39,44 +39,29 @@ pub struct WalletEx {
     key_usage: HashMap<[u8; 32], bool>,
     coinjoin_salt: [u8; 32],
     loaded_keys: bool,
-    get_wallet_transaction: Arc<dyn Fn(*const c_void, [u8; 32]) -> Option<Transaction>>,
-    sign_transaction: Arc<dyn Fn(*const c_void, &Transaction, bool) -> Option<Transaction>>,
-    is_mine_input: Arc<dyn Fn(*const c_void, OutPoint) -> bool>,
-    available_coins: Arc<dyn Fn(*const c_void, bool, CoinControl, &WalletEx) -> Vec<InputCoin>>,
-    select_coins: Arc<dyn Fn(*const c_void, bool, bool, bool, i32) -> Vec<CompactTallyItem>>,
-    inputs_with_amount: Arc<dyn Fn(*const c_void, u64) -> u32>,
-    fresh_coinjoin_address: Arc<dyn Fn(*const c_void , bool) -> Vec<u8>>,
-    commit_transaction: Arc<dyn Fn(*const c_void, Vec<TxOut>, CoinControl, bool, [u8; 32]) -> bool>,
-    is_masternode_or_disconnect_requested: Arc<dyn Fn(*const c_void, SocketAddr) -> bool>,
-    disconnect_masternode: Arc<dyn Fn(*const c_void, SocketAddr) -> bool>,
-    is_synced: Arc<dyn Fn(*const c_void) -> bool>,
-    send_message: Arc<dyn Fn(*const c_void, String, Vec<u8>, &SocketAddr, bool) -> bool>,
-    add_pending_masternode: Arc<dyn Fn(*const c_void, [u8; 32], [u8; 32]) -> bool>,
-    start_manager_async: Arc<dyn Fn(*const c_void)>,
-    get_coinjoin_keys: Arc<dyn Fn(*const c_void, bool) -> Vec<Vec<u8>>>,
 }
 
-// #[ferment_macro::export]
+#[ferment_macro::export]
 impl WalletEx {
     pub fn new<
         GetWalletTx: Fn(*const c_void, [u8; 32]) -> Option<Transaction> + 'static,
-        SignTransaction: Fn(*const c_void, &Transaction, bool) -> Option<Transaction> + 'static,
+        SignTransaction: Fn(*const c_void, Transaction, bool) -> Option<Transaction> + 'static,
         IsMineInput: Fn(*const c_void, OutPoint) -> bool + 'static,
         GetAvailableCoins: Fn(*const c_void, bool, CoinControl, &WalletEx) -> Vec<InputCoin> + 'static,
-        SelectCoins: Fn(*const c_void, bool, bool, bool, i32) -> Vec<CompactTallyItem> + 'static,
+        SelectCoins: Fn(*const c_void, bool, bool, bool, i32, &WalletEx) -> Vec<CompactTallyItem> + 'static,
         InputsWithAmount: Fn(*const c_void, u64) -> u32 + 'static,
-        FreshCJAddr: Fn(*const c_void , bool) -> Vec<u8> + 'static,
+        FreshCJAddr: Fn(*const c_void, bool) -> String + 'static,
         CommitTx: Fn(*const c_void, Vec<TxOut>, CoinControl, bool, [u8; 32]) -> bool + 'static,
         IsSynced: Fn(*const c_void) -> bool + 'static,
         IsMasternodeOrDisconnectRequested: Fn(*const c_void, SocketAddr) -> bool + 'static,
         DisconnectMasternode: Fn(*const c_void, SocketAddr) -> bool + 'static,
-        SendMessage: Fn(*const c_void, String, Vec<u8>, &SocketAddr, bool) -> bool + 'static,
+        SendMessage: Fn(*const c_void, String, Vec<u8>, SocketAddr, bool) -> bool + 'static,
         AddPendingMasternode: Fn(*const c_void, [u8; 32], [u8; 32]) -> bool + 'static,
         StartManagerAsync: Fn(*const c_void) + 'static,
-        GetCoinJoinKeys: Fn(*const c_void, bool) -> Vec<Vec<u8>> + 'static,
+        GetCoinJoinKeys: Fn(*const c_void, bool) -> Vec<String> + 'static,
     >(
         context: *const c_void,
-        options: Rc<RefCell<CoinJoinClientOptions>>,
+        options: CoinJoinClientOptions,
         get_wallet_transaction: GetWalletTx,
         sign_transaction: SignTransaction,
         is_mine_input: IsMineInput,
@@ -93,34 +78,37 @@ impl WalletEx {
         start_manager_async: StartManagerAsync,
         get_coinjoin_keys: GetCoinJoinKeys,
     ) -> Self {
-        WalletEx {
+        let provider = Arc::new(WalletProvider::new(
+            get_wallet_transaction,
+            sign_transaction,
+            is_mine_input,
+            available_coins,
+            select_coins,
+            inputs_with_amount,
+            fresh_coinjoin_address,
+            commit_transaction,
+            is_masternode_or_disconnect_requested,
+            disconnect_masternode,
+            is_synced,
+            send_message,
+            add_pending_masternode,
+            start_manager_async,
+            get_coinjoin_keys,
             context,
-            options,
+        ));
+        WalletEx {
+            provider,
+            options: Arc::new(options),
             locked_coins_set: HashSet::new(),
             anonymizable_tally_cached_non_denom: false,
             vec_anonymizable_tally_cached_non_denom: Vec::new(),
             anonymizable_tally_cached: false,
             vec_anonymizable_tally_cached: Vec::new(),
             map_outpoint_rounds_cache: HashMap::new(),
-            coinjoin_salt: [0;32], // TODO: InitCoinJoinSalt ?
+            coinjoin_salt: [0; 32], // TODO: InitCoinJoinSalt ?
             loaded_keys: false,
             unused_keys: HashMap::with_capacity(1024),
             key_usage: HashMap::new(),
-            get_wallet_transaction: Arc::new(get_wallet_transaction),
-            sign_transaction: Arc::new(sign_transaction),
-            is_mine_input: Arc::new(is_mine_input),
-            available_coins: Arc::new(available_coins),
-            select_coins: Arc::new(select_coins),
-            inputs_with_amount: Arc::new(inputs_with_amount),
-            fresh_coinjoin_address: Arc::new(fresh_coinjoin_address),
-            commit_transaction: Arc::new(commit_transaction),
-            is_masternode_or_disconnect_requested: Arc::new(is_masternode_or_disconnect_requested),
-            disconnect_masternode: Arc::new(disconnect_masternode),
-            is_synced: Arc::new(is_synced),
-            send_message: Arc::new(send_message),
-            add_pending_masternode: Arc::new(add_pending_masternode),
-            start_manager_async: Arc::new(start_manager_async),
-            get_coinjoin_keys: Arc::new(get_coinjoin_keys),
         }
     }
 
@@ -138,11 +126,11 @@ impl WalletEx {
         self.locked_coins_set.contains(outpoint)
     }
 
-    pub fn is_fully_mixed(&mut self, outpoint: OutPoint) -> bool {
+    pub fn check_if_is_fully_mixed(&mut self, outpoint: OutPoint) -> bool {
         let rounds = self.get_real_outpoint_coinjoin_rounds(outpoint.clone(), 0);
-        
+
         // Mix again if we don't have N rounds yet
-        if rounds < self.options.borrow().coinjoin_rounds {
+        if rounds < self.options.coinjoin_rounds {
             return false;
         }
 
@@ -150,7 +138,7 @@ impl WalletEx {
         // If we have already mixed N + MaxOffset rounds, don't mix again.
         // Otherwise, we should mix again 50% of the time, this results in an exponential decay
         // N rounds 50% N+1 25% N+2 12.5%... until we reach N + GetRandomRounds() rounds where we stop.
-        if rounds < self.options.borrow().coinjoin_rounds + self.options.borrow().coinjoin_random_rounds {
+        if rounds < self.options.coinjoin_rounds + self.options.coinjoin_random_rounds {
             let mut buffer = Vec::new();
             outpoint.consensus_encode(&mut buffer).unwrap();
             buffer.extend_from_slice(&self.coinjoin_salt.reversed());
@@ -164,7 +152,7 @@ impl WalletEx {
     }
 
     pub fn get_real_outpoint_coinjoin_rounds(&mut self, outpoint: OutPoint, rounds: i32) -> i32 {
-        let rounds_max = MAX_COINJOIN_ROUNDS + self.options.borrow().coinjoin_random_rounds;
+        let rounds_max = MAX_COINJOIN_ROUNDS + self.options.coinjoin_random_rounds;
 
         if rounds >= rounds_max {
             // there can only be rounds_max rounds max
@@ -177,7 +165,7 @@ impl WalletEx {
             return rounds_ref;
         }
 
-        let wtx: Option<Transaction> = self.get_wallet_transaction(outpoint.txid);
+        let wtx: Option<Transaction> = self.provider.get_wallet_transaction(outpoint.txid.to_byte_array());
 
         if wtx.is_none() {
             // no such tx in this wallet
@@ -229,9 +217,8 @@ impl WalletEx {
 
         // only denoms here so let's look up
         for txin_next in &transaction.input {
-
-            if (self.is_mine_input)(self.context, txin_next.previous_output) {
-                let outpoint = txin_next.previous_output;
+            let outpoint = txin_next.previous_output;
+            if self.provider.is_mine_input(outpoint) {
                 // let outpoint = TxOutPoint::new(txin_next.input_hash, txin_next.index);
                 let n = self.get_real_outpoint_coinjoin_rounds(outpoint, rounds + 1);
 
@@ -260,38 +247,11 @@ impl WalletEx {
         let result = self.available_coins(only_confirmed, coin_control);
         !result.is_empty()
     }
-
-    pub fn available_coins(&self, only_safe: bool, coin_control: CoinControl) -> Vec<InputCoin> {
-        (self.available_coins)(self.context, only_safe, coin_control, self)
-        // let mut vec_gathered_outputs: Vec<InputCoin> = Vec::new();
-        //
-        // unsafe {
-        //     // let encoded_coin_control = boxed(coin_control.encode());
-        //     let gathered_outputs = (self.available_coins)(self.context, only_safe, coin_control, self);
-        //     // (0..(*gathered_outputs).item_count)
-        //     //     .into_iter()
-        //     //     .map(|i| (**(*gathered_outputs).items.add(i)).decode())
-        //     //     .for_each(
-        //     //         |item| vec_gathered_outputs.push(item)
-        //     //     );
-        //     //
-        //     // (self.destroy_gathered_outputs)(gathered_outputs);
-        //     // let unboxed_coin_control = unbox_any(encoded_coin_control);
-        //     //
-        //     // if !coin_control.set_selected.is_empty() {
-        //     //     let unboxed = unbox_vec_ptr(unboxed_coin_control.set_selected, unboxed_coin_control.set_selected_size);
-        //     //     unbox_vec(unboxed);
-        //     // }
-        // }
-        //
-        // vec_gathered_outputs
-    }
-
     pub fn select_coins_grouped_by_addresses(
-        &mut self, 
-        skip_denominated: bool, 
-        anonymizable: bool, 
-        skip_unconfirmed: bool, 
+        &mut self,
+        skip_denominated: bool,
+        anonymizable: bool,
+        skip_unconfirmed: bool,
         max_outpoints_per_address: i32
     ) -> Vec<CompactTallyItem> {
         // Try using the cache for already confirmed mixable inputs.
@@ -307,20 +267,8 @@ impl WalletEx {
                 return self.vec_anonymizable_tally_cached.clone();
             }
         }
-        
-        // let mut vec_tally_ret: Vec<CompactTallyItem> = Vec::new();
-        let vec_tally_ret = (self.select_coins)(self.context, skip_denominated, anonymizable, skip_unconfirmed, max_outpoints_per_address);
-        // unsafe {
-            // let selected_coins = (self.select_coins)(self.context, skip_denominated, anonymizable, skip_unconfirmed, max_outpoints_per_address);
-            // (0..(*selected_coins).item_count)
-            //     .into_iter()
-            //     .map(|i| (**(*selected_coins).items.add(i)).decode())
-            //     .for_each(
-            //         |item| vec_tally_ret.push(item)
-            //     );
-            //
-            // (self.destroy_selected_coins)(selected_coins);
-        // }
+
+        let vec_tally_ret = self.provider.select_coins(skip_denominated, anonymizable, skip_unconfirmed, max_outpoints_per_address, self);
 
         // Cache already confirmed mixable entries for later use.
         // This should only be used if nMaxOupointsPerAddress was NOT specified.
@@ -340,12 +288,12 @@ impl WalletEx {
     }
 
     pub fn get_anonymizable_balance(&mut self, skip_denominated: bool, skip_unconfirmed: bool) -> u64 {
-        if !self.options.borrow().enable_coinjoin {
+        if !self.options.enable_coinjoin {
             return 0;
         }
 
         let tally_items = self.select_coins_grouped_by_addresses(skip_denominated, true, skip_unconfirmed, -1);
-        
+
         if tally_items.is_empty() {
             return 0;
         }
@@ -356,7 +304,7 @@ impl WalletEx {
 
         for item in tally_items {
             let is_denominated = CoinJoin::is_denominated_amount(item.amount);
-            
+
             if skip_denominated && is_denominated {
                 continue;
             }
@@ -369,31 +317,6 @@ impl WalletEx {
 
         total
     }
-
-    pub fn get_wallet_transaction(&self, hash: Txid) -> Option<Transaction> {
-        (self.get_wallet_transaction)(self.context, hash.to_byte_array())
-        // unsafe {
-        //     // let boxed_hash = boxed(hash.0);
-        //     let wtx = (self.get_wallet_transaction)(self.context, hash.to_byte_array());
-        //
-        //     if wtx.is_null() {
-        //         return None;
-        //     }
-        //
-        //     let transaction = (*wtx).decode();
-        //     (self.destroy_transaction)(wtx);
-        //     unbox_any(boxed_hash);
-        //     Some(transaction)
-        // }
-    }
-
-    /**
-     * Count the number of unspent outputs that have a certain value
-     */
-    pub fn count_inputs_with_amount(&self, value: u64) -> u32 {
-        (self.inputs_with_amount)(self.context, value)
-    }
-
     pub fn get_unused_key(&mut self, internal: bool) -> TxDestination {
         if self.unused_keys.is_empty() {
             if !self.key_usage.is_empty() && self.key_usage.values().all(|used| !used) {
@@ -419,117 +342,107 @@ impl WalletEx {
 
     pub fn add_unused_key(&mut self, destination: Vec<u8>) {
         let key_id = sha256::Hash::hash(&destination).to_byte_array();
-        log_debug!(target: "CoinJoin", "WalletEx - add unused key: {:?}", address::with_script_sig(&destination, &self.options.borrow().chain_type.script_map()));
+        log_debug!(target: "CoinJoin", "WalletEx - add unused key: {:?}", address::with_script_sig(&destination, &self.options.chain_type.script_map()));
         self.unused_keys.insert(key_id, destination);
         self.key_usage.insert(key_id, false);
     }
+    pub fn refresh_unused_keys(&mut self) {
+        self.unused_keys.clear();
+        let issued_keys = self.provider.get_issued_receive_keys();
+
+        for key in &issued_keys {
+            let pub_key = Vec::<u8>::script_pub_key_for_address(key, &self.options.chain_type.script_map());
+            let key_id = sha256::Hash::hash(&pub_key).to_byte_array();
+            self.unused_keys.insert(key_id, pub_key);
+            self.key_usage.insert(key_id, false);
+        }
+
+        let used_keys = self.provider.get_used_receive_keys();
+
+        for used_key in &used_keys {
+            let pub_key = Vec::<u8>::script_pub_key_for_address(used_key, &self.options.chain_type.script_map());
+            let key_id = sha256::Hash::hash(&pub_key).to_byte_array();
+            self.unused_keys.remove(&key_id);
+            self.key_usage.insert(key_id, true);
+        }
+
+        for (_, key) in &self.unused_keys {
+            log_debug!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.chain_type.script_map()));
+        }
+
+        for (key_id, used) in &self.key_usage {
+            if !used {
+                if let Some(key) = self.unused_keys.get(key_id) {
+                    log_debug!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.chain_type.script_map()));
+                }
+            }
+        }
+
+        self.loaded_keys = true;
+
+    }
+
+    pub fn process_used_scripts(&mut self, scripts: &Vec<Vec<u8>>) {
+        for script in scripts {
+            let key_id = sha256::Hash::hash(script).to_byte_array();
+
+            if self.loaded_keys {
+                self.key_usage.insert(key_id, true);
+                self.unused_keys.remove(&key_id);
+            }
+
+            if let Some(key) = self.unused_keys.get(&key_id) {
+                log_debug!(target: "CoinJoin", "WalletEx - key used: {:?}", address::with_script_pub_key(key, &self.options.chain_type.script_map()));
+            }
+        }
+    }
+}
+impl WalletEx {
+
+
+    pub fn available_coins(&self, only_safe: bool, coin_control: CoinControl) -> Vec<InputCoin> {
+        self.provider.available_coins(only_safe, coin_control, self)
+    }
+
+    pub fn get_wallet_transaction(&self, hash: [u8; 32]) -> Option<Transaction> {
+        self.provider.get_wallet_transaction(hash)
+    }
+
+    /**
+     * Count the number of unspent outputs that have a certain value
+     */
+    pub fn count_inputs_with_amount(&self, value: u64) -> u32 {
+        self.provider.count_inputs_with_amount(value)
+    }
+
 
     pub fn remove_unused_key(&mut self, destination: &TxDestination) {
         if let Some(key) = destination {
             let key_id = sha256::Hash::hash(key).to_byte_array();
             self.unused_keys.remove(&key_id);
             self.key_usage.insert(key_id, true);
-            log_debug!(target: "CoinJoin", "WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.borrow().chain_type.script_map()));
+            log_debug!(target: "CoinJoin", "WalletEx - remove unused key: {:?}", address::with_script_sig(&key, &self.options.chain_type.script_map()));
         }
     }
 
-    pub fn refresh_unused_keys(&mut self) {
-        self.unused_keys.clear();
-        let issued_keys = self.get_issued_receive_keys();
-        
-        for key in &issued_keys {
-            let key_id = sha256::Hash::hash(key).to_byte_array();
-            self.unused_keys.insert(key_id, key.clone());
-            self.key_usage.insert(key_id, false);
-        }
-
-        let used_keys = self.get_used_receive_keys();
-
-        for used_key in &used_keys {
-            let key_id = sha256::Hash::hash(used_key).to_byte_array();
-            self.unused_keys.remove(&key_id);
-            self.key_usage.insert(key_id, true);
-        }
-
-        for (_, key) in &self.unused_keys {
-            log_debug!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
-        }
-
-        for (key_id, used) in &self.key_usage {
-            if !used {
-                if let Some(key) = self.unused_keys.get(key_id) {
-                    log_debug!(target: "CoinJoin", "WalletEx - unused key: {:?}", address::with_script_sig(key, &self.options.borrow().chain_type.script_map()));
-                }
-            }
-        }
-
-        self.loaded_keys = true;
-        
+    fn fresh_receive_key(&mut self, internal: bool) -> Vec<u8> {
+        let fresh_address = self.provider.get_fresh_coinjoin_address(internal);
+        let script_map = self.options.chain_type.script_map();
+        let fresh_key = Vec::<u8>::script_pub_key_for_address(&fresh_address, &script_map);
+        log_debug!(target: "CoinJoin", "WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &script_map));
+        let key_id = sha256::Hash::hash(&fresh_key).to_byte_array();
+        self.key_usage.insert(key_id, true);
+        fresh_key
     }
 
-    pub fn process_used_scripts(&mut self, scripts: &Vec<Vec<u8>>) {
-        for script in scripts {
-            let key_id = sha256::Hash::hash(script).to_byte_array();
-            
-            if self.loaded_keys {
-                self.key_usage.insert(key_id, true);
-                self.unused_keys.remove(&key_id);
-            }
-            
-            if let Some(key) = self.unused_keys.get(&key_id) {
-                log_debug!(target: "CoinJoin", "WalletEx - key used: {:?}", address::with_script_pub_key(key, &self.options.borrow().chain_type.script_map()));
-            }
-        }
-    }
 
     pub fn commit_transaction(&self, vec_send: Vec<TxOut>, coin_control: CoinControl, is_denominating: bool, client_session_id: [u8; 32]) -> bool {
-        (self.commit_transaction)(self.context, vec_send, coin_control, is_denominating, client_session_id)
-        //
-        //
-        // let result: bool;
-        //
-        // unsafe {
-        //     let encoded_coin_control = boxed(coin_control.encode());
-        //     let boxed_vec = boxed_vec(
-        //         vec_send
-        //             .iter()
-        //             .map(|input| boxed((*input).clone()))
-        //             .collect()
-        //     );
-        //
-        //     let boxed_client_session_id = boxed(client_session_id.0); // Released in DashSync
-        //     result = (self.commit_transaction)(boxed_vec, vec_send.len(), encoded_coin_control, is_denominating, boxed_client_session_id, self.context);
-        //     let vec = unbox_vec_ptr(boxed_vec, vec_send.len());
-        //     unbox_any_vec(vec);
-        //     let unboxed_coin_control = unbox_any(encoded_coin_control);
-        //
-        //     if !unboxed_coin_control.set_selected.is_null() && unboxed_coin_control.set_selected_size > 0 {
-        //         let unboxed = unbox_vec_ptr(unboxed_coin_control.set_selected, unboxed_coin_control.set_selected_size);
-        //         unbox_vec(unboxed);
-        //     }
-        // }
-        //
-        // return result;
+        self.provider.commit_transaction(vec_send, coin_control, is_denominating, client_session_id)
     }
 
-    pub fn sign_transaction(&self, tx: &Transaction, anyone_can_pay: bool) -> Option<Transaction> {
-        (self.sign_transaction)(self.context, tx, anyone_can_pay)
-        // unsafe {
-        //     let boxed_tx = boxed(tx.encode());
-        //     let raw_tx = (self.sign_transaction)(boxed_tx, anyone_can_pay, self.context);
-        //
-        //     if raw_tx.is_null() {
-        //         return None;
-        //     }
-        //
-        //     let signed_tx = (*raw_tx).decode();
-        //     (self.destroy_transaction)(raw_tx);
-        //     unbox_any(boxed_tx);
-        //
-        //     return Some(signed_tx);
-        // }
+    pub fn sign_transaction(&self, tx: Transaction, anyone_can_pay: bool) -> Option<Transaction> {
+        self.provider.sign_transaction(tx, anyone_can_pay)
     }
-
     pub fn select_tx_dsins_by_denomination(&mut self, denom: u32, value_max: u64, vec_tx_dsin_ret: &mut Vec<CoinJoinTransactionInput>) -> bool {
         let mut value_total: u64 = 0;
         let mut set_recent_tx_ids = HashSet::new();
@@ -602,59 +515,25 @@ impl WalletEx {
     }
 
     pub fn is_masternode_or_disconnect_requested(&self, address: SocketAddr) -> bool {
-        (self.is_masternode_or_disconnect_requested)(self.context, address)
-        // return unsafe {
-        //     let boxed_address = boxed(address.ip_address.0);
-        //     let result = (self.is_masternode_or_disconnect_requested)(boxed_address, address.port, self.context);
-        //     unbox_any(boxed_address);
-        //     result
-        // };
+        self.provider.is_masternode_or_disconnect_requested(address)
     }
 
     pub fn disconnect_masternode(&self, address: SocketAddr) -> bool {
-        (self.disconnect_masternode)(self.context, address)
-        // return unsafe {
-        //     let boxed_address = boxed(address.ip_address.0);
-        //     let result = (self.disconnect_masternode)(boxed_address, address.port, self.context);
-        //     unbox_any(boxed_address);
-        //     result
-        // };
+        self.provider.disconnect_masternode(address)
     }
-
     pub fn is_synced(&self) -> bool {
-        (self.is_synced)(self.context)
+        self.provider.is_synced()
+    }
+    pub fn send_message(&self, message: Vec<u8>, msg_type: String, address: SocketAddr, warn: bool) -> bool {
+        self.provider.send_message(message, msg_type, address, warn)
     }
 
-    pub fn send_message(&mut self, message: Vec<u8>, msg_type: String, address: &SocketAddr, warn: bool) -> bool {
-        (self.send_message)(self.context, msg_type, message, address, warn)
-        // return unsafe {
-        //     let message_type = msg_type.to_c_string_ptr();
-        //     let boxed_ip = boxed(address.ip_address.0);
-        //     let boxed_message = boxed(ByteArray::from(message));
-        //     let result = (self.send_message)(
-        //         message_type,
-        //         boxed_message,
-        //         boxed_ip,
-        //         address.port,
-        //         warn,
-        //         self.context
-        //     );
-        //
-        //     let _ = CString::from_raw(message_type);
-        //     unbox_any(boxed_ip);
-        //     let msg = unbox_any(boxed_message);
-        //     let _ = Vec::from_raw_parts(msg.ptr as *mut u8, msg.len, msg.len);
-        //
-        //     result
-        // };
-    }
-
-    pub fn add_pending_masternode(&mut self, pro_tx_hash: [u8; 32], session_id: [u8; 32]) -> bool {
-        (self.add_pending_masternode)(self.context, pro_tx_hash, session_id)
+    pub fn add_pending_masternode(&self, pro_tx_hash: [u8; 32], session_id: [u8; 32]) -> bool {
+        self.provider.add_pending_masternode(pro_tx_hash, session_id)
     }
 
     pub fn start_manager_async(&self) {
-        (self.start_manager_async)(self.context)
+        self.provider.start_manager_async()
     }
 
     fn clear_anonymizable_caches(&mut self) {
@@ -666,57 +545,5 @@ impl WalletEx {
     //     (self.is_mine_input)(self.context, txin)
     // }
 
-    fn fresh_receive_key(&mut self, internal: bool) -> Vec<u8> {
-        let fresh_key = (self.fresh_coinjoin_address)(self.context, internal);
-        // let fresh_key = unsafe {
-        //     let data = (self.fresh_coinjoin_address)(self.context, internal);
-        //     let result = slice::from_raw_parts(data.ptr, data.len).to_vec();
-        //     unbox_vec_ptr(data.ptr as *mut u8, data.len);
-        //     result
-        // };
 
-        log_debug!(target: "CoinJoin", "WalletEx - fresh key: {:?}", address::with_script_pub_key(&fresh_key, &self.options.borrow().chain_type.script_map()));
-        let key_id = sha256::Hash::hash(&fresh_key).to_byte_array();
-        self.key_usage.insert(key_id, true);
-
-        fresh_key
-    }
-
-    fn get_issued_receive_keys(&self) -> Vec<Vec<u8>> {
-        (self.get_coinjoin_keys)(self.context, false)
-        // unsafe {
-        //     let data = (self.get_coinjoin_keys)(false, self.context);
-        //     let keys = &*data;
-        //     let mut result = Vec::with_capacity(keys.item_count);
-        //
-        //     for i in 0..keys.item_count {
-        //         let item = *keys.items.add(i);
-        //         let bytes = slice::from_raw_parts((*item).ptr, (*item).len).to_vec();
-        //         result.push(bytes);
-        //     }
-        //
-        //     (self.destroy_coinjoin_keys)(data);
-        //
-        //     result
-        // }
-    }
-
-    fn get_used_receive_keys(&self) -> Vec<Vec<u8>> {
-        (self.get_coinjoin_keys)(self.context, true)
-        // unsafe {
-        //     let data = (self.get_coinjoin_keys)(self.context, true);
-        //     let keys = &*data;
-        //     let mut result = Vec::with_capacity(keys.item_count);
-        //
-        //     for i in 0..keys.item_count {
-        //         let item = *keys.items.add(i);
-        //         let bytes = slice::from_raw_parts((*item).ptr, (*item).len).to_vec();
-        //         result.push(bytes);
-        //     }
-        //
-        //     (self.destroy_coinjoin_keys)(data);
-        //
-        //     result
-        // }
-    }
 }

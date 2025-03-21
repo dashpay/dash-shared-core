@@ -1,4 +1,4 @@
-use dashcore::blockdata::script::owned::ScriptBuf;
+use dashcore::blockdata::script::ScriptBuf;
 use dashcore::blockdata::transaction::outpoint::OutPoint;
 use dashcore::blockdata::transaction::txin::TxIn;
 use dashcore::hashes::Hash;

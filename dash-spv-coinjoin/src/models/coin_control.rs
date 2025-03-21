@@ -13,6 +13,42 @@ pub enum CoinType {
     OnlyCoinJoinCollateral = 5,
 }
 
+#[ferment_macro::export]
+impl CoinType {
+    pub fn is_all_coins(&self) -> bool {
+        *self == CoinType::AllCoins
+    }
+    pub fn is_only_fully_mixed(&self) -> bool {
+        *self == CoinType::OnlyFullyMixed
+    }
+    pub fn is_only_ready_to_mix(&self) -> bool {
+        *self == CoinType::OnlyReadyToMix
+    }
+    pub fn is_only_non_denominated(&self) -> bool {
+        *self == CoinType::OnlyNonDenominated
+    }
+    pub fn is_only_masternode_collateral(&self) -> bool {
+        *self == CoinType::OnlyMasternodeCollateral
+    }
+    pub fn is_only_coinjoin_collateral(&self) -> bool {
+        *self == CoinType::OnlyCoinJoinCollateral
+    }
+    pub fn index(&self) -> u8 {
+        *self as u8
+    }
+    pub fn from_index(index: u8) -> CoinType {
+        match index {
+            0 => CoinType::AllCoins,
+            1 => CoinType::OnlyFullyMixed,
+            2 => CoinType::OnlyReadyToMix,
+            3 => CoinType::OnlyNonDenominated,
+            4 => CoinType::OnlyMasternodeCollateral,
+            5 => CoinType::OnlyCoinJoinCollateral,
+            _ => panic!("Invalid CoinType index")
+        }
+    }
+}
+
 // CoinControl comes from Dash Core.  Not all functions fields and functions are supported within the Wallet class
 #[derive(Clone, Debug)]
 #[ferment_macro::export]

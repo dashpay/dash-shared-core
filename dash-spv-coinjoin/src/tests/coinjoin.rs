@@ -38,8 +38,8 @@ fn standard_denomination_test() {
 
     assert_eq!(100001, CoinJoin::get_smallest_denomination());
 
-    for value in CoinJoin::get_standard_denominations().iter() {
-        assert_eq!(*value as i64, CoinJoin::denomination_to_amount(CoinJoin::amount_to_denomination(*value)));
+    for value in CoinJoin::get_standard_denominations() {
+        assert_eq!(value as i64, CoinJoin::denomination_to_amount(CoinJoin::amount_to_denomination(value)));
     }
 }
 
@@ -79,7 +79,7 @@ fn is_collateral_valid_test() {
     let tx = Transaction::consensus_decode(&mut cursor).unwrap();
 
     let coinjoin = CoinJoin::new(
-        |_, _| Some((true, 40000)),
+        |_, _, _| 40000,
         |_, _| true,
         std::ptr::null()
     );
@@ -87,7 +87,7 @@ fn is_collateral_valid_test() {
     assert!(coinjoin.is_collateral_valid(&tx, true));
 
     let coinjoin = CoinJoin::new(
-        |_, _| Some((true, 10000)),
+        |_, _, _| 10000,
         |_, _| true,
         std::ptr::null()
     );

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use dashcore::hash_types::ProTxHash;
 use crate::models::masternode_meta_info::MasternodeMetaInfo;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MasternodeMetadataManager {
     meta_infos: HashMap<ProTxHash, MasternodeMetaInfo>,
     pub dsq_count: i64
@@ -28,7 +28,7 @@ impl MasternodeMetadataManager {
         Some(info)
     }
 
-    pub fn get_dsq_threshold(&mut self, pro_tx_hash: ProTxHash, mn_count: u64) -> i64 {
+    pub fn get_dsq_threshold(&mut self, pro_tx_hash: ProTxHash, mn_count: usize) -> i64 {
         if let Some(meta_info) = self.get_meta_info(pro_tx_hash, true) {
             meta_info.last_dsq + (mn_count / 5) as i64
         } else {

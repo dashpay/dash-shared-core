@@ -1,7 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 use logging::*;
-#[cfg(target_os = "ios")]
-use tracing::*;
 use crate::wallet_ex::WalletEx;
 use super::tx_destination::TxDestination;
 
