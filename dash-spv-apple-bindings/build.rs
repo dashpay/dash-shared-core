@@ -2,8 +2,8 @@ extern crate cbindgen;
 extern crate ferment_sys;
 
 use ferment_sys::Ferment;
-#[cfg(feature = "objc")]
-use ferment_sys::{Lang, ObjC, XCodeConfig};
+// #[cfg(feature = "objc")]
+// use ferment_sys::{Lang, ObjC, XCodeConfig};
 
 fn main() {
     if let Ok(profile) = std::env::var("CARGO_PROFILE") {
@@ -33,10 +33,10 @@ fn main() {
             "dashcore_hashes",
             "versioned-feature-core",
         ])
-        .with_languages(vec![
-            #[cfg(feature = "objc")]
-            Lang::ObjC(ObjC::new(XCodeConfig::new("DS", "DashSharedCore", "dash_shared_core"))),
-        ])
+        // .with_languages(vec![
+        //     #[cfg(feature = "objc")]
+        //     Lang::ObjC(ObjC::new(XCodeConfig::new("DS", "DashSharedCore", "dash_shared_core"))),
+        // ])
         .generate() {
         Ok(_) => println!("[ferment] [ok]"),
         Err(err) => panic!("[ferment] [err]: {}", err)

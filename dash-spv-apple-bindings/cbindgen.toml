@@ -7,7 +7,7 @@ tab_width = 4
 documentation_style = "c"
 #style = "tag"
 #swift_enum_macro = "CF_ENUM"
-include_guard = "dash_shared_core_h"
+include_guard = "dash_spv_apple_bindings_h"
 #trailer = "typedef struct Runtime Runtime;"
 [parse]
 parse_deps = true

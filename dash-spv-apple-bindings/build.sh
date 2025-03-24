@@ -7,7 +7,7 @@ if [[ "$BUILD_TYPE" == "release" ]]; then
 else
     BUILD_FLAG=""
 fi
-
+#FEATURES="objc"
 echo "Building Dash Shared Core..."
 pwd
 
@@ -38,6 +38,7 @@ REQUIRED_VERSION=1.80.1
 CURRENT_VERSION=$(rustc -V | awk '{sub(/-.*/,"");print $2}')
 FRAMEWORK=DashSharedCore
 LIB_NAME=dash_spv_apple_bindings
+OBJC=false
 WRAPPER=objc_wrapper
 
 echo "rustc -V: current ${CURRENT_VERSION} vs. required ${REQUIRED_VERSION}"
@@ -66,7 +67,11 @@ build_targets=(
 )
 for target in "${build_targets[@]}"; do
     if [ ! -f "../../target/$target/$BUILD_TYPE/lib${LIB_NAME}.a" ]; then
-        cargo build --target="$target" --features=objc --"$BUILD_FLAG" &
+        if $OBJC; then
+          cargo build --target="$target" --features=objc --"$BUILD_FLAG" &
+        else
+          cargo build --target="$target" --"$BUILD_FLAG" &
+        fi
     fi
 done
 wait
@@ -83,14 +88,17 @@ lipo -create ../target/x86_64-apple-ios/"$BUILD_TYPE"/lib${LIB_NAME}.a  \
 wait
 wait
 
-if which clang-format >/dev/null; then
-  find target/include -name ${WRAPPER}.h -print0 | xargs -0 clang-format -i -style=file
-else
-    echo "warning: clang-format not installed, install it by running $(brew install clang-format)"
+if $OBJC; then
+  if which clang-format >/dev/null; then
+    find target/include -name ${WRAPPER}.h -print0 | xargs -0 clang-format -i -style=file
+  else
+      echo "warning: clang-format not installed, install it by running $(brew install clang-format)"
+  fi
 fi
+
 sed -i '' '/#ifndef/ a\
 typedef struct Runtime Runtime;
-' target/include/dash_shared_core.h
+' target/include/dash_spv_apple_bindings.h
 
 xcodebuild -create-xcframework \
 	-library target/lib/ios/lib${LIB_NAME}_ios.a -headers target/include \
