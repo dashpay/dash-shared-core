@@ -1,6 +1,6 @@
 [package]
 name = "dash-spv-platform"
-version = "0.0.1"
+version = "0.1.0"
 description = "Library for interactions with platform SDK"
 
 edition = "2021"
@@ -9,9 +9,9 @@ publish = false
 [dependencies]
 anyhow = "1.0.95"
 
-dash-spv-crypto = { path = "../dash-spv-crypto" }
-dash-spv-event-bus = { path = "../dash-spv-event-bus" }
-dash-spv-macro = { path = "../dash-spv-macro" }
+dash-spv-crypto = { workspace = true }
+dash-spv-event-bus = { workspace = true }
+dash-spv-macro = { workspace = true }
 
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "message_verification", "quorum_validation"], default-features = false, branch = "feat/ferment" }
 dapi-grpc = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dapi-grpc", default-features = false, features = ["client"] }

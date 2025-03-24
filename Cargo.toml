@@ -22,6 +22,16 @@ homepage = "https://github.com/dashpay/dash-shared-core"
 license = "MIT"
 keywords = ["crypto", "dash", "spv"]
 
+[workspace.dependencies]
+dash-spv-coinjoin = { version = "0.5.1", path = "dash-spv-coinjoin" }
+dash-spv-crypto = { version = "0.5.1", path = "dash-spv-crypto" }
+dash-spv-event-bus = { version = "0.5.1", path = "dash-spv-event-bus" }
+dash-spv-keychain = { version = "0.0.1", path = "dash-spv-keychain" }
+dash-spv-macro = { version = "0.1.0", path = "dash-spv-macro" }
+dash-spv-masternode-processor = { version = "0.5.1", path = "dash-spv-masternode-processor" }
+dash-spv-platform = { version = "0.1.0", path = "dash-spv-platform" }
+logging = { version = "0.1.0", path = "logging" }
+
 #[profile.test]
 #default = ["use_serde", "test-helpers"]
 

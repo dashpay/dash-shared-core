@@ -1111,11 +1111,10 @@ dependencies = [
 
 [[package]]
 name = "dash-spv-coinjoin"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "cbindgen 0.28.0",
  "dash-spv-crypto",
- "dash-spv-masternode-processor",
  "dashcore",
  "ferment-macro",
  "logging",
@@ -1124,7 +1123,7 @@ dependencies = [
 
 [[package]]
 name = "dash-spv-crypto"
-version = "0.0.1"
+version = "0.5.1"
 dependencies = [
  "bip38",
  "bitflags 2.9.0",
@@ -1146,7 +1145,7 @@ dependencies = [
 
 [[package]]
 name = "dash-spv-event-bus"
-version = "0.0.1"
+version = "0.5.1"
 
 [[package]]
 name = "dash-spv-example-app"
@@ -1169,12 +1168,11 @@ dependencies = [
 
 [[package]]
 name = "dash-spv-masternode-processor"
-version = "0.4.18"
+version = "0.5.1"
 dependencies = [
  "base64 0.22.1",
  "bincode",
  "blake3",
- "bls-signatures",
  "dash-spv-crypto",
  "dashcore",
  "dirs-next",
@@ -1189,7 +1187,7 @@ dependencies = [
 
 [[package]]
 name = "dash-spv-platform"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "dapi-grpc",
@@ -1213,7 +1211,7 @@ dependencies = [
 
 [[package]]
 name = "dash_spv_apple_bindings"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "bincode_derive",
