@@ -1127,6 +1127,7 @@ name = "dash-spv-crypto"
 version = "0.0.1"
 dependencies = [
  "bip38",
+ "bitflags 2.9.0",
  "blake3",
  "bls-signatures",
  "byte",

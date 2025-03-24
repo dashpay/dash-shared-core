@@ -2,18 +2,18 @@ use std::ops::Index;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
+use bitflags::bitflags;
 use dashcore::bip32::DerivationPath;
 use dashcore::dip9::{DerivationPathReference, DerivationPathType};
+use dashcore::secp256k1::hashes::hex::DisplayHex;
 use indexmap::{IndexMap, IndexSet};
 use dash_spv_keychain::{KeyChainKey, KeyChainValue, KeychainController};
 use crate::derivation::{IIndexPath, IndexPath, BIP32_HARD};
-use crate::derivation::index_path::IndexHardSoft;
-use crate::keys::{BLSKey, DeriveKey, ECDSAKey, ED25519Key, IKey, KeyError, OpaqueKey};
+use crate::keys::{DeriveKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use crate::keys::key::KeyKind;
 use crate::network::{ChainType, IHaveChainSettings};
 use crate::util::address::address;
-use crate::util::data_ops::short_hex_string_from;
-use crate::util::from_hash160_for_script_map;
+use crate::util::{from_hash160_for_script_map, is_valid_dash_address_for_script_map};
 
 
 pub const SEQUENCE_GAP_LIMIT_EXTERNAL: usize = 10;
@@ -28,17 +28,63 @@ pub const SEQUENCE_DASHPAY_GAP_LIMIT_INCOMING: usize = 6;
 pub const SEQUENCE_DASHPAY_GAP_LIMIT_OUTGOING: usize = 3;
 pub const SEQUENCE_DASHPAY_GAP_LIMIT_INITIAL: usize = 10;
 
+pub trait DefaultGapSettings {
+    fn default_gap_settings(&self) -> RegisterAddressesSettings;
+}
+
 pub struct AddressInfo {
     pub index: u32,
     pub address: String,
     pub is_used: bool,
+    pub standalone: bool,
     pub internal: Option<bool>,
+    pub identity_index: Option<u32>,
+}
+
+#[derive(Clone)]
+pub enum AccountKind {
+    Standalone(StandaloneInfo),
+    Account(AccountInfo),
+}
+impl AccountKind {
+    pub fn is_transient(&self) -> bool {
+        match self {
+            AccountKind::Standalone(_) => true,
+            AccountKind::Account(info) => info.is_transient
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum SecretSource<'a> {
+    Seed(&'a [u8]),
+    ExtendedPrivateKeyData(&'a [u8]),
 }
 
 #[derive(Clone, Debug)]
 pub struct AccountInfo {
     pub account_number: u32,
     pub wallet_unique_id: String,
+    pub is_transient: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct StandaloneInfo {
+    pub extended_public_key_identifier: String
+}
+
+pub trait KeychainAccessible {
+    fn keychain_ref(&self) -> &KeychainController;
+}
+pub trait DBAccessible {
+    fn db_ref(&self) -> &DBController;
+}
+
+pub trait AccountKindAccessible {
+    fn account_ref(&self) -> &AccountKind;
+    fn account_is_transient(&self) -> bool {
+        self.account_ref().is_transient()
+    }
 }
 
 pub enum DerivationError {
@@ -55,36 +101,61 @@ pub enum DerivationStorageContext {
     Index(u32),
     IndexedAddress(u32, String),
     IndexedAddressIdentity(u32, String, u32),
-    InternalAddresses(IndexMap<u32, String>),
-    ExternalAddresses(IndexMap<u32, String>)
+    Addresses(IndexMap<u32, String>, FundsDirection),
 }
 
+bitflags! {
+    #[derive(Clone, PartialEq)]
+    pub struct FundsDirection: u32 {
+        const Internal = 1;
+        const External = 2;
+        const All = Self::Internal.bits() | Self::External.bits();
+    }
+}
 #[derive(Clone)]
 pub enum RegisterAddressesSettings {
     GapLimit(usize),
-    GapLimitInternal(usize, bool),
+    GapLimitFunds(usize, FundsDirection),
     GapLimitIdentity(usize, u32),
 }
 
 pub trait RegisterAddressesWithSettings {
-    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<String>, DerivationError>;
-    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<String>, DerivationError>;
+    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<(u32, String)>, DerivationError>;
+    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<(u32, String)>, DerivationError>;
 }
 
-// pub trait PublicKeyDataAtIndex {
-//     fn public_key_data_at_index(&self, index: u32) -> Vec<u8>;
-//     fn public_key_data_at_index_path<T>(&self, index_path: IndexPath<T>) -> Vec<u8>;
+pub trait KeyDataAtIndexPath<T> {
+    fn private_key_at_index_path(&self, index_path: IndexPath<T>, source: SecretSource) -> Result<OpaqueKey, KeyError>;
+    fn public_key_at_index_path(&self, index_path: IndexPath<T>) -> Result<OpaqueKey, KeyError>;
+    fn public_key_data_at_index_path(&self, index_path: IndexPath<T>) -> Result<Vec<u8>, KeyError>;
+}
+
+#[derive(Clone)]
+pub enum DerivationPathKind {
+    Funds(Funds),
+    IncomingFunds(IncomingFunds),
+    AssetLock(AssetLock),
+    Authentication(Authentication),
+    MasternodeHoldings(MasternodeHoldings),
+}
+
+// impl DefaultGapSettings for DerivationPathKind {
+//     fn default_gap_settings(&self) -> RegisterAddressesSettings {
+//         match self {
+//             DerivationPathKind::Funds(model) => {}
+//             DerivationPathKind::IncomingFunds(model) => {}
+//             DerivationPathKind::AssetLock(..) =>
+//                 RegisterAddressesSettings::GapLimit(5),
+//             DerivationPathKind::MasternodeHoldings(..) =>
+//                 RegisterAddressesSettings::GapLimit(10),
+//             DerivationPathKind::Authentication(model) if model.base.base.path_type == DerivationPathType::SINGLE_USER_AUTHENTICATION =>
+//                 RegisterAddressesSettings::GapLimit(10),
+//             DerivationPathKind::Authentication(model) =>
+//                 RegisterAddressesSettings::GapLimitIdentity(10, 0),
+//         }
+//     }
 // }
 
-#[derive(Clone, Debug)]
-pub enum DerivationPathKind {
-    Funds(FundsDerivationModel),
-    IncomingFunds(IncomingFundsDerivationModel),
-    AssetLock(AssetLockDerivationModel),
-    Authentication(AuthenticationDerivationModel),
-    MasternodeHoldings(MasternodeHoldingsDerivationModel),
-
-}
 impl DerivationPathKind {
     pub fn is_simple_indexed(&self) -> bool {
         match self {
@@ -96,22 +167,33 @@ impl DerivationPathKind {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct FundsDerivationModel {
+#[derive(Clone)]
+pub struct Funds {
     pub base: DerivationPathModel,
     pub all_change_addresses: IndexSet<String>,
     pub all_receive_addresses: IndexSet<String>,
-    pub internal_addresses: IndexSet<String>,
-    pub external_addresses: IndexSet<String>,
+    pub internal_addresses: Vec<(u32, String)>,
+    pub external_addresses: Vec<(u32, String)>,
 
     pub is_for_first_account: bool,
     pub has_known_balance_internal: bool,
     pub checked_initial_has_known_balance: bool,
-
 }
 
-impl FundsDerivationModel {
-    pub fn addresses(&self, internal: bool) -> Vec<String> {
+impl AccountKindAccessible for Funds {
+    fn account_ref(&self) -> &AccountKind {
+        self.base.account_ref()
+    }
+}
+
+impl DBAccessible for Funds {
+    fn db_ref(&self) -> &DBController {
+        self.base.db_ref()
+    }
+}
+
+impl Funds {
+    pub fn addresses(&self, internal: bool) -> Vec<(u32, String)> {
         Vec::from_iter(if internal {
             self.internal_addresses.iter().cloned()
         } else {
@@ -121,17 +203,17 @@ impl FundsDerivationModel {
     /// returns the first unused external address
     pub fn receive_address(&mut self) -> Option<String> {
         //TODO: limit to 10,000 total addresses and utxos for practical usability with bloom filters
-        if let Ok(addr) = self.register_addresses_with_settings(RegisterAddressesSettings::GapLimitInternal(1, false)) {
-            addr.last().cloned()
+        if let Ok(addr) = self.register_addresses_with_settings(RegisterAddressesSettings::GapLimitFunds(1, FundsDirection::External)) {
+            addr.last().map(|(_, address)| address.clone())
         } else {
             self.all_receive_addresses.last().cloned()
         }
     }
     pub fn change_address(&mut self) -> Option<String> {
         //TODO: limit to 10,000 total addresses and utxos for practical usability with bloom filters
-        self.register_addresses_with_settings(RegisterAddressesSettings::GapLimitInternal(1, true))
+        self.register_addresses_with_settings(RegisterAddressesSettings::GapLimitFunds(1, FundsDirection::Internal))
             .ok()
-            .and_then(|addresses| addresses.last().cloned())
+            .and_then(|addresses| addresses.last().map(|(_, address)| address.clone()))
     }
 
     pub fn contains_change_address(&self, address: &str) -> bool {
@@ -154,8 +236,8 @@ impl FundsDerivationModel {
 
     pub fn should_use_reduced_gap_limit(&mut self) -> bool {
         if !self.checked_initial_has_known_balance {
-            if let Some(AccountInfo { wallet_unique_id, .. }) = &self.base.account_info {
-                if let Ok(KeyChainValue::Int64(has_known_balance)) = self.base.controller.keychain_controller.get(KeyChainKey::HasKnownBalanceUniqueIDString { reference: self.base.reference.into(), unique_id: wallet_unique_id.clone() }) {
+            if let AccountKind::Account(AccountInfo { wallet_unique_id, .. }) = self.account_ref() {
+                if let Ok(KeyChainValue::Int64(has_known_balance)) = self.base.keychain_ref().get(KeyChainKey::HasKnownBalanceUniqueIDString { reference: self.base.reference as u32, unique_id: wallet_unique_id.clone() }) {
                     self.has_known_balance_internal = has_known_balance == 1;
                     self.checked_initial_has_known_balance = true;
                 }
@@ -198,15 +280,15 @@ impl FundsDerivationModel {
 
 }
 
-#[derive(Clone, Debug)]
-pub struct IncomingFundsDerivationModel {
+#[derive(Clone)]
+pub struct IncomingFunds {
     pub base: DerivationPathModel,
-    pub external_addresses: IndexSet<String>,
+    pub external_addresses: Vec<(u32, String)>,
     pub contact_source_identity_unique_id: [u8; 32],
     pub contact_destination_identity_unique_id: [u8; 32],
 }
 
-impl IncomingFundsDerivationModel {
+impl IncomingFunds {
     /// returns the first unused external address
     pub fn receive_address(&mut self) -> Option<String> {
         self.receive_address_in_context(self.base.controller.context)
@@ -222,24 +304,36 @@ impl IncomingFundsDerivationModel {
     pub fn receive_address_at_offset_in_context(&mut self, offset: usize, context: *const std::os::raw::c_void) -> Option<String> {
         //TODO: limit to 10,000 total addresses and utxos for practical usability with bloom filters
         if let Ok(addr) = self.register_addresses_with_settings_and_context(RegisterAddressesSettings::GapLimit(offset + 1), context) {
-            addr.last().cloned()
+            addr.last().map(|(_, address)| address).cloned()
         } else {
-            self.external_addresses.last().cloned()
+            self.external_addresses.last().map(|(_, addr)| addr.clone())
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct SimpleIndexedDerivationModel {
+#[derive(Clone)]
+pub struct SimpleIndexed {
     pub base: DerivationPathModel,
-    pub ordered_addresses: IndexSet<String>,
+    pub ordered_addresses: Vec<(u32, String)>,
 }
 
-impl SimpleIndexedDerivationModel {
+impl KeychainAccessible for SimpleIndexed {
+    fn keychain_ref(&self) -> &KeychainController {
+        self.base.keychain_ref()
+    }
+}
+
+impl DBAccessible for SimpleIndexed {
+    fn db_ref(&self) -> &DBController {
+        self.base.db_ref()
+    }
+}
+
+impl SimpleIndexed {
     pub fn first_unused_index(&self) -> usize {
         let mut i = self.ordered_addresses.len();
         // keep only the trailing contiguous block of addresses that aren't used
-        while i > 0 && !self.base.address_is_used(&self.ordered_addresses[i - 1]) {
+        while i > 0 && !self.base.address_is_used(&self.ordered_addresses[i - 1].1) {
             i -= 1;
         }
         i
@@ -261,7 +355,7 @@ impl SimpleIndexedDerivationModel {
                 let addr = address::with_public_key_data(&pub_key, self.base.chain_type.clone());
                 addresses.push(addr.clone());
                 if add_to_cache && self.ordered_addresses.len() == i as usize {
-                    self.ordered_addresses.insert(addr);
+                    self.ordered_addresses.push((i, addr));
                 }
             }
 
@@ -298,30 +392,31 @@ impl SimpleIndexedDerivationModel {
 /// found that haven't been used in any transactions. This method returns an array of <gapLimit> unused addresses
 /// following the last used address in the chain. The internal chain is used for change addresses and the external chain
 /// for receive addresses.
-impl RegisterAddressesWithSettings for FundsDerivationModel {
-    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<String>, DerivationError> {
+impl RegisterAddressesWithSettings for Funds {
+    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<(u32, String)>, DerivationError> {
         self.register_addresses_with_settings_and_context(settings, self.base.controller.context)
     }
 
-    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<String>, DerivationError> {
+    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<(u32, String)>, DerivationError> {
         match settings {
-            RegisterAddressesSettings::GapLimitInternal(gap_limit, internal) => {
-                if !self.base.is_transient {
+            RegisterAddressesSettings::GapLimitFunds(gap_limit, direction) => {
+                if !self.account_is_transient() {
                     return Err(DerivationError::AddressesMustBeLoaded);
                 }
-                let mut a = self.addresses(internal);
-                let mut i = a.len();
+                let mut ret = self.addresses(direction == FundsDirection::Internal);
+                let mut i = ret.len();
 
                 // keep only the trailing contiguous block of addresses with no transactions
-                while i > 0 && !self.base.address_is_used(&a[i - 1]) {
+                while i > 0 && !self.base.address_is_used(&ret[i - 1].1) {
                     i -= 1;
                 }
 
                 if i > 0 {
-                    a = a[i..].to_vec();
+                    ret.drain(..i);
                 }
-                if a.len() >= gap_limit {
-                    return Ok(a[..gap_limit].to_vec());
+                if ret.len() >= gap_limit {
+                    ret.drain(gap_limit..);
+                    return Ok(ret);
                 }
 
                 if gap_limit > 1 { // get receiveAddress and changeAddress first to avoid blocking
@@ -330,32 +425,33 @@ impl RegisterAddressesWithSettings for FundsDerivationModel {
                 }
 
                 //It seems weird to repeat this, but it's correct because of the original call receive address and change address
-                a = self.addresses(internal);
-                i = a.len();
+                ret = self.addresses(direction == FundsDirection::Internal);
+                i = ret.len();
 
                 let mut n = i as u32;
 
                 // keep only the trailing contiguous block of addresses with no transactions
-                while i > 0 && !self.base.address_is_used(&a[i - 1]) {
+                while i > 0 && !self.base.address_is_used(&ret[i - 1].1) {
                     i -= 1;
                 }
                 if i > 0 {
-                    a = a[i..].to_vec();
+                    ret.drain(..i);
                 }
-                if a.len() >= gap_limit {
-                    return Ok(a[..gap_limit].to_vec());
+                if ret.len() >= gap_limit {
+                    ret.drain(gap_limit..);
+                    return Ok(ret);
                 }
                 let mut add_addresses = IndexMap::new();
-                while a.len() < gap_limit { // generate new addresses up to gapLimit
-                    let pub_key = self.public_key_data_at_index(n, internal).map_err(DerivationError::from)?;
+                while ret.len() < gap_limit { // generate new addresses up to gapLimit
+                    let pub_key = self.public_key_data_at_index(n, direction == FundsDirection::Internal).map_err(DerivationError::from)?;
                     if let Some(addr) = ECDSAKey::address_from_public_key_data(&pub_key, self.base.chain_type.clone()) {
                         self.base.all_addresses.insert(addr.clone());
-                        if internal {
-                            self.internal_addresses.insert(addr.clone());
+                        if direction == FundsDirection::Internal {
+                            self.internal_addresses.push((n, addr.clone()));
                         } else {
-                            self.external_addresses.insert(addr.clone());
+                            self.external_addresses.push((n, addr.clone()));
                         }
-                        a.push(addr.clone());
+                        ret.push((n, addr.clone()));
                         add_addresses.insert(n, addr);
                         n += 1;
                     } else {
@@ -364,72 +460,82 @@ impl RegisterAddressesWithSettings for FundsDerivationModel {
                     }
                 }
 
-                if !self.base.is_transient {
-                    let storage_context = if internal { DerivationStorageContext::InternalAddresses(add_addresses) } else { DerivationStorageContext::ExternalAddresses(add_addresses) };
-                    self.base.controller.store_in_context(context, storage_context);
+                if !self.account_is_transient() {
+                    self.db_ref().store_in_context(context, DerivationStorageContext::Addresses(add_addresses, direction));
                 }
-                Ok(a)
+                Ok(ret)
             }
             settings => Err(DerivationError::UnsupportedSettings(settings))
         }
     }
 }
-
-impl RegisterAddressesWithSettings for IncomingFundsDerivationModel {
-    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<String>, DerivationError> {
+impl AccountKindAccessible for IncomingFunds {
+    fn account_ref(&self) -> &AccountKind {
+        self.base.account_ref()
+    }
+}
+impl DBAccessible for IncomingFunds {
+    fn db_ref(&self) -> &DBController {
+        self.base.db_ref()
+    }
+}
+impl RegisterAddressesWithSettings for IncomingFunds {
+    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<(u32, String)>, DerivationError> {
         self.register_addresses_with_settings_and_context(settings, self.base.controller.context)
     }
 
-    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<String>, DerivationError> {
+    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<(u32, String)>, DerivationError> {
         match settings {
             RegisterAddressesSettings::GapLimit(gap_limit) => {
-                if !self.base.is_transient {
-                    if !self.base.addresses_loaded {
+                if !self.account_is_transient() {
+                    if !self.base.controller.addresses_loaded {
                         sleep(Duration::from_millis(1000)); //quite hacky, we need to fix this
                     }
-                    if !self.base.addresses_loaded {
+                    if !self.base.controller.addresses_loaded {
                         return Err(DerivationError::AddressesMustBeLoaded);
                     }
                 }
-                let mut a= Vec::from(self.external_addresses.iter().cloned());
-                let mut i = a.len();
+                let mut ret = Vec::from(self.external_addresses.iter().cloned());
+                let mut i = ret.len();
                 // keep only the trailing contiguous block of addresses with no transactions
-                while i > 0 && !self.base.address_is_used(&a[i - 1]) {
+                while i > 0 && !self.base.address_is_used(&ret[i - 1]) {
                     i -= 1;
                 }
                 if i > 0 {
-                    a = a[i..].to_vec();
+                    ret.drain(..i);
                 }
-                if a.len() >= gap_limit {
-                    return Ok(a[..gap_limit].to_vec());
+                if ret.len() >= gap_limit {
+                    ret.drain(gap_limit..);
+                    return Ok(ret);
                 }
                 if gap_limit > 1 {
                     // get receiveAddress and changeAddress first to avoid blocking
                     let _ = self.receive_address_in_context(context);
                 }
                 // It seems weird to repeat this, but it's correct because of the original call receive address and change address
-                a = Vec::from_iter(self.external_addresses.clone());
-                i = a.len();
+                ret = Vec::from_iter(self.external_addresses.clone());
+                i = ret.len();
 
                 let mut n = i as u32;
 
                 // keep only the trailing contiguous block of addresses with no transactions
-                while i > 0 && !self.base.address_is_used(&a[i - 1]) {
+                while i > 0 && !self.base.address_is_used(&ret[i - 1]) {
                     i -= 1;
                 }
 
                 if i > 0 {
-                    a = a[i..].to_vec();
+                    ret.drain(..i);
                 }
-                if a.len() >= gap_limit {
-                    return Ok(a[..gap_limit].to_vec());
+                if ret.len() >= gap_limit {
+                    ret.drain(gap_limit..);
+                    return Ok(ret);
                 }
 
                 let mut upper_limit = gap_limit;
-                while a.len() < upper_limit { // generate new addresses up to gapLimit
+                while ret.len() < upper_limit { // generate new addresses up to gapLimit
                     let pub_key = self.public_key_data_at_index(n);
                     if let Some(address) = ECDSAKey::address_from_public_key_data(&pub_key, self.base.chain_type.clone()) {
-                        if !self.base.is_transient {
+                        if !self.account_is_transient() {
                             let is_used = self.base.store_new_address_in_context(address.clone(), n, context);
                             if is_used {
                                 self.base.used_addresses.insert(address.clone());
@@ -437,8 +543,8 @@ impl RegisterAddressesWithSettings for IncomingFundsDerivationModel {
                             }
                         }
                         self.base.all_addresses.insert(address.clone());
-                        self.external_addresses.insert(address.clone());
-                        a.push(address);
+                        self.external_addresses.push((n , address.clone()));
+                        ret.push(address);
                         n += 1;
 
                     } else {
@@ -446,88 +552,102 @@ impl RegisterAddressesWithSettings for IncomingFundsDerivationModel {
                         return Err(DerivationError::PublicKeyGeneration);
                     }
                 }
-                Ok(a)
+                Ok(ret)
             },
             settings => Err(DerivationError::UnsupportedSettings(settings))
         }
     }
 }
 
-impl RegisterAddressesWithSettings for SimpleIndexedDerivationModel {
-    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<String>, DerivationError> {
+impl AccountKindAccessible for SimpleIndexed {
+    fn account_ref(&self) -> &AccountKind {
+        self.base.account_ref()
+    }
+}
+impl RegisterAddressesWithSettings for SimpleIndexed {
+    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<(u32, String)>, DerivationError> {
         self.register_addresses_with_settings_and_context(settings, self.base.controller.context)
     }
 
-    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<String>, DerivationError> {
+    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<(u32, String)>, DerivationError> {
         match settings {
             RegisterAddressesSettings::GapLimit(gap_limit) => {
-                let mut r_array = Vec::from_iter(self.ordered_addresses.clone());
-                if !self.base.is_transient {
-                    if !self.base.addresses_loaded {
+                let mut ret = Vec::from_iter(self.ordered_addresses.clone());
+                if !self.account_is_transient() {
+                    if !self.base.controller.addresses_loaded {
                         return Err(DerivationError::AddressesMustBeLoaded);
                     }
                 }
-                let mut i = r_array.len();
+                let mut i = ret.len();
                 // keep only the trailing contiguous block of addresses that aren't used
-                while i > 0 && !self.base.address_is_used(&r_array[i - 1]) {
+                while i > 0 && !self.base.address_is_used(&ret[i - 1].1) {
                     i -= 1;
                 }
                 if i > 0 {
-                    // TODO: check i.. or i+1..
-                    // [rArray removeObjectsInRange:NSMakeRange(0, i)];
-                    r_array = r_array[i..].to_vec();
+                    ret.drain(..i);
                 }
-                if r_array.len() >= gap_limit {
-                    return Ok(r_array[..gap_limit].to_vec());
+                if ret.len() >= gap_limit {
+                    ret.drain(gap_limit..);
+                    return Ok(ret);
                 }
                 //It seems weird to repeat this, but it's correct because of the original call receive address and change address
-                r_array = Vec::from_iter(self.ordered_addresses.clone());
-                i = r_array.len();
+                ret = Vec::from_iter(self.ordered_addresses.clone());
+                i = ret.len();
                 let mut n = i as u32;
 
                 // keep only the trailing contiguous block of addresses with no transactions
-                while i > 0 && !self.base.address_is_used(&r_array[i - 1]) {
+                while i > 0 && !self.base.address_is_used(&ret[i - 1].1) {
                     i -= 1;
                 }
                 if i > 0 {
-                    // TODO: check i.. or i+1..
-                    // [rArray removeObjectsInRange:NSMakeRange(0, i)];
-                    r_array = r_array[i..].to_vec();
+                    ret.drain(..i);
                 }
-                if r_array.len() >= gap_limit {
-                    Ok(r_array[..gap_limit].to_vec())
+                if ret.len() >= gap_limit {
+                    ret.drain(gap_limit..);
+                    Ok(ret)
                 } else {
-                    while r_array.len() < gap_limit { // generate new addresses up to gapLimit
-                        let pub_key = self.base.public_key_data_at_index(n);
+                    while ret.len() < gap_limit { // generate new addresses up to gapLimit
+
+                        let pub_key = self.base.public_key_data_at_index_path(IndexPath::index_path_with_index(n))?;
                         let addr = address::with_public_key_data(&pub_key, self.base.chain_type.clone());
-                        if !self.base.is_transient {
+                        if !self.account_is_transient() {
                             self.base.store_new_address_in_context(&addr, n, context);
                         }
                         self.base.all_addresses.insert(addr.clone());
-                        r_array.push(addr.clone());
-                        self.ordered_addresses.insert(addr);
+                        ret.push((n, addr.clone()));
+                        self.ordered_addresses.push((n, addr));
                         n += 1;
                     }
-                    Ok(r_array)
+                    Ok(ret)
                 }
             },
             settings => Err(DerivationError::UnsupportedSettings(settings))
         }
     }
 }
+impl AccountKindAccessible for Authentication {
+    fn account_ref(&self) -> &AccountKind {
+        self.base.account_ref()
+    }
+}
+impl DBAccessible for Authentication {
+    fn db_ref(&self) -> &DBController {
+        self.base.db_ref()
+    }
+}
 
-impl RegisterAddressesWithSettings for AuthenticationDerivationModel {
-    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<String>, DerivationError> {
+impl RegisterAddressesWithSettings for Authentication {
+    fn register_addresses_with_settings(&mut self, settings: RegisterAddressesSettings) -> Result<Vec<(u32, String)>, DerivationError> {
         self.register_addresses_with_settings_and_context(settings, self.base.base.controller.context)
     }
 
-    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<String>, DerivationError> {
+    fn register_addresses_with_settings_and_context(&mut self, settings: RegisterAddressesSettings, context: *const std::os::raw::c_void) -> Result<Vec<(u32, String)>, DerivationError> {
         match settings {
             RegisterAddressesSettings::GapLimit(..) =>
                 self.base.register_addresses_with_settings_and_context(settings, context),
             RegisterAddressesSettings::GapLimitIdentity(gap_limit, identity_index) => {
-                if !self.base.base.is_transient {
-                    if !self.base.base.addresses_loaded {
+                if !self.account_is_transient() {
+                    if !self.base.base.controller.addresses_loaded {
                         return Err(DerivationError::AddressesMustBeLoaded);
                     }
                     assert_ne!(self.base.base.path_type, DerivationPathType::SINGLE_USER_AUTHENTICATION, "This should not be called for single user authentication. Use '- (NSArray *)registerAddressesWithGapLimit:(NSUInteger)gapLimit error:(NSError**)error' instead.");
@@ -537,42 +657,40 @@ impl RegisterAddressesWithSettings for AuthenticationDerivationModel {
                     if !self.addresses_by_identity.get(&identity_index) {
                         self.addresses_by_identity.insert(identity_index, vec![]);
                     }
-                    let mut a = self.addresses_by_identity.get(&identity_index).cloned().unwrap();
-                    let mut i = a.len();
+                    let mut ret = self.addresses_by_identity.get(&identity_index).cloned().unwrap();
+                    let mut i = ret.len();
 
                     // keep only the trailing contiguous block of addresses with no transactions
-                    while i > 0 && !self.base.base.address_is_used(&a[i - 1]) {
+                    while i > 0 && !self.base.base.address_is_used(&ret[i - 1].1) {
                         i -= 1;
                     }
                     if i > 0 {
-                        // TODO: check i.. or i+1..
-                        // [rArray removeObjectsInRange:NSMakeRange(0, i)];
-                        a = a[i..].to_vec();
+                        ret.drain(..i);
                     }
-                    if a.len() >= gap_limit {
-                        return Ok(a[..gap_limit].to_vec());
+                    if ret.len() >= gap_limit {
+                        ret.drain(gap_limit..);
+                        return Ok(ret);
                     }
 
                     //It seems weird to repeat this, but it's correct because of the original call receive address and change address
-                    a = self.addresses_by_identity.get(&identity_index).cloned().unwrap();
-                    i = a.len();
+                    ret = self.addresses_by_identity.get(&identity_index).cloned().unwrap();
+                    i = ret.len();
 
                     let mut n = i as u32;
 
                     // keep only the trailing contiguous block of addresses with no transactions
-                    while i > 0 && !self.base.base.address_is_used(&a[i - 1]) {
+                    while i > 0 && !self.base.base.address_is_used(&ret[i - 1].1) {
                         i -= 1;
                     }
                     if i > 0 {
-                        // TODO: check i.. or i+1..
-                        // [rArray removeObjectsInRange:NSMakeRange(0, i)];
-                        a = a[i..].to_vec();
+                        ret.drain(..i);
                     }
-                    if a.len() >= gap_limit {
-                        return Ok(a[..gap_limit].to_vec());
+                    if ret.len() >= gap_limit {
+                        ret.drain(gap_limit..);
+                        return Ok(ret);
                     }
 
-                    while a.len() < gap_limit {
+                    while ret.len() < gap_limit {
                         // generate new addresses up to gapLimit
                         let hardened_indexes = vec![identity_index | BIP32_HARD, n | BIP32_HARD];
                         let soft_indexes = vec![identity_index, n];
@@ -580,14 +698,14 @@ impl RegisterAddressesWithSettings for AuthenticationDerivationModel {
                         let pub_key = self.base.base.public_key_data_at_index_path(IndexPath::new(indexes)).map_err(DerivationError::from)?;
                         let addr = address::with_public_key_data(&pub_key, self.base.base.chain_type.clone());
                         if let Ok(addr) = addr {
-                            if !self.base.base.is_transient {
-                                self.base.base.controller.store_in_default_context(DerivationStorageContext::IndexedAddressIdentity(n, addr, identity_index));
+                            if !self.account_is_transient() {
+                                self.db_ref().store_in_default_context(DerivationStorageContext::IndexedAddressIdentity(n, addr, identity_index));
                             }
                             self.base.base.all_addresses.insert(addr.clone());
                             if let Some(addrs) = self.addresses_by_identity.get_mut(&identity_index) {
                                 addrs.push(addr);
                             }
-                            a.push(addr);
+                            ret.push(addr);
                             n += 1;
 
                         } else {
@@ -595,7 +713,7 @@ impl RegisterAddressesWithSettings for AuthenticationDerivationModel {
                         }
 
                     }
-                    Ok(a)
+                    Ok(ret)
                 }
 
             },
@@ -604,105 +722,94 @@ impl RegisterAddressesWithSettings for AuthenticationDerivationModel {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct AssetLockDerivationModel {
-    pub base: SimpleIndexedDerivationModel,
+#[derive(Clone)]
+pub struct AssetLock {
+    pub base: SimpleIndexed,
 
 }
 
-#[derive(Clone, Debug)]
-pub struct AuthenticationDerivationModel {
-    pub base: SimpleIndexedDerivationModel,
+#[derive(Clone)]
+pub struct Authentication {
+    pub base: SimpleIndexed,
     pub use_hardened_keys: bool,
     pub should_store_extended_private_key: bool,
-    pub addresses_by_identity: IndexMap<u32, Vec<String>>,
+    pub addresses_by_identity: IndexMap<u32, Vec<(u32, String)>>,
+}
+impl KeychainAccessible for DerivationPathModel {
+    fn keychain_ref(&self) -> &KeychainController {
+        self.controller.keychain_controller.as_ref()
+    }
 }
 
-impl AuthenticationDerivationModel {
+impl KeychainAccessible for Authentication {
+    fn keychain_ref(&self) -> &KeychainController {
+        self.base.keychain_ref()
+    }
+}
+
+impl Authentication {
     pub fn has_extended_private_key(&self) -> bool {
-        if let Ok(true) = self.base.base.controller.keychain_controller.has(KeyChainKey::WalletBasedExtendedPrivateKeyLocationString { unique_id: self.base.base.unique_id.clone() }) {
-            true
-        } else {
-            false
+        if let AccountKind::Account(AccountInfo { wallet_unique_id, ..}) = self.account_ref() {
+            if let Ok(true) = self.keychain_ref().has(KeyChainKey::wallet_based_extended_private_key_location_string(wallet_unique_id)) {
+                return true;
+            }
         }
+        false
     }
     pub fn extended_private_key_data(&self) -> Option<Vec<u8>> {
-        if let Ok(KeyChainValue::Bytes(data)) = self.base.base.controller.keychain_controller.get(KeyChainKey::WalletBasedExtendedPrivateKeyLocationString { unique_id: self.base.base.unique_id.clone() }) {
-            Some(data)
-        } else {
-            None
+        if let AccountKind::Account(AccountInfo { wallet_unique_id, ..}) = self.account_ref() {
+            if let Ok(KeyChainValue::Bytes(data)) = self.keychain_ref().get(KeyChainKey::wallet_based_extended_private_key_location_string(wallet_unique_id)) {
+                return Some(data);
+            }
         }
+        None
     }
 
-    pub fn first_unused_public_key(&self) -> Option<Vec<u8>> {
-        let first_unused_index = self.base.first_unused_index();
-        self.base.base.public_key_data_at_index(first_unused_index as u32)
+    pub fn first_unused_public_key(&self) -> Result<Vec<u8>, KeyError> {
+        let index_path = IndexPath::index_path_with_index(self.base.first_unused_index() as u32);
+        self.base.base.public_key_data_at_index_path(index_path)
     }
 
     //
-    // - (NSData *)firstUnusedPublicKey {
-    // return [self publicKeyDataAtIndex:(uint32_t)[self firstUnusedIndex]];
-    // }
-
     pub fn first_unused_private_key_from_seed(&self, seed: &[u8]) -> Result<OpaqueKey, KeyError> {
-        let first_unused_index = self.base.first_unused_index();
-        let index_path = IndexPath::index_path_with_index(first_unused_index as u32);
-        self.base.base.private_key_at_index_path(index_path, seed)
+        let index_path = IndexPath::index_path_with_index(self.base.first_unused_index() as u32);
+        self.base.base.private_key_at_index_path(index_path, SecretSource::Seed(seed))
     }
 
     pub fn private_key_at_index_path(&self, index_path: IndexPath<u32>) -> Result<OpaqueKey, KeyError> {
         if let Some(ext_prv_key_data) = self.extended_private_key_data() {
-            match self.base.base.signing_algorithm {
-                KeyKind::ECDSA => ECDSAKey::key_with_extended_private_key_data(&ext_prv_key_data)
-                    .and_then(|key| key.private_derive_to_path(&index_path))
-                    .map(OpaqueKey::ECDSA),
-                KeyKind::ED25519 => ED25519Key::key_with_extended_private_key_data(&ext_prv_key_data)
-                    .and_then(|key| key.private_derive_to_path(&index_path))
-                    .map(OpaqueKey::ED25519),
-                _ => BLSKey::key_with_extended_private_key_data(&ext_prv_key_data, self.base.base.signing_algorithm == KeyKind::BLS)
-                    .and_then(|key| key.private_derive_to_path(&index_path))
-                    .map(OpaqueKey::BLS)
-            }
+            self.base.base.signing_algorithm.private_key_at_index_path_u32(index_path, &ext_prv_key_data)
         } else {
             Err(KeyError::UnableToDerive)
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct MasternodeHoldingsDerivationModel {
-    pub base: SimpleIndexedDerivationModel,
+#[derive(Clone)]
+pub struct MasternodeHoldings {
+    pub base: SimpleIndexed,
 }
 
-impl FundsDerivationModel {
-    pub fn contains_change_address(&self, address: &str) -> bool {
-        self.all_change_addresses.contains(address)
+#[derive(Clone)]
+pub struct DBController {
+    pub context: *const std::os::raw::c_void,
+    pub store_in_context: Arc<dyn Fn(*const std::os::raw::c_void, DerivationStorageContext) -> bool + Send + Sync>,
+    pub load_in_context: Arc<dyn Fn(*const std::os::raw::c_void, DerivationStorageContext) -> Vec<AddressInfo> + Send + Sync>,
+}
+impl DBController {
+    pub fn new<
+        SC: Fn(*const std::os::raw::c_void, DerivationStorageContext) -> bool + Send + Sync + 'static,
+        LAC: Fn(*const std::os::raw::c_void, DerivationStorageContext) -> Vec<AddressInfo> + Send + Sync + 'static,
+    >(store_in_context: SC, load_in_context: LAC, context: *const std::os::raw::c_void) -> DBController {
+        Self {
+            context,
+            store_in_context: Arc::new(store_in_context),
+            load_in_context: Arc::new(load_in_context),
+        }
     }
 }
 
-
-
-#[derive(Clone, Debug)]
-pub struct DerivationPathController {
-    pub context: *const std::os::raw::c_void,
-    pub keychain_controller: Arc<KeychainController>,
-    // pub db_controller: Arc<DB>
-    // pub get_stored_context: Arc<dyn Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync>,
-    // pub set_stored_context: Arc<dyn Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync>,
-
-    pub store_in_context: Arc<dyn Fn(*const std::os::raw::c_void, DerivationStorageContext) -> bool + Send + Sync>,
-    pub load_addresses_in_context: Arc<dyn Fn(*const std::os::raw::c_void, DerivationStorageContext) -> Vec<AddressInfo> + Send + Sync>,
-    // - (void)storeNewAddressInContext:(NSString *)address
-    // atIndex:(uint32_t)n
-    // context:(NSManagedObjectContext *)context {
-    //
-
-    // pub context: Arc<FFIThreadSafeContext>
-    // pub core_data_controller:
-        // pub context_controller:
-    // pub context: Arc<FFIThreadSafeContext>
-}
-impl DerivationPathController {
+impl DBController {
     pub fn store_new_address(&self, address: &str, index: u32) -> bool {
         (self.store_in_context)(self.context, DerivationStorageContext::IndexedAddress(index, address.to_string()))
     }
@@ -717,10 +824,34 @@ impl DerivationPathController {
         (self.store_in_context)(self.context, data)
     }
 
-    pub fn load_addresses_in_context(&self, context: *const std::os::raw::c_void)
+    pub fn load_addresses_in_context(&self, context: *const std::os::raw::c_void) -> Vec<AddressInfo> {
+        (self.load_in_context)(context)
+    }
+
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+pub struct DerivationPathController {
+    pub context: *const std::os::raw::c_void,
+    pub keychain_controller: Arc<KeychainController>,
+    pub db_controller: Arc<DBController>,
+    pub addresses_loaded: bool,
+
+    // pub db_controller: Arc<DB>
+    // pub get_stored_context: Arc<dyn Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync>,
+    // pub set_stored_context: Arc<dyn Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync>,
+
+    // - (void)storeNewAddressInContext:(NSString *)address
+    // atIndex:(uint32_t)n
+    // context:(NSManagedObjectContext *)context {
+    //
+
+    // pub context: Arc<FFIThreadSafeContext>
+    // pub core_data_controller:
+        // pub context_controller:
+    // pub context: Arc<FFIThreadSafeContext>
+}
+#[derive(Clone)]
 pub struct DerivationPathModel {
     pub chain_type: ChainType,
     pub kind: DerivationPathKind,
@@ -730,27 +861,42 @@ pub struct DerivationPathModel {
     pub reference: DerivationPathReference,
     pub signing_algorithm: KeyKind,
 
-    pub account_info: Option<AccountInfo>,
-    // pub unique_id: String,
+    pub account_kind: AccountKind,
 
-    pub is_transient: bool,
     pub controller: DerivationPathController,
 
     pub all_addresses: IndexSet<String>,
     pub used_addresses: IndexSet<String>,
-    pub addresses_loaded: bool,
     /// master public key used to generate wallet addresses
     pub extended_pub_key: Option<OpaqueKey>,
+}
 
+impl AccountKindAccessible for DerivationPathModel {
+    fn account_ref(&self) -> &AccountKind {
+        &self.account_kind
+    }
+}
+
+impl DBAccessible for DerivationPathModel {
+    fn db_ref(&self) -> &DBController {
+        self.controller.db_controller.as_ref()
+    }
 }
 
 impl DerivationPathModel {
     pub fn new<
         SC: Fn(*const std::os::raw::c_void, DerivationStorageContext) -> bool + Send + Sync + 'static,
+        LAC: Fn(*const std::os::raw::c_void, DerivationStorageContext) -> Vec<AddressInfo> + Send + Sync + 'static,
     >(
         keychain_controller: Arc<KeychainController>,
         store_in_context: SC,
-        is_transient: bool,
+        load_addresses_in_context: LAC,
+        account_kind: AccountKind,
+        kind: DerivationPathKind,
+        path_type: DerivationPathType,
+        path: DerivationPath,
+        reference: DerivationPathReference,
+        signing_algorithm: KeyKind,
         context: *const std::os::raw::c_void,
         chain_type: ChainType
     ) -> Self {
@@ -758,32 +904,49 @@ impl DerivationPathModel {
 
         Self {
             chain_type,
-            addresses_loaded: false,
-            is_transient,
+            kind,
+            path,
+            path_type,
+            reference,
+            signing_algorithm,
+            account_kind,
             all_addresses: IndexSet::new(),
             used_addresses: IndexSet::new(),
             controller: DerivationPathController {
                 context,
                 keychain_controller,
-
-                store_in_context: Arc::new(store_in_context),
-            }
+                db_controller: Arc::new(DBController::new(store_in_context, load_addresses_in_context, context)),
+                addresses_loaded: false,
+            },
+            extended_pub_key: None,
         }
     }
-
     pub fn extended_public_key_keychain_key(&self) -> KeyChainKey {
-        if self.wallet && (self.path.len() > 0 || self.reference == DerivationPathReference::Root) {
-            KeyChainKey::WalletBasedExtendedPublicKeyLocationString { unique_id: self.unique_id.clone() }
-        } else {
-            KeyChainKey::StandaloneExtendedPublicKeyLocationString { extended_public_key_identifier: self.unique_id.clone() }
+        match self.account_ref() {
+            AccountKind::Standalone(StandaloneInfo { extended_public_key_identifier, .. }) =>
+                KeyChainKey::standalone_extended_public_key_location_string(extended_public_key_identifier),
+            AccountKind::Account(AccountInfo { wallet_unique_id, .. }) =>
+                KeyChainKey::wallet_based_extended_public_key_location_string(wallet_unique_id),
         }
+        // let keychain_location = match &self.account_info {
+        //     Some(AccountInfo { wallet_unique_id, .. }) if self.path.len() > 0 || self.reference == DerivationPathReference::Root =>
+        //         KeyChainKey::WalletBasedExtendedPublicKeyLocationString { unique_id: wallet_unique_id.clone() },
+        //     _ =>
+        //         KeyChainKey::StandaloneExtendedPublicKeyLocationString { extended_public_key_identifier: self.unique_id.clone() }
+        // };
+        //
+        // if self.account_info.is_some() && (self.path.len() > 0 || self.reference == DerivationPathReference::Root) {
+        //     KeyChainKey::WalletBasedExtendedPublicKeyLocationString { unique_id: self.unique_id.clone() }
+        // } else {
+        //     KeyChainKey::StandaloneExtendedPublicKeyLocationString { extended_public_key_identifier: self.unique_id.clone() }
+        // }
     }
     pub fn extended_public_key(&self) -> Result<OpaqueKey, KeyError> {
         if let Some(ext_pub_key) = &self.extended_pub_key {
             Ok(ext_pub_key.clone())
         } else {
             let key = self.extended_public_key_keychain_key();
-            if let Ok(KeyChainValue::Bytes(data)) = self.controller.keychain_controller.get(key) {
+            if let Ok(KeyChainValue::Bytes(data)) = self.keychain_ref().get(key) {
                 self.signing_algorithm.key_with_extended_public_key_data(&data)
             } else {
                 Err(KeyError::Any("Unable to get extended public key".to_string()))
@@ -795,7 +958,7 @@ impl DerivationPathModel {
             return true;
         }
         let key = self.extended_public_key_keychain_key();
-        if let Ok(true) = self.controller.keychain_controller.has(key) {
+        if let Ok(true) = self.keychain_ref().has(key) {
             true
         } else {
             false
@@ -819,10 +982,10 @@ impl DerivationPathModel {
         self.extended_pub_key = Some(key.clone());
         if let Some(wallet_unique_id) = store_under_wallet_unique_id {
             let pub_key_data = key.extended_public_key_data()?;
-            let _ = self.controller.keychain_controller.set(KeyChainKey::wallet_based_extended_public_key_location_string(wallet_unique_id.clone()), KeyChainValue::Bytes(pub_key_data), false);
+            let _ = self.keychain_ref().set(KeyChainKey::wallet_based_extended_public_key_location_string(wallet_unique_id.as_str()), KeyChainValue::Bytes(pub_key_data), false);
             if store_private_key {
                 let prv_key_data = key.extended_private_key_data()?;
-                let _ = self.controller.keychain_controller.set(KeyChainKey::wallet_based_extended_private_key_location_string(wallet_unique_id.to_string()), KeyChainValue::Bytes(prv_key_data.to_vec()), true);
+                let _ = self.keychain_ref().set(KeyChainKey::wallet_based_extended_private_key_location_string(wallet_unique_id.as_str()), KeyChainValue::Bytes(prv_key_data.to_vec()), true);
             }
         }
         Ok(key)
@@ -848,30 +1011,25 @@ impl DerivationPathModel {
         self.extended_pub_key = Some(child_key.clone());
         if let Some(wallet_unique_id) = store_under_wallet_unique_id {
             let pub_key_data = child_key.extended_public_key_data()?;
-            let _ = self.controller.keychain_controller.set(KeyChainKey::wallet_based_extended_public_key_location_string(wallet_unique_id), KeyChainValue::Bytes(pub_key_data), false);
+            let _ = self.keychain_ref().set(KeyChainKey::wallet_based_extended_public_key_location_string(wallet_unique_id.as_str()), KeyChainValue::Bytes(pub_key_data), false);
         }
         Ok(child_key)
     }
 
 
-    pub fn private_key_at_index_path(&self, index_path: IndexPath<u32>, seed: &[u8]) -> Result<OpaqueKey, KeyError> {
+    pub fn private_key_at_index_path(&self, index_path: IndexPath<u32>, source: SecretSource) -> Result<OpaqueKey, KeyError> {
         if self.path.is_empty() {
             Err(KeyError::UnableToDerive)
         } else {
-            let top_key = self.signing_algorithm.key_with_seed_data(seed)?;
-            match top_key {
-                OpaqueKey::ECDSA(key) =>
-                    key.private_derive_to_path(self)
-                        .and_then(|key| key.private_derive_to_path(&index_path))
-                        .map(OpaqueKey::ECDSA),
-                OpaqueKey::BLS(key) => key.private_derive_to_path(self)
-                    .and_then(|key| key.private_derive_to_path(&index_path))
-                    .map(OpaqueKey::BLS),
-
-                OpaqueKey::ED25519(key) => key.private_derive_to_path(self)
-                    .and_then(|key| key.private_derive_to_path(&index_path))
-                    .map(OpaqueKey::ED25519),
-
+            match source {
+                SecretSource::Seed(seed) => {
+                    let top_key = self.signing_algorithm.key_with_seed_data(seed)?;
+                    let key = top_key.private_derive_to_path(self)?;
+                    key.private_derive_to_path(&index_path)
+                }
+                SecretSource::ExtendedPrivateKeyData(data) => {
+                    self.signing_algorithm.derive_key_from_extended_private_key_data_for_index_path_u32(data, index_path)
+                }
             }
         }
     }
@@ -879,10 +1037,10 @@ impl DerivationPathModel {
 
 
     pub fn store_new_address(&self, address: &str, index: u32) -> bool {
-        self.controller.store_new_address(address, index)
+        self.db_ref().store_new_address(address, index)
     }
     pub fn store_new_address_in_context(&self, address: &str, index: u32, context: *const std::os::raw::c_void) -> bool {
-        self.controller.store_new_address_in_context(address, index, context)
+        self.db_ref().store_new_address_in_context(address, index, context)
     }
 
     /// true if the address is controlled by the wallet
@@ -907,16 +1065,151 @@ impl DerivationPathModel {
             DerivationPathKind::Funds(model) =>
                 model.index_path_of_known_address(address),
             DerivationPathKind::IncomingFunds(model) =>
-                model.external_addresses.get_index_of(address)
-                    .map(|index| IndexPath::index_path_with_index(index as u32)),
-            DerivationPathKind::AssetLock(AssetLockDerivationModel { base, .. }) |
-            DerivationPathKind::Authentication(AuthenticationDerivationModel { base, .. }) |
-            DerivationPathKind::MasternodeHoldings(MasternodeHoldingsDerivationModel { base, .. }) =>
-                base.ordered_addresses.get_index_of(address)
-                    .map(|index| IndexPath::index_path_with_index(index as u32)),
+                model.external_addresses.iter()
+                    .find_map(|(index, addr)| addr.eq(address)
+                        .then_some(IndexPath::index_path_with_index(*index))),
+            DerivationPathKind::AssetLock(AssetLock { base, .. }) |
+            DerivationPathKind::Authentication(Authentication { base, .. }) |
+            DerivationPathKind::MasternodeHoldings(MasternodeHoldings { base, .. }) =>
+                base.ordered_addresses.iter()
+                    .find_map(|(index, addr)| addr.eq(address)
+                        .then_some(IndexPath::index_path_with_index(*index))),
         }
     }
-    pub fn public_key_data_at_index_path(&self, index_path: IndexPath<u32>) -> Result<Vec<u8>, KeyError> {
+
+    /// inform the derivation path that the address has been used by a transaction, true if the derivation path contains the address
+    pub fn register_transaction_address(&mut self, address: &str) -> bool {
+        let contains = self.contains_address(address);
+        if contains && !self.address_is_used(address) {
+            self.used_addresses.insert(address.to_string());
+            let _addresses = match &mut self.kind {
+                DerivationPathKind::Funds(model) if model.contains_change_address(address) =>
+                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimitFunds(SEQUENCE_GAP_LIMIT_INTERNAL, FundsDirection::Internal)),
+                DerivationPathKind::Funds(model) =>
+                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimitFunds(SEQUENCE_GAP_LIMIT_EXTERNAL, FundsDirection::External)),
+                DerivationPathKind::IncomingFunds(model) =>
+                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_EXTERNAL)),
+                DerivationPathKind::AssetLock(model) =>
+                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_INTERNAL)),
+                DerivationPathKind::Authentication(model) =>
+                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_EXTERNAL)),
+                DerivationPathKind::MasternodeHoldings(model) =>
+                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_INTERNAL)),
+            };
+        }
+        contains
+    }
+    pub fn load_addresses_in_context(&self, context: *const std::os::raw::c_void) -> Vec<AddressInfo> {
+        self.db_ref().load_addresses_in_context(context)
+    }
+    pub fn load_addresses(&mut self) {
+        if self.controller.addresses_loaded { return }
+        let addresses = self.load_addresses_in_context(self.controller.context);
+
+        match &mut self.kind {
+            DerivationPathKind::Funds(model) => {
+                for AddressInfo { internal, address, index, is_used, ..} in addresses {
+                    let is_internal = internal.unwrap();
+                    let container = if is_internal { &mut model.internal_addresses } else { &mut model.external_addresses };
+                    // while index >= container.len() as u32 {
+                    //     container.insert(None);
+                    // }
+                    if !is_valid_dash_address_for_script_map(&address, &self.chain_type.script_map()) {
+                        #[cfg(debug_assertions)]
+                        println!("{} address %@ loaded but was not valid on chain {}", self.chain_type.name(), address);
+                        #[cfg(not(debug_assertions))]
+                        println!("{} address %@ loaded but was not valid on chain <REDACTED>", self.chain_type.name());
+                        continue;
+                    }
+                    container.push((index, address.clone()));
+                    self.all_addresses.insert(address.clone());
+                    if is_used {
+                        self.used_addresses.insert(address.clone());
+                    }
+                }
+
+                self.controller.addresses_loaded = true;
+                let reduced_gap_limit = model.should_use_reduced_gap_limit();
+                let gap_limit = if reduced_gap_limit { SEQUENCE_UNUSED_GAP_LIMIT_INITIAL } else { SEQUENCE_GAP_LIMIT_INITIAL };
+                let _ = model.register_addresses_with_settings_and_context(RegisterAddressesSettings::GapLimitFunds(gap_limit, FundsDirection::Internal), self.controller.context);
+                let _ = model.register_addresses_with_settings_and_context(RegisterAddressesSettings::GapLimitFunds(gap_limit, FundsDirection::External), self.controller.context);
+            },
+            DerivationPathKind::IncomingFunds(model) => {
+                for AddressInfo { address, index, is_used, ..} in addresses {
+
+                    let container = &mut model.external_addresses;
+                    // while index >= container.len() as u32 {
+                    //     container.insert(None);
+                    // }
+                    if !is_valid_dash_address_for_script_map(&address, &self.chain_type.script_map()) {
+                        #[cfg(debug_assertions)]
+                        println!("{} address %@ loaded but was not valid on chain {}", self.chain_type.name(), address);
+                        #[cfg(not(debug_assertions))]
+                        println!("{} address %@ loaded but was not valid on chain <REDACTED>", self.chain_type.name());
+                        continue;
+                    }
+                    container[index] = Some(address.clone());
+                    self.all_addresses.insert(address.clone());
+                    if is_used {
+                        self.used_addresses.insert(address.clone());
+                    }
+                }
+                self.controller.addresses_loaded = true;
+                let _ = model.register_addresses_with_settings_and_context(RegisterAddressesSettings::GapLimit(SEQUENCE_DASHPAY_GAP_LIMIT_INITIAL), self.controller.context);
+            },
+            DerivationPathKind::Authentication(model) => {
+                self.controller.addresses_loaded = true;
+                let _ = model.register_addresses_with_settings(if self.path_type = DerivationPathType::SINGLE_USER_AUTHENTICATION {
+                    RegisterAddressesSettings::GapLimit(10)
+                } else {
+                    RegisterAddressesSettings::GapLimitIdentity(10, 0)
+                });
+            },
+            DerivationPathKind::AssetLock(AssetLock { base, .. }) |
+            DerivationPathKind::MasternodeHoldings(MasternodeHoldings { base, .. }) => {
+                self.controller.addresses_loaded = true;
+                let _ = base.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(10));
+            },
+            _ => {}
+        }
+    }
+
+    pub fn create_identifier_for_derivation_path(&self) -> Result<String, KeyError> {
+        let extended_public_key = self.extended_public_key()?;
+        let identifier = extended_public_key.create_identifier()?;
+        let hex = identifier.to_lower_hex_string();
+        Ok(hex[..7].to_string())
+    }
+
+
+
+}
+
+impl KeyDataAtIndexPath<u32> for DerivationPathModel {
+    fn private_key_at_index_path(&self, index_path: IndexPath<u32>, source: SecretSource) -> Result<OpaqueKey, KeyError> {
+        if self.path.is_empty() {
+            Err(KeyError::UnableToDerive)
+        } else {
+            match source {
+                SecretSource::Seed(seed) => {
+                    let top_key = self.signing_algorithm.key_with_seed_data(seed)?;
+                    let key = top_key.private_derive_to_path(self)?;
+                    key.private_derive_to_path(&index_path)
+                }
+                SecretSource::ExtendedPrivateKeyData(data) => {
+                    self.signing_algorithm.derive_key_from_extended_private_key_data_for_index_path_u32(data, index_path)
+                }
+            }
+        }
+
+    }
+
+    fn public_key_at_index_path(&self, index_path: IndexPath<u32>) -> Result<OpaqueKey, KeyError> {
+        let data = self.public_key_data_at_index_path(index_path)?;
+        self.signing_algorithm.key_with_public_key_data(&data)
+    }
+
+    fn public_key_data_at_index_path(&self, index_path: IndexPath<u32>) -> Result<Vec<u8>, KeyError> {
         match &self.kind {
             DerivationPathKind::Authentication(model) => {
                 let mut has_hardened_derivation = false;
@@ -946,119 +1239,5 @@ impl DerivationPathModel {
                     .and_then(|key| key.public_key_data_at_index_path_u32(index_path))
             }
         }
-    }
-
-    /// inform the derivation path that the address has been used by a transaction, true if the derivation path contains the address
-    pub fn register_transaction_address(&mut self, address: &str) -> bool {
-        let contains = self.contains_address(address);
-        if contains && !self.address_is_used(address) {
-            self.used_addresses.insert(address.to_string());
-            let _addresses = match &mut self.kind {
-                DerivationPathKind::Funds(model) if model.contains_change_address(address) =>
-                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimitInternal(SEQUENCE_GAP_LIMIT_INTERNAL, true)),
-                DerivationPathKind::Funds(model) =>
-                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimitInternal(SEQUENCE_GAP_LIMIT_EXTERNAL, false)),
-                DerivationPathKind::IncomingFunds(model) =>
-                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_EXTERNAL)),
-                DerivationPathKind::AssetLock(model) =>
-                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_INTERNAL)),
-                DerivationPathKind::Authentication(model) =>
-                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_EXTERNAL)),
-                DerivationPathKind::MasternodeHoldings(model) =>
-                    model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(SEQUENCE_GAP_LIMIT_INTERNAL)),
-            };
-        }
-        contains
-    }
-    pub fn load_addresses_in_context(&mut self, context: *const std::os::raw::c_void) -> Vec<AddressInfo> {
-        self.controller.load_addresses_in_context
-    }
-    pub fn load_addresses(&mut self) {
-        match &mut self.kind {
-            DerivationPathKind::Funds(model) => {
-                if !self.addresses_loaded {
-                    let addresses = self.load_addresses_in_context(self.controller.context);
-
-                    self.addresses_loaded = true;
-                    let reduced_gap_limit = model.should_use_reduced_gap_limit();
-                    let gap_limit = if reduced_gap_limit { SEQUENCE_UNUSED_GAP_LIMIT_INITIAL } else { SEQUENCE_GAP_LIMIT_INITIAL };
-                    let _ = model.register_addresses_with_settings_and_context(RegisterAddressesSettings::GapLimitInternal(gap_limit, true), self.controller.context);
-                    let _ = model.register_addresses_with_settings_and_context(RegisterAddressesSettings::GapLimitInternal(gap_limit, false), self.controller.context);
-                }
-            },
-            DerivationPathKind::IncomingFunds(..) => {
-                self.load_addresses_in_context(self.controller.context);
-            },
-            DerivationPathKind::Authentication(model) => {
-                if !self.addresses_loaded {
-                    self.load_addresses_in_context(self.controller.context);
-                    self.addresses_loaded = true;
-                    if self.path_type = DerivationPathType::SINGLE_USER_AUTHENTICATION {
-                        let _ = model.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(10));
-                    } else {
-                        let _ = model.register_addresses_with_settings(RegisterAddressesSettings::GapLimitIdentity(10, 0));
-                    }
-
-                }
-
-            },
-            DerivationPathKind::AssetLock(AssetLockDerivationModel { base, .. }) |
-            DerivationPathKind::MasternodeHoldings(MasternodeHoldingsDerivationModel { base, .. }) => {
-                if !self.addresses_loaded {
-                    self.load_addresses_in_context(self.controller.context);
-                    self.addresses_loaded = true;
-                    let _ = base.register_addresses_with_settings(RegisterAddressesSettings::GapLimit(10));
-                }
-            },
-        }
-    }
-
-    pub fn create_identifier_for_derivation_path(&self) -> Result<String, KeyError> {
-        self.extended_public_key()
-            .and_then(|ext_pub_key| ext_pub_key.create_identifier())
-            .map(|id| short_hex_string_from(&id))
-    }
-
-
-
-}
-
-// IIndexPath<Item: Clone + Debug + Encodable + IndexHardSoft + PartialEq + Extremum>
-
-impl IIndexPath for DerivationPathModel {
-    type Item = ();
-
-    fn new(indexes: Vec<Self::Item>) -> Self {
-        todo!()
-    }
-
-    fn new_hardened(indexes: Vec<Self::Item>, hardened: Vec<bool>) -> Self {
-        todo!()
-    }
-
-    fn indexes(&self) -> &Vec<Self::Item> {
-        todo!()
-    }
-
-    fn hardened_indexes(&self) -> &Vec<bool> {
-        todo!()
-    }
-}
-
-impl IndexHardSoft for DerivationPathModel {
-    fn harden(&self) -> Self {
-        todo!()
-    }
-
-    fn soften(&self) -> Self {
-        todo!()
-    }
-
-    fn hardened(&self) -> u64 {
-        todo!()
-    }
-
-    fn softened(&self) -> u64 {
-        todo!()
     }
 }

@@ -11,20 +11,20 @@ pub enum KeyChainKey {
 }
 
 impl KeyChainKey {
-    pub fn standalone_info_dictionary_location_string(extended_public_key_identifier: String) -> Self {
-        Self::StandaloneInfoDictionaryLocationString { extended_public_key_identifier }
+    pub fn standalone_info_dictionary_location_string(extended_public_key_identifier: &str) -> Self {
+        Self::StandaloneInfoDictionaryLocationString { extended_public_key_identifier: extended_public_key_identifier.to_string() }
     }
-    pub fn standalone_extended_public_key_location_string(extended_public_key_identifier: String) -> Self {
-        Self::StandaloneExtendedPublicKeyLocationString { extended_public_key_identifier }
+    pub fn standalone_extended_public_key_location_string(extended_public_key_identifier: &str) -> Self {
+        Self::StandaloneExtendedPublicKeyLocationString { extended_public_key_identifier: extended_public_key_identifier.to_string() }
     }
-    pub fn has_known_balance_unique_id_string(reference: u32, unique_id: String) -> Self {
-        Self::HasKnownBalanceUniqueIDString { reference, unique_id }
+    pub fn has_known_balance_unique_id_string(reference: u32, unique_id: &str) -> Self {
+        Self::HasKnownBalanceUniqueIDString { reference, unique_id: unique_id.to_string() }
     }
-    pub fn wallet_based_extended_private_key_location_string(unique_id: String) -> Self {
-        Self::WalletBasedExtendedPrivateKeyLocationString { unique_id }
+    pub fn wallet_based_extended_private_key_location_string(unique_id: &str) -> Self {
+        Self::WalletBasedExtendedPrivateKeyLocationString { unique_id: unique_id.to_string() }
     }
-    pub fn wallet_based_extended_public_key_location_string(unique_id: String) -> Self {
-        Self::WalletBasedExtendedPublicKeyLocationString { unique_id }
+    pub fn wallet_based_extended_public_key_location_string(unique_id: &str) -> Self {
+        Self::WalletBasedExtendedPublicKeyLocationString { unique_id: unique_id.to_string() }
     }
 }
 

@@ -1,6 +1,4 @@
 use std::fmt::Debug;
-use std::os::raw::c_ulong;
-use std::slice;
 use dashcore::consensus::Encodable;
 use crate::crypto::byte_util::clone_into_array;
 use super::BIP32_HARD;
@@ -222,12 +220,5 @@ impl<T> IIndexPath for IndexPath<T> where T: Clone + Debug + Encodable + IndexHa
 
     fn hardened_indexes(&self) -> &Vec<bool> {
         &self.hardened
-    }
-}
-
-impl IndexPath<u32> {
-    pub fn from_ffi(indexes: *const c_ulong, length: usize) -> Self {
-        let indexes_slice = unsafe { slice::from_raw_parts(indexes, length) };
-        IndexPath::new(indexes_slice.iter().map(|&index| index as u32).collect())
     }
 }

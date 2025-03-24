@@ -28,6 +28,7 @@ rs-x11-hash = "0.1.8"
 serde = { version = "1.0.215", features = ["derive"], optional = true }
 simplelog = "0.12.2"
 zeroize = "1.5.7"
+bitflags = "2.9.0"
 
 [lib]
 name = "dash_spv_crypto"
