@@ -1,9 +1,10 @@
 use std::sync::Arc;
-use ferment::unbox_any;
+use ferment::{boxed, unbox_any};
 use tokio::runtime::Runtime;
 use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use crate::custom::dashcore::{dashcore_hash_types_BlockHash, dashcore_hash_types_ConfirmedHash, dashcore_hash_types_ConfirmedHashHashedWithProRegTx, dashcore_hash_types_CycleHash, dashcore_hash_types_InputsHash, dashcore_hash_types_MerkleRootMasternodeList, dashcore_hash_types_MerkleRootQuorums, dashcore_hash_types_ProTxHash, dashcore_hash_types_PubkeyHash, dashcore_hash_types_QuorumCommitmentHash, dashcore_hash_types_QuorumEntryHash, dashcore_hash_types_QuorumHash, dashcore_hash_types_QuorumSigningRequestId, dashcore_hash_types_QuorumVVecHash, dashcore_hash_types_ScriptHash, dashcore_hash_types_Sha256dHash, dashcore_hash_types_SpecialTransactionPayloadHash, dashcore_hash_types_TxMerkleNode, dashcore_hash_types_Txid};
 use crate::custom::{to_ffi_bytes, to_ffi_hash};
+use crate::custom::std::SocketAddr;
 use crate::DashSPVCore;
 use crate::fermented::generics::{Arr_u8_20, Arr_u8_32};
 
@@ -14,55 +15,25 @@ use crate::fermented::generics::{Arr_u8_20, Arr_u8_32};
 pub struct TokioRuntime(*const Runtime);
 # [no_mangle]
 pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_tokio_runtime(self_: *mut DashSPVCore) -> *mut TokioRuntime {
-    ferment::boxed(TokioRuntime(Arc::as_ptr(&(&*self_).platform.runtime)))
+    boxed(TokioRuntime(Arc::as_ptr(&(&*self_).platform.runtime)))
 }
 # [no_mangle]
 pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_runtime(self_: *mut DashSPVCore) -> *mut Runtime {
     Arc::as_ptr(&(&*self_).platform.runtime) as *mut _
 }
 # [no_mangle]
+pub unsafe extern "C" fn SocketAddr_destroy(self_: *mut SocketAddr) {
+    unbox_any(self_);
+}
+# [no_mangle]
 pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_destroy(self_: *mut DashSPVCore) {
-    ferment::unbox_any(self_);
+    unbox_any(self_);
 }
 
 # [no_mangle]
 pub unsafe extern "C" fn dash_spv_coinjoin_coinjoin_client_manager_CoinJoinClientManager_destroy(self_: *mut CoinJoinClientManager) {
-    ferment::unbox_any(self_);
+    unbox_any(self_);
 }
-// #[no_mangle]
-// pub unsafe extern "C" fn masternode_list_map_by_key(
-//     self_: *mut std_collections_Map_keys_u8_arr_32_values_dash_spv_masternode_processor_models_masternode_list_MasternodeList,
-//     key: *mut Arr_u8_32,
-// ) -> *mut dash_spv_masternode_processor_models_masternode_list_MasternodeList {
-//     let self_ = FFIConversionFrom::<BTreeMap<[u8; 32], MasternodeList>>::ffi_from(self_);
-//     let key = FFIConversionFrom::<[u8; 32]>::ffi_from(key);
-//     let result = self_.get(&key).cloned();
-//     FFIConversionTo::<MasternodeList>::ffi_to_opt(result)
-// }
-// #[no_mangle]
-// pub unsafe extern "C" fn masternode_by_pro_reg_tx_hash(
-//     self_: *mut std_collections_Map_keys_u8_arr_32_values_dash_spv_masternode_processor_models_masternode_entry_MasternodeEntry,
-//     pro_reg_tx_hash: *mut Arr_u8_32,
-// ) -> *mut dash_spv_masternode_processor_models_masternode_entry_MasternodeEntry {
-//     let self_ = FFIConversionFrom::<BTreeMap<[u8; 32], MasternodeEntry>>::ffi_from(self_);
-//     let key = FFIConversionFrom::<[u8; 32]>::ffi_from(pro_reg_tx_hash);
-//     let result = self_.get(&key).cloned();
-//     FFIConversionTo::<MasternodeEntry>::ffi_to_opt(result)
-// }
-//
-// #[no_mangle]
-// pub unsafe extern "C" fn llmq_by_type_and_hash(
-//     self_: *mut std_collections_Map_keys_dash_spv_crypto_network_llmq_type_LLMQType_values_std_collections_Map_keys_u8_arr_32_values_dash_spv_crypto_llmq_entry_LLMQEntry,
-//     llmq_type: *mut dash_spv_crypto_network_llmq_type_LLMQType,
-//     llmq_hash: *mut Arr_u8_32,
-// ) -> *mut dash_spv_crypto_llmq_entry_LLMQEntry {
-//     let self_ = FFIConversionFrom::<BTreeMap<LLMQType, BTreeMap<[u8; 32], LLMQEntry>>>::ffi_from(self_);
-//     let llmq_type = FFIConversionFrom::<LLMQType>::ffi_from(llmq_type);
-//     let llmq_hash = FFIConversionFrom::<[u8; 32]>::ffi_from(llmq_hash);
-//     let result = self_.get(&llmq_type).and_then(|q| q.get(&llmq_hash)).cloned();
-//     FFIConversionTo::<LLMQEntry>::ffi_to_opt(result)
-// }
-//
 
 /// [u8; 32]
 #[no_mangle] pub unsafe extern "C" fn dashcore_hash_types_BlockHash_ctor(hash: *mut Arr_u8_32) -> *mut dashcore_hash_types_BlockHash {
