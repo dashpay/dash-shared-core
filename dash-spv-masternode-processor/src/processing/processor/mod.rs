@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 #[cfg(feature = "message_verification")]
 use dashcore::{ephemerealdata::{chain_lock::ChainLock, instant_lock::InstantLock}, sml::message_verification_error::MessageVerificationError};
-use dashcore::bls_sig_utils::BLSSignature;
 use dashcore::consensus::deserialize;
 use dashcore::hashes::Hash;
 use dashcore::hash_types::{BlockHash, ProTxHash};
@@ -18,7 +17,7 @@ use dashcore::network::message_sml::MnListDiff;
 use dashcore::prelude::CoreBlockHeight;
 use dashcore::sml::llmq_type::LLMQType;
 use dashcore::sml::masternode_list::MasternodeList;
-use dashcore::sml::masternode_list_engine::MasternodeListEngine;
+use dashcore::sml::masternode_list_engine::{MasternodeListEngine, MasternodeListEngineBlockContainer};
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dashcore::sml::quorum_validation_error::{ClientDataRetrievalError, QuorumValidationError};
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
@@ -39,16 +38,7 @@ impl Debug for MasternodeProcessor {
 }
 impl MasternodeProcessor {
     pub fn new(provider: Arc<dyn CoreProvider>, network: Network) -> Self {
-        Self { provider, engine: MasternodeListEngine {
-            block_hashes: Default::default(),
-            block_heights: Default::default(),
-            masternode_lists: Default::default(),
-            known_chain_locks: Default::default(),
-            known_snapshots: Default::default(),
-            rotated_quorums_per_cycle: Default::default(),
-            quorum_statuses: Default::default(),
-            network,
-        } }
+        Self { provider, engine: MasternodeListEngine::default_for_network(network) }
     }
 }
 
@@ -60,13 +50,6 @@ impl MasternodeProcessor {
     }
     pub fn current_masternode_list(&self) -> Option<MasternodeList> {
         self.engine.latest_masternode_list().cloned()
-    }
-
-    pub fn used_block_hashes(&self) -> Vec<[u8; 32]> {
-        self.engine.block_hashes
-            .values()
-            .map(|hash| hash.to_byte_array())
-            .collect()
     }
 
     pub fn known_masternode_lists_count(&self) -> usize {
@@ -132,14 +115,15 @@ impl MasternodeProcessor {
     pub fn masternode_lists(&self) -> BTreeMap<CoreBlockHeight, MasternodeList> {
         self.engine.masternode_lists.clone()
     }
-    pub fn known_chain_locks(&self) -> BTreeMap<BlockHash, BLSSignature> {
-        self.engine.known_chain_locks.clone()
-    }
     pub fn known_block_hashes(&self) -> BTreeMap<u32, [u8; 32]> {
-        self.engine.block_hashes.iter().map(|(h, hash)| (*h, hash.to_byte_array())).collect()
+        match &self.engine.block_container {
+            MasternodeListEngineBlockContainer::BTreeMapContainer(map) => map.block_hashes.iter().map(|(h, hash)| (*h, hash.to_byte_array())).collect(),
+        }
     }
     pub fn known_block_heights(&self) -> BTreeMap<[u8; 32], u32> {
-        self.engine.block_heights.iter().map(|(hash, h)| (hash.to_byte_array(), *h)).collect()
+        match &self.engine.block_container {
+            MasternodeListEngineBlockContainer::BTreeMapContainer(map) => map.block_heights.iter().map(|(hash, h)| (hash.to_byte_array(), *h)).collect()
+        }
     }
 
     #[cfg(feature = "std")]
@@ -184,7 +168,7 @@ impl MasternodeProcessor {
     ///
     pub fn process_qr_info_result_from_message(
         &mut self,
-        message: &[u8], verify_rotated_quorums: bool) -> Result<BTreeSet<BlockHash>, ProcessingError> {
+        message: &[u8], verify_tip_non_rotated_quorums: bool, verify_rotated_quorums: bool) -> Result<BTreeSet<BlockHash>, ProcessingError> {
 
         let qr_info: QRInfo = deserialize(message)?;
 
@@ -199,26 +183,27 @@ impl MasternodeProcessor {
             }
         };
 
-        let get_chain_lock_sig_fn = {
-            |block_hash: &BlockHash| {
-                match self.provider.lookup_cl_signature_by_block_hash(block_hash.to_byte_array()) {
-                    Ok(sig) => {
-                        if sig.is_zeroed() {
-                            Ok(None)
-                        } else {
-                            Ok(Some(sig))
-                        }
-                    },
-                    Err(_) => Err(ClientDataRetrievalError::RequiredBlockNotPresent(*block_hash)),
-                }
-            }
-        };
-
+        // let get_chain_lock_sig_fn = {
+        //     |block_hash: &BlockHash| {
+        //         match self.provider.lookup_cl_signature_by_block_hash(block_hash.to_byte_array()) {
+        //             Ok(sig) => {
+        //                 if sig.is_zeroed() {
+        //                     Ok(None)
+        //                 } else {
+        //                     Ok(Some(sig))
+        //                 }
+        //             },
+        //             Err(_) => Err(ClientDataRetrievalError::RequiredBlockNotPresent(*block_hash)),
+        //         }
+        //     }
+        // };
+        //
         self.engine.feed_qr_info(
             qr_info,
+            verify_tip_non_rotated_quorums,
             verify_rotated_quorums,
             Some(get_height_fn),
-            Some(get_chain_lock_sig_fn),
+            // Some(get_chain_lock_sig_fn),
         )?;
 
         let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(&[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85], false);
@@ -250,9 +235,12 @@ impl MasternodeProcessor {
             Ok(mn_list_diff) => mn_list_diff,
             Err(err) => return Err(err.into()),
         };
-        self.engine
-            .apply_diff(mn_list_diff, diff_block_height, verify_quorums)
-            .map_err(|e| ProcessingError::QuorumValidationError(QuorumValidationError::SMLError(e)))
+        let base_block_hash = mn_list_diff.base_block_hash;
+        let block_hash = mn_list_diff.block_hash;
+        let signature = self.engine
+            .apply_diff(mn_list_diff, diff_block_height, verify_quorums, None)
+            .map_err(|e| ProcessingError::QuorumValidationError(QuorumValidationError::SMLError(e)))?;
+        Ok((base_block_hash, block_hash))
     }
 
     pub fn serialize_engine(&self) -> Result<Vec<u8>, ProcessingError> {
