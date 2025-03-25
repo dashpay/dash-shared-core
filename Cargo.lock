@@ -1250,7 +1250,7 @@ dependencies = [
 [[package]]
 name = "dashcore"
 version = "0.39.1"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#c051fcca671d52a4b557f2533ab21480322332ac"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#3899a549abbdeac0674ce0c7a9ce56510d068085"
 dependencies = [
  "anyhow",
  "base64-compat",
@@ -1280,12 +1280,12 @@ dependencies = [
 [[package]]
 name = "dashcore-private"
 version = "0.39.1"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#c051fcca671d52a4b557f2533ab21480322332ac"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#3899a549abbdeac0674ce0c7a9ce56510d068085"
 
 [[package]]
 name = "dashcore-rpc"
 version = "0.39.1"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#c051fcca671d52a4b557f2533ab21480322332ac"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#3899a549abbdeac0674ce0c7a9ce56510d068085"
 dependencies = [
  "dashcore-rpc-json",
  "hex",
@@ -1298,7 +1298,7 @@ dependencies = [
 [[package]]
 name = "dashcore-rpc-json"
 version = "0.39.1"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#c051fcca671d52a4b557f2533ab21480322332ac"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#3899a549abbdeac0674ce0c7a9ce56510d068085"
 dependencies = [
  "bincode",
  "dashcore",
@@ -1312,7 +1312,7 @@ dependencies = [
 [[package]]
 name = "dashcore_hashes"
 version = "0.39.1"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#c051fcca671d52a4b557f2533ab21480322332ac"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#3899a549abbdeac0674ce0c7a9ce56510d068085"
 dependencies = [
  "bincode",
  "dashcore-private",

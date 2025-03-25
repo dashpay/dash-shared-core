@@ -20,6 +20,7 @@ use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_engine::{MasternodeListEngine, MasternodeListEngineBlockContainer};
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dashcore::sml::quorum_validation_error::{ClientDataRetrievalError, QuorumValidationError};
+use dash_spv_crypto::crypto::byte_util::Zeroable;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::processing::core_provider::CoreProvider;
 use crate::processing::processor::processing_error::ProcessingError;
@@ -174,6 +175,9 @@ impl MasternodeProcessor {
 
         let get_height_fn = {
             |block_hash: &BlockHash| {
+                if block_hash.as_byte_array().is_zero() {
+                    return Ok(0);
+                }
                 let height = self.provider.lookup_block_height_by_hash(block_hash.to_byte_array());
                 if height == u32::MAX {
                     Err(ClientDataRetrievalError::RequiredBlockNotPresent(*block_hash))
@@ -183,27 +187,11 @@ impl MasternodeProcessor {
             }
         };
 
-        // let get_chain_lock_sig_fn = {
-        //     |block_hash: &BlockHash| {
-        //         match self.provider.lookup_cl_signature_by_block_hash(block_hash.to_byte_array()) {
-        //             Ok(sig) => {
-        //                 if sig.is_zeroed() {
-        //                     Ok(None)
-        //                 } else {
-        //                     Ok(Some(sig))
-        //                 }
-        //             },
-        //             Err(_) => Err(ClientDataRetrievalError::RequiredBlockNotPresent(*block_hash)),
-        //         }
-        //     }
-        // };
-        //
         self.engine.feed_qr_info(
             qr_info,
             verify_tip_non_rotated_quorums,
             verify_rotated_quorums,
             Some(get_height_fn),
-            // Some(get_chain_lock_sig_fn),
         )?;
 
         let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(&[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85], false);
