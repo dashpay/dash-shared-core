@@ -1,18 +1,17 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use dash_spv_masternode_processor::hashes::hex::ToHex;
-use dash_spv_masternode_processor::tx::transaction::{Transaction, TransactionOutput, TransactionInput};
-use dash_spv_masternode_processor::util::script::ScriptType;
+use dashcore::blockdata::transaction::Transaction;
+use dashcore::blockdata::transaction::txin::TxIn;
+use dashcore::blockdata::transaction::txout::TxOut;
+use dashcore::hashes::Hash;
 use logging::*;
-use tracing::{error, warn, info};
 use crate::coinjoin::CoinJoin;
 use crate::messages::{coinjoin_entry::CoinJoinEntry, pool_state::PoolState, pool_status::PoolStatus, pool_message::PoolMessage};
 use crate::models::valid_in_outs::ValidInOuts;
 
-#[repr(C)]
 #[derive(Debug)]
+#[ferment_macro::export]
 pub struct CoinJoinBaseSession {
     pub entries: Vec<CoinJoinEntry>,
     pub final_mutable_transaction: Option<Transaction>,
@@ -47,7 +46,7 @@ impl CoinJoinBaseSession {
         }
     }
 
-    pub fn is_valid_in_outs(&self, vin: &Vec<TransactionInput>, vout: &Vec<TransactionOutput>) -> ValidInOuts {
+    pub fn is_valid_in_outs(&self, vin: &Vec<TxIn>, vout: &Vec<TxOut>) -> ValidInOuts {
         let mut set_scrip_pub_keys = HashSet::new();
         let mut result = ValidInOuts::new();
         
@@ -60,8 +59,8 @@ impl CoinJoinBaseSession {
             return result;
         }
 
-        let mut check_tx_out = |tx_out: &TransactionOutput| -> ValidInOuts {
-            let denom = CoinJoin::amount_to_denomination(tx_out.amount);
+        let mut check_tx_out = |tx_out: &TxOut| -> ValidInOuts {
+            let denom = CoinJoin::amount_to_denomination(tx_out.value);
             let mut result = ValidInOuts::new();
 
             if denom != self.session_denom {
@@ -74,10 +73,11 @@ impl CoinJoinBaseSession {
                 return result;
             }
 
-            let hex = tx_out.script.as_ref().unwrap_or(&vec![]).to_hex();
+            let out_script = tx_out.script_pubkey.to_hex_string();
+            // let hex = tx_out.script_pubkey.as_ref().unwrap_or(&vec![]).to_hex();
 
-            if tx_out.script_pub_key_type() != ScriptType::PayToPubkeyHash {
-                log_error!(target: "CoinJoin", "ERROR: invalid scriptPubKey={}", hex);
+            if !tx_out.script_pubkey.is_p2pkh() {
+                log_error!(target: "CoinJoin", "ERROR: invalid scriptPubKey={}", out_script);
                 result.message_id = PoolMessage::ErrInvalidScript;
                 result.consume_collateral = true;
                 result.result = false;
@@ -85,8 +85,8 @@ impl CoinJoinBaseSession {
                 return result;
             }
 
-            if !set_scrip_pub_keys.insert(hex.clone()) {
-                log_error!(target: "CoinJoin", "ERROR: already have this script! scriptPubKey={}", hex);
+            if !set_scrip_pub_keys.insert(out_script.clone()) {
+                log_error!(target: "CoinJoin", "ERROR: already have this script! scriptPubKey={}", out_script);
                 result.message_id = PoolMessage::ErrAlreadyHave;
                 result.consume_collateral = true;
                 result.result = false;
@@ -113,7 +113,7 @@ impl CoinJoinBaseSession {
         }
 
         for tx_in in vin {
-            if tx_in.input_hash.0.is_empty() {
+            if tx_in.previous_output.txid.as_byte_array().is_empty() {
                 log_error!(target: "CoinJoin", "ERROR: invalid input! {:?}", tx_in);
                 result.message_id = PoolMessage::ErrInvalidInput;
                 result.consume_collateral = true;
@@ -123,7 +123,7 @@ impl CoinJoinBaseSession {
             }
         }
 
-        return result;
+        result
     }
 
     pub fn get_state_string(&self) -> &'static str {

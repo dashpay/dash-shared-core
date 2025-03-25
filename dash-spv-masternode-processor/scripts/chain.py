@@ -1,8 +1,9 @@
 from enum import Enum, unique
 @unique
 class Chain(Enum):
-    MAINNET = "mainnet", "insight.dashevo.org"
-    TESTNET = "testnet", "insight.testnet.networks.dash.org:3002"
+    MAINNET = "mainnet", "insight.dash.org"
+    TESTNET = "testnet", "insight.testnet.networks.dash.org"
+#     TESTNET = "testnet", "insight.testnet.networks.dash.org:3002"
     SCREWDRIVER = "screwdriver", "insight.screwdriver.networks.dash.org:3002"
     ABSINTHE = "absinthe", "insight.absinthe.networks.dash.org:3002"
 

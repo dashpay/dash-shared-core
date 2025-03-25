@@ -1,15 +1,13 @@
-use std::io::{Error, Read, Write};
+use std::io;
+use std::io::{Cursor, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
-use dash_spv_masternode_processor::consensus::encode::VarInt;
-use dash_spv_masternode_processor::crypto::byte_util::{Reversable, UInt256};
-use dash_spv_masternode_processor::consensus::{encode, Encodable};
-use dash_spv_masternode_processor::crypto::UInt768;
-use dash_spv_masternode_processor::hashes::hex::ToHex;
-use dash_spv_masternode_processor::hashes::{sha256d, Hash};
-use dash_spv_masternode_processor::keys::BLSKey;
-use dash_spv_masternode_processor::models::OperatorPublicKey;
+use dashcore::bls_sig_utils::BLSSignature;
+use dashcore::consensus::{Decodable, Encodable};
+use dashcore::consensus::encode::{Error, VarInt};
+use dashcore::hashes::{sha256d, Hash};
+use dashcore::hash_types::ProTxHash;
 use logging::*;
-use tracing::warn;
+use dash_spv_crypto::keys::BLSKey;
 use crate::coinjoin::CoinJoin;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
@@ -19,12 +17,13 @@ use crate::constants::COINJOIN_QUEUE_TIMEOUT;
 // A currently in progress mixing merge and denomination information
 // #[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[ferment_macro::export]
 pub struct CoinJoinQueueMessage {
     pub denomination: u32,
-    pub pro_tx_hash: UInt256,
+    pub pro_tx_hash: ProTxHash,
     pub time: i64,
     pub ready: bool, // ready to submit
-    pub signature: Option<UInt768>,
+    pub signature: Option<BLSSignature>,
     // Memory only
     pub tried: bool
 }
@@ -38,26 +37,38 @@ impl std::fmt::Display for CoinJoinQueueMessage {
             self.time,
             self.is_time_out_of_bounds(current_time),
             self.ready,
-            self.pro_tx_hash.reversed().0.to_hex().chars().take(16).collect::<String>()
+            self.pro_tx_hash.to_hex()
         )?;
         Ok(())
     }
 }
 
 impl CoinJoinQueueMessage {
+    pub fn get_signature_hash(&self) -> sha256d::Hash {
+        let mut writer = Vec::<u8>::new();
+        self.denomination.consensus_encode(&mut writer).unwrap();
+        self.pro_tx_hash.consensus_encode(&mut writer).unwrap();
+        self.time.consensus_encode(&mut writer).unwrap();
+        self.ready.consensus_encode(&mut writer).unwrap();
+        sha256d::Hash::hash(&writer)
+    }
+}
+
+#[ferment_macro::export]
+impl CoinJoinQueueMessage {
+    pub fn from_message(message: &[u8]) -> CoinJoinQueueMessage {
+        let mut cursor = Cursor::new(message);
+        CoinJoinQueueMessage::consensus_decode(&mut cursor).unwrap()
+    }
     pub fn is_time_out_of_bounds(&self, current_time: u64) -> bool {
-        return current_time.saturating_sub(self.time as u64) > COINJOIN_QUEUE_TIMEOUT || 
-            (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT;
+        current_time.saturating_sub(self.time as u64) > COINJOIN_QUEUE_TIMEOUT ||
+            (self.time as u64).saturating_sub(current_time) > COINJOIN_QUEUE_TIMEOUT
     }
 
-    pub fn check_signature(&self, key: OperatorPublicKey) -> bool {
+    pub fn check_signature(&self, key: [u8; 48], use_legacy: bool) -> bool {
         if let Some(ref signature) = self.signature {
             let hash = self.get_signature_hash();
-            let verified = BLSKey::key_with_public_key(
-                key.data, 
-                key.is_legacy()
-            ).verify_insecure(&hash, *signature);
-
+            let verified = BLSKey::key_with_public_key(key, use_legacy).verify_insecure(hash.as_byte_array(), signature.as_bytes());
             if !verified {
                 log_warn!(target: "CoinJoinQueue", "verifySignature failed");
             }
@@ -65,17 +76,9 @@ impl CoinJoinQueueMessage {
             return verified;
         }
 
-        return false;
+        false
     }
 
-    pub fn get_signature_hash(&self) -> Vec<u8> {
-        let mut writer = Vec::<u8>::new();
-        self.denomination.consensus_encode(&mut writer).unwrap();
-        self.pro_tx_hash.consensus_encode(&mut writer).unwrap();
-        self.time.consensus_encode(&mut writer).unwrap();
-        self.ready.consensus_encode(&mut writer).unwrap();
-        sha256d::Hash::hash(&writer).into_inner().to_vec()
-    }
 }
 
 impl CoinJoinMessageType for CoinJoinQueueMessage {
@@ -84,18 +87,18 @@ impl CoinJoinMessageType for CoinJoinQueueMessage {
     }
 }
 
-impl encode::Encodable for CoinJoinQueueMessage {
+impl Encodable for CoinJoinQueueMessage {
     #[inline]
-    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
+    fn consensus_encode<W: Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
         let mut offset = 0;
-        offset += self.denomination.consensus_encode(&mut writer)?;
-        offset += self.pro_tx_hash.consensus_encode(&mut writer)?;
-        offset += self.time.consensus_encode(&mut writer)?;
-        offset += self.ready.consensus_encode(&mut writer)?;
+        offset += self.denomination.consensus_encode(writer)?;
+        offset += self.pro_tx_hash.consensus_encode(writer)?;
+        offset += self.time.consensus_encode(writer)?;
+        offset += self.ready.consensus_encode(writer)?;
         offset += match self.signature {
             Some(ref signature) => {
-                let len_offset = VarInt(signature.0.len() as u64).consensus_encode(&mut writer)?;
-                let sig_offset = signature.consensus_encode(&mut writer)?;
+                let len_offset = VarInt(signature.len() as u64).consensus_encode(writer)?;
+                let sig_offset = signature.consensus_encode(writer)?;
                 len_offset + sig_offset
             }
             None => 0
@@ -105,15 +108,15 @@ impl encode::Encodable for CoinJoinQueueMessage {
     }
 }
 
-impl encode::Decodable for CoinJoinQueueMessage {
+impl Decodable for CoinJoinQueueMessage {
     #[inline]
-    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
-        let denomination = u32::consensus_decode(&mut d)?;
-        let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
-        let time = i64::consensus_decode(&mut d)?;
-        let ready: bool = bool::consensus_decode(&mut d)?;
-        let _signature_len = VarInt::consensus_decode(&mut d)?;
-        let signature: Option<UInt768> = UInt768::consensus_decode(&mut d).ok();
+    fn consensus_decode<D: Read + ?Sized>(d: &mut D) -> Result<Self, Error> {
+        let denomination = u32::consensus_decode(d)?;
+        let pro_tx_hash = ProTxHash::consensus_decode(d)?;
+        let time = i64::consensus_decode(d)?;
+        let ready: bool = bool::consensus_decode(d)?;
+        let _signature_len = VarInt::consensus_decode(d)?;
+        let signature: Option<BLSSignature> = BLSSignature::consensus_decode(d).ok();
         let message = CoinJoinQueueMessage { denomination, pro_tx_hash, time, ready, signature, tried: false };
         Ok(message)
     }

@@ -1,15 +1,17 @@
-use dash_spv_masternode_processor::crypto::UInt256;
+use dashcore::hash_types::ProTxHash;
 
 #[derive(Debug, Clone)]
+#[ferment_macro::export]
 pub struct MasternodeMetaInfo {
-    pub pro_tx_hash: UInt256,
+    pub pro_tx_hash: ProTxHash,
     // the dsq count from the last dsq broadcast of this node
     pub last_dsq: i64,
     pub mixing_tx_count: i32
 }
 
+#[ferment_macro::export]
 impl MasternodeMetaInfo {
-    pub fn new(pro_tx_hash: UInt256) -> MasternodeMetaInfo {
+    pub fn new(pro_tx_hash: ProTxHash) -> MasternodeMetaInfo {
         Self {
             pro_tx_hash,
             last_dsq: 0,

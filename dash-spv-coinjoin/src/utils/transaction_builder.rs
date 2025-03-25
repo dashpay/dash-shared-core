@@ -1,20 +1,21 @@
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
-use tracing::{info, debug};
+use dashcore::psbt::serialize::Serialize;
+use dashcore::blockdata::transaction::Transaction;
+use dashcore::blockdata::transaction::txin::TxIn;
+use dashcore::blockdata::transaction::txout::TxOut;
+use dashcore::blockdata::script::ScriptBuf;
+use dashcore::consensus::Encodable;
+use dashcore::hashes::Hash;
+use dash_spv_crypto::network::ChainType;
+use dash_spv_crypto::network::TXIN_SEQUENCE;
+use dash_spv_crypto::util::data_append::DataAppend;
+use dash_spv_crypto::util::params::TX_MIN_OUTPUT_AMOUNT;
 use logging::*;
-use dash_spv_masternode_processor::chain::common::ChainType;
-use dash_spv_masternode_processor::chain::params::TX_MIN_OUTPUT_AMOUNT;
-use dash_spv_masternode_processor::chain::tx::protocol::TXIN_SEQUENCE;
-use dash_spv_masternode_processor::consensus::Encodable;
-use dash_spv_masternode_processor::crypto::UInt256;
-use dash_spv_masternode_processor::ffi::ByteArray;
-use dash_spv_masternode_processor::tx::{Transaction, TransactionInput, TransactionOutput, TransactionType};
-use dash_spv_masternode_processor::util::data_append::DataAppend;
 
 use crate::coin_selection::compact_tally_item::CompactTallyItem;
 use crate::constants::REFERENCE_DEFAULT_MIN_TX_FEE;
-use crate::ffi::recepient::Recipient;
 use crate::utils::coin_format::CoinFormat;
 use crate::wallet_ex::WalletEx;
 use crate::models::coin_control::CoinControl;
@@ -67,27 +68,39 @@ impl<'a> TransactionBuilder {
         coin_control.allow_other_inputs = false;
 
         let mut dummy_tx = Transaction {
-            inputs: Vec::new(),
-            outputs: Vec::new(),
+            version: 0,
             lock_time: 0,
-            version: 0, 
-            tx_hash: None,
-            tx_type: TransactionType::Classic,
-            payload_offset: 0,
-            block_height: 0
+            input: vec![],
+            output: vec![],
+            special_transaction_payload: None
         };
-
+        // let mut dummy_tx = Transaction {
+        //     inputs: Vec::new(),
+        //     outputs: Vec::new(),
+        //     lock_time: 0,
+        //     version: 0,
+        //     tx_hash: None,
+        //     tx_type: TransactionType::Classic,
+        //     payload_offset: 0,
+        //     block_height: 0
+        // };
+        //
         // Select all tallyItem outputs in the coinControl so that CreateTransaction knows what to use
         for coin in &tally_item.input_coins {
             coin_control.select(coin.tx_outpoint.clone());
-            let input = TransactionInput {
-                input_hash: coin.tx_outpoint.hash,
-                index: coin.tx_outpoint.index,
-                script: None,
-                signature: Some(Vec::new()),
-                sequence: TXIN_SEQUENCE
-            };
-            dummy_tx.inputs.push(input);
+            // let input = TransactionInput {
+            //     input_hash: coin.tx_outpoint.hash,
+            //     index: coin.tx_outpoint.index,
+            //     script: None,
+            //     signature: Some(Vec::new()),
+            //     sequence: TXIN_SEQUENCE
+            // };
+            dummy_tx.input.push(TxIn {
+                previous_output: coin.tx_outpoint,
+                script_sig: ScriptBuf::from(vec![]),
+                sequence: TXIN_SEQUENCE,
+                witness: Default::default(),
+            });
         }
 
         let bytes_base = TransactionBuilder::calculate_maximum_signed_tx_size(wallet_ex.clone(), &mut dummy_tx);
@@ -112,7 +125,7 @@ impl<'a> TransactionBuilder {
     pub fn could_add_output(&self, amount_output: u64) -> bool {
         // Adding another output can change the serialized size of the vout size hence + GetSizeOfCompactSizeDiff()
         let bytes = self.get_bytes_total() + self.bytes_output + self.get_size_of_compact_size_diff(1);
-        return TransactionBuilder::get_amount_left(self.get_amount_initial() as i64, (self.get_amount_used() + amount_output) as i64, self.get_fee(bytes as u64) as i64) >= 0;
+        TransactionBuilder::get_amount_left(self.get_amount_initial() as i64, (self.get_amount_used() + amount_output) as i64, self.get_fee(bytes as u64) as i64) >= 0
     }
 
     /// Check if it's possible to add multiple outputs as vector of amounts. Returns true if its possible to add all of them and false if not.
@@ -126,17 +139,17 @@ impl<'a> TransactionBuilder {
         }
         // Adding other outputs can change the serialized size of the vout size hence + GetSizeOfCompactSizeDiff()
         let bytes = self.get_bytes_total() + bytes_additional + self.get_size_of_compact_size_diff(vec_len);
-        return TransactionBuilder::get_amount_left(self.get_amount_initial() as i64, self.get_amount_used() as i64 + amount_additional as i64, self.get_fee(bytes as u64) as i64) >= 0;
+        TransactionBuilder::get_amount_left(self.get_amount_initial() as i64, self.get_amount_used() as i64 + amount_additional as i64, self.get_fee(bytes as u64) as i64) >= 0
     }
 
     /// Get amount we had available when we started
     pub fn get_amount_initial(&self) -> u64 {
-        return self.tally_item.amount;
+        self.tally_item.amount
     }
 
     /// Helper to calculate static amount left by simply subtracting an used amount and a fee from a provided initial amount.
     pub fn get_amount_left(amount_initial: i64, amount_used: i64, fee: i64) -> i64{
-        return amount_initial - amount_used - fee;
+        amount_initial - amount_used - fee
     }
 
     /// Get the amount currently left to add more outputs. Does respect fees.
@@ -146,40 +159,37 @@ impl<'a> TransactionBuilder {
         let bytes_total = self.get_bytes_total();
         let fee = self.get_fee(bytes_total as u64);
 
-        return initial.saturating_sub(used).saturating_sub(fee);
+        initial.saturating_sub(used).saturating_sub(fee)
     }
 
     /// Check if an amounts should be considered as dust
     pub fn is_dust(amount: u64) -> bool {
-        return TX_MIN_OUTPUT_AMOUNT > amount;
+        TX_MIN_OUTPUT_AMOUNT > amount
     }
 
     /// Add an output with the amount. Returns a pointer to the output if it could be added and nullptr if not due to insufficient amount left.
     pub fn add_zero_output(&mut self) -> bool {
-        return self.add_output(0)
+        self.add_output(0)
     }
 
     pub fn add_output(&mut self, amount_output: u64) -> bool {
         if self.could_add_output(amount_output) {
-            self.outputs.push(TransactionBuilderOutput::new(self.wallet_ex.clone(), amount_output as u64, self.dry_run));
+            self.outputs.push(TransactionBuilderOutput::new(self.wallet_ex.clone(), amount_output, self.dry_run));
             return true;
         }
-        return false;
+        false
     }
 
-    pub fn commit(&mut self, str_result: &mut String, is_denominating: bool, client_session_id: UInt256) -> bool {
-        let vec_send: Vec<Recipient> = self.outputs
+    pub fn commit(&mut self, str_result: &mut String, is_denominating: bool, client_session_id: [u8; 32]) -> bool {
+        let vec_send: Vec<TxOut> = self.outputs
             .iter()
             .filter(|x| x.script.is_some())
-            .map(|out| Recipient {
-                script_pub_key: ByteArray::from(out.script.clone().unwrap()),
-                amount: out.amount
-            })
+            .map(TransactionBuilderOutput::build_output)
             .collect();
 
-        log_debug!(target: "CoinJoin", "tx_builder.commit: {:?}", vec_send.iter().map(|f| f.amount).collect::<Vec<u64>>());
+        log_debug!(target: "CoinJoin", "tx_builder.commit: {:?}", vec_send.iter().map(|f| f.value).collect::<Vec<u64>>());
 
-        if !self.wallet_ex.borrow().commit_transaction(&vec_send, self.coin_control.clone(), is_denominating, client_session_id) {
+        if !self.wallet_ex.borrow().commit_transaction(vec_send, self.coin_control.clone(), is_denominating, client_session_id) {
             log_debug!(target: "CoinJoin", "tx_builder.commit: Failed to commit transaction");
             str_result.push_str("Failed to commit transaction");
             return false;
@@ -188,15 +198,15 @@ impl<'a> TransactionBuilder {
         log_debug!(target: "CoinJoin", "tx_builder.commit: Transaction committed");
         str_result.push_str("Transaction committed");
         self.keep_keys = true;
-        return true;
+        true
     }
 
     fn calculate_maximum_signed_tx_size(wallet_ex: Rc<RefCell<WalletEx>>, tx: &mut Transaction) -> i32 {
-        for input in tx.inputs.iter_mut() {
-            match wallet_ex.borrow().get_wallet_transaction(input.input_hash) {
+        for input in tx.input.iter_mut() {
+            match wallet_ex.borrow().get_wallet_transaction(input.previous_output.txid.to_byte_array()) {
                 Some(transaction) => {
-                    assert!(input.index < transaction.outputs.len() as u32, "Index out of bounds");
-                    input.script = transaction.outputs[input.index as usize].script.clone();
+                    assert!(input.previous_output.vout < transaction.output.len() as u32, "Index out of bounds");
+                    input.script_sig = transaction.output[input.previous_output.vout as usize].script_pubkey.clone();
                 },
                 None => {
                     // Cannot estimate size without knowing the input details
@@ -205,36 +215,36 @@ impl<'a> TransactionBuilder {
             }
         }
 
-        if let Some(signed_tx) = wallet_ex.borrow().sign_transaction(&tx, false) {
-            return signed_tx.to_data().len() as i32;
+        if let Some(signed_tx) = wallet_ex.borrow().sign_transaction(tx.clone(), false) {
+            signed_tx.serialize().len() as i32
+        } else {
+            log_info!(target: "CoinJoin", "TxBuilder: Could not sign transaction");
+            -1
         }
-
-        log_info!(target: "CoinJoin", "TxBuilder: Could not sign transaction");
-        return -1;
     }
 
     fn calculate_bytes_output(chain_type: ChainType) -> i32 {
         let script_map = chain_type.script_map();
         let pub_key = Vec::<u8>::script_pub_key_for_address(&TransactionBuilder::get_dummy_address(chain_type), &script_map);
-        let tx_output = TransactionOutput { amount: 0, script: Some(pub_key), address: None };
+        let tx_output = TxOut { value: 0, script_pubkey: ScriptBuf::from(pub_key) };
         let mut buffer = Vec::new();
         tx_output.consensus_encode(&mut buffer).unwrap();
         
-        return buffer.len() as i32;
+        buffer.len() as i32
     }
 
     fn get_dummy_address(chain_type: ChainType) -> String {
-        return if chain_type == ChainType::MainNet { "XqQHMfqiEbmswPk7Ruhfq3WKrgANDunDgG".to_string() } else { "yVkt3e49pAj11jSj4HAnzVAWmy4VD1MwZd".to_string() };
+        if chain_type == ChainType::MainNet { "XqQHMfqiEbmswPk7Ruhfq3WKrgANDunDgG".to_string() } else { "yVkt3e49pAj11jSj4HAnzVAWmy4VD1MwZd".to_string() }
     }
 
     fn get_bytes_total(&self) -> i32 {
-        return self.bytes_base + self.outputs.len() as i32 * self.bytes_output + self.get_size_of_compact_size_diff(self.outputs.len());
+        self.bytes_base + self.outputs.len() as i32 * self.bytes_output + self.get_size_of_compact_size_diff(self.outputs.len())
     }
     
     fn get_size_of_compact_size_diff(&self, add: usize) -> i32 {
         let size = self.outputs.len();
 
-        return self.get_compact_size_diff(size, size + add);
+        self.get_compact_size_diff(size, size + add)
     }
 
     fn get_compact_size_diff(&self, old_size: usize, new_size: usize) -> i32 {
@@ -242,7 +252,7 @@ impl<'a> TransactionBuilder {
         let old_var_int_size = (old_size as i32).consensus_encode(&mut buffer).unwrap() as i32;
         let new_var_int_size = (new_size as i32).consensus_encode(&mut buffer).unwrap() as i32;
 
-        return old_var_int_size - new_var_int_size;
+        old_var_int_size - new_var_int_size
     }
 
     fn get_amount_used(&self) -> u64 {
@@ -250,7 +260,7 @@ impl<'a> TransactionBuilder {
         for output in &self.outputs {
             amount += output.amount;
         }
-        return amount;
+        amount
     }
 
     /// Get fees based on the number of bytes and the feerate set in CoinControl.
@@ -268,7 +278,7 @@ impl<'a> TransactionBuilder {
             fee_calc = REFERENCE_DEFAULT_MIN_TX_FEE;
         }
 
-        return fee_calc;
+        fee_calc
     }
 
     /// Clear the output vector and keep/return the included keys depending on the value of fKeepKeys

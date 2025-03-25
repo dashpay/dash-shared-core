@@ -1,31 +1,32 @@
-use std::ffi::c_void;
-use std::io::{Read, Write, Error};
-use dash_spv_masternode_processor::consensus::encode;
-use dash_spv_masternode_processor::common::block::Block;
-use dash_spv_masternode_processor::crypto::byte_util::UInt256;
-use dash_spv_masternode_processor::ffi::boxer::boxed;
-use dash_spv_masternode_processor::ffi::to::ToFFI;
-use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
-use dash_spv_masternode_processor::tx::transaction::Transaction;
-
-use crate::ffi::callbacks::HasChainLock;
+use std::io;
+use std::io::{Cursor, Read, Write};
+use dashcore::consensus::{Decodable, Encodable};
+use dashcore::consensus::encode::Error;
+use dashcore::Transaction;
 use crate::messages::coinjoin_message::CoinJoinMessageType;
 
 // dstx
 // #[repr(C)]
 #[derive(Clone, Debug)]
+#[ferment_macro::export]
 pub struct CoinJoinBroadcastTx {
     pub tx: Transaction,
-    pub pro_tx_hash: UInt256,
+    pub pro_tx_hash: [u8; 32],
     pub signature: Option<Vec<u8>>,
     pub signature_time: i64,
     // memory only
     // when corresponding tx is 0-confirmed or conflicted, nConfirmedHeight is -1
-    confirmed_height: i32,
+    pub confirmed_height: i32,
+}
+
+#[ferment_macro::export]
+pub fn from_message(message: &[u8]) -> CoinJoinBroadcastTx {
+    let mut cursor = Cursor::new(message);
+    CoinJoinBroadcastTx::consensus_decode(&mut cursor).unwrap()
 }
 
 impl CoinJoinBroadcastTx {
-    pub fn new(tx: Transaction, pro_tx_hash: UInt256, signature: Option<Vec<u8>>, signature_time: i64) -> Self {
+    pub fn new(tx: Transaction, pro_tx_hash: [u8; 32], signature: Option<Vec<u8>>, signature_time: i64) -> Self {
         Self {
             tx,
             pro_tx_hash,
@@ -39,24 +40,6 @@ impl CoinJoinBroadcastTx {
         self.confirmed_height = confirmed_height;
     }
 
-    pub fn is_expired(&self, block: Block, has_chain_lock: HasChainLock, context: *const c_void) -> bool {
-        // expire confirmed DSTXes after ~1h since confirmation or chainlocked confirmation
-        if self.confirmed_height == -1 || (block.height as i32) < self.confirmed_height {
-            return false; // not mined yet
-        }
-
-        if block.height as i32 - self.confirmed_height > 24 {
-            return true; // mined more than an hour ago
-        }
-
-        return unsafe {
-            let boxed_block = boxed(block.encode());
-            let is_chain_locked = has_chain_lock(boxed_block, context);
-            unbox_any(boxed_block);
-            
-            is_chain_locked
-        }; 
-    }
 }
 
 impl CoinJoinMessageType for CoinJoinBroadcastTx {
@@ -65,31 +48,33 @@ impl CoinJoinMessageType for CoinJoinBroadcastTx {
     }
 }
 
-impl encode::Encodable for CoinJoinBroadcastTx {
+impl Encodable for CoinJoinBroadcastTx {
     #[inline]
-    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
+    fn consensus_encode<W: Write + ?Sized>(&self, writer: &mut W) -> Result<usize, io::Error> {
         let mut offset = 0;
-        let tx_data = self.tx.to_data(); // TODO: consensus_encode
-        writer.write_all(&tx_data)?;
-        offset += tx_data.len();
-        offset += self.pro_tx_hash.consensus_encode(&mut writer)?;
+        offset += self.tx.consensus_encode(writer)?;
+        // let tx_data = self.tx.to_data(); // TODO: consensus_encode
+        // writer.write_all(&tx_data)?;
+        // offset += self.tx.consensus_encode(&mut writer)?;
+        // offset += tx_data.len();
+        offset += self.pro_tx_hash.consensus_encode(writer)?;
         offset += match self.signature {
-            Some(ref signature) => signature.consensus_encode(&mut writer)?,
+            Some(ref signature) => signature.consensus_encode(writer)?,
             None => 0
         };
-        offset += self.signature_time.consensus_encode(&mut writer)?;
+        offset += self.signature_time.consensus_encode(writer)?;
 
         Ok(offset)
     }
 }
 
-impl encode::Decodable for CoinJoinBroadcastTx {
+impl Decodable for CoinJoinBroadcastTx {
     #[inline]
-    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
-        let tx = Transaction::consensus_decode(&mut d)?;
-        let pro_tx_hash = UInt256::consensus_decode(&mut d)?;
-        let signature: Option<Vec<u8>> = Vec::consensus_decode(&mut d).ok();
-        let signature_time = i64::consensus_decode(&mut d)?;
+    fn consensus_decode<D: Read + ?Sized>(d: &mut D) -> Result<Self, Error> {
+        let tx = Transaction::consensus_decode(d)?;
+        let pro_tx_hash = <[u8; 32]>::consensus_decode(d)?;
+        let signature: Option<Vec<u8>> = Vec::consensus_decode(d).ok();
+        let signature_time = i64::consensus_decode(d)?;
 
         Ok(CoinJoinBroadcastTx::new(tx, pro_tx_hash, signature, signature_time) )
     }

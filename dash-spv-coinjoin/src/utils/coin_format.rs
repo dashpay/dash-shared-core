@@ -1,4 +1,4 @@
-use dash_spv_masternode_processor::chain::params::DUFFS;
+use dash_spv_crypto::util::params::DUFFS;
 
 pub trait CoinFormat {
     fn to_friendly_string(self) -> String;

@@ -58,4 +58,4 @@
 
 #define REFERENCE_DEFAULT_MIN_TX_FEE 1000
 
-#endif /* example_h */
+#endif  /* example_h */

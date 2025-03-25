@@ -1,26 +1,23 @@
 #[cfg(target_os = "ios")]
-use tracing::{error, warn, info, debug};
-
-#[cfg(target_os = "ios")]
 use std::sync::Once;
 
-#[cfg(target_os = "ios")]
-use std::path::PathBuf;
+// #[cfg(target_os = "ios")]
+// use std::path::PathBuf;
+//
+// #[cfg(target_os = "ios")]
+// use dirs::document_dir;
 
 #[cfg(target_os = "ios")]
-use dirs::document_dir;
-
-#[cfg(target_os = "ios")]
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 
 #[cfg(target_os = "ios")]
 use std::io::{Write, Result};  // Importing std::io::Result only for iOS
 
 #[cfg(target_os = "ios")]
 use std::sync::Mutex;
-use dirs::download_dir;
-#[cfg(target_os = "ios")]
-use tracing_subscriber::fmt::writer::BoxMakeWriter;
+
+// #[cfg(target_os = "ios")]
+// use tracing_subscriber::fmt::writer::BoxMakeWriter;
 
 #[cfg(target_os = "ios")]
 use tracing_subscriber::fmt::{MakeWriter, SubscriberBuilder};
@@ -34,12 +31,14 @@ static INIT: Once = Once::new();
 // Function to initialize logging
 // Custom MakeWriter struct that holds a Mutex around a File
 #[cfg(target_os = "ios")]
+#[allow(unused)]
 struct MutexMakeWriter {
     file: Mutex<File>,
 }
 
 #[cfg(target_os = "ios")]
 impl MutexMakeWriter {
+    #[allow(unused)]
     fn new(file: File) -> Self {
         Self {
             file: Mutex::new(file),
@@ -129,13 +128,13 @@ pub fn init_logging() {
 macro_rules! log_error {
     (target: $target:expr, $($arg:tt)*) => {
         {
-            error!(target: $target, $($arg)*); // Logs to file via tracing
+            tracing::error!(target: $target, $($arg)*); // Logs to file via tracing
             println!("ERROR [{}]: {}", $target, format!($($arg)*)); // Console output
         }
     };
     ($($arg:tt)*) => {
         {
-            error!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            tracing::error!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
             println!("ERROR [default_log_prefix]: {}", format!($($arg)*)); // Console output
         }
     };
@@ -158,13 +157,13 @@ macro_rules! log_error {
 macro_rules! log_warn {
     (target: $target:expr, $($arg:tt)*) => {
         {
-            warn!(target: $target, $($arg)*); // Logs to file via tracing
+            tracing::warn!(target: $target, $($arg)*); // Logs to file via tracing
             println!("WARN [{}]: {}", $target, format!($($arg)*)); // Console output
         }
     };
     ($($arg:tt)*) => {
         {
-            warn!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            tracing::warn!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
             println!("WARN [default_log_prefix]: {}", format!($($arg)*)); // Console output
         }
     };
@@ -187,13 +186,13 @@ macro_rules! log_warn {
 macro_rules! log_info {
     (target: $target:expr, $($arg:tt)*) => {
         {
-            info!(target: $target, $($arg)*); // Logs to file via tracing
+            tracing::info!(target: $target, $($arg)*); // Logs to file via tracing
             println!("INFO [{}]: {}", $target, format!($($arg)*)); // Console output
         }
     };
     ($($arg:tt)*) => {
         {
-            info!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            tracing::info!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
             println!("INFO [default_log_prefix]: {}", format!($($arg)*)); // Console output
         }
     };
@@ -216,13 +215,13 @@ macro_rules! log_info {
 macro_rules! log_debug {
     (target: $target:expr, $($arg:tt)*) => {
         {
-            debug!(target: $target, $($arg)*); // Logs to file via tracing
+            tracing::debug!(target: $target, $($arg)*); // Logs to file via tracing
             println!("DEBUG [{}]: {}", $target, format!($($arg)*)); // Console output
         }
     };
     ($($arg:tt)*) => {
         {
-            debug!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
+            tracing::debug!(target: "default_log_prefix", $($arg)*); // Logs to file via tracing
             println!("DEBUG [default_log_prefix]: {}", format!($($arg)*)); // Console output
         }
     };

@@ -1,11 +1,7 @@
-use std::ffi::c_void;
 use std::{collections::HashMap, io::Cursor};
-use dash_spv_masternode_processor::ffi::unboxer::unbox_any;
-use dash_spv_masternode_processor::types;
-use dash_spv_masternode_processor::{hashes::hex::FromHex, consensus::Decodable};
-use dash_spv_masternode_processor::tx::transaction::Transaction;
-
-use crate::ffi::input_value::InputValue;
+use dashcore::consensus::Decodable;
+use dashcore::hashes::hex::FromHex;
+use dashcore::Transaction;
 use crate::coinjoin::CoinJoin;
 
 #[test]
@@ -42,8 +38,8 @@ fn standard_denomination_test() {
 
     assert_eq!(100001, CoinJoin::get_smallest_denomination());
 
-    for value in CoinJoin::get_standard_denominations().iter() {
-        assert_eq!(*value as i64, CoinJoin::denomination_to_amount(CoinJoin::amount_to_denomination(*value)));
+    for value in CoinJoin::get_standard_denominations() {
+        assert_eq!(value as i64, CoinJoin::denomination_to_amount(CoinJoin::amount_to_denomination(value)));
     }
 }
 
@@ -83,47 +79,45 @@ fn is_collateral_valid_test() {
     let tx = Transaction::consensus_decode(&mut cursor).unwrap();
 
     let coinjoin = CoinJoin::new(
-        good_input_value,
-        has_chain_lock,
-        destroy_input_value,
+        |_, _, _| 40000,
+        |_, _| true,
         std::ptr::null()
     );
 
     assert!(coinjoin.is_collateral_valid(&tx, true));
 
     let coinjoin = CoinJoin::new(
-        bad_input_value,
-        has_chain_lock,
-        destroy_input_value,
+        |_, _, _| 10000,
+        |_, _| true,
         std::ptr::null()
     );
 
     assert!(!coinjoin.is_collateral_valid(&tx, true));
 }
 
-extern "C" fn good_input_value(
-    _prevout_hash: *mut [u8; 32],
-    _index: u32,
-    _context: *const c_void,
-) -> *mut InputValue {
-    Box::into_raw(Box::new(InputValue { is_valid: true, value: 40000 }))
-}
-
-extern "C" fn bad_input_value(
-    _prevout_hash: *mut [u8; 32],
-    _index: u32,
-    _context: *const c_void,
-) -> *mut InputValue {
-    Box::into_raw(Box::new(InputValue { is_valid: true, value: 10000 }))
-}
-
-extern "C" fn has_chain_lock(
-    _block: *mut types::Block,
-    _context: *const c_void,
-) -> bool {
-    true
-}
-
-unsafe extern "C" fn destroy_input_value(input_value: *mut InputValue) {
-    let _res = unbox_any(input_value);
-}
+// extern "C" fn good_input_value(
+//     _prevout_hash: *mut [u8; 32],
+//     _index: u32,
+//     _context: *const c_void,
+// ) -> *mut InputValue {
+//     Box::into_raw(Box::new(InputValue { is_valid: true, value: 40000 }))
+// }
+//
+// extern "C" fn bad_input_value(
+//     _prevout_hash: *mut [u8; 32],
+//     _index: u32,
+//     _context: *const c_void,
+// ) -> *mut InputValue {
+//     Box::into_raw(Box::new(InputValue { is_valid: true, value: 10000 }))
+// }
+//
+// extern "C" fn has_chain_lock(
+//     _block: *mut types::Block,
+//     _context: *const c_void,
+// ) -> bool {
+//     true
+// }
+//
+// unsafe extern "C" fn destroy_input_value(input_value: *mut InputValue) {
+//     let _res = unbox_any(input_value);
+// }

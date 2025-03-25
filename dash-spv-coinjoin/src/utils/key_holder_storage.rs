@@ -1,5 +1,4 @@
 use std::{cell::RefCell, rc::Rc};
-use tracing::info;
 use logging::*;
 use crate::{utils::key_holder::KeyHolder, wallet_ex::WalletEx};
 
@@ -18,8 +17,7 @@ impl KeyHolderStorage {
         let key_holder = KeyHolder::new(wallet);
         let script = key_holder.destination.clone();
         self.storage.push(key_holder);
-        
-        return script;
+        script
     }
 
     pub fn keep_all(&mut self) {

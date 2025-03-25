@@ -1,5 +1,6 @@
-#[repr(C)]
+// #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[ferment_macro::export]
 pub enum PoolMessage {
     ErrAlreadyHave = 0,
     ErrDenom = 1,
@@ -28,12 +29,13 @@ pub enum PoolMessage {
     ErrConnectionTimeout = 24,
 }
 
+#[ferment_macro::export]
 impl PoolMessage {
     pub fn value(&self) -> i32 {
         *self as i32
     }
 
-    pub fn from_value(value: i32) -> Self {
+    pub fn from_value(value: i32) -> PoolMessage {
         match value {
             0 => PoolMessage::ErrAlreadyHave,
             1 => PoolMessage::ErrDenom,
@@ -62,11 +64,11 @@ impl PoolMessage {
         }
     }
 
-    pub fn msg_pool_min() -> Self {
+    pub fn msg_pool_min() -> PoolMessage {
         PoolMessage::ErrAlreadyHave
     }
 
-    pub fn msg_pool_max() -> Self {
+    pub fn msg_pool_max() -> PoolMessage {
         PoolMessage::ErrSizeMismatch
     }
 }

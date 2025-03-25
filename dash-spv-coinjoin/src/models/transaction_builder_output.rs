@@ -1,7 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
-
+use dashcore::blockdata::script::ScriptBuf;
+use dashcore::blockdata::transaction::txout::TxOut;
+use crate::models::reserve_destination::ReserveDestination;
 use crate::wallet_ex::WalletEx;
-use super::reserve_destination::ReserveDestination;
 
 #[derive(Clone)]
 pub struct TransactionBuilderOutput {
@@ -37,6 +38,13 @@ impl<'a> TransactionBuilderOutput {
         }
 
         self.amount = new_amount;
-        return true;
+        true
+    }
+
+    pub fn build_output(&self) -> TxOut {
+        TxOut {
+            value: self.amount,
+            script_pubkey: ScriptBuf::from(self.script.clone().unwrap_or_default()),
+        }
     }
 }
