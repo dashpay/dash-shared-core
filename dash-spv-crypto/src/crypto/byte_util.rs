@@ -945,18 +945,3 @@ pub fn test_superior_and_equal_uint256() {
     let big_e_left_shifted = big_e.shift_left_le(34);
     assert!(big_e_left_shifted.eq(&big_d_left_shifted), "D and E should be equal");
 }
-
-#[test]
-pub fn test_biguints_ops() {
-    let mut x = [0u8; 32];
-    x[0] = 0x32; // 50
-    let a = UInt256(x);
-    for i in 0..=32 {
-        println!("{}", a >> i);
-    }
-
-    let a = b"a0fcffffffffffffffffffffffffffffffffffffffffffffffffffffff4ffbff";
-    let b = b"100e000000000000000000000000000000000000000000000000000000000000";
-
-}
-

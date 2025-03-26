@@ -23,7 +23,7 @@ dirs-next = "2.0.0"
 ferment = { git = "https://github.com/dashpay/ferment", package = "ferment" }
 ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
 
-dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "message_verification", "quorum_validation", "bincode"], default-features = false, branch = "feat/ferment" }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "message_verification", "quorum_validation", "bincode", "ed25519-dalek"], default-features = false, branch = "feat/ferment" }
 
 rs-x11-hash = "0.1.8"
 serde = { version = "1.0.215", features = ["derive"], optional = true }

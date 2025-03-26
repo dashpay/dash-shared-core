@@ -523,7 +523,7 @@ fn test_processor_devnet_333_2() {
     let message = load_message(chain_id.clone(), "mnlistdiff--1-25480.dat");
     let (base_block_hash, block_hash) = processor.process_mn_list_diff_result_from_message(&message, None, true).expect("");
     let message = load_message(chain_id, "qrinfo--1-24868.dat");
-    let missed_hashes = processor.process_qr_info_result_from_message(&message, true).expect("");
+    let missed_hashes = processor.process_qr_info_result_from_message(&message, false, true).expect("");
         // .expect("Failed to process qr info");
     // let result = process_qr_info(&processor, &chain.load_message("qrinfo--1-24868.dat"), false, 70221, true, context.cache).unwrap();
     // assert!(result.result_at_h.is_valid(), "Invalid result at h");

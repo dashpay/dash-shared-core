@@ -2,10 +2,10 @@
 #![allow(unused_variables)]
 extern crate simplelog;
 
-// #[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 pub mod tests;
 
-#[cfg(feature = "test-helpers")]
+// #[cfg(feature = "test-helpers")]
 pub mod block_store;
 #[cfg(feature = "test-helpers")]
 pub mod test_helpers;

@@ -1,10 +1,7 @@
-#[cfg(feature = "test-helpers")]
 use std::collections::BTreeMap;
-#[cfg(feature = "test-helpers")]
-use dash_spv_crypto::network::{ChainType, DevnetType, IHaveChainSettings};
-#[cfg(feature = "test-helpers")]
+use dash_spv_crypto::network::{ChainType, DevnetType};
+// #[cfg(feature = "test-helpers")]
 use crate::block_store::{init_mainnet_store, init_testnet_store, MerkleBlock};
-#[cfg(feature = "test-helpers")]
 use crate::processing::CoreProviderError;
 
 #[cfg(test)]
@@ -19,7 +16,6 @@ pub mod listdiff;
 pub mod serde_helper;
 
 #[derive(Debug)]
-#[cfg(feature = "test-helpers")]
 pub struct FFIContext {
     pub chain: ChainType,
     pub is_dip_0024: bool,
@@ -28,13 +24,11 @@ pub struct FFIContext {
     pub blocks: Vec<MerkleBlock>,
     pub cl_signatures: BTreeMap<[u8; 32], [u8; 96]>,
 }
-#[cfg(feature = "test-helpers")]
 impl Drop for FFIContext {
     fn drop(&mut self) {
         println!("FFIContext is being dropped");
     }
 }
-#[cfg(feature = "test-helpers")]
 impl FFIContext {
     pub fn block_for_hash(&self, hash: [u8; 32]) -> Option<&MerkleBlock> {
         self.blocks.iter().find(|block| hash.eq(&block.hash))
@@ -61,10 +55,6 @@ impl FFIContext {
     pub fn cl_signature_by_block_hash(&self, block_hash: &[u8; 32]) -> Option<&[u8; 96]> {
         self.cl_signatures.get(block_hash)
     }
-    pub fn genesis_as_ptr(&self) -> *const u8 {
-        self.chain.genesis_hash().as_ptr()
-    }
-
     pub fn chain_default(chain: ChainType, is_dip_0024: bool, blocks: Vec<MerkleBlock>) -> Self {
         Self { chain, is_dip_0024, blocks, cl_signatures: BTreeMap::new() }
     }

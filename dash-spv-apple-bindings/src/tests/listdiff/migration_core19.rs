@@ -1,4 +1,3 @@
-use std::ptr::null;
 use std::sync::Arc;
 use dash_spv_crypto::network::{ChainType, DevnetType};
 use dash_spv_masternode_processor::block_store::MerkleBlock;
@@ -42,7 +41,7 @@ fn test_verify_chained_rotation() {
                     MerkleBlock::reversed(5140, "000001321487a80eefd7f6137da9bb9b06f19143cbdaa15cfda63753bd8eee46", "c344d520890dc4e1f16be687e359b13578e74ae14d01183ca417650d7498eb81"),
                 ]));
 
-    let processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
+    let mut processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     let listdiffs = [
         "MNL_1_4968.dat",
         "MNL_4968_4992.dat",
@@ -62,10 +61,9 @@ fn test_verify_chained_rotation() {
         "QRINFO_1_5140.dat",
         "QRINFO_5032_5140.dat",
     ];
-    // let mut ctx = context.write().unwrap();
     listdiffs.iter().for_each(|filename| {
         let message = load_message(chain.identifier(), filename);
-        let result = processor.mn_list_diff_result_from_message(&message, true, version, false, null())
+        let result = processor.process_mn_list_diff_result_from_message(&message, None, true)
             .expect("Failed to process listdiff");
         // assert_diff_result(&ctx, &result);
     });
@@ -73,7 +71,7 @@ fn test_verify_chained_rotation() {
     // ctx.is_dip_0024 = true;
     qrinfos.iter().for_each(|filename| {
         let message = load_message(chain.identifier(), filename);
-        let result = processor.qr_info_result_from_message(&message, true, version, true, false, null())
+        let result = processor.process_qr_info_result_from_message(&message, true, true)
             .expect("Failed to process qrinfo");
         // assert_qrinfo_result(&ctx, &result);
     });

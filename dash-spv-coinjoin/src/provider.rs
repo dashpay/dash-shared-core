@@ -22,22 +22,22 @@ pub struct CoinJoinProvider {
 #[ferment_macro::export]
 impl CoinJoinProvider  {
     pub fn new<
-        GML: Fn(*const c_void) -> MasternodeList + 'static,
-        USB: Fn(*const c_void) + 'static,
-        IWFNB: Fn(*const c_void) -> bool + 'static,
-        SLL: Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool) + 'static,
-        MLL: Fn(*const c_void, bool, bool, Vec<PoolStatus>) + 'static,
-        MBH: Fn(*const c_void, [u8; 32]) -> Option<QualifiedMasternodeListEntry> + 'static,
-        VMC: Fn(*const c_void) -> usize + 'static,
+        GetMasternodeList: Fn(*const c_void) -> MasternodeList + 'static,
+        UpdateSuccessBlock: Fn(*const c_void) + 'static,
+        IsWaitingForNewBlock: Fn(*const c_void) -> bool + 'static,
+        SessionLifecycleListener: Fn(*const c_void, bool, i32, [u8; 32], u32, PoolState, PoolMessage, PoolStatus, Option<SocketAddr>, bool) + 'static,
+        MixingLifecycleListener: Fn(*const c_void, bool, bool, Vec<PoolStatus>) + 'static,
+        GetMasternodeByProRegTxHash: Fn(*const c_void, [u8; 32]) -> Option<QualifiedMasternodeListEntry> + 'static,
+        GetValidMasternodesCount: Fn(*const c_void) -> usize + 'static,
 
     >(
-        get_masternode_list: GML,
-        update_success_block: USB,
-        is_waiting_for_new_block: IWFNB,
-        session_lifecycle_listener: SLL,
-        mixing_lifecycle_listener: MLL,
-        masternode_by_hash: MBH,
-        valid_mns_count: VMC,
+        get_masternode_list: GetMasternodeList,
+        update_success_block: UpdateSuccessBlock,
+        is_waiting_for_new_block: IsWaitingForNewBlock,
+        session_lifecycle_listener: SessionLifecycleListener,
+        mixing_lifecycle_listener: MixingLifecycleListener,
+        masternode_by_hash: GetMasternodeByProRegTxHash,
+        valid_mns_count: GetValidMasternodesCount,
         context: *const c_void,
     ) -> Self {
         Self {

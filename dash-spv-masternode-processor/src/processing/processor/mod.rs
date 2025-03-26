@@ -41,6 +41,14 @@ impl MasternodeProcessor {
     pub fn new(provider: Arc<dyn CoreProvider>, network: Network) -> Self {
         Self { provider, engine: MasternodeListEngine::default_for_network(network) }
     }
+
+    pub fn from_bincode_list_diff(provider: Arc<dyn CoreProvider>, network: Network, bytes: &[u8], expected_diff_height: u32) -> Self {
+        let diff = deserialize::<MnListDiff>(bytes).expect("failed to deserialize diff");
+        let engine = MasternodeListEngine::initialize_with_diff_to_height(diff, expected_diff_height, network)
+            .expect("expected to start engine");
+        Self { provider, engine }
+    }
+
 }
 
 #[ferment_macro::export]
@@ -244,4 +252,5 @@ impl MasternodeProcessor {
                 size
             })
     }
+
 }

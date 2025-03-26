@@ -4,11 +4,13 @@ use dashcore::bls_sig_utils::BLSSignature;
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dash_spv_crypto::network::ChainType;
-#[cfg(test)]
+#[cfg(all(test, feature = "use_serde"))]
 use dash_spv_masternode_processor::common::block::MBlock;
 use dash_spv_masternode_processor::processing::core_provider::{CoreProvider, CoreProviderError};
 #[cfg(test)]
-use dash_spv_masternode_processor::{processing::MasternodeProcessor, tests::FFIContext};
+use dash_spv_masternode_processor::processing::MasternodeProcessor;
+#[cfg(test)]
+use dash_spv_masternode_processor::tests::FFIContext;
 use dash_spv_masternode_processor::models::sync_state::CacheState;
 
 #[ferment_macro::opaque]
