@@ -1,4 +1,5 @@
-use ferment::{boxed, from_primitive_group, FFIConversionFrom, FFIConversionTo};
+use std::net::{Ipv4Addr, Ipv6Addr};
+use ferment::{boxed, FFIConversionDestroy, FFIConversionFrom, FFIConversionTo};
 use crate::fermented::generics::{Arr_u8_16, Arr_u8_4};
 
 #[allow(non_camel_case_types)]
@@ -8,37 +9,19 @@ pub enum SocketAddr {
     V4 { ip: *mut Arr_u8_4, port: u16 },
     V6 { ip: *mut Arr_u8_16, port: u16, flowinfo: u32, scope_id: u32 },
 }
-impl FFIConversionFrom<std::net::Ipv4Addr> for Arr_u8_4  {
-    unsafe fn ffi_from_const(ffi: *const Self) -> std::net::Ipv4Addr {
-        let octets: [u8; 4] = FFIConversionFrom::ffi_from_const(ffi);
-        std::net::Ipv4Addr::from(octets)
-    }
-}
-impl FFIConversionTo<std::net::Ipv4Addr> for Arr_u8_4  {
-    unsafe fn ffi_to_const(obj: std::net::Ipv4Addr) -> *const Self {
-        FFIConversionTo::ffi_to_const(obj.octets())
-    }
-}
-impl FFIConversionFrom<std::net::Ipv6Addr> for Arr_u8_16  {
-    unsafe fn ffi_from_const(ffi: *const Self) -> std::net::Ipv6Addr {
-        let octets: [u8; 16] = FFIConversionFrom::ffi_from_const(ffi);
-        std::net::Ipv6Addr::from(octets)
-    }
-}
-impl FFIConversionTo<std::net::Ipv6Addr> for Arr_u8_16  {
-    unsafe fn ffi_to_const(obj: std::net::Ipv6Addr) -> *const Self {
-        FFIConversionTo::ffi_to_const(obj.octets())
-    }
-}
 
 impl FFIConversionFrom<std::net::SocketAddr> for SocketAddr {
     unsafe fn ffi_from_const(ffi: *const Self) -> std::net::SocketAddr {
         let ffi = &*ffi;
         match ffi {
-            Self::V4 { ip, port } =>
-                std::net::SocketAddr::V4(std::net::SocketAddrV4::new(FFIConversionFrom::ffi_from(*ip), *port)),
-            Self::V6 { ip, port, flowinfo, scope_id } =>
-                std::net::SocketAddr::V6(std::net::SocketAddrV6::new(FFIConversionFrom::ffi_from(*ip), *port, *flowinfo, *scope_id))
+            Self::V4 { ip, port } => {
+                let octets = FFIConversionFrom::<[u8; 4]>::ffi_from_const(*ip);
+                std::net::SocketAddr::V4(std::net::SocketAddrV4::new(Ipv4Addr::from(octets), *port))
+            },
+            Self::V6 { ip, port, flowinfo, scope_id } => {
+                let octets = FFIConversionFrom::<[u8; 16]>::ffi_from_const(*ip);
+                std::net::SocketAddr::V6(std::net::SocketAddrV6::new(Ipv6Addr::from(octets), *port, *flowinfo, *scope_id))
+            }
         }
     }
 }
@@ -46,23 +29,29 @@ impl FFIConversionFrom<std::net::SocketAddr> for SocketAddr {
 impl FFIConversionTo<std::net::SocketAddr> for SocketAddr {
     unsafe fn ffi_to_const(obj: std::net::SocketAddr) -> *const Self {
         boxed(match obj {
-            std::net::SocketAddr::V4(addr) =>
-                Self::V4 { ip: FFIConversionTo::ffi_to(addr.ip().octets()), port: addr.port() },
-            std::net::SocketAddr::V6(addr) =>
-                Self::V6 { ip: FFIConversionTo::ffi_to(addr.ip().octets()), port: addr.port(), flowinfo: addr.flowinfo(), scope_id: addr.scope_id() }
+            std::net::SocketAddr::V4(addr) => {
+                let octets = addr.ip().octets();
+                Self::V4 { ip: FFIConversionTo::ffi_to(octets), port: addr.port() }
+            },
+            std::net::SocketAddr::V6(addr) => {
+                let octets = addr.ip().octets();
+                Self::V6 { ip: FFIConversionTo::ffi_to(octets), port: addr.port(), flowinfo: addr.flowinfo(), scope_id: addr.scope_id() }
+            }
         })
     }
 }
+
+impl FFIConversionDestroy<std::net::SocketAddr> for SocketAddr {}
 
 impl Drop for SocketAddr {
     fn drop(&mut self) {
         unsafe {
             match self {
                 Self::V4 { ip, port } => {
-                    ferment::unbox_any(ip);
+                    ferment::unbox_any(*ip);
                 }
                 Self::V6 { ip, port, flowinfo, scope_id } => {
-                    ferment::unbox_any(ip);
+                    ferment::unbox_any(*ip);
                 }
             }
         }
