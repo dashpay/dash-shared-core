@@ -10,28 +10,24 @@ pub enum SocketAddr {
 }
 impl FFIConversionFrom<std::net::Ipv4Addr> for Arr_u8_4  {
     unsafe fn ffi_from_const(ffi: *const Self) -> std::net::Ipv4Addr {
-        let ffi_ref = &*ffi;
-        let vec: Vec<u8> = from_primitive_group(ffi_ref.values, ffi_ref.count);
-        let octets: [u8; 4] = vec.try_into().unwrap();
+        let octets: [u8; 4] = FFIConversionFrom::ffi_from_const(ffi);
         std::net::Ipv4Addr::from(octets)
     }
 }
 impl FFIConversionTo<std::net::Ipv4Addr> for Arr_u8_4  {
     unsafe fn ffi_to_const(obj: std::net::Ipv4Addr) -> *const Self {
-        boxed(Self { count: 4, values: ferment::to_primitive_group(obj.octets().into_iter ()) })
+        FFIConversionTo::ffi_to_const(obj.octets())
     }
 }
 impl FFIConversionFrom<std::net::Ipv6Addr> for Arr_u8_16  {
     unsafe fn ffi_from_const(ffi: *const Self) -> std::net::Ipv6Addr {
-        let ffi_ref = &*ffi;
-        let vec: Vec<u8> = from_primitive_group(ffi_ref.values, ffi_ref.count);
-        let octets: [u8; 16] = vec.try_into().unwrap();
+        let octets: [u8; 16] = FFIConversionFrom::ffi_from_const(ffi);
         std::net::Ipv6Addr::from(octets)
     }
 }
 impl FFIConversionTo<std::net::Ipv6Addr> for Arr_u8_16  {
     unsafe fn ffi_to_const(obj: std::net::Ipv6Addr) -> *const Self {
-        boxed(Self { count: 16, values: ferment::to_primitive_group(obj.octets().into_iter()) })
+        FFIConversionTo::ffi_to_const(obj.octets())
     }
 }
 
