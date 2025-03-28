@@ -202,7 +202,9 @@ impl MasternodeProcessor {
             Some(get_height_fn),
         )?;
 
-        let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(&[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85], false);
+        let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(
+            &[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85],
+            false);
         Ok(hashes)
     }
 
@@ -233,6 +235,14 @@ impl MasternodeProcessor {
         };
         let base_block_hash = mn_list_diff.base_block_hash;
         let block_hash = mn_list_diff.block_hash;
+        let base_block_height = self.provider.lookup_block_height_by_hash(base_block_hash.to_byte_array());
+        let block_height = self.provider.lookup_block_height_by_hash(block_hash.to_byte_array());
+        if base_block_height != u32::MAX {
+            self.engine.feed_block_height(base_block_height, base_block_hash);
+        }
+        if block_height != u32::MAX {
+            self.engine.feed_block_height(block_height, block_hash);
+        }
         let signature = self.engine
             .apply_diff(mn_list_diff, diff_block_height, verify_quorums, None)
             .map_err(|e| ProcessingError::QuorumValidationError(QuorumValidationError::SMLError(e)))?;
