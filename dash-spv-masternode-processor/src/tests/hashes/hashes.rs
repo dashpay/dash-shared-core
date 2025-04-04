@@ -3,7 +3,6 @@ use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use dashcore::hashes::hex::FromHex;
 use dashcore::hashes::{ripemd160, sha1, sha256, sha256d, sha512, Hash};
 use dashcore::prelude::DisplayHex;
-use dash_spv_crypto::util::base58;
 
 #[test]
 fn test_base64_hash_size() {
@@ -51,29 +50,6 @@ fn test_x11() {
     assert_eq!("eee8ff78056e3b0cd35cd8e267fa871270a183a5d05c764d8c2047b7c3cca014", output.to_lower_hex_string(), "x11 error");
 }
 
-#[test]
-fn test_base58() {
-    let s = base58::from("Ƀ#&$@*^(*#!^");
-    assert!(s.is_err(), "base58::from");
-    let s = base58::from("");
-    assert_eq!(s.unwrap().to_lower_hex_string(), "", "base58::from");
-    let s = base58::from("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
-    assert_eq!(base58::encode_slice(&s.unwrap()), "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz", "base58");
-    let s = base58::from("1111111111111111111111111111111111111111111111111111111111111111111");
-    assert_eq!(base58::encode_slice(&s.unwrap()), "1111111111111111111111111111111111111111111111111111111111111111111", "base58");
-    let s = base58::from("111111111111111111111111111111111111111111111111111111111111111111z");
-    assert_eq!(base58::encode_slice(&s.unwrap()), "111111111111111111111111111111111111111111111111111111111111111111z", "base58");
-    let s = base58::from("z");
-    assert_eq!(base58::encode_slice(&s.unwrap()), "z", "base58");
-    let s = base58::from_check("");
-    assert_eq!(s, Err(base58::Error::TooShort(0)), "base58");
-    let s = base58::check_encode_slice(&Vec::from_hex("000000000000000000000000000000000000000000").unwrap());
-    assert_eq!(base58::from_check(s.as_str()).unwrap(), Vec::from_hex("000000000000000000000000000000000000000000").unwrap(), "base58");
-    let s = base58::check_encode_slice(&Vec::from_hex("000000000000000000000000000000000000000001").unwrap());
-    assert_eq!(base58::from_check(s.as_str()).unwrap(), Vec::from_hex("000000000000000000000000000000000000000001").unwrap(), "base58");
-    let s = base58::check_encode_slice(&Vec::from_hex("05FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").unwrap());
-    assert_eq!(base58::from_check(s.as_str()).unwrap(), Vec::from_hex("05FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").unwrap(), "base58");
-}
 
 #[test]
 fn test_sha1() {

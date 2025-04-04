@@ -823,189 +823,216 @@ impl PlatformSDK {
     }
 }
 
-// pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {
-//     let mut rng = rand::rngs::StdRng::from_entropy();
-//     let ipk1 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
-//     let ipk2 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
-//     let public_keys = BTreeMap::from_iter([(1, IdentityPublicKey::V0(
-//         IdentityPublicKeyV0 {
-//             id: ipk1.id(),
-//             purpose: Purpose::AUTHENTICATION,
-//             security_level: SecurityLevel::MASTER,
-//             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
-//             key_type: KeyType::ECDSA_SECP256K1,
-//             read_only: false,
-//             data: ipk1.data().clone(),
-//             disabled_at: Some(1)
-//         }
-//     )), (2, IdentityPublicKey::V0(
-//         IdentityPublicKeyV0 {
-//             id: ipk2.id(),
-//             purpose: Purpose::AUTHENTICATION,
-//             security_level: SecurityLevel::MASTER,
-//             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
-//             key_type: KeyType::ECDSA_SECP256K1,
-//             read_only: ipk2.read_only(),
-//             data: ipk2.data().clone(),
-//             disabled_at: Some(1)
-//         }
-//     ))]);
-//     Ok(Identity::V0(IdentityV0 { id, public_keys, balance: 2, revision: 1 }))
-// }
-
-// #[tokio::test]
-// async fn test_mainnet_get_identities_for_wallets_public_keys() {
-//     async fn mainnet_get_identities_for_wallets_public_keys() -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
-//         let key_hashes =
-//             [[56, 130, 69, 49, 128, 208, 91, 105, 110, 162, 39, 35, 66, 49, 38, 28, 133, 213, 133, 252], [91, 201, 141, 60, 109, 100, 243, 8, 136, 121, 118, 100, 169, 165, 198, 96, 228, 231, 76, 164], [238, 40, 164, 26, 84, 158, 90, 227, 77, 165, 195, 121, 94, 23, 24, 160, 173, 14, 21, 48], [102, 22, 141, 109, 43, 97, 177, 93, 105, 200, 103, 76, 134, 17, 198, 209, 120, 167, 71, 53], [59, 216, 144, 232, 223, 201, 28, 131, 40, 174, 25, 104, 227, 51, 26, 85, 54, 46, 98, 114]];
-//
-//         let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
-//         let get_data_contract = |ctx, identifier| {
-//             println!("get_data_contract: {:?}", identifier);
-//             Err(ContextProviderError::Generic("DDDDD".to_string()))
-//         };
-//         let get_quorum_public_key = |ctx, quorum_type, quorum_hash, core_chain_locked_height| {
-//             println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash, core_chain_locked_height);
-//             Err(ContextProviderError::Generic("DDDDD".to_string()))
-//         };
-//         let get_platform_activation_height = |ctx| {
-//             println!("get_platform_activation_height");
-//             Ok(0)
-//         };
-//         // let masternode_provider = Arc::new(MasternodeProvider::new());
-//         let address_list = Vec::from_iter(MAINNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:443").as_str()).ok()));
-//         let sdk = create_sdk(
-//             PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, context_arc.clone()), address_list);
-//
-//         let sdk_arc = Arc::new(sdk);
-//         let manager = IdentitiesManager::new(&sdk_arc);
-//         let key_hashes = BTreeMap::from_iter([("fcd1b9a4fc61468a".to_string(), key_hashes.to_vec())]);
-//         manager.get_identities_for_wallets_public_keys(key_hashes).await
-//     }
-//
-//     match mainnet_get_identities_for_wallets_public_keys().await {
-//         Ok(result) => {
-//             println!("Ok: {:?}", result);
-//         },
-//         Err(err) => {
-//             println!("Error: {:?}", err);
-//         }
-//     }
-// }
-
-// fn values_to_documents<'a>(document_type: DocumentTypeRef<'a>, identity_id: [u8; 32], entropy: [u8; 32], values: Vec<Value>, version: &'a PlatformVersion) -> Result<IndexMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>, Error> {
-//     let owner_id = Identifier::from(identity_id);
-//     let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
-//     for value in values.into_iter() {
-//         let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, version)
-//             .map_err(Error::from)?;
-//         documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
-//     }
-//     Ok(documents)
-// }
-
-// asdtwotwooct
 #[cfg(test)]
-fn create_test_sdk(chain: &ChainType) -> Sdk {
-    let address_list = match chain {
-        ChainType::MainNet => Vec::from_iter(MAINNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:443").as_str()).ok())),
-        _ => Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:1443").as_str()).ok())),
-    };
-    let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
-    let get_data_contract = |_ctx, identifier| {
-        println!("get_data_contract: {:?}", identifier);
-        Err(ContextProviderError::Generic("DDDDD".to_string()))
-    };
-    let get_quorum_public_key = |quorum_type, quorum_hash, core_chain_locked_height| {
-        println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash, core_chain_locked_height);
-        Err(ContextProviderError::Generic("DDDDD".to_string()))
-    };
-    let get_platform_activation_height = |_ctx| {
-        println!("get_platform_activation_height");
-        Ok(0)
-    };
-    create_sdk(
-        PlatformProvider::new(
-            Arc::new(get_quorum_public_key),
-            get_data_contract,
-            get_platform_activation_height,
-            context_arc.clone()),
-        address_list)
-}
-#[tokio::test]
-async fn search_identity_by_name() {
-    use dpp::system_data_contracts::SystemDataContract;
-    use dash_sdk::platform::DocumentQuery;
-    let chain = ChainType::TestNet;
-    let sdk = create_test_sdk(&chain);
-    let contract_id = SystemDataContract::DPNS.id();
-    let sdk_arc = Arc::new(sdk);
-    let query = DocumentQuery::new_with_data_contract_id(&sdk_arc, contract_id, "domain");
-    // let domain = "dash";
-    // let name = "asdtwotwooct";
+mod tests {
 
-    let doc_manager = DocumentsManager::new(&sdk_arc, chain);
+    // pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {
+    //     let mut rng = rand::rngs::StdRng::from_entropy();
+    //     let ipk1 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
+    //     let ipk2 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
+    //     let public_keys = BTreeMap::from_iter([(1, IdentityPublicKey::V0(
+    //         IdentityPublicKeyV0 {
+    //             id: ipk1.id(),
+    //             purpose: Purpose::AUTHENTICATION,
+    //             security_level: SecurityLevel::MASTER,
+    //             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
+    //             key_type: KeyType::ECDSA_SECP256K1,
+    //             read_only: false,
+    //             data: ipk1.data().clone(),
+    //             disabled_at: Some(1)
+    //         }
+    //     )), (2, IdentityPublicKey::V0(
+    //         IdentityPublicKeyV0 {
+    //             id: ipk2.id(),
+    //             purpose: Purpose::AUTHENTICATION,
+    //             security_level: SecurityLevel::MASTER,
+    //             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
+    //             key_type: KeyType::ECDSA_SECP256K1,
+    //             read_only: ipk2.read_only(),
+    //             data: ipk2.data().clone(),
+    //             disabled_at: Some(1)
+    //         }
+    //     ))]);
+    //     Ok(Identity::V0(IdentityV0 { id, public_keys, balance: 2, revision: 1 }))
+    // }
 
-    match doc_manager.documents_with_query(query.await.unwrap()).await {
-        Ok(result) => {
-            println!("Ok: {:?}", result);
-        }
-        Err(err) => {
-            println!("Error: {:?}", err);
-        }
-    }
+    // #[tokio::test]
+    // async fn test_mainnet_get_identities_for_wallets_public_keys() {
+    //     async fn mainnet_get_identities_for_wallets_public_keys() -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
+    //         let key_hashes =
+    //             [[56, 130, 69, 49, 128, 208, 91, 105, 110, 162, 39, 35, 66, 49, 38, 28, 133, 213, 133, 252], [91, 201, 141, 60, 109, 100, 243, 8, 136, 121, 118, 100, 169, 165, 198, 96, 228, 231, 76, 164], [238, 40, 164, 26, 84, 158, 90, 227, 77, 165, 195, 121, 94, 23, 24, 160, 173, 14, 21, 48], [102, 22, 141, 109, 43, 97, 177, 93, 105, 200, 103, 76, 134, 17, 198, 209, 120, 167, 71, 53], [59, 216, 144, 232, 223, 201, 28, 131, 40, 174, 25, 104, 227, 51, 26, 85, 54, 46, 98, 114]];
+    //
+    //         let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
+    //         let get_data_contract = |ctx, identifier| {
+    //             println!("get_data_contract: {:?}", identifier);
+    //             Err(ContextProviderError::Generic("DDDDD".to_string()))
+    //         };
+    //         let get_quorum_public_key = |ctx, quorum_type, quorum_hash, core_chain_locked_height| {
+    //             println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash, core_chain_locked_height);
+    //             Err(ContextProviderError::Generic("DDDDD".to_string()))
+    //         };
+    //         let get_platform_activation_height = |ctx| {
+    //             println!("get_platform_activation_height");
+    //             Ok(0)
+    //         };
+    //         // let masternode_provider = Arc::new(MasternodeProvider::new());
+    //         let address_list = Vec::from_iter(MAINNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:443").as_str()).ok()));
+    //         let sdk = create_sdk(
+    //             PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, context_arc.clone()), address_list);
+    //
+    //         let sdk_arc = Arc::new(sdk);
+    //         let manager = IdentitiesManager::new(&sdk_arc);
+    //         let key_hashes = BTreeMap::from_iter([("fcd1b9a4fc61468a".to_string(), key_hashes.to_vec())]);
+    //         manager.get_identities_for_wallets_public_keys(key_hashes).await
+    //     }
+    //
+    //     match mainnet_get_identities_for_wallets_public_keys().await {
+    //         Ok(result) => {
+    //             println!("Ok: {:?}", result);
+    //         },
+    //         Err(err) => {
+    //             println!("Error: {:?}", err);
+    //         }
+    //     }
+    // }
 
-}
+    // fn values_to_documents<'a>(document_type: DocumentTypeRef<'a>, identity_id: [u8; 32], entropy: [u8; 32], values: Vec<Value>, version: &'a PlatformVersion) -> Result<IndexMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>, Error> {
+    //     let owner_id = Identifier::from(identity_id);
+    //     let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+    //     for value in values.into_iter() {
+    //         let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, version)
+    //             .map_err(Error::from)?;
+    //         documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+    //     }
+    //     Ok(documents)
+    // }
 
-#[tokio::test]
-async fn test_testnet_get_identities_for_wallets_public_keys() {
-    async fn testnet_get_identities_for_wallets_public_keys() -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
-        use dashcore::hashes::hex::FromHex;
-        // let key_hashes =
-        //     [[61, 109, 200, 109, 172, 74, 46, 253, 71, 179, 136, 237, 252, 103, 3, 212, 243, 105, 230, 114],
-        //         [138, 75, 20, 232, 201, 81, 135, 207, 206, 176, 233, 200, 155, 226, 11, 43, 69, 218, 235, 100],
-        //         [212, 176, 162, 172, 173, 243, 14, 168, 196, 178, 235, 214, 97, 221, 188, 170, 146, 133, 186, 213],
-        //         [36, 251, 54, 207, 245, 49, 18, 218, 112, 196, 174, 195, 166, 228, 199, 177, 71, 79, 183, 61],
-        //         [131, 183, 222, 165, 235, 186, 250, 74, 70, 87, 236, 55, 208, 136, 178, 181, 212, 249, 106, 16]];
-        let key_hashes = [
-            [136, 226, 186, 122, 129, 233, 109, 32, 43, 42, 239, 97, 31, 1, 255, 200, 185, 184, 56, 243],
-            [50, 184, 144, 250, 181, 179, 124, 121, 215, 190, 42, 190, 227, 83, 233, 235, 186, 187, 0, 247],
-            [103, 161, 254, 195, 162, 50, 221, 58, 95, 177, 230, 64, 95, 145, 13, 191, 220, 175, 42, 168],
-            [31, 35, 161, 72, 134, 75, 216, 179, 146, 121, 99, 172, 8, 156, 166, 97, 237, 81, 145, 39],
-            [147, 219, 37, 98, 100, 110, 242, 176, 147, 244, 166, 220, 109, 201, 44, 116, 87, 82, 118, 1]
-        ];
+    use std::collections::BTreeMap;
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use dash_sdk::dapi_client::Address;
+    use dash_sdk::Sdk;
+    use dashcore::secp256k1::hashes::hex::DisplayHex;
+    use dpp::identity::Identity;
+    use drive_proof_verifier::error::ContextProviderError;
+    use dash_spv_crypto::network::ChainType;
+    use crate::{create_sdk, DEFAULT_TESTNET_ADDRESS_LIST, MAINNET_ADDRESS_LIST};
+    use crate::error::Error;
+    use crate::identity::manager::IdentitiesManager;
+    use crate::provider::PlatformProvider;
+    use crate::thread_safe_context::FFIThreadSafeContext;
 
+    // asdtwotwooct
+    #[allow(unused)]
+    fn create_test_sdk(chain: &ChainType) -> Sdk {
+        let address_list = match chain {
+            ChainType::MainNet => Vec::from_iter(MAINNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:443").as_str()).ok())),
+            _ => Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:1443").as_str()).ok())),
+        };
         let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
         let get_data_contract = |_ctx, identifier| {
             println!("get_data_contract: {:?}", identifier);
-            Err(ContextProviderError::Generic("get_data_contract: DDDDD".to_string()))
+            Err(ContextProviderError::Generic("DDDDD".to_string()))
         };
-        let get_quorum_public_key = Arc::new(|quorum_type: u32, quorum_hash: [u8; 32], core_chain_locked_height: u32| {
-            println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash.to_lower_hex_string(), core_chain_locked_height);
-            Ok(<[u8; 48]>::from_hex("90bfc37734097f59401a45554a7ddcf0e846e333b74bcd70c8f973a3d932697bdaf5671d0e4a4961a7d2c9a853833429").unwrap())
-        });
+        let get_quorum_public_key = |quorum_type, quorum_hash, core_chain_locked_height| {
+            println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash, core_chain_locked_height);
+            Err(ContextProviderError::Generic("DDDDD".to_string()))
+        };
         let get_platform_activation_height = |_ctx| {
             println!("get_platform_activation_height");
             Ok(0)
         };
-        // let address_list = Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(s).ok()));
-        let address_list = Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:1443").as_str()).ok()));
-
-        let sdk = create_sdk(
-            PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, context_arc.clone()), address_list);
-
-        let sdk_arc = Arc::new(sdk);
-        let manager = IdentitiesManager::new(&sdk_arc, ChainType::TestNet);
-        let key_hashes = BTreeMap::from_iter([("e092d129ef12bb99".to_string(), key_hashes.to_vec())]);
-        manager.get_identities_for_wallets_public_keys(key_hashes).await
+        create_sdk(
+            PlatformProvider::new(
+                Arc::new(get_quorum_public_key),
+                get_data_contract,
+                get_platform_activation_height,
+                context_arc.clone()),
+            address_list)
     }
+    // #[tokio::test]
+    // async fn search_identity_by_name() {
+    //     use dpp::system_data_contracts::SystemDataContract;
+    //     use dash_sdk::platform::DocumentQuery;
+    //     let chain = ChainType::TestNet;
+    //     let sdk = create_test_sdk(&chain);
+    //     let contract_id = SystemDataContract::DPNS.id();
+    //     let sdk_arc = Arc::new(sdk);
+    //     let doc_manager = DocumentsManager::new(&sdk_arc, chain);
+    //
+    //     let query = DocumentQuery::new_with_data_contract_id(&sdk_arc, contract_id, "domain").await;
+    //     match query {
+    //         Ok(doc_query) => {
+    //             match doc_manager.documents_with_query(doc_query).await {
+    //                 Ok(result) => {
+    //                     println!("Ok: {:?}", result);
+    //                 }
+    //                 Err(err) => {
+    //                     println!("Error: {:?}", err);
+    //                 }
+    //             }
+    //         }
+    //         Err(error) => {
+    //             println!("{:?}", error);
+    //         }
+    //     }
+    //     // let domain = "dash";
+    //     // let name = "asdtwotwooct";
+    //
+    //
+    //
+    // }
 
-    match testnet_get_identities_for_wallets_public_keys().await {
-        Ok(result) => {
-            println!("Ok: {:?}", result);
-        },
-        Err(err) => {
-            println!("Error: {:?}", err);
+    #[tokio::test]
+    async fn test_testnet_get_identities_for_wallets_public_keys() {
+        async fn testnet_get_identities_for_wallets_public_keys() -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
+            use dashcore::hashes::hex::FromHex;
+            // let key_hashes =
+            //     [[61, 109, 200, 109, 172, 74, 46, 253, 71, 179, 136, 237, 252, 103, 3, 212, 243, 105, 230, 114],
+            //         [138, 75, 20, 232, 201, 81, 135, 207, 206, 176, 233, 200, 155, 226, 11, 43, 69, 218, 235, 100],
+            //         [212, 176, 162, 172, 173, 243, 14, 168, 196, 178, 235, 214, 97, 221, 188, 170, 146, 133, 186, 213],
+            //         [36, 251, 54, 207, 245, 49, 18, 218, 112, 196, 174, 195, 166, 228, 199, 177, 71, 79, 183, 61],
+            //         [131, 183, 222, 165, 235, 186, 250, 74, 70, 87, 236, 55, 208, 136, 178, 181, 212, 249, 106, 16]];
+            let key_hashes = [
+                [136, 226, 186, 122, 129, 233, 109, 32, 43, 42, 239, 97, 31, 1, 255, 200, 185, 184, 56, 243],
+                [50, 184, 144, 250, 181, 179, 124, 121, 215, 190, 42, 190, 227, 83, 233, 235, 186, 187, 0, 247],
+                [103, 161, 254, 195, 162, 50, 221, 58, 95, 177, 230, 64, 95, 145, 13, 191, 220, 175, 42, 168],
+                [31, 35, 161, 72, 134, 75, 216, 179, 146, 121, 99, 172, 8, 156, 166, 97, 237, 81, 145, 39],
+                [147, 219, 37, 98, 100, 110, 242, 176, 147, 244, 166, 220, 109, 201, 44, 116, 87, 82, 118, 1]
+            ];
+
+            let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
+            let get_data_contract = |_ctx, identifier| {
+                println!("get_data_contract: {:?}", identifier);
+                Err(ContextProviderError::Generic("get_data_contract: DDDDD".to_string()))
+            };
+            let get_quorum_public_key = Arc::new(|quorum_type: u32, quorum_hash: [u8; 32], core_chain_locked_height: u32| {
+                println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash.to_lower_hex_string(), core_chain_locked_height);
+                Ok(<[u8; 48]>::from_hex("90bfc37734097f59401a45554a7ddcf0e846e333b74bcd70c8f973a3d932697bdaf5671d0e4a4961a7d2c9a853833429").unwrap())
+            });
+            let get_platform_activation_height = |_ctx| {
+                println!("get_platform_activation_height");
+                Ok(0)
+            };
+            // let address_list = Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(s).ok()));
+            let address_list = Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:1443").as_str()).ok()));
+
+            let sdk = create_sdk(
+                PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, context_arc.clone()), address_list);
+
+            let sdk_arc = Arc::new(sdk);
+            let manager = IdentitiesManager::new(&sdk_arc, ChainType::TestNet);
+            let key_hashes = BTreeMap::from_iter([("e092d129ef12bb99".to_string(), key_hashes.to_vec())]);
+            manager.get_identities_for_wallets_public_keys(key_hashes).await
+        }
+
+        match testnet_get_identities_for_wallets_public_keys().await {
+            Ok(result) => {
+                println!("Ok: {:?}", result);
+            },
+            Err(err) => {
+                println!("Error: {:?}", err);
+            }
         }
     }
 }

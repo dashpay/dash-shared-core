@@ -1,4 +1,4 @@
-use bls_signatures::G1Element;
+use dashcore::bls_signatures::G1Element;
 use dashcore::hashes::hex::FromHex;
 use dashcore::secp256k1::hashes::hex::DisplayHex;
 use dash_spv_crypto::crypto::byte_util::Zeroable;

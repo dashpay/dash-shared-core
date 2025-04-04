@@ -118,5 +118,11 @@ impl CoinJoinTransactionType {
         }
 
         Some(fee)
-    }   
+    }
+    pub fn is_none(&self) -> bool {
+        *self == Self::None
+    }
+    pub fn should_use_fee(&self) -> bool {
+        matches!(self, Self::MixingFee | Self::CreateDenomination | Self::MakeCollateralInputs)
+    }
 }

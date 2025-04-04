@@ -11,6 +11,7 @@ mod fermented_extended;
 mod tests;
 mod ffi_core_provider;
 pub mod coinjoin;
+#[cfg(not(test))]
 pub mod custom;
 
 pub extern crate dash_spv_masternode_processor;
@@ -53,6 +54,13 @@ impl Debug for DashSPVCore {
 // AnyOther by_value: Type(Dictionary(NonPrimitiveFermentable(SmartPointer(Arc($Ty(std :: sync :: Arc < dyn Fn (* const std :: os :: raw :: c_void , u32) -> Option < [u8 ; 32] > >, [Object(Type(Dictionary(LambdaFn($Ty(dyn Fn (* const std :: os :: raw :: c_void , u32) -> Option < [u8 ; 32] >, [])))))]))))))
 
 #[ferment_macro::export]
+#[derive(Clone)]
+pub struct DiffConfig {
+    pub bytes: Vec<u8>,
+    pub height: u32,
+}
+
+#[ferment_macro::export]
 impl DashSPVCore {
 
     pub fn with_callbacks<
@@ -70,6 +78,7 @@ impl DashSPVCore {
         NSS: Fn(*const std::os::raw::c_void, CacheState) + Send + Sync + 'static,
     >(
         chain_type: ChainType,
+        diff_config: Option<DiffConfig>,
         address_list: Option<Vec<&'static str>>,
 
         get_data_contract: DC,
@@ -95,7 +104,11 @@ impl DashSPVCore {
             notify_sync_state,
             context));
         let network = Network::from(chain_type.clone());
-        let processor = MasternodeProcessor::new(provider.clone(), network);
+        let processor = if let Some(DiffConfig { bytes, height }) = diff_config {
+            MasternodeProcessor::from_bincode_list_diff(provider.clone(), network, &bytes, height)
+        } else {
+            MasternodeProcessor::new(provider.clone(), network)
+        };
         let processor_arc = Arc::new(processor);
         let processor_arc_clone = Arc::clone(&processor_arc);
         let get_quorum_public_key = Arc::new(move |llmq_type: u32, llmq_hash: [u8; 32], core_chain_locked_height: u32| {

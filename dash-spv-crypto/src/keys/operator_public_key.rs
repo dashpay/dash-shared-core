@@ -1,5 +1,5 @@
 use std::io;
-use bls_signatures::G1Element;
+use dashcore::bls_signatures::G1Element;
 use dashcore::consensus::{Decodable, Encodable};
 use crate::keys::BLSKey;
 

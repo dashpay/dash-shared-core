@@ -1,4 +1,4 @@
-use bls_signatures::{BasicSchemeMPL, G1Element, G2Element, Scheme};
+use dashcore::bls_signatures::{BasicSchemeMPL, G1Element, G2Element, Scheme};
 use dashcore::hashes::hex::FromHex;
 use dash_spv_crypto::keys::{BLSKey, OperatorPublicKey};
 

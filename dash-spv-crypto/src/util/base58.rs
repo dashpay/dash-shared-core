@@ -252,6 +252,7 @@ impl From<key::Error> for Error {
 #[cfg(test)]
 mod tests {
     use dashcore::hashes::hex::FromHex;
+    use dashcore::secp256k1::hashes::hex::DisplayHex;
     use super::*;
 
     #[test]
@@ -310,6 +311,30 @@ mod tests {
         // Check that `len > 4` is enforced.
         assert_eq!(from_check(&encode_slice(&[1,2,3])), Err(Error::TooShort(3)));
 
+    }
+
+    #[test]
+    fn test_base58() {
+        let s = from("Ƀ#&$@*^(*#!^");
+        assert!(s.is_err(), "base58::from");
+        let s = from("");
+        assert_eq!(s.unwrap().to_lower_hex_string(), "", "base58::from");
+        let s = from("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
+        assert_eq!(encode_slice(&s.unwrap()), "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz", "base58");
+        let s = from("1111111111111111111111111111111111111111111111111111111111111111111");
+        assert_eq!(encode_slice(&s.unwrap()), "1111111111111111111111111111111111111111111111111111111111111111111", "base58");
+        let s = from("111111111111111111111111111111111111111111111111111111111111111111z");
+        assert_eq!(encode_slice(&s.unwrap()), "111111111111111111111111111111111111111111111111111111111111111111z", "base58");
+        let s = from("z");
+        assert_eq!(encode_slice(&s.unwrap()), "z", "base58");
+        let s = from_check("");
+        assert_eq!(s, Err(Error::TooShort(0)), "base58");
+        let s = check_encode_slice(&Vec::from_hex("000000000000000000000000000000000000000000").unwrap());
+        assert_eq!(from_check(s.as_str()).unwrap(), Vec::from_hex("000000000000000000000000000000000000000000").unwrap(), "base58");
+        let s = check_encode_slice(&Vec::from_hex("000000000000000000000000000000000000000001").unwrap());
+        assert_eq!(from_check(s.as_str()).unwrap(), Vec::from_hex("000000000000000000000000000000000000000001").unwrap(), "base58");
+        let s = check_encode_slice(&Vec::from_hex("05FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").unwrap());
+        assert_eq!(from_check(s.as_str()).unwrap(), Vec::from_hex("05FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").unwrap(), "base58");
     }
 }
 

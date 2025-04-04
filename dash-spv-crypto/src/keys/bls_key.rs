@@ -1,5 +1,5 @@
-use bls_signatures::bip32::{ExtendedPrivateKey, ExtendedPublicKey};
-use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
+use dashcore::bls_signatures::bip32::{ExtendedPrivateKey, ExtendedPublicKey};
+use dashcore::bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
 use dashcore::consensus::Encodable;
 use dashcore::hashes::{hash160, hex::FromHex, sha256, sha256d, Hash};
 use dashcore::secp256k1::hashes::hex::DisplayHex;

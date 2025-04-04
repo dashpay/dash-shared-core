@@ -15,6 +15,7 @@ use dashcore::network::message_qrinfo::QuorumSnapshot;
 use dashcore::network::message_qrinfo::QRInfo;
 use dashcore::network::message_sml::MnListDiff;
 use dashcore::prelude::CoreBlockHeight;
+use dashcore::sml::llmq_entry_verification::LLMQEntryVerificationStatus;
 use dashcore::sml::llmq_type::LLMQType;
 use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_engine::{MasternodeListEngine, MasternodeListEngineBlockContainer};
@@ -41,6 +42,14 @@ impl MasternodeProcessor {
     pub fn new(provider: Arc<dyn CoreProvider>, network: Network) -> Self {
         Self { provider, engine: MasternodeListEngine::default_for_network(network) }
     }
+
+    pub fn from_bincode_list_diff(provider: Arc<dyn CoreProvider>, network: Network, bytes: &[u8], expected_diff_height: u32) -> Self {
+        let diff = deserialize::<MnListDiff>(bytes).expect("failed to deserialize diff");
+        let engine = MasternodeListEngine::initialize_with_diff_to_height(diff, expected_diff_height, network)
+            .expect("expected to start engine");
+        Self { provider, engine }
+    }
+
 }
 
 #[ferment_macro::export]
@@ -99,6 +108,17 @@ impl MasternodeProcessor {
     pub fn current_masternode_list_quorum_count(&self) -> usize {
         let list = self.current_masternode_list();
         list.map(|list| list.quorums_count() as usize)
+            .unwrap_or_default()
+    }
+
+    pub fn current_quorums_of_type_count(&self, quorum_type: &LLMQType) -> usize {
+        self.current_masternode_list()
+            .and_then(|list| list.quorums.get(quorum_type).map(|q| q.len()))
+            .unwrap_or_default()
+    }
+    pub fn current_valid_quorums_of_type_count(&self, quorum_type: &LLMQType) -> usize {
+        self.current_masternode_list()
+            .and_then(|list| list.quorums.get(quorum_type).map(|q| q.values().filter(|q| q.verified == LLMQEntryVerificationStatus::Verified).count()))
             .unwrap_or_default()
     }
 
@@ -194,7 +214,9 @@ impl MasternodeProcessor {
             Some(get_height_fn),
         )?;
 
-        let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(&[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85], false);
+        let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(
+            &[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85],
+            false);
         Ok(hashes)
     }
 
@@ -225,6 +247,14 @@ impl MasternodeProcessor {
         };
         let base_block_hash = mn_list_diff.base_block_hash;
         let block_hash = mn_list_diff.block_hash;
+        let base_block_height = self.provider.lookup_block_height_by_hash(base_block_hash.to_byte_array());
+        let block_height = self.provider.lookup_block_height_by_hash(block_hash.to_byte_array());
+        if base_block_height != u32::MAX {
+            self.engine.feed_block_height(base_block_height, base_block_hash);
+        }
+        if block_height != u32::MAX {
+            self.engine.feed_block_height(block_height, block_hash);
+        }
         let signature = self.engine
             .apply_diff(mn_list_diff, diff_block_height, verify_quorums, None)
             .map_err(|e| ProcessingError::QuorumValidationError(QuorumValidationError::SMLError(e)))?;
@@ -244,4 +274,5 @@ impl MasternodeProcessor {
                 size
             })
     }
+
 }

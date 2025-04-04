@@ -2,9 +2,8 @@ use std::{fs, io::Read};
 use std::sync::Arc;
 use dashcore::hashes::Hash;
 use dashcore::hashes::hex::FromHex;
-use dashcore::secp256k1::hashes::hex::DisplayHex;
+use dashcore::ProTxHash;
 use dash_spv_crypto::network::ChainType;
-use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_masternode_processor::logger::register_rust_logger;
 use dash_spv_masternode_processor::block_store::MerkleBlock;
 use dash_spv_masternode_processor::processing::processor::processing_error::ProcessingError;
@@ -17,6 +16,8 @@ extern crate reqwest;
 
 #[cfg(all(feature = "test-helpers", feature = "use_serde"))]
 pub fn get_block_from_insight_by_hash(hash: [u8; 32]) -> Option<MerkleBlock> {
+    use dashcore::secp256k1::hashes::hex::DisplayHex;
+    use dash_spv_crypto::crypto::byte_util::Reversed;
     let path = format!("https://testnet-insight.dashevo.org/insight-api/block/{}", hash.reversed().to_lower_hex_string().as_str());
     request_block(path)
 }
@@ -82,7 +83,8 @@ pub fn perform_mnlist_diff_test_for_message(
     assert!(length - *offset >= 32);
     let _block_hash = TryInto::<[u8; 32]>::try_into(&message[32..64]).expect("Error converting message");
     assert!(length - *offset >= 4);
-    let total_transactions = TryInto::<u32>::try_into(&message[64..68]).expect("Error converting message");
+
+    let total_transactions = u32::from_le_bytes(message[64..68].try_into().expect("Error converting message"));
     assert_eq!(total_transactions, should_be_total_transactions, "Invalid transaction count");
 
     let use_insight_as_backup = false;
@@ -94,21 +96,23 @@ pub fn perform_mnlist_diff_test_for_message(
         .expect(format!("Masternode List at {}", block_hash.to_string()).as_str());
 
     let masternodes = &masternode_list.masternodes;
-    let mut pro_tx_hashes: Vec<[u8; 32]> = masternodes.keys().map(Hash::to_byte_array).collect();
+    let mut pro_tx_hashes: Vec<ProTxHash> = masternodes.keys().cloned().collect();
+    // let mut pro_tx_hashes: Vec<[u8; 32]> = masternodes.keys().map(|hash| hash.to_byte_array()).collect();
     pro_tx_hashes.sort();
-    let mut verify_hashes: Vec<[u8; 32]> = verify_string_hashes
+    let mut verify_hashes: Vec<ProTxHash> = verify_string_hashes
         .into_iter()
-        .map(|h| <[u8; 32]>::from_hex(h).unwrap().reversed())
+        .map(|h| ProTxHash::from_hex(h).unwrap())
+
+            // <[u8; 32]>::from_hex(h).unwrap().reversed())
         .collect();
     verify_hashes.sort();
 
     pro_tx_hashes.iter().zip(verify_hashes.iter()).for_each(|(h1, h2)| {
-        println!("{} == {}", h1.to_lower_hex_string(), h2.to_lower_hex_string());
+        println!("{} == {}", h1.to_hex(), h2.to_hex());
     });
 
     assert_eq!(verify_hashes, pro_tx_hashes, "Provider transaction hashes");
     let mut masternode_list_hashes: Vec<[u8; 32]> = pro_tx_hashes
-        .clone()
         .iter()
         .map(|hash| masternodes[hash].entry_hash.to_byte_array())
         .collect();
@@ -175,7 +179,7 @@ pub fn assert_diff_chain(chain: ChainType, diff_files: &[&'static str], qrinfo_f
     qrinfo_files.iter().for_each(|filename| {
         let protocol_version = extract_protocol_version_from_filename(filename).unwrap_or(70219);
         let message = load_message(chain.identifier(), filename);
-        let maybe_result = processor.process_qr_info_result_from_message(&message, true);
+        let maybe_result = processor.process_qr_info_result_from_message(&message, false, true);
         match maybe_result {
             Ok(_) |
             Err(ProcessingError::MissingLists(..)) => {},
