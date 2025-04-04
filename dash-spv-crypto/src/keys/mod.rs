@@ -118,8 +118,8 @@ impl From<dashcore::secp256k1::Error> for KeyError {
         Self::Any(value.to_string())
     }
 }
-impl From<bls_signatures::BlsError> for KeyError {
-    fn from(value: bls_signatures::BlsError) -> Self {
+impl From<dashcore::bls_signatures::BlsError> for KeyError {
+    fn from(value: dashcore::bls_signatures::BlsError) -> Self {
         Self::Any(value.to_string())
     }
 }

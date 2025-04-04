@@ -9,7 +9,7 @@ Pod::Spec.new do |s|
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
   s.source           = { :git => 'https://github.com/dashpay/dash-shared-core.git', :tag => s.version.to_s }
 
-  s.ios.deployment_target = '13.0'
+  s.ios.deployment_target = '14.0'
   s.macos.deployment_target = '10.15'
 
   s.prepare_command = <<-CMD

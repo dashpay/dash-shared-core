@@ -27,12 +27,6 @@ impl std::fmt::Display for ProcessingError {
 
 impl std::error::Error for ProcessingError {}
 
-// impl From<bls_signatures::BlsError> for ProcessingError {
-//     fn from(value: bls_signatures::BlsError) -> Self {
-//         ProcessingError::ParseError(format!("{value}"))
-//     }
-// }
-
 impl From<dashcore::secp256k1::Error> for ProcessingError {
     fn from(value: dashcore::secp256k1::Error) -> Self {
         ProcessingError::ParseError(format!("{value}"))
