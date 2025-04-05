@@ -39,7 +39,7 @@ impl CoinJoinTransactionType {
     pub fn from_tx(tx: &Transaction, input_values: &Vec<u64>) -> CoinJoinTransactionType {
         let input_sum: u64 = input_values.iter().sum();
 
-        if tx.input.len() == tx.output.len() && tx.output.iter().all(|output| CoinJoin::is_denominated_amount(output.value)) {
+        if tx.input.len() == tx.output.len() && tx.input.len() > 0 && tx.output.iter().all(|output| CoinJoin::is_denominated_amount(output.value)) {
             return Self::Mixing;
         } else if Self::is_mixing_fee(tx, input_sum) {
             return Self::MixingFee;
