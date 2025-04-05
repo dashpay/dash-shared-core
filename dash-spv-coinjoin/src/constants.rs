@@ -1,4 +1,5 @@
-use dash_spv_masternode_processor::chain::params::{MAX_MONEY, DUFFS};
+use dashcore::constants::MAX_MONEY;
+use dash_spv_crypto::util::params::DUFFS;
 
 pub const COINJOIN_AUTO_TIMEOUT_MIN: i32 = 5;
 pub const COINJOIN_AUTO_TIMEOUT_MAX: i32 = 15;

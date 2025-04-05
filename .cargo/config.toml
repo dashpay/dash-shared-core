@@ -1,8 +1,31 @@
+# macOS: -mmacosx-version-min=xx.yy
+# iphoneos: -mios-version-min=xx.yy
+# iphonesimulator: -mios-simulator-version-min=xx.yy
+
 [target.aarch64-apple-ios]
-rustflags = ["-C", "link-arg=-target", "-C", "link-arg=arm64-apple-ios13.0"]
+rustflags = ["-C", "link-arg=-mios-version-min=14.0", "-C", "link-arg=-target", "-C", "link-arg=arm64-apple-ios14.0", "-C", "link-arg=-Wl,-dead_strip"]
 
 [target.x86_64-apple-ios]
-rustflags = ["-C", "link-arg=-target", "-C", "link-arg=x86_64-apple-ios13.0"]
+rustflags = ["-C", "link-arg=-target", "-C", "link-arg=x86_64-apple-ios14.0", "-C", "link-arg=-mios-simulator-version-min=14.0", "-C", "link-arg=-Wl,-dead_strip"]
 
 [target.aarch64-apple-ios-sim]
-rustflags = ["-C", "link-arg=-target", "-C", "link-arg=arm64-apple-ios13.0-simulator"]
+rustflags = ["-C", "link-arg=-mios-simulator-version-min=14.0", "-C", "link-arg=-target", "-C", "link-arg=arm64-apple-ios14.0-simulator", "-C", "link-arg=-Wl,-dead_strip"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-mmacosx-version-min=10.15"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-mmacosx-version-min=10.15"]
+
+[env]
+CFLAGS_aarch64_apple_ios = "-mios-version-min=14.0"
+CFLAGS_aarch64_apple_ios_sim = "-mios-simulator-version-min=14.0"
+CFLAGS_x86_64_apple_ios = "-mios-simulator-version-min=14.0"
+
+CPPFLAGS_aarch64_apple_ios = "-mios-version-min=14.0"
+CPPFLAGS_aarch64_apple_ios_sim = "-mios-simulator-version-min=14.0"
+CPPFLAGS_x86_64_apple_ios = "-mios-simulator-version-min=14.0"
+
+LDFLAGS_aarch64_apple_ios = "-mios-version-min=14.0"
+LDLAGS_aarch64_apple_ios_sim = "-mios-simulator-version-min=14.0"
+LDLAGS_x86_64_apple_ios = "-mios-simulator-version-min=14.0"

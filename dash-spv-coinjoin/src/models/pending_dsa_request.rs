@@ -1,12 +1,10 @@
+use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
-
-use dash_spv_masternode_processor::common::SocketAddress;
-
 use crate::messages::CoinJoinAcceptMessage;
 
 #[derive(Debug)]
 pub(crate) struct PendingDsaRequest {
-    pub addr: SocketAddress,
+    pub addr: SocketAddr,
     pub dsa: CoinJoinAcceptMessage,
     time_created: SystemTime,
 }
@@ -14,7 +12,7 @@ pub(crate) struct PendingDsaRequest {
 const TIMEOUT: Duration = Duration::from_secs(15);
 
 impl PendingDsaRequest {
-    pub fn new(addr: SocketAddress, dsa: CoinJoinAcceptMessage) -> Self {
+    pub fn new(addr: SocketAddr, dsa: CoinJoinAcceptMessage) -> Self {
         Self { addr, dsa, time_created: SystemTime::now() }
     }
 

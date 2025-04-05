@@ -1,0 +1,38 @@
+[package]
+name = "dash-spv-platform"
+version = "0.1.0"
+description = "Library for interactions with platform SDK"
+
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = "1.0.95"
+
+dash-spv-crypto = { workspace = true }
+dash-spv-event-bus = { workspace = true }
+dash-spv-macro = { workspace = true }
+
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "message_verification", "quorum_validation"], default-features = false, branch = "feat/ferment" }
+dapi-grpc = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dapi-grpc", default-features = false, features = ["client"] }
+dash-sdk = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dash-sdk", default-features = false, features = ["apple"] }
+data-contracts = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "data-contracts", default-features = false, features = ["apple"] }
+dpp = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dpp", default-features = false, features = ["apple"] }
+drive = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive", default-features = false, features = ["verify"] }
+drive-proof-verifier = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive-proof-verifier", default-features = false, features = ["apple"] }
+platform-value = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-value", default-features = false, features = ["apple"] }
+platform-version = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-version", default-features = false, features = ["apple"] }
+
+ferment = { git = "https://github.com/dashpay/ferment", package = "ferment" }
+ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
+
+http = { version = "0.2.12" }
+indexmap = "2.7.0"
+tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = ["state-transitions"]
+state-transitions = ["dpp/state-transitions"]
+
+[lib]
+name = "dash_spv_platform"

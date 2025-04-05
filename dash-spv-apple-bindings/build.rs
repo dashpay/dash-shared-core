@@ -1,36 +1,44 @@
 extern crate cbindgen;
+extern crate ferment_sys;
 
-use std::env;
+use ferment_sys::Ferment;
+// #[cfg(feature = "objc")]
+// use ferment_sys::{Lang, ObjC, XCodeConfig};
 
 fn main() {
-    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    // Here we write down crate names (!) where we want to retrieve C-bindings
-    let includes = vec![
-        "dash-spv-masternode-processor".to_string(),
-        "dash-spv-coinjoin".to_string(),
-        "rs-merk-verify-c-binding".to_string()
-    ];
-    let config = cbindgen::Config {
-        language: cbindgen::Language::C,
-        parse: cbindgen::ParseConfig {
-            parse_deps: true,
-            include: Some(includes.clone()),
-            extra_bindings: includes,
-            ..Default::default()
-        },
-        enumeration: cbindgen::EnumConfig {
-            prefix_with_name: true,
-            ..Default::default()
-        },
-        braces: cbindgen::Braces::SameLine,
-        line_length: 80,
-        tab_width: 4,
-        // cpp_compat: false,
-        documentation_style: cbindgen::DocumentationStyle::C,
-        include_guard: Some("dash_shared_core_h".to_string()),
-        ..Default::default()
-    };
-    cbindgen::generate_with_config(&crate_dir, config)
-        .unwrap()
-        .write_to_file("../target/dash_shared_core.h");
+    if let Ok(profile) = std::env::var("CARGO_PROFILE") {
+        if profile == "debug" {
+            println!("Skipping build.rs in debug mode");
+            return; // Exit early in debug mode
+        }
+    }
+
+    match Ferment::with_crate_name("dash_spv_apple_bindings")
+        .with_cbindgen_config_from_file("cbindgen.toml")
+        .with_default_mod_name()
+        .with_external_crates(vec![
+            "dash-spv-coinjoin",
+            "dash-spv-crypto",
+            "dash-spv-keychain",
+            "dash-spv-masternode-processor",
+            "dash-spv-platform",
+            "dash-sdk",
+            "platform-value",
+            "platform-version",
+            "data-contracts",
+            "dpp",
+            "drive-proof-verifier",
+            "rs-dapi-client",
+            "dashcore",
+            "dashcore_hashes",
+            "versioned-feature-core",
+        ])
+        // .with_languages(vec![
+        //     #[cfg(feature = "objc")]
+        //     Lang::ObjC(ObjC::new(XCodeConfig::new("DS", "DashSharedCore", "dash_shared_core"))),
+        // ])
+        .generate() {
+        Ok(_) => println!("[ferment] [ok]"),
+        Err(err) => panic!("[ferment] [err]: {}", err)
+    }
 }

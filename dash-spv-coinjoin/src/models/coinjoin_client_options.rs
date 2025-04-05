@@ -1,7 +1,7 @@
-use dash_spv_masternode_processor::chain::common::ChainType;
+use dash_spv_crypto::network::ChainType;
 
-#[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[ferment_macro::export]
 pub struct CoinJoinClientOptions {
     pub enable_coinjoin: bool,
     pub coinjoin_amount: u64,

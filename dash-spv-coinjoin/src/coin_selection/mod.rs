@@ -1,2 +1,2 @@
-pub(crate) mod compact_tally_item;
-pub(crate) mod input_coin;
+pub mod compact_tally_item;
+pub mod input_coin;

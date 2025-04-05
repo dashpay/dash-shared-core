@@ -1,5 +1,4 @@
 use std::{cell::RefCell, rc::Rc};
-use tracing::debug;
 use logging::*;
 use crate::wallet_ex::WalletEx;
 use super::tx_destination::TxDestination;
@@ -47,7 +46,7 @@ impl<'a> ReserveDestination {
             }
         }
 
-        return self.key.clone();
+        self.key.clone()
     }
 
     pub fn keep_destination(&mut self) {
@@ -62,7 +61,7 @@ impl<'a> ReserveDestination {
 
     pub fn return_destination(&mut self) {
         if self.key.is_some() {
-            self.wallet_ex.borrow_mut().add_unused_key(&self.key);
+            self.wallet_ex.borrow_mut().add_unused_key(self.key.clone().unwrap());
         } else {
             log_debug!(target: "CoinJoin", "cannot return key");
         }

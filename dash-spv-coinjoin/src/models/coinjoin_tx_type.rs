@@ -1,9 +1,8 @@
-use dash_spv_masternode_processor::tx::Transaction;
-
+use dashcore::Transaction;
 use crate::coinjoin::CoinJoin;
 
-#[repr(C)]
 #[derive(Debug, PartialEq)]
+#[ferment_macro::export]
 pub enum CoinJoinTransactionType {
     None,
     CreateDenomination,
@@ -13,33 +12,56 @@ pub enum CoinJoinTransactionType {
     Send,
 }
 
+#[ferment_macro::export]
 impl CoinJoinTransactionType {
-    pub fn from_tx(tx: &Transaction, input_values: &Vec<u64>) -> Self {
+
+    pub fn index(&self) -> u8 {
+        match self {
+            Self::None => 0,
+            Self::CreateDenomination => 1,
+            Self::MakeCollateralInputs => 2,
+            Self::MixingFee => 3,
+            Self::Mixing => 4,
+            Self::Send => 5,
+        }
+    }
+    pub fn from_index(index: u8) -> CoinJoinTransactionType {
+        match index {
+            0 => Self::None,
+            1 => Self::CreateDenomination,
+            2 => Self::MakeCollateralInputs,
+            3 => Self::MixingFee,
+            4 => Self::Mixing,
+            5 => Self::Send,
+            _ => panic!("Invalid index {}", index),
+        }
+    }
+    pub fn from_tx(tx: &Transaction, input_values: &Vec<u64>) -> CoinJoinTransactionType {
         let input_sum: u64 = input_values.iter().sum();
 
-        if tx.inputs.len() == tx.outputs.len() && tx.inputs.len() > 0 && tx.outputs.iter().all(|output| CoinJoin::is_denominated_amount(output.amount)) {
+        if tx.input.len() == tx.output.len() && tx.input.len() > 0 && tx.output.iter().all(|output| CoinJoin::is_denominated_amount(output.amount)) {
             return Self::Mixing;
         } else if Self::is_mixing_fee(tx, input_sum) {
             return Self::MixingFee;
         } else {
             let mut make_collateral = false;
-            if tx.outputs.len() == 2 {
-                let amount_0 = tx.outputs[0].amount;
-                let amount_1 = tx.outputs[1].amount;
+            if tx.output.len() == 2 {
+                let amount_0 = tx.output[0].value;
+                let amount_1 = tx.output[1].value;
                 // <case1>, see CCoinJoinClientSession.makeCollateralAmounts
                 make_collateral = (amount_0 == CoinJoin::get_max_collateral_amount() && !CoinJoin::is_denominated_amount(amount_1) && amount_1 >= CoinJoin::get_collateral_amount()) ||
                     (amount_1 == CoinJoin::get_max_collateral_amount() && !CoinJoin::is_denominated_amount(amount_0) && amount_0 >= CoinJoin::get_collateral_amount()) ||
                     // <case2>, see CCoinJoinClientSession.makeCollateralAmounts
                     (amount_0 == amount_1 && CoinJoin::is_collateral_amount(amount_0));
-            } else if tx.outputs.len() == 1 {
+            } else if tx.output.len() == 1 {
                 // <case3>, see CCoinJoinClientSession.makeCollateralAmounts
-                make_collateral = CoinJoin::is_collateral_amount(tx.outputs[0].amount);
+                make_collateral = CoinJoin::is_collateral_amount(tx.output[0].value);
             }
             if make_collateral {
                 return Self::MakeCollateralInputs;
             } else {
-                for output in &tx.outputs {
-                    if CoinJoin::is_denominated_amount(output.amount) {
+                for output in &tx.output {
+                    if CoinJoin::is_denominated_amount(output.value) {
                         return Self::CreateDenomination; // Done, it's definitely a tx creating mixing denoms, no need to look any further
                     }
                 }
@@ -48,21 +70,20 @@ impl CoinJoinTransactionType {
 
         // is this a coinjoin send transaction
         if CoinJoinTransactionType::is_coinjoin_send(tx, &input_values) {
-            return Self::Send;
+            Self::Send
+        } else {
+            Self::None
         }
-
-        return Self::None;
     }
 
-    fn is_coinjoin_send(tx: &Transaction, input_values: &Vec<u64>) -> bool {
+    pub fn is_coinjoin_send(tx: &Transaction, input_values: &Vec<u64>) -> bool {
         let inputs_are_denominated = input_values.iter().all(|input| CoinJoin::is_denominated_amount(*input));
         let fee = CoinJoinTransactionType::get_fee(tx, input_values);
-        
-        return inputs_are_denominated && fee.map_or(false, |f| f != 0);
+        inputs_are_denominated && fee.map_or(false, |f| f != 0)
     }
 
-    fn is_mixing_fee(tx: &Transaction, inputs_value: u64) -> bool {
-        let outputs_value = tx.outputs.iter().map(|output| output.amount).sum();
+    pub fn is_mixing_fee(tx: &Transaction, inputs_value: u64) -> bool {
+        let outputs_value = tx.output.iter().map(|output| output.value).sum();
         
         if inputs_value < outputs_value {
             return false;
@@ -71,20 +92,20 @@ impl CoinJoinTransactionType {
         let net_value = inputs_value - outputs_value;
         
         // check for the tx with OP_RETURN
-        if outputs_value == 0 && tx.inputs.len() == 1 && tx.outputs.len() == 1 && tx.outputs[0].is_op_return() {
+        if outputs_value == 0 && tx.input.len() == 1 && tx.output.len() == 1 && tx.output[0].script_pubkey.is_op_return() {
             return true;
         }
 
-        return tx.inputs.len() == 1 && tx.outputs.len() == 1
+        tx.input.len() == 1 && tx.output.len() == 1
             && CoinJoin::is_collateral_amount(inputs_value)
             && CoinJoin::is_collateral_amount(outputs_value)
-            && CoinJoin::is_collateral_amount(net_value);
+            && CoinJoin::is_collateral_amount(net_value)
     }
 
-    fn get_fee(tx: &Transaction, inputs_values: &Vec<u64>) -> Option<u64> {
+    pub fn get_fee(tx: &Transaction, inputs_values: &Vec<u64>) -> Option<u64> {
         let mut fee: u64 = 0;
 
-        if inputs_values.is_empty() || tx.outputs.is_empty() {
+        if inputs_values.is_empty() || tx.output.is_empty() {
             return None;
         }
 
@@ -92,10 +113,16 @@ impl CoinJoinTransactionType {
             fee = fee.saturating_add(*input_value);
         }
 
-        for output in &tx.outputs {
-            fee = fee.saturating_sub(output.amount);
+        for output in &tx.output {
+            fee = fee.saturating_sub(output.value);
         }
 
-        return Some(fee);
-    }   
+        Some(fee)
+    }
+    pub fn is_none(&self) -> bool {
+        *self == Self::None
+    }
+    pub fn should_use_fee(&self) -> bool {
+        matches!(self, Self::MixingFee | Self::CreateDenomination | Self::MakeCollateralInputs)
+    }
 }

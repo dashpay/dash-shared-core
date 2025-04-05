@@ -18,7 +18,7 @@ chain = Chain.from_string(args.chain)
 
 blocks = []
 for i in range(root, head, step):
-    r = requests.get(f'https://{chain.api_base}/insight-api-dash/block/{i}')
+    r = requests.get(f'https://{chain.api_base}/insight-api/block/{i}')
     block = r.json()
     block_hash = block["hash"]
     block_height  = block["height"]
@@ -26,5 +26,5 @@ for i in range(root, head, step):
     print('MerkleBlock::reversed({}, "{}", "{}"), '.format(block_height, block_hash, merkle_root))
     blocks.append(block)
 
-with open('scripts/{}.json'.format(chain.name), 'w', encoding='utf-8') as f:
-    json.dump(blocks, f, ensure_ascii=False, indent=4)
+# with open('scripts/{}.json'.format(chain.name), 'w', encoding='utf-8') as f:
+#     json.dump(blocks, f, ensure_ascii=False, indent=4)

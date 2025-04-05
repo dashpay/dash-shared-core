@@ -1,10 +1,11 @@
-use std::ffi::c_void;
+use std::os::raw::c_void;
 use std::net::SocketAddr;
 use std::{ptr, thread};
 use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 use logging::*;
+#[cfg(target_os = "ios")]
 use tracing::*;
 
 use system_configuration::core_foundation::base::{kCFAllocatorDefault, TCFType};
