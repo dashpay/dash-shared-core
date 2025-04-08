@@ -35,6 +35,7 @@ use dash_spv_masternode_processor::processing::core_provider::CoreProviderError;
 use dash_spv_masternode_processor::processing::MasternodeProcessor;
 use dash_spv_platform::PlatformSDK;
 use platform_value::{BinaryData, Identifier};
+use dash_spv_crypto::crypto::byte_util::Reversed;
 use dash_spv_masternode_processor::models::sync_state::CacheState;
 use dash_spv_platform::cache::PlatformCache;
 use crate::ffi_core_provider::FFICoreProvider;
@@ -113,7 +114,8 @@ impl DashSPVCore {
         let processor_arc_clone = Arc::clone(&processor_arc);
         let get_quorum_public_key = Arc::new(move |llmq_type: u32, llmq_hash: [u8; 32], core_chain_locked_height: u32| {
             let llmq_type = LLMQType::from_u16(llmq_type as u16);
-            let llmq_hash = QuorumHash::from_byte_array(llmq_hash);
+            let llmq_hash = QuorumHash::from_byte_array(llmq_hash.reversed());
+            // let llmq_hash = QuorumHash::from_byte_array(llmq_hash);
             processor_arc_clone.engine.find_quorum_public_key(&llmq_type, &llmq_hash)
                 .map(|key| key.0)
                 .ok_or(ContextProviderError::InvalidQuorum(format!("Quorum not found: {}: {}", llmq_type, llmq_hash.to_string())))

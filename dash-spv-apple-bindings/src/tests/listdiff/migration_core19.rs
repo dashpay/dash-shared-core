@@ -4,11 +4,9 @@ use dash_spv_masternode_processor::block_store::MerkleBlock;
 use dash_spv_masternode_processor::test_helpers::load_message;
 use dash_spv_masternode_processor::tests::FFIContext;
 use crate::ffi_core_provider::FFICoreProvider;
-use crate::tests::common::register_logger;
 
 #[test]
 fn test_verify_chained_rotation() {
-    register_logger();
     let version = 70224;
     let chain = ChainType::DevNet(DevnetType::Screwdriver);
     let context = Arc::new(

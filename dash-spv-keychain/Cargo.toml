@@ -7,7 +7,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
+ferment-macro = { version = "0.2", package = "ferment-macro" }
 
 [lib]
 name = "dash_spv_keychain"

@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-extern crate simplelog;
 
 #[cfg(any(test, feature = "test-helpers"))]
 pub mod tests;
@@ -18,5 +17,4 @@ pub mod common;
 pub mod models;
 pub mod processing;
 pub mod util;
-pub mod logger;
 

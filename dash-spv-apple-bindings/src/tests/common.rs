@@ -4,55 +4,11 @@ use dashcore::hashes::Hash;
 use dashcore::hashes::hex::FromHex;
 use dashcore::ProTxHash;
 use dash_spv_crypto::network::ChainType;
-use dash_spv_masternode_processor::logger::register_rust_logger;
 use dash_spv_masternode_processor::block_store::MerkleBlock;
 use dash_spv_masternode_processor::processing::processor::processing_error::ProcessingError;
 use dash_spv_masternode_processor::test_helpers::load_message;
 pub use dash_spv_masternode_processor::tests::FFIContext;
 use crate::ffi_core_provider::FFICoreProvider;
-
-extern crate libc;
-extern crate reqwest;
-
-#[cfg(all(feature = "test-helpers", feature = "use_serde"))]
-pub fn get_block_from_insight_by_hash(hash: [u8; 32]) -> Option<MerkleBlock> {
-    use dashcore::secp256k1::hashes::hex::DisplayHex;
-    use dash_spv_crypto::crypto::byte_util::Reversed;
-    let path = format!("https://testnet-insight.dashevo.org/insight-api/block/{}", hash.reversed().to_lower_hex_string().as_str());
-    request_block(path)
-}
-#[cfg(all(feature = "test-helpers", feature = "use_serde"))]
-pub fn get_block_from_insight_by_height(height: u32) -> Option<MerkleBlock> {
-    let path = format!("https://testnet-insight.dashevo.org/insight-api/block/{}", height);
-    request_block(path)
-}
-
-#[cfg(all(feature = "test-helpers", feature = "use_serde"))]
-pub fn request_block(path: String) -> Option<MerkleBlock> {
-    println!("request_block: {}", path.as_str());
-    match reqwest::blocking::get(path.as_str()) {
-        Ok(response) => match response.json::<serde_json::Value>() {
-            Ok(json) => {
-                let block: dash_spv_masternode_processor::tests::serde_helper::Block = serde_json::from_value(json).unwrap();
-                let merkle_block = MerkleBlock::from(block);
-                println!("request_block: {}", path.as_str());
-                Some(merkle_block)
-            },
-            Err(err) => {
-                println!("{}", err);
-                None
-            },
-        },
-        Err(err) => {
-            println!("{}", err);
-            None
-        },
-    }
-}
-
-pub fn register_logger() {
-    unsafe { register_rust_logger(); }
-}
 
 pub fn get_file_as_byte_vec(filename: &str) -> Vec<u8> {
     //println!("get_file_as_byte_vec: {}", filename);
@@ -156,7 +112,6 @@ pub fn extract_protocol_version_from_filename(filename: &str) -> Option<u32> {
 }
 
 pub fn assert_diff_chain(chain: ChainType, diff_files: &[&'static str], qrinfo_files: &[&'static str], block_store: Option<Vec<MerkleBlock>>, allow_invalid_merkle_roots: bool) {
-    register_logger();
     let context = Arc::new(FFIContext::chain_default(chain.clone(), false, block_store.unwrap_or_default()));
     let mut processor = FFICoreProvider::default_processor(Arc::clone(&context), chain.clone());
     diff_files.iter().for_each(|filename| {
