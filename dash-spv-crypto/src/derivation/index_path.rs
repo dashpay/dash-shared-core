@@ -99,10 +99,20 @@ pub trait IIndexPath: Sized {
                 .collect())
     }
     fn last_index(&self) -> Self::Item {
-        self.index_at_position(self.length() - 1)
+        let len = self.length();
+        if len > 0 {
+            self.index_at_position(len - 1)
+        } else {
+            Self::Item::max()
+        }
     }
     fn last_hardened(&self) -> bool {
-        self.hardened_at_position(self.length() - 1)
+        let len = self.length();
+        if len > 0 {
+            self.hardened_at_position(len - 1)
+        } else {
+            false
+        }
     }
     fn indexes(&self) -> &Vec<Self::Item>;
     fn hardened_indexes(&self) -> &Vec<bool>;
@@ -121,7 +131,12 @@ pub trait IIndexPath: Sized {
         }
     }
     fn terminal_hardened(&self) -> bool {
-        self.hardened_at_position(self.hardened_indexes().len() - 1)
+        let len = self.hardened_indexes().len();
+        if len > 0 {
+            self.hardened_at_position(len - 1)
+        } else {
+            false
+        }
     }
 
     fn index_u64_at_position(&self, position: usize) -> u64 {

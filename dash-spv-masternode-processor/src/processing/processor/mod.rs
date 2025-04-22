@@ -16,7 +16,7 @@ use dashcore::network::message_qrinfo::QRInfo;
 use dashcore::network::message_sml::MnListDiff;
 use dashcore::prelude::CoreBlockHeight;
 use dashcore::sml::llmq_entry_verification::LLMQEntryVerificationStatus;
-use dashcore::sml::llmq_type::LLMQType;
+use dashcore::sml::llmq_type::{DKGParams, LLMQType, DKG_60_75, DKG_DEVNET_DIP_0024};
 use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_engine::{MasternodeListEngine, MasternodeListEngineBlockContainer};
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
@@ -26,11 +26,20 @@ use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::processing::core_provider::CoreProvider;
 use crate::processing::processor::processing_error::ProcessingError;
 
+#[ferment_macro::export]
+#[derive(Clone)]
+pub struct DiffConfig {
+    pub bytes: Vec<u8>,
+    pub height: u32,
+}
+
+
 // https://github.com/rust-lang/rfcs/issues/2770
 #[ferment_macro::opaque]
 pub struct MasternodeProcessor {
     pub provider: Arc<dyn CoreProvider>,
     pub engine: MasternodeListEngine,
+    pub last_known_qr_info_block_height: Option<u32>
     // pub dapi_address_handler: Option<Arc<dyn DAPIAddressHandler>>,
 }
 impl Debug for MasternodeProcessor {
@@ -40,22 +49,53 @@ impl Debug for MasternodeProcessor {
 }
 impl MasternodeProcessor {
     pub fn new(provider: Arc<dyn CoreProvider>, network: Network) -> Self {
-        Self { provider, engine: MasternodeListEngine::default_for_network(network) }
+        Self { provider, engine: MasternodeListEngine::default_for_network(network), last_known_qr_info_block_height: None }
     }
 
-    pub fn from_bincode_list_diff(provider: Arc<dyn CoreProvider>, network: Network, bytes: &[u8], expected_diff_height: u32) -> Self {
-        let diff = deserialize::<MnListDiff>(bytes).expect("failed to deserialize diff");
-        let engine = MasternodeListEngine::initialize_with_diff_to_height(diff, expected_diff_height, network)
-            .expect("expected to start engine");
-        Self { provider, engine }
+    pub fn from_diff_config(provider: Arc<dyn CoreProvider>, network: Network, diff_config: Option<DiffConfig>) -> Self {
+        diff_config
+            .and_then(|DiffConfig { bytes, height }| Self::from_checkpoint(provider.clone(), network, &bytes, height))
+            .unwrap_or(Self::new(provider.clone(), network))
     }
 
+    pub fn from_checkpoint(provider: Arc<dyn CoreProvider>, network: Network, bytes: &[u8], expected_diff_height: u32) -> Option<Self> {
+        maybe_engine_from_checkpoint(network, bytes, expected_diff_height)
+            .map(|engine| Self { provider, engine, last_known_qr_info_block_height: None })
+    }
+
+}
+
+fn maybe_engine_from_checkpoint(network: Network, bytes: &[u8], expected_diff_height: u32) -> Option<MasternodeListEngine> {
+    match deserialize::<MnListDiff>(bytes) {
+        Ok(diff) => match MasternodeListEngine::initialize_with_diff_to_height(diff, expected_diff_height, network) {
+            Ok(engine) => Some(engine),
+            Err(err) => {
+                println!("[Processor] Failed to initialize engine: {}", err);
+                None
+
+            }
+        }
+        Err(err) => {
+            println!("[Processor] Failed to deserialize checkpoint: {}", err);
+            None
+        }
+    }
 }
 
 #[ferment_macro::export]
 impl MasternodeProcessor {
 
+    pub fn reinit_engine(&mut self, chain_type: ChainType, diff_config: Option<DiffConfig>) {
+        let network = Network::from(chain_type);
+        if let Some(engine) = diff_config.and_then(|DiffConfig { bytes, height }| maybe_engine_from_checkpoint(network, &bytes, height)) {
+            self.engine = engine;
+        } else {
+            self.engine = MasternodeListEngine::default_for_network(network);
+        }
+    }
+
     pub fn clear(&mut self) {
+        self.last_known_qr_info_block_height = None;
         self.engine.clear();
     }
     pub fn current_masternode_list(&self) -> Option<MasternodeList> {
@@ -133,6 +173,23 @@ impl MasternodeProcessor {
                 .unwrap_or(chain_type.genesis_hash())
     }
 
+    pub fn is_current_masternode_list_outdated(&self, tip_height: u32) -> bool {
+        match self.current_masternode_list() {
+            Some(list) => list.known_height == u32::MAX || tip_height > list.known_height + 8,
+            None => true,
+        }
+    }
+
+    pub fn is_qr_info_outdated(&self, tip_height: u32) -> bool {
+        match self.last_known_qr_info_block_height {
+            None => true,
+            Some(last_qr_block_height) => {
+                let DKGParams { mining_window_end, interval, .. } = if self.provider.chain_type().is_devnet_any() { DKG_DEVNET_DIP_0024 } else { DKG_60_75 };
+                tip_height % interval == mining_window_end && tip_height >= last_qr_block_height + mining_window_end
+            }
+        }
+    }
+
     pub fn masternode_lists(&self) -> BTreeMap<CoreBlockHeight, MasternodeList> {
         self.engine.masternode_lists.clone()
     }
@@ -160,6 +217,17 @@ impl MasternodeProcessor {
     #[cfg(feature = "message_verification")]
     pub fn verify_chain_lock(&self, chain_lock: &ChainLock) -> Result<bool, MessageVerificationError> {
         self.engine.verify_chain_lock(chain_lock).map(|_| true)
+    }
+
+    #[cfg(feature = "quorum_validation")]
+    pub fn verify_current_masternode_list_quorums(&mut self) -> Result<bool, QuorumValidationError> {
+        let current_list = self.current_masternode_list()
+            .ok_or(QuorumValidationError::CorruptedCodeExecution("No current_masternode_list".to_string()))?;
+        self.engine.verify_non_rotating_masternode_list_quorums(
+            current_list.known_height,
+            &[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85]
+        )?;
+        Ok(true)
     }
 
 
@@ -216,7 +284,7 @@ impl MasternodeProcessor {
 
         let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(
             &[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85],
-            false);
+            true);
         Ok(hashes)
     }
 
@@ -275,4 +343,39 @@ impl MasternodeProcessor {
             })
     }
 
+    pub fn print_engine_status(&self) {
+        let mut debug_string = format!("[{}] Engine Status:", self.engine.network);
+        debug_string.push_str(format!("KnownLists ({}):\n", self.engine.masternode_lists.len()).as_str());
+        debug_string.push_str(self.engine.masternode_lists.iter().fold(String::new(), |mut acc, (block_height, list)| {
+            acc.push_str(format!("\t{}: {}\n", block_height, list.block_hash).as_str());
+            acc
+        }).as_str());
+        debug_string.push_str("Quorums Statuses: \n");
+        debug_string.push_str(self.engine.quorum_statuses.iter().fold(String::new(), |mut acc, (llmq_type, quorums)| {
+            let quorums_of_type = quorums.iter().fold(String::new(), |mut acc, (quorum_hash, (set, key, status))| {
+                acc.push_str(format!("\t\t{}: {}: {}\n", quorum_hash.to_string(), key.to_string(), status).as_str());
+                acc
+
+            });
+            acc.push_str(format!("\t{llmq_type}:\n{quorums_of_type}\n").as_str());
+            acc
+        }).as_str());
+        println!("{debug_string}");
+    }
+}
+
+#[cfg(all(test, feature = "test-helpers"))]
+mod test {
+    use dashcore::consensus::deserialize;
+    use dashcore::network::message_sml::MnListDiff;
+    use crate::test_helpers::message_from_file;
+
+    #[test]
+    fn test_testnet_qr_info() {
+        let message = message_from_file("../files/QRINFO_MISSED_70235_766510624.244100.dat");
+        let mn_list_diff : MnListDiff = deserialize(message.as_slice()).expect("message");
+        let base_block_hash = mn_list_diff.base_block_hash;
+        let block_hash = mn_list_diff.block_hash;
+        println!("base block hash: {}, {}", base_block_hash.to_string(), block_hash.to_string());
+    }
 }

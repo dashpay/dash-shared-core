@@ -1,5 +1,6 @@
 use dashcore::consensus;
 use dashcore::secp256k1::hashes::hex::DisplayHex;
+use dashcore::sml::error::SmlError;
 use dashcore::sml::quorum_validation_error::QuorumValidationError;
 use crate::processing::CoreProviderError;
 
@@ -18,6 +19,7 @@ pub enum ProcessingError {
     EncodeError(String),
     DecodeError(String),
     QuorumValidationError(QuorumValidationError),
+    SML(SmlError),
 }
 impl std::fmt::Display for ProcessingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -48,6 +50,11 @@ impl From<CoreProviderError> for ProcessingError {
 impl From<QuorumValidationError> for ProcessingError {
     fn from(value: QuorumValidationError) -> Self {
         ProcessingError::QuorumValidationError(value)
+    }
+}
+impl From<SmlError> for ProcessingError {
+    fn from(value: SmlError) -> Self {
+        ProcessingError::SML(value)
     }
 }
 
@@ -83,6 +90,8 @@ impl ProcessingError {
                 format!("EncodeError({encode_error})"),
             ProcessingError::DecodeError(encode_error) =>
                 format!("DecodeError({encode_error})"),
+            ProcessingError::SML(error) =>
+                format!("SML({error})"),
         }
     }
 }

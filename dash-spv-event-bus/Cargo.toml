@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 #rs-dapi-client = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "rs-dapi-client" }
+ferment-macro = { version = "0.2", package = "ferment-macro" }
 
 [lib]
 name = "dash_spv_event_bus"

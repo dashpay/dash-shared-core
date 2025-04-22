@@ -10,8 +10,8 @@ license.workspace = true
 keywords.workspace = true
 
 [dependencies]
-tracing = { version = "0.1.40", features = ["max_level_debug"] } #"release_max_level_warn"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing = { version = "0.1.41", features = ["max_level_debug"] } #"release_max_level_warn"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-appender = "0.2"
 dirs = "4.0"
 dirs-next = "2.0.0"  # Optional, for dynamic log file paths

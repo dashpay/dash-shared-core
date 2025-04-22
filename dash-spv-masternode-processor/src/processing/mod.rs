@@ -93,6 +93,7 @@ pub fn peer_addresses_with_connectivity_nonce(masternode_list: MasternodeList, n
     masternode_list.peer_addresses_with_connectivity_nonce(nonce, max_count).into_iter().map(|socket_addr| match socket_addr {
             SocketAddr::V4(v4) => {
                 let mut writer = [0u8; 16];
+                writer[8..12].copy_from_slice(&0xffffu32.to_be_bytes());
                 writer[12..].copy_from_slice(&v4.ip().octets());
                 (writer, v4.port())
             },
@@ -113,9 +114,10 @@ pub fn socket_addr_port(socket_addr: SocketAddr) -> u16 {
 pub fn socket_addr_ip(socket_addr: SocketAddr) -> [u8; 16] {
     match socket_addr {
         SocketAddr::V4(v4) => {
-            let mut octets = [0u8; 16];
-            octets[8..12].copy_from_slice(&v4.ip().octets());
-            octets
+            let mut writer = [0u8; 16];
+            writer[8..12].copy_from_slice(&0xffffu32.to_be_bytes());
+            writer[12..].copy_from_slice(&v4.ip().octets());
+            writer
         },
         SocketAddr::V6(v6) => v6.ip().octets()
     }

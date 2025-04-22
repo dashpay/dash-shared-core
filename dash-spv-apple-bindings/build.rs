@@ -1,4 +1,3 @@
-extern crate cbindgen;
 extern crate ferment_sys;
 
 use ferment_sys::Ferment;

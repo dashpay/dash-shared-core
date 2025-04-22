@@ -8,9 +8,7 @@ build = "build.rs"
 publish = true
 
 [dependencies]
-anyhow = { version = "1.0.75" }
-bincode_derive = "=2.0.0-rc.3"
-
+anyhow = { version = "1.0" }
 byte = "0.2"
 dash-spv-coinjoin = { workspace = true, features = [] }
 dash-spv-keychain = { workspace = true }
@@ -26,13 +24,13 @@ drive = { git = "https://github.com/dashpay/platform", branch = "test/ferment", 
 drive-proof-verifier = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "drive-proof-verifier", default-features = false, features = ["apple"] }
 platform-value = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-value", features = ["apple"] }
 platform-version = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "platform-version", features = ["apple"] }
-grovedb-version = "2.2.1"
+grovedb-version = { git = "https://github.com/dashpay/grovedb", rev = "f89e03e4e0ac12aa2feea5c94b38c09f4909facc" }
 versioned-feature-core = "1.0.0"
 
-ferment = { git = "https://github.com/dashpay/ferment", package = "ferment" }
-ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
+ferment = { version = "0.2", package = "ferment" }
+ferment-macro = { version = "0.2", package = "ferment-macro" }
 
-indexmap = { version = "2.0.2", features = ["serde"] }
+indexmap = { version = "2.9.0", features = ["serde"] }
 jsonschema = "0.29.0"
 logging = { path = "../logging" }
 tracing = "0.1.40"
@@ -42,20 +40,17 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 
 [dev-dependencies]
-libc = "0.2.146"
-reqwest = { version = "0.12.5", features = ["blocking", "json"] }
 dash-spv-masternode-processor = { workspace = true, features = ["default", "test-helpers"] }
 serde = { version = "1.0.209", features = ["derive"] }
 
 [build-dependencies]
-cbindgen = "0.28.0"
 #ferment-sys = { git = "https://github.com/dashpay/ferment", package = "ferment-sys", features = ["cbindgen_only"] }
-ferment-sys = { git = "https://github.com/dashpay/ferment", package = "ferment-sys" }
+ferment-sys = { version = "0.2", package = "ferment-sys" }
 #ferment-sys = { git = "https://github.com/dashpay/ferment", branch = "feat/reorg", package = "ferment-sys", features = ["objc"] }
 #ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }
 
 [features]
-default = ["state-transitions", "std"]
+default = ["state-transitions", "std", "message_verification", "quorum_validation"]
 bls-signatures = ["dpp/bls-signatures"]
 blsful = ["dashcore/blsful"]
 cbor = ["platform-value/cbor", "dpp/cbor", "dpp/ciborium"]
@@ -79,6 +74,7 @@ json-object = ["dpp/json-object"]
 json-schema-validation = ["dpp/json-schema-validation"]
 message-signing = ["dpp/message-signing"]
 message_verification = ["dashcore/message_verification"]
+quorum_validation = ["dashcore/quorum_validation"]
 mocks = ["dash-sdk/mocks"]
 mock-versions = ["platform-version/mock-versions"]
 objc = ["ferment-sys/objc"]
@@ -99,5 +95,4 @@ name = "dash_spv_apple_bindings"
 crate-type = ["staticlib", "cdylib"]
 
 [package.metadata]
-ios-deployment-target = "12.0"  # Set to a common minimum target (e.g., 12.0)
-
+ios-deployment-target = "14.0"

@@ -504,17 +504,7 @@ fn test_processor_devnet_333_2() {
             std::mem::forget(context);
             result.ok()
         }),
-        get_cl_signature_by_block_hash: Arc::new(move |context, block_hash| unsafe {
-            let context = Arc::from_raw(context as *const FFIContext);
-            let result = context.cl_signature_by_block_hash(&block_hash)
-                .map(BLSSignature::from)
-                .ok_or(CoreProviderError::NullResult(format!("No clsig for block hash {}", block_hash.to_lower_hex_string())));
-            std::mem::forget(context);
-            result
-        }),
         update_address_usage_of_masternodes: Arc::new(|context, modified_masternodes| {}),
-        issue_with_masternode_list_from_peer: Arc::new(|context, is_dip24, peer| {}),
-        notify_sync_state: Arc::new(|context, state| {}),
     };
     let provider_arc = Arc::new(provider);
     // let cache = Arc::new(MasternodeProcessorCache::new(provider_arc.clone()));

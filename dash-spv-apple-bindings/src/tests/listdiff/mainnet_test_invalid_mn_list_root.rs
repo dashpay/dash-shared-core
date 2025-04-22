@@ -6,7 +6,6 @@ use dash_spv_masternode_processor::test_helpers::{load_message, message_from_fil
 use dash_spv_masternode_processor::tests::FFIContext;
 use dash_spv_masternode_processor::tests::serde_helper::MNList;
 use crate::ffi_core_provider::FFICoreProvider;
-// use crate::tests::common::{create_default_context_and_cache, process_mnlistdiff, register_default_processor};
 
 #[test]
 fn mainnet_test_invalid_mn_list_root() {

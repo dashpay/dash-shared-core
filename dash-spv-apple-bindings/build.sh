@@ -69,7 +69,7 @@ build_targets=(
 )
 export IPHONEOS_DEPLOYMENT_TARGET=$MIN_IOS
 export MACOSX_DEPLOYMENT_TARGET=$MIN_MACOS
-export RUSTC_LOG=rustc_codegen_ssa::back::link=info
+#export RUSTC_LOG=rustc_codegen_ssa::back::link=info
 
 if $OBJC; then
   features="objc"
@@ -87,7 +87,7 @@ done
 
 wait
 mkdir -p target/{framework,include,lib/{ios,ios-simulator,macos}}
-./verify_o_set.sh $MIN_IOS ../target
+./verify_o_set.sh $MIN_IOS ../target/"$BUILD_TYPE"
 ./verify_a_lib.sh $MIN_IOS ../target/x86_64-apple-ios/"$BUILD_TYPE"/lib${LIB_NAME}.a
 ./verify_a_lib.sh $MIN_IOS ../target/aarch64-apple-ios/"$BUILD_TYPE"/lib${LIB_NAME}.a
 

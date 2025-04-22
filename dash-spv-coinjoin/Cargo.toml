@@ -4,7 +4,6 @@ version = "0.5.1"
 description = "Library for processing coinjoin messages"
 
 edition = "2021"
-build = "build.rs"
 publish = false
 
 [features]
@@ -14,12 +13,9 @@ test-helpers = []
 [dependencies]
 dash-spv-crypto = { workspace = true }
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple"], default-features = false, branch = "feat/ferment" }
-ferment-macro = { git = "https://github.com/dashpay/ferment", package = "ferment-macro" }
+ferment-macro = { version = "0.2", package = "ferment-macro" }
 logging = { path = "../logging" }
 tracing = "0.1.40"
-
-[build-dependencies]
-cbindgen = "0.28.0"
 
 [lib]
 name = "dash_spv_coinjoin"

@@ -3,7 +3,8 @@ const TESTNET_INSIGHT_URL: &str = "https://insight.testnet.networks.dash.org/ins
 
 use serde::Deserialize;
 use std::error::Error;
-use hashes::hex::{FromHex, ToHex};
+use dashcore::hashes::hex::FromHex;
+use dashcore::prelude::DisplayHex;
 use dash_spv_crypto::crypto::byte_util::Reversed;
 use crate::common::Block;
 use crate::common::block::MBlock;
@@ -69,7 +70,7 @@ fn insight_block_by_url(insight_url: String, by: String) -> Result<InsightBlock,
         chain_work,
         height: json.height,
     };
-    println!("From insight: {} {}", block.height, block.block_hash.to_hex());
+    println!("From insight: {} {}", block.height, block.block_hash.to_lower_hex_string());
     Ok(block)
 }
 
