@@ -1195,7 +1195,7 @@ dependencies = [
 [[package]]
 name = "dashcore"
 version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#ff4a39cb8ad20c0df34ea43e2ec74d110fcd618f"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
 dependencies = [
  "anyhow",
  "base64-compat",
@@ -1222,12 +1222,12 @@ dependencies = [
 [[package]]
 name = "dashcore-private"
 version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#ff4a39cb8ad20c0df34ea43e2ec74d110fcd618f"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
 
 [[package]]
 name = "dashcore-rpc"
 version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#ff4a39cb8ad20c0df34ea43e2ec74d110fcd618f"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
 dependencies = [
  "dashcore-rpc-json",
  "hex",
@@ -1240,7 +1240,7 @@ dependencies = [
 [[package]]
 name = "dashcore-rpc-json"
 version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#ff4a39cb8ad20c0df34ea43e2ec74d110fcd618f"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
 dependencies = [
  "bincode",
  "dashcore",
@@ -1254,7 +1254,7 @@ dependencies = [
 [[package]]
 name = "dashcore_hashes"
 version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#ff4a39cb8ad20c0df34ea43e2ec74d110fcd618f"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
 dependencies = [
  "bincode",
  "dashcore-private",
@@ -2144,9 +2144,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.8"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5017294ff4bb30944501348f6f8e42e6ad28f42c8bbef7a74029aff064a4e3c2"
+checksum = "75249d144030531f8dee69fe9cea04d3edf809a017ae445e2abdff6629e86633"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -2846,9 +2846,9 @@ checksum = "744a4c881f502e98c2241d2e5f50040ac73b30194d64452bb6260393b53f0dc9"
 
 [[package]]
 name = "libc"
-version = "0.2.171"
+version = "0.2.172"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
+checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
 name = "libloading"
@@ -3550,9 +3550,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.94"
+version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a31971752e70b8b2686d7e46ec17fb38dad4051d94024c88df49b667caea9c84"
+checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
 dependencies = [
  "unicode-ident",
 ]
@@ -5157,9 +5157,9 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "ureq"
-version = "3.0.10"
+version = "3.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b0351ca625c7b41a8e4f9bb6c5d9755f67f62c2187ebedecacd9974674b271d"
+checksum = "b7a3e9af6113ecd57b8c63d3cd76a385b2e3881365f1f489e54f49801d0c83ea"
 dependencies = [
  "base64 0.22.1",
  "flate2",
@@ -5175,9 +5175,9 @@ dependencies = [
 
 [[package]]
 name = "ureq-proto"
-version = "0.3.5"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae239d0a3341aebc94259414d1dc67cfce87d41cbebc816772c91b77902fafa4"
+checksum = "fadf18427d33828c311234884b7ba2afb57143e6e7e69fda7ee883b624661e36"
 dependencies = [
  "base64 0.22.1",
  "http",

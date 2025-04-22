@@ -212,7 +212,7 @@ impl IdentitiesManager {
                     identities.insert(key_hash, identity);
                 },
                 Ok(None) => {
-                    println!("{self:?} None::monitor_for_key_hashes -> key_hash: {}: identity: None", key_hash.to_lower_hex_string());
+                    println!("{self:?} None::monitor_for_key_hashes -> key_hash: {}", key_hash.to_lower_hex_string());
                 }
                 Err(error) => {
                     println!("{self:?} Error::monitor_for_key_hashes -> key_hash: {}: error: {:?}", key_hash.to_lower_hex_string(), error);

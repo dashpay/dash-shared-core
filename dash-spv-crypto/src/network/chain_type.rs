@@ -617,7 +617,8 @@ pub fn chain_type_from_index(index: u16) -> ChainType {
 #[ferment_macro::export]
 pub fn devnet_type_from_index(index: u16) -> DevnetType {
     DevnetType::from(index as i16)
-}#[ferment_macro::export]
+}
+#[ferment_macro::export]
 pub fn devnet_type_from_identifier(identifier: &str) -> DevnetType {
     DevnetType::from(identifier)
 }

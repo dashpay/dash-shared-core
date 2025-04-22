@@ -26,6 +26,14 @@ use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::processing::core_provider::CoreProvider;
 use crate::processing::processor::processing_error::ProcessingError;
 
+#[ferment_macro::export]
+#[derive(Clone)]
+pub struct DiffConfig {
+    pub bytes: Vec<u8>,
+    pub height: u32,
+}
+
+
 // https://github.com/rust-lang/rfcs/issues/2770
 #[ferment_macro::opaque]
 pub struct MasternodeProcessor {
@@ -44,17 +52,47 @@ impl MasternodeProcessor {
         Self { provider, engine: MasternodeListEngine::default_for_network(network), last_known_qr_info_block_height: None }
     }
 
-    pub fn from_bincode_list_diff(provider: Arc<dyn CoreProvider>, network: Network, bytes: &[u8], expected_diff_height: u32) -> Self {
-        let diff = deserialize::<MnListDiff>(bytes).expect("failed to deserialize diff");
-        let engine = MasternodeListEngine::initialize_with_diff_to_height(diff, expected_diff_height, network)
-            .expect("expected to start engine");
-        Self { provider, engine, last_known_qr_info_block_height: None }
+    pub fn from_diff_config(provider: Arc<dyn CoreProvider>, network: Network, diff_config: Option<DiffConfig>) -> Self {
+        diff_config
+            .and_then(|DiffConfig { bytes, height }| Self::from_checkpoint(provider.clone(), network, &bytes, height))
+            .unwrap_or(Self::new(provider.clone(), network))
+    }
+
+    pub fn from_checkpoint(provider: Arc<dyn CoreProvider>, network: Network, bytes: &[u8], expected_diff_height: u32) -> Option<Self> {
+        maybe_engine_from_checkpoint(network, bytes, expected_diff_height)
+            .map(|engine| Self { provider, engine, last_known_qr_info_block_height: None })
     }
 
 }
 
+fn maybe_engine_from_checkpoint(network: Network, bytes: &[u8], expected_diff_height: u32) -> Option<MasternodeListEngine> {
+    match deserialize::<MnListDiff>(bytes) {
+        Ok(diff) => match MasternodeListEngine::initialize_with_diff_to_height(diff, expected_diff_height, network) {
+            Ok(engine) => Some(engine),
+            Err(err) => {
+                println!("[Processor] Failed to initialize engine: {}", err);
+                None
+
+            }
+        }
+        Err(err) => {
+            println!("[Processor] Failed to deserialize checkpoint: {}", err);
+            None
+        }
+    }
+}
+
 #[ferment_macro::export]
 impl MasternodeProcessor {
+
+    pub fn reinit_engine(&mut self, chain_type: ChainType, diff_config: Option<DiffConfig>) {
+        let network = Network::from(chain_type);
+        if let Some(engine) = diff_config.and_then(|DiffConfig { bytes, height }| maybe_engine_from_checkpoint(network, &bytes, height)) {
+            self.engine = engine;
+        } else {
+            self.engine = MasternodeListEngine::default_for_network(network);
+        }
+    }
 
     pub fn clear(&mut self) {
         self.last_known_qr_info_block_height = None;
@@ -323,5 +361,21 @@ impl MasternodeProcessor {
             acc
         }).as_str());
         println!("{debug_string}");
+    }
+}
+
+#[cfg(all(test, feature = "test-helpers"))]
+mod test {
+    use dashcore::consensus::deserialize;
+    use dashcore::network::message_sml::MnListDiff;
+    use crate::test_helpers::message_from_file;
+
+    #[test]
+    fn test_testnet_qr_info() {
+        let message = message_from_file("../files/QRINFO_MISSED_70235_766510624.244100.dat");
+        let mn_list_diff : MnListDiff = deserialize(message.as_slice()).expect("message");
+        let base_block_hash = mn_list_diff.base_block_hash;
+        let block_hash = mn_list_diff.block_hash;
+        println!("base block hash: {}, {}", base_block_hash.to_string(), block_hash.to_string());
     }
 }
