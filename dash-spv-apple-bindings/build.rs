@@ -1,5 +1,6 @@
 extern crate ferment_sys;
 
+#[cfg(feature = "fermentize")]
 use ferment_sys::Ferment;
 // #[cfg(feature = "objc")]
 // use ferment_sys::{Lang, ObjC, XCodeConfig};
@@ -11,7 +12,7 @@ fn main() {
             return; // Exit early in debug mode
         }
     }
-
+    #[cfg(feature = "fermentize")]
     match Ferment::with_crate_name("dash_spv_apple_bindings")
         .with_cbindgen_config_from_file("cbindgen.toml")
         .with_default_mod_name()
@@ -39,5 +40,9 @@ fn main() {
         .generate() {
         Ok(_) => println!("[ferment] [ok]"),
         Err(err) => panic!("[ferment] [err]: {}", err)
+    }
+    #[cfg(not(feature = "fermentize"))]
+    {
+        println!("Fermentation is disabled. Skipping build.rs.");
     }
 }

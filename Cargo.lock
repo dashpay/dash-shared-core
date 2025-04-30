@@ -898,7 +898,7 @@ dependencies = [
 [[package]]
 name = "dapi-grpc"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "dapi-grpc-macros",
  "futures-core",
@@ -916,7 +916,7 @@ dependencies = [
 [[package]]
 name = "dapi-grpc-macros"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "heck 0.5.0",
  "quote",
@@ -961,7 +961,7 @@ dependencies = [
 [[package]]
 name = "dash-sdk"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -1196,7 +1196,7 @@ dependencies = [
 [[package]]
 name = "dashpay-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1207,7 +1207,7 @@ dependencies = [
 [[package]]
 name = "data-contracts"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "dashpay-contract",
  "dpns-contract",
@@ -1369,7 +1369,7 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 [[package]]
 name = "dpns-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1380,7 +1380,7 @@ dependencies = [
 [[package]]
 name = "dpp"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1429,7 +1429,7 @@ dependencies = [
 [[package]]
 name = "drive"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "bincode",
  "byteorder",
@@ -1456,7 +1456,7 @@ dependencies = [
 [[package]]
 name = "drive-proof-verifier"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "bincode",
  "dapi-grpc",
@@ -1661,7 +1661,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 [[package]]
 name = "feature-flags-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -2689,7 +2689,7 @@ dependencies = [
 [[package]]
 name = "json-schema-compatibility-validator"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "json-patch",
  "once_cell",
@@ -2772,7 +2772,7 @@ dependencies = [
 [[package]]
 name = "keyword-search-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -2881,7 +2881,7 @@ dependencies = [
 [[package]]
 name = "masternode-reward-shares-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -3370,7 +3370,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 [[package]]
 name = "platform-serialization"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "bincode",
  "platform-version",
@@ -3379,7 +3379,7 @@ dependencies = [
 [[package]]
 name = "platform-serialization-derive"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3390,7 +3390,7 @@ dependencies = [
 [[package]]
 name = "platform-value"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -3411,7 +3411,7 @@ dependencies = [
 [[package]]
 name = "platform-version"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "bincode",
  "ferment-macro",
@@ -3424,7 +3424,7 @@ dependencies = [
 [[package]]
 name = "platform-versioning"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3855,7 +3855,7 @@ dependencies = [
 [[package]]
 name = "rs-dapi-client"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "backon",
  "chrono",
@@ -4724,7 +4724,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 [[package]]
 name = "token-history-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -5246,7 +5246,7 @@ dependencies = [
 [[package]]
 name = "wallet-utils-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -5679,7 +5679,7 @@ dependencies = [
 [[package]]
 name = "withdrawals-contract"
 version = "2.0.0-rc.4"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#86dc9f0c18feac26a20461baad446eac73ce0c32"
 dependencies = [
  "num_enum 0.5.11",
  "platform-value",

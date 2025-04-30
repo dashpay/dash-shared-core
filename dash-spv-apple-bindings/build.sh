@@ -77,11 +77,23 @@ else
   features=""
 fi
 
+fermentize=1
 for target in "${build_targets[@]}"; do
     echo "▶ Building for $target"
     lib_path="../../target/$target/$BUILD_TYPE/lib${LIB_NAME}.a"
+
+    if [ "$fermentize" -eq 1 ]; then
+        extra_features="fermentize"
+        fermentize=0
+    else
+        extra_features=""
+    fi
+
     if [ ! -f "$lib_path" ]; then
-      cargo +nightly -Z build-std=std,compiler_builtins build --features="$features" --target="$target" --"$BUILD_FLAG"
+        cargo +nightly -Z build-std=std,compiler_builtins build \
+            --features="$features $extra_features" \
+            --target="$target" \
+            --"$BUILD_FLAG"
     fi
 done
 
