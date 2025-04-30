@@ -34,7 +34,7 @@ version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
 dependencies = [
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "once_cell",
  "version_check",
 ]
@@ -46,7 +46,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if",
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "once_cell",
  "serde",
  "version_check",
@@ -167,28 +167,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
-name = "async-stream"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
-dependencies = [
- "async-stream-impl",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -196,7 +174,7 @@ checksum = "e539d3fca749fcee5236ab05e93a52867dd549cc157c8cb7f99595f3cedffdb5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -210,53 +188,6 @@ name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
-
-[[package]]
-name = "axum"
-version = "0.7.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edca88bc138befd0323b20752846e6587272d3b03b0343c8ea28a6f819e6e71f"
-dependencies = [
- "async-trait",
- "axum-core",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "http-body-util",
- "itoa",
- "matchit",
- "memchr",
- "mime",
- "percent-encoding",
- "pin-project-lite",
- "rustversion",
- "serde",
- "sync_wrapper",
- "tower 0.5.2",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "axum-core"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09f2bd6146b97ae3359fa0cc6d6b376d9539582c7b4220f041a33ec24c226199"
-dependencies = [
- "async-trait",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "rustversion",
- "sync_wrapper",
- "tower-layer",
- "tower-service",
-]
 
 [[package]]
 name = "backon"
@@ -360,7 +291,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "shlex",
- "syn 2.0.100",
+ "syn 2.0.101",
  "which",
 ]
 
@@ -461,9 +392,9 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "389a099b34312839e16420d499a9cad9650541715937ffbdd40d36f49e77eeb3"
+checksum = "3888aaa89e4b2a40fca9848e400f6a658a5a3978de7be858e209cafa8be9a4a0"
 dependencies = [
  "arrayref",
  "arrayvec",
@@ -584,7 +515,7 @@ dependencies = [
  "proc-macro-crate 3.3.0",
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -697,16 +628,16 @@ dependencies = [
  "quote",
  "serde",
  "serde_json",
- "syn 2.0.100",
+ "syn 2.0.101",
  "tempfile",
  "toml",
 ]
 
 [[package]]
 name = "cc"
-version = "1.2.19"
+version = "1.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e3a13707ac958681c13b39b458c073d0d9bc8a22cb1b2f4c8e55eb72c13f362"
+checksum = "04da6a0d40b948dfc4fa8f5bbf402b0fc1a64a28dbf7d12ffd683550f2c1b63a"
 dependencies = [
  "shlex",
 ]
@@ -734,9 +665,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chrono"
-version = "0.4.40"
+version = "0.4.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a7964611d71df112cb1730f2ee67324fcf4d0fc6606acbbe9bfe06df124637c"
+checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -797,18 +728,18 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.36"
+version = "4.5.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2df961d8c8a0d08aa9945718ccf584145eee3f3aa06cddbeac12933781102e04"
+checksum = "eccb054f56cbd38340b380d4a8e69ef1f02f1af43db2f0cc817a4774d80ae071"
 dependencies = [
  "clap_builder",
 ]
 
 [[package]]
 name = "clap_builder"
-version = "4.5.36"
+version = "4.5.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "132dbda40fb6753878316a489d5a1242a8ef2f0d9e47ba01c951ea8aa7d013a5"
+checksum = "efd9466fac8543255d3b1fcad4762c5e116ffe808c8a3043d4263cd4fd4862a2"
 dependencies = [
  "anstream",
  "anstyle",
@@ -961,17 +892,17 @@ checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
 name = "dapi-grpc"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "dapi-grpc-macros",
  "futures-core",
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "platform-version",
  "prost",
  "serde",
@@ -984,12 +915,12 @@ dependencies = [
 
 [[package]]
 name = "dapi-grpc-macros"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "heck 0.5.0",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1013,7 +944,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1024,13 +955,13 @@ checksum = "fc34b93ccb385b40dc71c6fceac4b2ad23662c7eeb248cf10d529b7e055b6ead"
 dependencies = [
  "darling_core",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
 name = "dash-sdk"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -1058,7 +989,7 @@ dependencies = [
  "rustls-pemfile",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1178,7 +1109,7 @@ dependencies = [
  "ferment",
  "ferment-macro",
  "ferment-sys",
- "grovedb-version",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc)",
  "indexmap 2.9.0",
  "jsonschema 0.29.1",
  "logging",
@@ -1194,8 +1125,8 @@ dependencies = [
 
 [[package]]
 name = "dashcore"
-version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
+version = "0.39.6"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6dd37995cc4370beb2903e4956d06fec80cba077"
 dependencies = [
  "anyhow",
  "base64-compat",
@@ -1221,13 +1152,13 @@ dependencies = [
 
 [[package]]
 name = "dashcore-private"
-version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
+version = "0.39.6"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6dd37995cc4370beb2903e4956d06fec80cba077"
 
 [[package]]
 name = "dashcore-rpc"
-version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
+version = "0.39.6"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6dd37995cc4370beb2903e4956d06fec80cba077"
 dependencies = [
  "dashcore-rpc-json",
  "hex",
@@ -1239,8 +1170,8 @@ dependencies = [
 
 [[package]]
 name = "dashcore-rpc-json"
-version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
+version = "0.39.6"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6dd37995cc4370beb2903e4956d06fec80cba077"
 dependencies = [
  "bincode",
  "dashcore",
@@ -1253,8 +1184,8 @@ dependencies = [
 
 [[package]]
 name = "dashcore_hashes"
-version = "0.39.4"
-source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6b336b952ffda05f0e2c4079a5e707b2aae2bc7a"
+version = "0.39.6"
+source = "git+https://github.com/dashpay/rust-dashcore?branch=feat%2Fferment#6dd37995cc4370beb2903e4956d06fec80cba077"
 dependencies = [
  "bincode",
  "dashcore-private",
@@ -1264,29 +1195,30 @@ dependencies = [
 
 [[package]]
 name = "dashpay-contract"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "platform-value",
  "platform-version",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "data-contracts"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "dashpay-contract",
  "dpns-contract",
  "feature-flags-contract",
  "ferment-macro",
+ "keyword-search-contract",
  "masternode-reward-shares-contract",
  "platform-value",
  "platform-version",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "token-history-contract",
  "versioned-feature-core 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "wallet-utils-contract",
@@ -1295,9 +1227,9 @@ dependencies = [
 
 [[package]]
 name = "der"
-version = "0.7.9"
+version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f55bf8e7b65898637379c1b74eb1551107c8294ed26d855ceb9fd1a09cfc9bc0"
+checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid",
  "zeroize",
@@ -1321,7 +1253,7 @@ checksum = "30542c1ad912e0e3d22a1935c290e12e8a29d704a420177a31faad4a601a0800"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1350,7 +1282,7 @@ checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
  "unicode-xid",
 ]
 
@@ -1362,7 +1294,7 @@ checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1425,7 +1357,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1436,19 +1368,19 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "dpns-contract"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "platform-value",
  "platform-version",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "dpp"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1465,7 +1397,7 @@ dependencies = [
  "env_logger",
  "ferment",
  "ferment-macro",
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "hex",
  "indexmap 2.9.0",
  "integer-encoding",
@@ -1490,14 +1422,14 @@ dependencies = [
  "serde_repr",
  "sha2",
  "strum",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "versioned-feature-core 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "drive"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "bincode",
  "byteorder",
@@ -1507,7 +1439,7 @@ dependencies = [
  "grovedb-costs",
  "grovedb-epoch-based-storage-flags",
  "grovedb-path",
- "grovedb-version",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
  "hex",
  "indexmap 2.9.0",
  "integer-encoding",
@@ -1516,15 +1448,15 @@ dependencies = [
  "platform-version",
  "serde",
  "sqlparser",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tracing",
  "versioned-feature-core 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "drive-proof-verifier"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "bincode",
  "dapi-grpc",
@@ -1541,7 +1473,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tenderdash-abci",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tracing",
 ]
 
@@ -1728,20 +1660,20 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "feature-flags-contract"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "platform-value",
  "platform-version",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "ferment"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8fffd7c8fc84e2113ff10c3780579bf6ec4b617faf0065501ca58a2a084d3ab"
+checksum = "f68b50581933f0b5148b0c9f3b6e3874160a71237e2ddb870cd881aa4513392d"
 dependencies = [
  "indexmap 2.9.0",
  "serde_json",
@@ -1749,9 +1681,9 @@ dependencies = [
 
 [[package]]
 name = "ferment-macro"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee42cf9f88c8efcaedfc11d1a23b91fc025c700614f5d33bc32163c5cd084f3"
+checksum = "f63bf4a230d4776aab70e63792a3c5890c0fe5768d21548fdd4be15c258b38b9"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -1759,9 +1691,9 @@ dependencies = [
 
 [[package]]
 name = "ferment-sys"
-version = "0.2.1"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84908d47567dcbe6f00472cee2196dae245c666c3cf70516d506bdcbabb94234"
+checksum = "1c3030e19188148a841d63aa4bbb473477d1efeeebc19f069265ddeb3ad478aa"
 dependencies = [
  "cargo_metadata",
  "cbindgen",
@@ -1939,7 +1871,7 @@ checksum = "162ee34ebcb7c64a8abebc059ce0fee27c2262618d7b60ed8faf72fef13c3650"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1995,9 +1927,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
+checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
 dependencies = [
  "cfg-if",
  "js-sys",
@@ -2058,14 +1990,15 @@ dependencies = [
 [[package]]
 name = "grovedb"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
+source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
 dependencies = [
  "bincode",
+ "bincode_derive",
  "blake3",
  "grovedb-costs",
  "grovedb-merk",
  "grovedb-path",
- "grovedb-version",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
  "hex",
  "hex-literal",
  "indexmap 2.9.0",
@@ -2078,7 +2011,7 @@ dependencies = [
 [[package]]
 name = "grovedb-costs"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
+source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
 dependencies = [
  "integer-encoding",
  "intmap",
@@ -2088,7 +2021,7 @@ dependencies = [
 [[package]]
 name = "grovedb-epoch-based-storage-flags"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
+source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
 dependencies = [
  "grovedb-costs",
  "hex",
@@ -2100,15 +2033,16 @@ dependencies = [
 [[package]]
 name = "grovedb-merk"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
+source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
 dependencies = [
  "bincode",
+ "bincode_derive",
  "blake3",
  "byteorder",
  "ed",
  "grovedb-costs",
  "grovedb-path",
- "grovedb-version",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
  "grovedb-visualize",
  "hex",
  "indexmap 2.9.0",
@@ -2119,9 +2053,18 @@ dependencies = [
 [[package]]
 name = "grovedb-path"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
+source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
 dependencies = [
  "hex",
+]
+
+[[package]]
+name = "grovedb-version"
+version = "3.0.0"
+source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+dependencies = [
+ "thiserror 2.0.12",
+ "versioned-feature-core 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2136,7 +2079,7 @@ dependencies = [
 [[package]]
 name = "grovedb-visualize"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=f89e03e4e0ac12aa2feea5c94b38c09f4909facc#f89e03e4e0ac12aa2feea5c94b38c09f4909facc"
+source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
 dependencies = [
  "hex",
  "itertools 0.14.0",
@@ -2577,7 +2520,7 @@ checksum = "1ec89e9337638ecdc08744df490b221a7399bf8d164eb52a665454e60e075ad6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -2700,9 +2643,9 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "jiff"
-version = "0.2.8"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5ad87c89110f55e4cd4dc2893a9790820206729eaf221555f742d540b0724a0"
+checksum = "5a064218214dc6a10fbae5ec5fa888d80c45d611aba169222fc272072bf7aef6"
 dependencies = [
  "jiff-static",
  "log",
@@ -2713,13 +2656,13 @@ dependencies = [
 
 [[package]]
 name = "jiff-static"
-version = "0.2.8"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d076d5b64a7e2fe6f0743f02c43ca4a6725c0f904203bfe276a5b3e793103605"
+checksum = "199b7932d97e325aff3a7030e141eafe7f2c6268e1d1b24859b753a627f45254"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -2745,13 +2688,13 @@ dependencies = [
 
 [[package]]
 name = "json-schema-compatibility-validator"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "json-patch",
  "once_cell",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -2776,7 +2719,7 @@ dependencies = [
  "bytecount",
  "fancy-regex 0.13.0",
  "fraction",
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "iso8601",
  "itoa",
  "memchr",
@@ -2824,6 +2767,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecc2af9a1119c51f12a14607e783cb977bde58bc069ff0c3da1095e635d70654"
 dependencies = [
  "cpufeatures",
+]
+
+[[package]]
+name = "keyword-search-contract"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
+dependencies = [
+ "platform-value",
+ "platform-version",
+ "serde_json",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -2899,12 +2853,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lockfree-object-pool"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9374ef4228402d4b7e403e5838cb880d9ee663314b0a900d5a6aabf0c213552e"
-
-[[package]]
 name = "log"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2932,13 +2880,13 @@ dependencies = [
 
 [[package]]
 name = "masternode-reward-shares-contract"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "platform-value",
  "platform-version",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -2949,12 +2897,6 @@ checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
 dependencies = [
  "regex-automata 0.1.10",
 ]
-
-[[package]]
-name = "matchit"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 
 [[package]]
 name = "memchr"
@@ -3140,7 +3082,7 @@ checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3233,7 +3175,7 @@ dependencies = [
  "proc-macro-crate 3.3.0",
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3274,7 +3216,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3394,7 +3336,7 @@ checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3427,8 +3369,8 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "platform-serialization"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "bincode",
  "platform-version",
@@ -3436,19 +3378,19 @@ dependencies = [
 
 [[package]]
 name = "platform-serialization-derive"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
  "virtue 0.0.17",
 ]
 
 [[package]]
 name = "platform-value"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -3462,31 +3404,31 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "treediff",
 ]
 
 [[package]]
 name = "platform-version"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "bincode",
  "ferment-macro",
- "grovedb-version",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
  "once_cell",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "versioned-feature-core 1.0.0 (git+https://github.com/dashpay/versioned-feature-core)",
 ]
 
 [[package]]
 name = "platform-versioning"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3516,7 +3458,7 @@ version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
- "zerocopy 0.8.24",
+ "zerocopy 0.8.25",
 ]
 
 [[package]]
@@ -3526,7 +3468,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "664ec5419c51e34154eec046ebcba56312d5a2fc3b09a06da188e1ad21afadf6"
 dependencies = [
  "proc-macro2",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3545,7 +3487,7 @@ version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edce586971a4dfaa28950c6f18ed55e0406c1ab88bbce2c6f6293a7aaba73d35"
 dependencies = [
- "toml_edit 0.22.24",
+ "toml_edit 0.22.26",
 ]
 
 [[package]]
@@ -3583,7 +3525,7 @@ dependencies = [
  "prost",
  "prost-types",
  "regex",
- "syn 2.0.100",
+ "syn 2.0.101",
  "tempfile",
 ]
 
@@ -3597,7 +3539,7 @@ dependencies = [
  "itertools 0.14.0",
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3677,7 +3619,7 @@ version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
 ]
 
 [[package]]
@@ -3715,7 +3657,7 @@ version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba009ff324d1fc1b900bd1fdb31564febe58a8ccc8a6fdbb93b543d33b13ca43"
 dependencies = [
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "libredox",
  "thiserror 1.0.69",
 ]
@@ -3737,7 +3679,7 @@ checksum = "1165225c21bff1f3bbce98f5a1f889949bc902d3575308cc7b0de30b4f6d27c7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -3843,7 +3785,7 @@ dependencies = [
  "system-configuration 0.6.1",
  "tokio",
  "tokio-native-tls",
- "tower 0.5.2",
+ "tower",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -3860,7 +3802,7 @@ checksum = "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
 dependencies = [
  "cc",
  "cfg-if",
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
@@ -3912,14 +3854,14 @@ dependencies = [
 
 [[package]]
 name = "rs-dapi-client"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "backon",
  "chrono",
  "dapi-grpc",
  "futures",
- "getrandom 0.2.15",
+ "getrandom 0.2.16",
  "gloo-timers",
  "hex",
  "http",
@@ -3929,7 +3871,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tonic-web-wasm-client",
  "tracing",
@@ -3970,7 +3912,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6268b74858287e1a062271b988a0c534bf85bbeb567fe09331bf40ed78113d5"
 dependencies = [
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4250,7 +4192,7 @@ checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4274,7 +4216,7 @@ checksum = "175ee3e80ae9982737ca543e96133087cbd9a485eecc3bc4de9c1a37b47ea59c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4323,7 +4265,7 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4374,9 +4316,9 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "signal-hook-registry"
-version = "1.4.2"
+version = "1.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9e9e0b4211b72e7b8b6e85c807d36c212bdb33ea8587f7569562a84df5465b1"
+checksum = "9203b8055f63a2a00e2f593bb0510367fe707d7ff1e5c872de2f537b339e5410"
 dependencies = [
  "libc",
 ]
@@ -4496,7 +4438,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4527,9 +4469,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.100"
+version = "2.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b09a44accad81e1ba1cd74a32461ba89dee89095ba17b32f5d03683b1b1fc2a0"
+checksum = "8ce2b7fc941b3a24138a0a7cf8e858bfc6a992e7978a068a5c760deb0ed43caf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4553,7 +4495,7 @@ checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4619,8 +4561,8 @@ dependencies = [
 
 [[package]]
 name = "tenderdash-abci"
-version = "1.3.0+1.3.0"
-source = "git+https://github.com/dashpay/rs-tenderdash-abci?tag=v1.3.0%2B1.3.0#cdd40c47ac2ed52a4fa0a72b2efb86af9b87a878"
+version = "1.4.0"
+source = "git+https://github.com/dashpay/rs-tenderdash-abci?tag=v1.4.0#e2dd15f39246081e7d569e585ab78ff5340116ac"
 dependencies = [
  "bytes",
  "hex",
@@ -4634,8 +4576,8 @@ dependencies = [
 
 [[package]]
 name = "tenderdash-proto"
-version = "1.3.0+1.3.0"
-source = "git+https://github.com/dashpay/rs-tenderdash-abci?tag=v1.3.0%2B1.3.0#cdd40c47ac2ed52a4fa0a72b2efb86af9b87a878"
+version = "1.4.0"
+source = "git+https://github.com/dashpay/rs-tenderdash-abci?tag=v1.4.0#e2dd15f39246081e7d569e585ab78ff5340116ac"
 dependencies = [
  "bytes",
  "chrono",
@@ -4652,8 +4594,8 @@ dependencies = [
 
 [[package]]
 name = "tenderdash-proto-compiler"
-version = "1.3.0+1.3.0"
-source = "git+https://github.com/dashpay/rs-tenderdash-abci?tag=v1.3.0%2B1.3.0#cdd40c47ac2ed52a4fa0a72b2efb86af9b87a878"
+version = "1.4.0"
+source = "git+https://github.com/dashpay/rs-tenderdash-abci?tag=v1.4.0#e2dd15f39246081e7d569e585ab78ff5340116ac"
 dependencies = [
  "fs_extra",
  "prost-build",
@@ -4690,7 +4632,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4701,7 +4643,7 @@ checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4781,13 +4723,13 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "token-history-contract"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "platform-value",
  "platform-version",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -4816,7 +4758,7 @@ checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -4852,9 +4794,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.14"
+version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b9590b93e6fcc1739458317cccd391ad3955e2bde8913edf6f95f9e65a8f034"
+checksum = "66a539a9ad6d5d281510d5bd368c973d636c02dbf8a67300bfb6b950696ad7df"
 dependencies = [
  "bytes",
  "futures-core",
@@ -4865,21 +4807,21 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.20"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd87a5cdd6ffab733b2f74bc4fd7ee5fff6634124999ac278c35fc78c6120148"
+checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
 dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit 0.22.24",
+ "toml_edit 0.22.26",
 ]
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.8"
+version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dd7358ecb8fc2f8d014bf86f6f638ce72ba252a2c3a2572f2a795f1d23efb41"
+checksum = "3da5db5a963e24bc68be8b17b6fa82814bb22ee8660f192bb182771d498f09a3"
 dependencies = [
  "serde",
 ]
@@ -4897,26 +4839,31 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.22.24"
+version = "0.22.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17b4795ff5edd201c7cd6dca065ae59972ce77d1b80fa0a84d94950ece7d1474"
+checksum = "310068873db2c5b3e7659d2cc35d21855dbafa50d1ce336397c666e3cb08137e"
 dependencies = [
  "indexmap 2.9.0",
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.7.6",
+ "toml_write",
+ "winnow 0.7.7",
 ]
 
 [[package]]
-name = "tonic"
-version = "0.12.3"
+name = "toml_write"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877c5b330756d856ffcc4553ab34a5684481ade925ecc54bcd1bf02b1d0d4d52"
+checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
+
+[[package]]
+name = "tonic"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85839f0b32fd242bb3209262371d07feda6d780d16ee9d2bc88581b89da1549b"
 dependencies = [
- "async-stream",
  "async-trait",
- "axum",
  "base64 0.22.1",
  "bytes",
  "h2",
@@ -4930,12 +4877,11 @@ dependencies = [
  "pin-project",
  "prost",
  "rustls-native-certs",
- "rustls-pemfile",
  "socket2",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tower 0.4.13",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -4944,23 +4890,23 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.12.3"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9557ce109ea773b399c9b9e5dca39294110b74f1f342cb347a80d1fce8c26a11"
+checksum = "d85f0383fadd15609306383a90e85eaed44169f931a5d2be1b42c76ceff1825e"
 dependencies = [
  "prettyplease",
  "proc-macro2",
  "prost-build",
  "prost-types",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
 name = "tonic-web-wasm-client"
-version = "0.6.2"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8957be1a1c7aa12d4c9d67882060dd57aed816bbc553fa60949312e839f4a8ea"
+checksum = "12abe1160d2a9a3e4bf578e2e37fd8b4f65c5e64fca6037d6f1ed6c0e02a78ac"
 dependencies = [
  "base64 0.22.1",
  "byteorder",
@@ -4972,7 +4918,7 @@ dependencies = [
  "httparse",
  "js-sys",
  "pin-project",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tonic",
  "tower-service",
  "wasm-bindgen",
@@ -4983,37 +4929,21 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.4.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8fa9be0de6cf49e536ce1851f987bd21a43b771b09473c3549a6c853db37c1c"
-dependencies = [
- "futures-core",
- "futures-util",
- "indexmap 1.9.3",
- "pin-project",
- "pin-project-lite",
- "rand",
- "slab",
- "tokio",
- "tokio-util",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "tower"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d039ad9159c98b70ecfd540b2573b97f7f52c3e8d9f8ad57a24b916a536975f9"
 dependencies = [
  "futures-core",
  "futures-util",
+ "indexmap 2.9.0",
  "pin-project-lite",
+ "slab",
  "sync_wrapper",
  "tokio",
+ "tokio-util",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]
@@ -5059,7 +4989,7 @@ checksum = "395ae124c09f9e6918a2310af6038fba074bcf474ac352496d5910dd59a2226d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -5315,13 +5245,13 @@ dependencies = [
 
 [[package]]
 name = "wallet-utils-contract"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "platform-value",
  "platform-version",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -5370,7 +5300,7 @@ dependencies = [
  "log",
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
  "wasm-bindgen-shared",
 ]
 
@@ -5405,7 +5335,7 @@ checksum = "8ae87ea40c9f689fc23f209965b6fb8a99ad69aeeb0231408be24920604395de"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -5444,9 +5374,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.26.8"
+version = "0.26.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2210b291f7ea53617fbafcc4939f10914214ec15aace5ba62293a668f322c5c9"
+checksum = "29aad86cec885cafd03e8305fd727c418e970a521322c91688414d5b8efba16b"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -5515,7 +5445,7 @@ checksum = "a47fddd13af08290e67f4acabf4b459f647552718f683a7b415d290ac744a836"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -5526,7 +5456,7 @@ checksum = "bd9211b69f8dcdfa817bfd14bf1c97c9188afa36f4750130fcdf3f400eca9fa8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -5730,9 +5660,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63d3fcd9bba44b03821e7d699eeee959f3126dcc4aa8e4ae18ec617c2a5cea10"
+checksum = "6cb8234a863ea0e8cd7284fcdd4f145233eb00fee02bbdd9861aec44e6477bc5"
 dependencies = [
  "memchr",
 ]
@@ -5748,8 +5678,8 @@ dependencies = [
 
 [[package]]
 name = "withdrawals-contract"
-version = "2.0.0-dev.1"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#8aa2db970233302e27717028ef6d2af7772ab9c0"
+version = "2.0.0-rc.4"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#40d8433d84a3093638d577b6d5d7ed44af9d626e"
 dependencies = [
  "num_enum 0.5.11",
  "platform-value",
@@ -5757,7 +5687,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_repr",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -5801,7 +5731,7 @@ checksum = "2380878cad4ac9aac1e2435f3eb4020e8374b5f13c296cb75b4620ff8e229154"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
  "synstructure",
 ]
 
@@ -5816,11 +5746,11 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.24"
+version = "0.8.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2586fea28e186957ef732a5f8b3be2da217d65c5969d4b1e17f973ebbe876879"
+checksum = "a1702d9583232ddb9174e01bb7c15a2ab8fb1bc6f227aa1233858c351a3ba0cb"
 dependencies = [
- "zerocopy-derive 0.8.24",
+ "zerocopy-derive 0.8.25",
 ]
 
 [[package]]
@@ -5831,18 +5761,18 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.24"
+version = "0.8.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a996a8f63c5c4448cd959ac1bab0aaa3306ccfd060472f85943ee0750f0169be"
+checksum = "28a6e20d751156648aa063f3800b706ee209a32c0b4d9f24be3d980b01be55ef"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -5862,7 +5792,7 @@ checksum = "d71e5d6e06ab090c67b5e44993ec16b72dcbaabc526db883a360057678b48502"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
  "synstructure",
 ]
 
@@ -5884,7 +5814,7 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -5906,7 +5836,7 @@ checksum = "6eafa6dfb17584ea3e2bd6e76e0cc15ad7af12b09abdd1ca55961bed9b1063c6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.100",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -5926,14 +5856,12 @@ dependencies = [
 
 [[package]]
 name = "zopfli"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5019f391bac5cf252e93bbcc53d039ffd62c7bfb7c150414d61369afe57e946"
+checksum = "edfc5ee405f504cd4984ecc6f14d02d55cfda60fa4b689434ef4102aae150cd7"
 dependencies = [
  "bumpalo",
  "crc32fast",
- "lockfree-object-pool",
  "log",
- "once_cell",
  "simd-adler32",
 ]

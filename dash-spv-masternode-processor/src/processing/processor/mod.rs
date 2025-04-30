@@ -21,6 +21,7 @@ use dashcore::sml::masternode_list::MasternodeList;
 use dashcore::sml::masternode_list_engine::{MasternodeListEngine, MasternodeListEngineBlockContainer};
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
 use dashcore::sml::quorum_validation_error::{ClientDataRetrievalError, QuorumValidationError};
+use dashcore::transaction::special_transaction::quorum_commitment::QuorumEntry;
 use dash_spv_crypto::crypto::byte_util::Zeroable;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::processing::core_provider::CoreProvider;
@@ -261,6 +262,17 @@ impl MasternodeProcessor {
 
         let qr_info: QRInfo = deserialize(message)?;
 
+        let mut d = String::new();
+        d.push_str(format!("\ntip: {}", quorum_list_desc(&qr_info.mn_list_diff_h.new_quorums)).as_str());
+        d.push_str(format!("\n  h: {}", quorum_list_desc(&qr_info.mn_list_diff_h.new_quorums)).as_str());
+        d.push_str(format!("\n  h-c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_c.new_quorums)).as_str());
+        d.push_str(format!("\n h-2c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_2c.new_quorums)).as_str());
+        d.push_str(format!("\n h-3c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_3c.new_quorums)).as_str());
+        d.push_str(format!("\n h-4c{}", qr_info.quorum_snapshot_and_mn_list_diff_at_h_minus_4c.as_ref().map(|(q,qq)| quorum_list_desc(&qq.new_quorums)).unwrap_or_default()).as_str());
+        d.push_str(format!("\n lq/i{}", quorum_list_desc(&qr_info.last_commitment_per_index)).as_str());
+
+        println!("QRINFO quorums: {d}");
+
         let get_height_fn = {
             |block_hash: &BlockHash| {
                 if block_hash.as_byte_array().is_zero() {
@@ -313,6 +325,9 @@ impl MasternodeProcessor {
             Ok(mn_list_diff) => mn_list_diff,
             Err(err) => return Err(err.into()),
         };
+
+        println!("MNLDIFF quorums: {}", quorum_list_desc(&mn_list_diff.new_quorums));
+
         let base_block_hash = mn_list_diff.base_block_hash;
         let block_hash = mn_list_diff.block_hash;
         let base_block_height = self.provider.lookup_block_height_by_hash(base_block_hash.to_byte_array());
@@ -355,13 +370,19 @@ impl MasternodeProcessor {
             let quorums_of_type = quorums.iter().fold(String::new(), |mut acc, (quorum_hash, (set, key, status))| {
                 acc.push_str(format!("\t\t{}: {}: {}\n", quorum_hash.to_string(), key.to_string(), status).as_str());
                 acc
-
             });
             acc.push_str(format!("\t{llmq_type}:\n{quorums_of_type}\n").as_str());
             acc
         }).as_str());
         println!("{debug_string}");
     }
+}
+
+fn quorum_list_desc(q: &Vec<QuorumEntry>) -> String {
+    q.iter().fold(String::new(), |mut acc, q| {
+        acc.push_str(format!("\t{}: {}\n", q.llmq_type, q.quorum_hash.to_string()).as_str());
+        acc
+    })
 }
 
 #[cfg(all(test, feature = "test-helpers"))]

@@ -2,6 +2,7 @@ use std::os::raw::c_void;
 use std::sync::Arc;
 use dash_sdk::dpp::prelude::CoreBlockHeight;
 use dash_sdk::platform::DataContract;
+use dpp::data_contract::TokenConfiguration;
 use drive_proof_verifier::ContextProvider;
 use drive_proof_verifier::error::ContextProviderError;
 use platform_value::Identifier;
@@ -52,5 +53,9 @@ impl ContextProvider for PlatformProvider {
 
     fn get_platform_activation_height(&self) -> Result<CoreBlockHeight, ContextProviderError> {
         (self.get_platform_activation_height)(self.context.get())
+    }
+
+    fn get_token_configuration(&self, token_id: &Identifier) -> Result<Option<TokenConfiguration>, ContextProviderError> {
+        Err(ContextProviderError::TokenConfigurationFailure(format!("Not implemented {token_id}")))
     }
 }
