@@ -295,7 +295,10 @@ impl MasternodeProcessor {
         )?;
 
         let hashes = self.engine.latest_masternode_list_non_rotating_quorum_hashes(
-            &[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85],
+            match self.provider.chain_type() {
+                ChainType::MainNet => &[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85],
+                _ => &[LLMQType::Llmqtype50_60, LLMQType::Llmqtype400_85, LLMQType::Llmqtype400_60],
+            },
             true);
         Ok(hashes)
     }

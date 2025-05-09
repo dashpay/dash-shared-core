@@ -159,7 +159,7 @@ impl WalletEx {
             return rounds_max - 1;
         }
 
-        let mut rounds_ref = *self.map_outpoint_rounds_cache.entry(outpoint.clone()).or_insert(-10);
+        let mut rounds_ref = *self.map_outpoint_rounds_cache.entry(outpoint).or_insert(-10);
 
         if rounds_ref != -10 {
             return rounds_ref;
