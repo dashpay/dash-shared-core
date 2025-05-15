@@ -75,7 +75,7 @@ pub struct IdentityModel {
 
     pub get_private_key: Arc<dyn Fn(/*context*/*const c_void, /*index*/u32, KeyKind) -> Option<Vec<u8>>>,
 
-    pub create_new_key: Arc<dyn Fn(/*context*/*const c_void, KeyKind, SecurityLevel, Purpose) -> Result<(u32, OpaqueKey), Error>>,
+    pub create_new_key: Arc<dyn Fn(/*context*/*const c_void, KeyKind, SecurityLevel, Purpose) -> Result<u32, Error>>,
     pub active_private_keys_are_loaded: Arc<dyn Fn(*const c_void, /*is_local*/bool, /*key_info_dictionaries*/ HashMap<u32, KeyInfo>) -> Result<bool, Error>>
     // activePrivateKeysAreLoadedWithFetchingError
 }
@@ -93,15 +93,15 @@ impl IdentityModel {
         (self.active_private_keys_are_loaded)(context, self.is_local, self.key_info_dictionaries.clone())
     }
 
-    pub fn create_new_ecdsa_auth_key(&self, context: *const c_void, level: SecurityLevel) -> Result<(u32, OpaqueKey), Error> {
+    pub fn create_new_ecdsa_auth_key(&self, context: *const c_void, level: SecurityLevel) -> Result<u32, Error> {
         (self.create_new_key)(context, KeyKind::ECDSA, level, Purpose::AUTHENTICATION)
     }
 
-    pub fn create_new_ecdsa_auth_key_of_level_if_needed(&self, context: *const c_void, level: SecurityLevel) -> Result<(), Error> {
+    pub fn create_new_ecdsa_auth_key_of_level_if_needed(&self, context: *const c_void, level: SecurityLevel) -> Result<u32, Error> {
         if self.keys_created == 0 {
-            self.create_new_ecdsa_auth_key(context, level).map(|_| ())
+            self.create_new_ecdsa_auth_key(context, level)
         } else {
-            Ok(())
+            Ok(u32::MAX)
         }
     }
 
@@ -119,7 +119,7 @@ impl IdentityModel {
         SaveRegisteredKey: Fn(*const c_void, SaveKeyContext) -> bool + Sync + Send + 'static,
         SaveNewUsername: Fn(*const c_void, SaveUsernameContext) + Sync + Send + 'static,
         GetPrivateKeyAtIndex: Fn(*const c_void, u32, KeyKind) -> Option<Vec<u8>> + Sync + Send + 'static,
-        CreateNewKey: Fn(*const c_void, KeyKind, SecurityLevel, Purpose) -> Result<(u32, OpaqueKey), Error> + Sync + Send + 'static,
+        CreateNewKey: Fn(*const c_void, KeyKind, SecurityLevel, Purpose) -> Result<u32, Error> + Sync + Send + 'static,
         ActivePrivateKeysAreLoaded: Fn(*const c_void, bool, HashMap<u32, KeyInfo>) -> Result<bool, Error> + Sync + Send + 'static,
 
     >(

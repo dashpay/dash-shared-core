@@ -228,13 +228,12 @@ impl IdentitiesManager {
     pub async fn fetch_identity_network_state_information(
         &self,
         model: &mut IdentityModel,
-        unique_id: [u8; 32],
         context: *const c_void
     ) -> Result<(bool, bool), Error> {
-        let debug_string = format!("[IdentityManager] Fetch Identity State ({})", unique_id.to_lower_hex_string());
+        let debug_string = format!("[IdentityManager] Fetch Identity State ({})", model.unique_id.to_lower_hex_string());
         println!("{debug_string}");
         let options = if model.is_local { IdentityValidator::AcceptNotFoundAsNotAnError } else { IdentityValidator::None };
-        match self.monitor_for_id_bytes(unique_id, RetryStrategy::SlowingDown50Percent(DEFAULT_FETCH_IDENTITY_RETRY_COUNT), options).await {
+        match self.monitor_for_id_bytes(model.unique_id, RetryStrategy::SlowingDown50Percent(DEFAULT_FETCH_IDENTITY_RETRY_COUNT), options).await {
             Ok(Some(identity)) => {
                 model.update_with_state_information(identity, context)?;
                 println!("{}: OK", debug_string);

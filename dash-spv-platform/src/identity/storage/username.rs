@@ -1,7 +1,7 @@
 use crate::document::usernames::UsernameStatus;
 
 #[derive(Clone, Debug)]
-#[ferment_macro::opaque]
+#[ferment_macro::export]
 pub enum SaveUsernameContext {
     NewUsername {
         username: String,
