@@ -1,3 +1,4 @@
+use std::os::raw::c_void;
 use std::sync::Arc;
 use dash_sdk::{platform::{DocumentQuery, FetchMany}, Sdk};
 use dpp::data_contract::DataContract;
@@ -9,14 +10,17 @@ use dpp::document::{Document, DocumentV0Getters};
 use dpp::errors::ProtocolError;
 use dpp::identity::identity_public_key::IdentityPublicKey;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
-use dpp::util::entropy_generator::{DefaultEntropyGenerator, EntropyGenerator};
 use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::Identifier;
+use platform_value::string_encoding::Encoding;
 use platform_version::version::PlatformVersion;
+use dash_spv_crypto::crypto::byte_util::Random;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_macro::StreamManager;
 use crate::error::Error;
+use crate::identity::manager::DEFAULT_FETCH_USERNAMES_RETRY_COUNT;
+use crate::identity::model::IdentityModel;
 use crate::query::{order_by_asc_normalized_label, order_by_asc_owner_id, where_domain_is_dash, where_normalized_label_equal_to, where_normalized_label_starts_with, where_owner_in, where_owner_is, where_records_identity_is};
 use crate::signer::CallbackSigner;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
@@ -84,8 +88,8 @@ impl DocumentsManager {
     ) -> Result<Document, Error> {
         let document_type = contract.document_type_for_name(document_type)
             .map_err(ProtocolError::from)?;
-        let entropy = DefaultEntropyGenerator.generate()?;
-
+        // let entropy = DefaultEntropyGenerator.generate()?;
+        let entropy = <[u8; 32]>::random();
         document_type
             .create_document_from_data(document.properties().into(), document.owner_id(), block_height, core_block_height, entropy, PlatformVersion::latest())
             .map_err(Error::from)?
@@ -226,5 +230,22 @@ impl DocumentsManager {
         self.many_documents_with_query(query).await
     }
 
+
+    pub async fn fetch_usernames(&self, model: &mut IdentityModel, contract: DataContract, context: *const c_void) -> Result<bool, Error> {
+        let documents = self.stream_dpns_documents_for_identity_with_user_id_using_contract(
+            model.unique_id,
+            contract, RetryStrategy::Linear(DEFAULT_FETCH_USERNAMES_RETRY_COUNT),
+            DocumentValidator::None,
+            1000
+        ).await?;
+        for (identifier, maybe_document) in documents {
+            if let Some(document) = maybe_document {
+                model.update_with_username_document(document, context);
+            } else {
+                println!("[WARN] Document {} is nil", identifier.to_string(Encoding::Hex));
+            }
+        }
+        Ok(true)
+    }
 }
 

@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::query::{order_by_asc_normalized_label, where_domain_is, where_normalized_label_equal_to, where_normalized_label_in};
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[ferment_macro::export]
 pub enum UsernameStatus {
     NotPresent = 0,

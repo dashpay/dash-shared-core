@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Formatter};
+use std::os::raw::c_void;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-// use dashcore::hashes::hex::DisplayHex;
 use dpp::identity::{Identity, IdentityPublicKey, identity_public_key::key_type::KeyType};
 use dash_sdk::platform::Fetch;
 use dash_sdk::platform::types::identity::PublicKeyHash;
 use dash_sdk::{RequestSettings, Sdk};
 use dashcore::hashes::{hash160, Hash};
-use dashcore::secp256k1::hashes::hex::DisplayHex;
+use dashcore::prelude::DisplayHex;
 use dash_spv_macro::StreamManager;
 use dpp::identity::accessors::IdentityGettersV0;
 use dpp::identity::identity_public_key::accessors::v0::IdentityPublicKeyGettersV0;
@@ -19,13 +19,16 @@ use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::{BinaryData, Identifier};
 use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
-// use dash_spv_crypto::hashes::hash160;
 use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use dash_spv_crypto::keys::key::KeyKind;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::error::Error;
+use crate::identity::model::IdentityModel;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 const KEYS_TO_CHECK: u32 = 5;
+pub const DEFAULT_FETCH_IDENTITY_RETRY_COUNT: u32 = 5;
+pub const DEFAULT_FETCH_USERNAMES_RETRY_COUNT: u32 = 5;
+
 const DEFAULT_SETTINGS: RequestSettings = RequestSettings {
     connect_timeout: Some(Duration::from_millis(20000)),
     timeout: Some(Duration::from_secs(0)),
@@ -222,6 +225,31 @@ impl IdentitiesManager {
         Ok(identities)
     }
 
+    pub async fn fetch_identity_network_state_information(
+        &self,
+        model: &mut IdentityModel,
+        unique_id: [u8; 32],
+        context: *const c_void
+    ) -> Result<(bool, bool), Error> {
+        let debug_string = format!("[IdentityManager] Fetch Identity State ({})", unique_id.to_lower_hex_string());
+        println!("{debug_string}");
+        let options = if model.is_local { IdentityValidator::AcceptNotFoundAsNotAnError } else { IdentityValidator::None };
+        match self.monitor_for_id_bytes(unique_id, RetryStrategy::SlowingDown50Percent(DEFAULT_FETCH_IDENTITY_RETRY_COUNT), options).await {
+            Ok(Some(identity)) => {
+                model.update_with_state_information(identity, context)?;
+                println!("{}: OK", debug_string);
+                Ok((true, true))
+            },
+            Ok(None) => {
+                println!("{}: ERROR: None", debug_string);
+                Ok((true, false))
+            }
+            Err(error) => {
+                println!("{}: ERROR: {:?}", debug_string, error);
+                Err(error)
+            }
+        }
+    }
 }
 
 // TODO: Here we have ugly thing with keys conversion.
@@ -334,6 +362,15 @@ pub fn key_kind_from_key_type(key_type: KeyType) -> KeyKind {
         KeyType::EDDSA_25519_HASH160 => KeyKind::ED25519
     }
 }
+#[ferment_macro::export]
+pub fn key_kind_to_key_type(kind: KeyKind) -> KeyType {
+    match kind {
+        KeyKind::ECDSA => KeyType::ECDSA_SECP256K1,
+        KeyKind::BLS | KeyKind::BLSBasic => KeyType::BLS12_381,
+        KeyKind::ED25519 => KeyType::EDDSA_25519_HASH160,
+    }
+}
+
 #[ferment_macro::export]
 pub fn key_kind_to_key_type_index(kind: KeyKind) -> u8 {
     match kind {

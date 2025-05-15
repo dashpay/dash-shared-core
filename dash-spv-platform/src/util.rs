@@ -46,7 +46,7 @@ pub trait ValidationError {
 pub trait MaxRetryError {
     fn max_retry_error() -> Self;
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub enum RetryStrategy {
     None,

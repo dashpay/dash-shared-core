@@ -1,3 +1,4 @@
+use std::os::raw::c_void;
 use std::sync::Arc;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::platform::DocumentQuery;
@@ -12,11 +13,12 @@ use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::Identifier;
 use crate::error::Error;
+use crate::identity::model::IdentityModel;
 use crate::models::contact_request::{ContactRequest, ContactRequestKind};
 use crate::query::{order_by_asc_created_at, where_created_since, where_owner_is, where_recipient_is};
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub enum ContactRequestValidator {
     None = 0,
@@ -48,11 +50,12 @@ impl StreamSpec for ContactRequestValidator {
     type ResultMany = IndexMap<Identifier, Option<Document>>;
 }
 
-#[derive(Clone, Debug, StreamManager)]
+#[derive(Clone, StreamManager)]
 #[ferment_macro::opaque]
 pub struct ContactRequestManager {
     pub sdk: Arc<Sdk>,
     pub chain_type: ChainType,
+    // pub has_contact_request_with_id: Arc<dyn Fn(/*context*/*const c_void, /*direction*/ bool, /*identifier*/[u8; 32], /*storage_context*/*const c_void) -> bool>,
 }
 
 impl ContactRequestManager {
@@ -136,6 +139,59 @@ impl ContactRequestManager {
         let query = self.query_outgoing_contact_requests(contract, user_id, since, start_after)?;
         self.stream_many_with_settings::<ContactRequestValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
             .map(|docs| process_contact_requests(&user_id, docs))
+    }
+
+    pub async fn fetch_incoming_contact_requests_in_context<
+        HasContactRequestWithId: Fn(/*context*/*const c_void, /*direction*/ bool, /*identifier*/[u8; 32], /*storage_context*/*const c_void) -> bool + Send + Sync + 'static
+    >(
+        &self,
+        model: &mut IdentityModel,
+        contract: DataContract,
+        since: u64,
+        start_after: Option<Vec<u8>>,
+        storage_context: *const c_void,
+        context: *const c_void,
+        has_contact_request_with_id: HasContactRequestWithId,
+    ) ->Result<Vec<ContactRequest>, Error> {
+        let result = self.stream_incoming_contact_requests_with_contract(model.unique_id, since, start_after, contract, RetryStrategy::Linear(5), ContactRequestValidator::None, 1000).await?;
+        let mut contact_requests = Vec::new();
+        for contact_request in result {
+            match contact_request {
+                ContactRequestKind::Incoming(request) => {
+                    if !has_contact_request_with_id(context, true, request.owner_id, storage_context) {
+                        contact_requests.push(request);
+                    }
+                },
+                ContactRequestKind::Outgoing(_) => {},
+            }
+        }
+        Ok(contact_requests)
+    }
+    pub async fn fetch_outgoing_contact_requests_in_context<
+        HasContactRequestWithId: Fn(/*context*/*const c_void, /*direction*/ bool, /*identifier*/[u8; 32], /*storage_context*/*const c_void) -> bool + Send + Sync + 'static
+    >(
+        &self,
+        model: &mut IdentityModel,
+        data_contract: DataContract,
+        since: u64,
+        start_after: Option<Vec<u8>>,
+        storage_context: *const c_void,
+        context: *const c_void,
+        has_contact_request_with_id: HasContactRequestWithId,
+    ) -> Result<Vec<ContactRequest>, Error> {
+        let result = self.stream_outgoing_contact_requests_with_contract(model.unique_id, since, start_after, data_contract, RetryStrategy::Linear(5), ContactRequestValidator::None, 1000).await?;
+        let mut contact_requests = Vec::new();
+        for contact_request in result {
+            match contact_request {
+                ContactRequestKind::Outgoing(request) => {
+                    if !has_contact_request_with_id(context, false, request.recipient, storage_context) {
+                        contact_requests.push(request);
+                    }
+                },
+                ContactRequestKind::Incoming(_) => {},
+            }
+        }
+        Ok(contact_requests)
     }
 }
 

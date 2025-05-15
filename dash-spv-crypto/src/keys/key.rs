@@ -13,7 +13,7 @@ use crate::util::data_append::DataAppend;
 use crate::util::script::ScriptElement;
 use crate::util::sec_vec::SecVec;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[ferment_macro::export]
 pub enum KeyKind {
     ECDSA = 0,

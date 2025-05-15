@@ -19,7 +19,6 @@ std = ["dashcore/std"]
 bincode = "=2.0.0-rc.3"
 dash-spv-crypto = { workspace = true }
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "bincode", "ed25519-dalek"], default-features = false, branch = "feat/ferment" }
-ferment = { version = "0.2", package = "ferment" }
 ferment-macro = { version = "0.2", package = "ferment-macro" }
 serde = { version = "1.0.215", features = ["derive"], optional = true }
 serde_json = "1.0.85"

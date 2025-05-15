@@ -17,11 +17,13 @@ pub extern crate dash_spv_masternode_processor;
 pub extern crate dash_spv_coinjoin;
 
 use std::fmt::{Debug, Formatter};
+use std::os::raw::c_void;
 use std::sync::Arc;
 use dashcore::{Network, QuorumHash};
 use dashcore::hashes::Hash;
 use dashcore::sml::llmq_type::LLMQType;
 use dashcore::sml::masternode_list_entry::qualified_masternode_list_entry::QualifiedMasternodeListEntry;
+use data_contracts::SystemDataContract;
 use dpp::data_contract::DataContract;
 use dpp::identity::identity_public_key::IdentityPublicKey;
 
@@ -41,7 +43,7 @@ use crate::ffi_core_provider::FFICoreProvider;
 pub struct DashSPVCore {
     pub processor: Arc<MasternodeProcessor>,
     pub platform: Arc<PlatformSDK>,
-    context: *const std::os::raw::c_void,
+    context: *const c_void,
 }
 
 impl Debug for DashSPVCore {
@@ -49,37 +51,37 @@ impl Debug for DashSPVCore {
         f.write_str(format!("[{}] [SPVCore]", self.processor.provider.chain_type().name()).as_str())
     }
 }
-// AnyOther by_value: Type(Dictionary(NonPrimitiveFermentable(SmartPointer(Arc($Ty(std :: sync :: Arc < dyn Fn (* const std :: os :: raw :: c_void , u32) -> Option < [u8 ; 32] > >, [Object(Type(Dictionary(LambdaFn($Ty(dyn Fn (* const std :: os :: raw :: c_void , u32) -> Option < [u8 ; 32] >, [])))))]))))))
-
 
 #[ferment_macro::export]
 impl DashSPVCore {
 
     pub fn with_callbacks<
         // platform
-        DC: Fn(*const std::os::raw::c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
-        AH: Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
-        CS: Fn(*const std::os::raw::c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
-        CCS: Fn(*const std::os::raw::c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
+        GetDataContract: Fn(*const c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
+        GetPlatformActivationHeight: Fn(*const c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
+        Sign: Fn(*const c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
+        CanSign: Fn(*const c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
+        GetDataContractFromCache: Fn(*const c_void, SystemDataContract) -> DataContract + Send + Sync + 'static,
         // masternode
-        BHT: Fn(*const std::os::raw::c_void, [u8; 32]) -> u32 + Send + Sync + 'static,
-        BHH: Fn(*const std::os::raw::c_void, u32) -> Option<[u8; 32]> + Send + Sync + 'static,
-        UMU: Fn(*const std::os::raw::c_void, Vec<QualifiedMasternodeListEntry>) + Send + Sync + 'static,
+        GetBlockHeightByBlockHash: Fn(*const c_void, [u8; 32]) -> u32 + Send + Sync + 'static,
+        GetBlockHashByBlockHeight: Fn(*const c_void, u32) -> Option<[u8; 32]> + Send + Sync + 'static,
+        UpdateMasternodesAddressUsage: Fn(*const c_void, Vec<QualifiedMasternodeListEntry>) + Send + Sync + 'static,
     >(
         chain_type: ChainType,
         diff_config: Option<DiffConfig>,
         address_list: Option<Vec<&'static str>>,
 
-        get_data_contract: DC,
-        get_platform_activation_height: AH,
-        callback_signer: CS,
-        callback_can_sign: CCS,
+        get_data_contract: GetDataContract,
+        get_platform_activation_height: GetPlatformActivationHeight,
+        callback_signer: Sign,
+        callback_can_sign: CanSign,
+        get_data_contract_from_cache: GetDataContractFromCache,
 
-        get_block_height_by_hash: BHT,
-        get_block_hash_by_height: BHH,
-        update_address_usage_of_masternodes: UMU,
+        get_block_height_by_hash: GetBlockHeightByBlockHash,
+        get_block_hash_by_height: GetBlockHashByBlockHeight,
+        update_address_usage_of_masternodes: UpdateMasternodesAddressUsage,
 
-        context: *const std::os::raw::c_void) -> Self {
+        context: *const c_void) -> Self {
         let provider = Arc::new(FFICoreProvider::new(
             chain_type.clone(),
             get_block_height_by_hash,
@@ -104,6 +106,7 @@ impl DashSPVCore {
             get_platform_activation_height,
             callback_signer,
             callback_can_sign,
+            get_data_contract_from_cache,
             address_list,
             chain_type,
             context
