@@ -935,6 +935,8 @@ impl PlatformSDK {
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .thread_name("dash-spv-platform")
+            .enable_io()
+            .enable_time()
             .build()
             .unwrap();
         Self {
