@@ -1,6 +1,6 @@
 use dpp::document::{Document, DocumentV0Getters};
 use dpp::prelude::{Revision, TimestampMillis};
-use platform_value::{Hash256, Identifier, Value};
+use platform_value::{Identifier, Value};
 use crate::error::Error;
 
 #[derive(Clone, Debug)]
@@ -9,7 +9,7 @@ pub struct TransientDashPayUser {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub avatar_fingerprint: Option<Vec<u8>>,
-    pub avatar_hash: Option<Hash256>,
+    pub avatar_hash: Option<[u8; 32]>,
     pub public_message: Option<String>,
     pub revision: Option<Revision>,
     pub document_identifier: Identifier,
@@ -61,31 +61,24 @@ impl TryFrom<&Document> for TransientDashPayUser {
 }
 impl TransientDashPayUser {
     pub fn with_profile_document(document: Document) -> Self {
-        let avatar_url = if let Some(Value::Text(avatar_url)) = document.get("avatarUrl") {
-            Some(avatar_url.clone())
+        let avatar_url = document.get("avatarUrl")
+            .and_then(|value| value.as_text())
+            .map(|text| text.to_string());
+        let avatar_fingerprint = document.get("avatarFingerprint")
+            .and_then(|value| value.as_bytes())
+            .cloned();
+
+        let avatar_hash = if let Some(Value::Bytes32(avatar_hash)) = document.get("avatarHash") {
+            Some(avatar_hash.clone())
         } else {
             None
         };
-        let avatar_fingerprint = if let Some(Value::Bytes(avatar_fingerprint)) = document.get("avatarFingerprint") {
-            Some(avatar_fingerprint.clone())
-        } else {
-            None
-        };
-        let avatar_hash = if let Some(Value::Identifier(avatar_fingerprint)) = document.get("avatarHash") {
-            Some(avatar_fingerprint.clone())
-        } else {
-            None
-        };
-        let public_message = if let Some(Value::Text(public_message)) = document.get("publicMessage") {
-            Some(public_message.clone())
-        } else {
-            None
-        };
-        let display_name = if let Some(Value::Text(public_message)) = document.get("displayName") {
-            Some(public_message.clone())
-        } else {
-            None
-        };
+        let public_message = document.get("publicMessage")
+            .and_then(|value| value.as_text())
+            .map(|text| text.to_string());
+        let display_name = document.get("displayName")
+            .and_then(|value| value.as_text())
+            .map(|text| text.to_string());
         Self {
             revision: document.revision(),
             avatar_url,

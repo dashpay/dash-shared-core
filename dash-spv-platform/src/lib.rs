@@ -827,16 +827,19 @@ impl PlatformSDK {
             let document_type = data_contract.document_type_for_name("domain")
                 .map_err(Error::from)?;
             let documents = model.create_salted_domain_hashes_documents(self.sdk.version(), &salted_domain_hashes, document_type)?;
-
-            let private_key_data = model.get_main_private_key_in_context(context)
-                .ok_or(Error::Any(0, "No private key".to_string()))?;
-            let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-            let state_transition = self.documents.create_state_transition(documents, &mut nonce_counter)
-                .map_err(Error::from)?;
-            self.sign_and_publish_state_transition(&private_key_data, key_kind_to_key_type(model.current_main_key_type), StateTransition::Batch(state_transition)).await?;
-            model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(username_full_paths));
-            Ok(true)
-            // self.register_registration_pending_usernames(platform, context).await
+            if model.is_local {
+                Err(Error::Any(0, "Identity is not local".to_string()))
+            } else {
+                let private_key_data = model.get_main_private_key_in_context(context)
+                    .ok_or(Error::Any(0, "No private key".to_string()))?;
+                let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+                let state_transition = self.documents.create_state_transition(documents, &mut nonce_counter)
+                    .map_err(Error::from)?;
+                self.sign_and_publish_state_transition(&private_key_data, key_kind_to_key_type(model.current_main_key_type), StateTransition::Batch(state_transition)).await?;
+                model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(username_full_paths));
+                Ok(true)
+                // self.register_registration_pending_usernames(platform, context).await
+            }
         }
     }
 

@@ -40,7 +40,7 @@ impl SaveUsernameContext {
         }
     }
     pub fn username(username: &str, domain: &str, status: UsernameStatus, salt: Option<[u8; 32]>, commit_save: bool) -> SaveUsernameContext {
-        SaveUsernameContext::NewUsername {
+        SaveUsernameContext::Username {
             username: username.to_string(),
             domain: domain.to_string(),
             status,

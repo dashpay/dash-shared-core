@@ -1,8 +1,8 @@
 use std::os::raw::c_void;
 use std::sync::Arc;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
-use dash_sdk::platform::DocumentQuery;
-use dash_sdk::Sdk;
+use dash_sdk::platform::{DocumentQuery, FetchMany};
+use dash_sdk::{RequestSettings, Sdk};
 use dash_spv_macro::StreamManager;
 use dpp::data_contract::DataContract;
 use dpp::data_contracts::SystemDataContract;
@@ -17,6 +17,13 @@ use crate::identity::model::IdentityModel;
 use crate::models::contact_request::{ContactRequest, ContactRequestKind};
 use crate::query::{order_by_asc_created_at, where_created_since, where_owner_is, where_recipient_is};
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
+
+pub const CONTACT_REQUEST_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: None,
+    timeout: None,
+    retries: Some(5),
+    ban_failed_address: None,
+};
 
 #[derive(Clone, Debug)]
 #[ferment_macro::export]
@@ -153,42 +160,60 @@ impl ContactRequestManager {
         context: *const c_void,
         has_contact_request_with_id: HasContactRequestWithId,
     ) ->Result<Vec<ContactRequest>, Error> {
-        let result = self.stream_incoming_contact_requests_with_contract(model.unique_id, since, start_after, contract, RetryStrategy::Linear(5), ContactRequestValidator::None, 1000).await?;
+        let user_id = model.unique_id;
+        let query = self.query_incoming_contact_requests(contract, user_id, since, start_after)?;
+        let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(CONTACT_REQUEST_SETTINGS)).await?;
         let mut contact_requests = Vec::new();
-        for contact_request in result {
-            match contact_request {
-                ContactRequestKind::Incoming(request) => {
-                    if !has_contact_request_with_id(context, true, request.owner_id, storage_context) {
-                        contact_requests.push(request);
-                    }
-                },
-                ContactRequestKind::Outgoing(_) => {},
+        for (_, document) in documents {
+            if let Some(doc) = document {
+                let request = ContactRequest::try_from(doc)?;
+                if user_id.eq(&request.recipient) && !has_contact_request_with_id(context, true, request.owner_id, storage_context) {
+                    contact_requests.push(request);
+                }
             }
         }
         Ok(contact_requests)
+
+        //
+        // let requests = process_contact_requests(&user_id, documents);
+        //
+        // // let requests = self.stream_incoming_contact_requests_with_contract(model.unique_id, since, start_after, contract, RetryStrategy::Linear(5), ContactRequestValidator::None, 1000).await?;
+        // let mut contact_requests = Vec::new();
+        // for contact_request in requests {
+        //     match contact_request {
+        //         ContactRequestKind::Incoming(request) => {
+        //             if !has_contact_request_with_id(context, true, request.owner_id, storage_context) {
+        //                 contact_requests.push(request);
+        //             }
+        //         },
+        //         ContactRequestKind::Outgoing(_) => {},
+        //     }
+        // }
+        // Ok(contact_requests)
     }
     pub async fn fetch_outgoing_contact_requests_in_context<
         HasContactRequestWithId: Fn(/*context*/*const c_void, /*direction*/ bool, /*identifier*/[u8; 32], /*storage_context*/*const c_void) -> bool + Send + Sync + 'static
     >(
         &self,
         model: &mut IdentityModel,
-        data_contract: DataContract,
+        contract: DataContract,
         since: u64,
         start_after: Option<Vec<u8>>,
         storage_context: *const c_void,
         context: *const c_void,
         has_contact_request_with_id: HasContactRequestWithId,
     ) -> Result<Vec<ContactRequest>, Error> {
-        let result = self.stream_outgoing_contact_requests_with_contract(model.unique_id, since, start_after, data_contract, RetryStrategy::Linear(5), ContactRequestValidator::None, 1000).await?;
+        let user_id = model.unique_id;
+        let query = self.query_outgoing_contact_requests(contract, user_id, since, start_after)?;
+        let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(CONTACT_REQUEST_SETTINGS)).await?;
         let mut contact_requests = Vec::new();
-        for contact_request in result {
-            match contact_request {
-                ContactRequestKind::Outgoing(request) => {
-                    if !has_contact_request_with_id(context, false, request.recipient, storage_context) {
-                        contact_requests.push(request);
-                    }
-                },
-                ContactRequestKind::Incoming(_) => {},
+        for (_, document) in documents {
+            if let Some(doc) = document {
+                let request = ContactRequest::try_from(doc)?;
+                let recipient = request.recipient;
+                if !user_id.eq(&recipient) && !has_contact_request_with_id(context, false, recipient, storage_context) {
+                    contact_requests.push(request);
+                }
             }
         }
         Ok(contact_requests)

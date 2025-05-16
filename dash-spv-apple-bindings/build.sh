@@ -124,6 +124,20 @@ if $OBJC; then
   fi
 fi
 
+#TODO: there is a bug in cbindgen that can't deal with featured functions arguments
+sed -E -i '' '
+/dpp_data_contract_document_type_v1_DocumentTypeV1_ctor\(/,/token_costs_TokenCosts \*/ {
+  /StatelessJsonSchemaLazyValidator \*json_schema_validator/d
+}
+/dpp_data_contract_document_type_v1_DocumentTypeV1_ctor\(/,/token_costs_TokenCosts \*/ {
+  /token_costs_TokenCosts \*/i\
+#if (!defined(TEST) && defined(DPP_VALIDATION))\
+StatelessJsonSchemaLazyValidator *json_schema_validator,\
+#endif
+}
+' target/include/dash_spv_apple_bindings.h
+
+
 #TODO: ferment should be used instead of sed
 sed -i '' '/#ifndef/ a\
 typedef struct Runtime Runtime;

@@ -28,6 +28,7 @@ use crate::identity::manager::identity_public_key;
 use crate::identity::registration_status::IdentityRegistrationStatus;
 use crate::identity::storage::username::SaveUsernameContext;
 use crate::identity::username_status_info::UsernameStatusInfo;
+use crate::models::transient_dashpay_user::TransientDashPayUser;
 
 pub const DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL: SecurityLevel = SecurityLevel::HIGH;
 pub const DEFAULT_USERNAME_REGISTRATION_PURPOSE: Purpose = Purpose::AUTHENTICATION;
@@ -68,6 +69,7 @@ pub struct IdentityModel {
     pub is_outgoing_invitation: bool,
     pub is_from_incoming_invitation: bool,
 
+    pub transient_dashpay_user: Option<TransientDashPayUser>,
 
     pub get_derivation_context: Arc<dyn Fn(*const c_void, KeyKind, OpaqueKey, u32, u32) -> *const c_void>,
     pub save_key: Arc<dyn Fn(*const c_void, SaveKeyContext) -> bool>,
@@ -158,6 +160,7 @@ impl IdentityModel {
             index: 0,
             is_outgoing_invitation: false,
             is_from_incoming_invitation: false,
+            transient_dashpay_user: None,
             get_derivation_context: Arc::new(get_derivation_context),
             save_key: Arc::new(save_key),
             save_username: Arc::new(save_username),

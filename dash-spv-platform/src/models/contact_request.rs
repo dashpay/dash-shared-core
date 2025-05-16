@@ -17,11 +17,34 @@ pub struct ContactRequest {
     pub recipient: [u8; 32],
     pub encrypted_account_label: Option<Vec<u8>>,
     pub encrypted_public_key: Vec<u8>,
-    pub account_reference: u32,
-    pub sender_key_index: u32,
-    pub recipient_key_index: u32,
+    pub account_reference: i64,
+    pub sender_key_index: i64,
+    pub recipient_key_index: i64,
     pub created_at: u64,
 }
+
+// V0(DocumentV0 {
+//     id: Identifier(IdentifierBytes32(..)),
+//     owner_id: Identifier(IdentifierBytes32(..)),
+//     properties: {
+//         "accountReference": I64(..),
+//         "encryptedAccountLabel": Bytes(..),
+//         "encryptedPublicKey": Bytes(..),
+//         "recipientKeyIndex": I64(..),
+//         "senderKeyIndex": I64(..),
+//         "toUserId": Identifier(..)
+//     },
+//     revision: None,
+//     created_at: Some(..),
+//     updated_at: None,
+//     transferred_at: None,
+//     created_at_block_height: None,
+//     updated_at_block_height: None,
+//     transferred_at_block_height: None,
+//     created_at_core_block_height: Some(..),
+//     updated_at_core_block_height: None,
+//     transferred_at_core_block_height: None
+// })
 
 impl TryFrom<Document> for ContactRequest {
     type Error = Error;
@@ -32,32 +55,26 @@ impl TryFrom<Document> for ContactRequest {
         let created_at = value.created_at()
             .ok_or(Error::DashSDKError("created_at not present".to_string()))?;
         let props = value.properties_consumed();
-        let recipient = if let Some(Value::Identifier(val)) = props.get("toUserId") {
-            val.clone()
-        } else {
-            return Err(Error::DashSDKError("toUserId not present".to_string()));
-        };
-        let encrypted_account_label = if let Some(Value::Bytes(val)) = props.get("encryptedAccountLabel") {
-            Some(val.clone())
-        } else {
-            None
-        };
-        let encrypted_public_key = if let Some(Value::Bytes(val)) = props.get("encryptedPublicKey") {
-            val.clone()
-        } else {
-            return Err(Error::DashSDKError("encryptedPublicKey not present".to_string()));
-        };
-        let account_reference = if let Some(Value::U32(val)) = props.get("accountReference") {
+        let recipient = props.get("toUserId")
+            .and_then(|value| value.to_identifier().map(|identifier| identifier.into_buffer()).ok())
+            .ok_or(Error::DashSDKError("toUserId not present".to_string()))?;
+        let encrypted_public_key = props.get("encryptedPublicKey")
+            .and_then(|value| value.as_bytes().cloned())
+            .ok_or(Error::DashSDKError("encryptedPublicKey not present".to_string()))?;
+
+        let encrypted_account_label = props.get("encryptedAccountLabel")
+            .and_then(|value| value.as_bytes().cloned());
+        let account_reference = if let Some(Value::I64(val)) = props.get("accountReference") {
             *val
         } else {
             0
         };
-        let sender_key_index = if let Some(Value::U32(val)) = props.get("senderKeyIndex") {
+        let sender_key_index = if let Some(Value::I64(val)) = props.get("senderKeyIndex") {
             *val
         } else {
             return Err(Error::DashSDKError("senderKeyIndex not present".to_string()));
         };
-        let recipient_key_index = if let Some(Value::U32(val)) = props.get("recipientKeyIndex") {
+        let recipient_key_index = if let Some(Value::I64(val)) = props.get("recipientKeyIndex") {
             *val
         } else {
             return Err(Error::DashSDKError("recipientKeyIndex not present".to_string()));

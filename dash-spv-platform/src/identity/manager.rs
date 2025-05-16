@@ -26,13 +26,19 @@ use crate::error::Error;
 use crate::identity::model::IdentityModel;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 const KEYS_TO_CHECK: u32 = 5;
-pub const DEFAULT_FETCH_IDENTITY_RETRY_COUNT: u32 = 5;
-pub const DEFAULT_FETCH_USERNAMES_RETRY_COUNT: u32 = 5;
+pub const DEFAULT_FETCH_IDENTITY_RETRY_COUNT: usize = 5;
+pub const DEFAULT_FETCH_USERNAMES_RETRY_COUNT: usize = 5;
 
 const DEFAULT_SETTINGS: RequestSettings = RequestSettings {
     connect_timeout: Some(Duration::from_millis(20000)),
     timeout: Some(Duration::from_secs(0)),
     retries: Some(3),
+    ban_failed_address: None,
+};
+const DEFAULT_IDENTITY_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: Some(Duration::from_millis(20000)),
+    timeout: Some(Duration::from_secs(0)),
+    retries: Some(DEFAULT_FETCH_IDENTITY_RETRY_COUNT),
     ban_failed_address: None,
 };
 
@@ -232,22 +238,39 @@ impl IdentitiesManager {
     ) -> Result<(bool, bool), Error> {
         let debug_string = format!("[IdentityManager] Fetch Identity State ({})", model.unique_id.to_lower_hex_string());
         println!("{debug_string}");
-        let options = if model.is_local { IdentityValidator::AcceptNotFoundAsNotAnError } else { IdentityValidator::None };
-        match self.monitor_for_id_bytes(model.unique_id, RetryStrategy::SlowingDown50Percent(DEFAULT_FETCH_IDENTITY_RETRY_COUNT), options).await {
-            Ok(Some(identity)) => {
+        // let options = if model.is_local { IdentityValidator::AcceptNotFoundAsNotAnError } else { IdentityValidator::None };
+
+        match Identity::fetch_with_settings(self.sdk_ref(), Identifier::from(model.unique_id), DEFAULT_IDENTITY_SETTINGS).await? {
+            Some(identity) => {
                 model.update_with_state_information(identity, context)?;
                 println!("{}: OK", debug_string);
                 Ok((true, true))
-            },
-            Ok(None) => {
-                println!("{}: ERROR: None", debug_string);
-                Ok((true, false))
             }
-            Err(error) => {
-                println!("{}: ERROR: {:?}", debug_string, error);
-                Err(error)
+            None if model.is_local => {
+                println!("{}: None (Ok)", debug_string);
+                Ok((true, false))
+            },
+            None => {
+                println!("{}: None (Error)", debug_string);
+                Err(Error::Any(0, "Identity expected here".to_string()))
             }
         }
+
+        // match self.monitor_for_id_bytes(model.unique_id, RetryStrategy::SlowingDown50Percent(DEFAULT_FETCH_IDENTITY_RETRY_COUNT), options).await {
+        //     Ok(Some(identity)) => {
+        //         model.update_with_state_information(identity, context)?;
+        //         println!("{}: OK", debug_string);
+        //         Ok((true, true))
+        //     },
+        //     Ok(None) => {
+        //         println!("{}: ERROR: None", debug_string);
+        //         Ok((true, false))
+        //     }
+        //     Err(error) => {
+        //         println!("{}: ERROR: {:?}", debug_string, error);
+        //         Err(error)
+        //     }
+        // }
     }
 }
 
@@ -295,6 +318,20 @@ pub fn opaque_key_from_identity_public_key(public_key: IdentityPublicKey) -> Res
                 .map_err(|_e| KeyError::WrongLength(public_key_data.len()))
                 .map(|pubkey| BLSKey::key_with_public_key(pubkey, false))
                 .map(OpaqueKey::BLS)
+        }
+        key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
+    }
+}
+#[ferment_macro::export]
+pub fn identity_public_key_data(public_key: IdentityPublicKey) -> Result<Vec<u8>, KeyError> {
+    let public_key_data = public_key.data();
+    match public_key.key_type() {
+        KeyType::ECDSA_SECP256K1 =>
+            ECDSAKey::key_with_public_key_data(public_key_data.as_slice()).map(|key| key.public_key_data()),
+        KeyType::BLS12_381 => {
+            <Vec<u8> as TryInto<[u8; 48]>>::try_into(public_key_data.to_vec())
+                .map_err(|_e| KeyError::WrongLength(public_key_data.len()))
+                .map(|pubkey| BLSKey::key_with_public_key(pubkey, false).public_key_data())
         }
         key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
     }
