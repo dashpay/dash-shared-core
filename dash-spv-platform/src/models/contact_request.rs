@@ -23,29 +23,6 @@ pub struct ContactRequest {
     pub created_at: u64,
 }
 
-// V0(DocumentV0 {
-//     id: Identifier(IdentifierBytes32(..)),
-//     owner_id: Identifier(IdentifierBytes32(..)),
-//     properties: {
-//         "accountReference": I64(..),
-//         "encryptedAccountLabel": Bytes(..),
-//         "encryptedPublicKey": Bytes(..),
-//         "recipientKeyIndex": I64(..),
-//         "senderKeyIndex": I64(..),
-//         "toUserId": Identifier(..)
-//     },
-//     revision: None,
-//     created_at: Some(..),
-//     updated_at: None,
-//     transferred_at: None,
-//     created_at_block_height: None,
-//     updated_at_block_height: None,
-//     transferred_at_block_height: None,
-//     created_at_core_block_height: Some(..),
-//     updated_at_core_block_height: None,
-//     transferred_at_core_block_height: None
-// })
-
 impl TryFrom<Document> for ContactRequest {
     type Error = Error;
 

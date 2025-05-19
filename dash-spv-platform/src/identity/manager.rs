@@ -281,8 +281,6 @@ impl IdentitiesManager {
     ) -> Result<(bool, bool), Error> {
         let debug_string = format!("[IdentityManager] Fetch Identity State ({})", model.unique_id.to_lower_hex_string());
         println!("{debug_string}");
-        // let options = if model.is_local { IdentityValidator::AcceptNotFoundAsNotAnError } else { IdentityValidator::None };
-
         match Identity::fetch_with_settings(self.sdk_ref(), Identifier::from(model.unique_id), DEFAULT_IDENTITY_SETTINGS).await? {
             Some(identity) => {
                 model.update_with_state_information(identity, context)?;
@@ -298,22 +296,6 @@ impl IdentitiesManager {
                 Err(Error::Any(0, "Identity expected here".to_string()))
             }
         }
-
-        // match self.monitor_for_id_bytes(model.unique_id, RetryStrategy::SlowingDown50Percent(DEFAULT_FETCH_IDENTITY_RETRY_COUNT), options).await {
-        //     Ok(Some(identity)) => {
-        //         model.update_with_state_information(identity, context)?;
-        //         println!("{}: OK", debug_string);
-        //         Ok((true, true))
-        //     },
-        //     Ok(None) => {
-        //         println!("{}: ERROR: None", debug_string);
-        //         Ok((true, false))
-        //     }
-        //     Err(error) => {
-        //         println!("{}: ERROR: {:?}", debug_string, error);
-        //         Err(error)
-        //     }
-        // }
     }
 }
 

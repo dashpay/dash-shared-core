@@ -103,13 +103,11 @@ impl DocumentsManager {
     ) -> Result<Document, Error> {
         let document_type = contract.document_type_for_name(document_type)
             .map_err(ProtocolError::from)?;
-        // let entropy = DefaultEntropyGenerator.generate()?;
         let entropy = <[u8; 32]>::random();
         document_type
             .create_document_from_data(document.properties().into(), document.owner_id(), block_height, core_block_height, entropy, PlatformVersion::latest())
             .map_err(Error::from)?
             .put_to_platform_and_wait_for_response(&self.sdk, document_type.to_owned_document_type(), entropy, identity_public_key, signer, None)
-            // .put_to_platform_and_wait_for_response(&self.sdk, document_type.to_owned_document_type(), entropy, identity_public_key, Arc::new(contract), signer)
             .await
             .map_err(Error::from)
 
@@ -249,16 +247,7 @@ impl DocumentsManager {
     pub async fn fetch_usernames(&self, model: &mut IdentityModel, contract: DataContract, context: *const c_void) -> Result<bool, Error> {
         let user_id = model.unique_id;
         let query = self.query_dpns_documents_for_identity_with_user_id(contract, user_id)?;
-
         let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(USERNAME_SETTINGS)).await?;
-
-        //
-        // let documents = self.stream_dpns_documents_for_identity_with_user_id_using_contract(
-        //     model.unique_id,
-        //     contract, RetryStrategy::Linear(DEFAULT_FETCH_USERNAMES_RETRY_COUNT),
-        //     DocumentValidator::None,
-        //     1000
-        // ).await?;
         for (identifier, maybe_document) in documents {
             if let Some(document) = maybe_document {
                 model.update_with_username_document(document, context);
