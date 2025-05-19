@@ -3,6 +3,8 @@
 
 mod address;
 #[cfg(not(test))]
+pub mod custom;
+#[cfg(not(test))]
 mod fermented;
 #[cfg(not(test))]
 mod fermented_extended;
@@ -10,9 +12,6 @@ mod fermented_extended;
 #[cfg(test)]
 mod tests;
 mod ffi_core_provider;
-pub mod coinjoin;
-#[cfg(not(test))]
-pub mod custom;
 
 pub extern crate dash_spv_masternode_processor;
 pub extern crate dash_spv_coinjoin;

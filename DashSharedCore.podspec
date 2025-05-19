@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
 
   s.prepare_command = <<-CMD
     cd dash-spv-apple-bindings
-    ./build.sh debug
+    ./build.sh
   CMD
 
   s.source_files = 'dash-spv-apple-bindings/target/include/**/*.h'

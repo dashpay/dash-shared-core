@@ -50,6 +50,7 @@ ferment-sys = { version = "0.2", package = "ferment-sys" }
 #ferment-sys = { path = "../../ferment/ferment-sys", features = ["objc"] }
 
 [features]
+fermentize = []
 default = ["state-transitions", "std", "message_verification", "quorum_validation"]
 bls-signatures = ["dpp/bls-signatures"]
 blsful = ["dashcore/blsful"]

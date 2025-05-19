@@ -51,6 +51,7 @@ use dpp::state_transition::state_transition_factory::StateTransitionFactory;
 use dpp::state_transition::StateTransition;
 use dpp::state_transition::state_transitions::identity::public_key_in_creation::IdentityPublicKeyInCreation;
 use dpp::state_transition::proof_result::StateTransitionProofResult;
+use dpp::tokens::token_payment_info::TokenPaymentInfo;
 use dpp::withdrawal::Pooling;
 use drive::query::{OrderClause, WhereClause};
 use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
@@ -373,7 +374,7 @@ impl PlatformSDK {
         private_key: OpaqueKey
     ) -> Result<StateTransition, Error> {
         let doc_type_ref = document_type.as_ref();
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, doc_type_ref, Bytes32(entropy))])]);
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(action_type, vec![(document, doc_type_ref, Bytes32(entropy), None)])]);
         let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
         let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
             .map_err(Error::from)?;
@@ -391,7 +392,7 @@ impl PlatformSDK {
         private_key: OpaqueKey
     ) -> Result<StateTransition, Error> {
         let document_type = data_contract.document_type_for_name(table_name).map_err(Error::from)?;
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(action_type, vec![(document, document_type, Bytes32(entropy))])]);
+        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(action_type, vec![(document, document_type, Bytes32(entropy), None)])]);
         let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
         let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
             .map_err(Error::from)?;
@@ -400,7 +401,7 @@ impl PlatformSDK {
     #[cfg(feature = "state-transitions")]
     pub fn document_batch_signed_transition<'a>(
         &self,
-        documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>,
+        documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32, Option<TokenPaymentInfo>)>>,
         private_key: OpaqueKey,
     ) -> Result<StateTransition, Error> {
         let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
@@ -528,16 +529,6 @@ impl PlatformSDK {
     }
 
 
-    #[cfg(feature = "state-transitions")]
-    pub async fn document_batch<'a>(
-        &self,
-        documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>,
-        private_key: OpaqueKey,
-    ) -> Result<StateTransitionProofResult, Error> {
-        println!("document_batch: {documents:?} -- {private_key:?}");
-        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
-        self.publish_state_transition(signed_transition).await
-    }
 
     pub fn friend_request_document(
         &self,
@@ -589,7 +580,7 @@ impl PlatformSDK {
         let owner_id = Identifier::from(identity_id);
         let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
             .map_err(Error::from)?;
-        let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
+        let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)])]);
         let signed_transition = self.document_batch_signed_transition(documents_iter, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
@@ -609,11 +600,11 @@ impl PlatformSDK {
         let document_type = contract.document_type_for_name("domain")
             .map_err(ProtocolError::from)?;
         let owner_id = Identifier::from(identity_id);
-        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::new();
         for value in username_values.into_iter() {
             let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
                 .map_err(Error::from)?;
-            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)]);
         }
         let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
         self.publish_state_transition(signed_transition).await
@@ -638,12 +629,12 @@ impl PlatformSDK {
         let document_type = contract.document_type_for_name("preorder")
             .map_err(ProtocolError::from)?;
         let owner_id = Identifier::from(identity_id);
-        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
+        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::new();
         for salted_domain_hash in salted_domain_hashes.into_iter() {
             let map = ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]);
             let document = document_type.create_document_from_data(Value::Map(map), owner_id, 1000, 1000, entropy, self.sdk.version())
                 .map_err(Error::from)?;
-            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
+            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)]);
         }
 
         let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
@@ -730,7 +721,7 @@ impl PlatformSDK {
             Some(document_id) =>
                 document_type.create_document_with_prevalidated_properties(Identifier::from(document_id), owner_id, 1000, 1000, profile.to_prevalidated_properties(), self.sdk.version()),
         }.map_err(Error::from)?;
-        let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))])]);
+        let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)])]);
         let signed_transition = self.document_batch_signed_transition(documents_iter, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
@@ -791,6 +782,16 @@ impl PlatformSDK {
     }
 
 
+    #[cfg(feature = "state-transitions")]
+    pub async fn document_batch<'a>(
+        &self,
+        documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32, Option<TokenPaymentInfo>)>>,
+        private_key: OpaqueKey,
+    ) -> Result<StateTransitionProofResult, Error> {
+        println!("document_batch: {documents:?} -- {private_key:?}");
+        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
+        self.publish_state_transition(signed_transition).await
+    }
 
     pub async fn fetch_documents(
         &self,
