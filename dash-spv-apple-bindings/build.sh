@@ -137,6 +137,19 @@ StatelessJsonSchemaLazyValidator *json_schema_validator,\
 }
 ' target/include/dash_spv_apple_bindings.h
 
+sed -E -i '' '
+/dpp_data_contract_document_type_v0_DocumentTypeV0_ctor\(/,/StatelessJsonSchemaLazyValidator \*json_schema_validator\);/ {
+  s/(\*security_level_requirement),/\1/;
+  s/StatelessJsonSchemaLazyValidator \*json_schema_validator\);/\
+#if (!defined(TEST) \&\& defined(DPP_VALIDATION))\
+,\
+                                                                                                                 StatelessJsonSchemaLazyValidator *json_schema_validator\
+#endif\
+);\
+/
+}
+' target/include/dash_spv_apple_bindings.h
+
 
 #TODO: ferment should be used instead of sed
 sed -i '' '/#ifndef/ a\

@@ -407,6 +407,46 @@ impl IdentityModel {
         })
     }
 
+    /// Profile
+    ///
+    pub fn maybe_user(&self) -> Option<TransientDashPayUser> {
+        self.transient_dashpay_user.clone()
+    }
+    pub fn set_user(&mut self, user: Option<TransientDashPayUser>) {
+        self.transient_dashpay_user = user;
+    }
+
+    pub fn if_user_matches_revision(&self, remote_profile_revision: u64) -> bool {
+        if let Some(user) = self.transient_dashpay_user.as_ref() {
+            if let Some(revision) = user.revision {
+                return revision == remote_profile_revision
+            }
+        }
+        false
+    }
+
+    pub fn maybe_avatar_path(&self) -> Option<String> {
+        self.transient_dashpay_user.as_ref().and_then(|user| user.avatar_url.clone())
+    }
+    pub fn maybe_avatar_fingerprint(&self) -> Option<Vec<u8>> {
+        self.transient_dashpay_user.as_ref().and_then(|user| user.avatar_fingerprint.clone())
+    }
+    pub fn maybe_avatar_hash(&self) -> Option<[u8; 32]> {
+        self.transient_dashpay_user.as_ref().and_then(|user| user.avatar_hash.clone())
+    }
+    pub fn maybe_display_name(&self) -> Option<String> {
+        self.transient_dashpay_user.as_ref().and_then(|user| user.display_name.clone())
+    }
+    pub fn maybe_public_message(&self) -> Option<String> {
+        self.transient_dashpay_user.as_ref().and_then(|user| user.public_message.clone())
+    }
+    pub fn maybe_profile_created_at(&self) -> Option<u64> {
+        self.transient_dashpay_user.as_ref().and_then(|user| user.created_at.clone())
+    }
+    pub fn maybe_profile_updated_at(&self) -> Option<u64> {
+        self.transient_dashpay_user.as_ref().and_then(|user| user.updated_at.clone())
+    }
+
     pub fn set_username_full_paths(&mut self, username_full_paths: Vec<String>, status: UsernameStatus) {
         username_full_paths.into_iter().for_each(|full_path| self.set_username_status(full_path, status.clone()));
     }
@@ -495,6 +535,9 @@ impl IdentityModel {
 
     pub fn key_at_index(&self, index: u32) -> Option<OpaqueKey> {
         self.key_info_dictionaries.get(&index).map(|info| info.key.clone())
+    }
+    pub fn has_key_at_index(&self, index: u32) -> bool {
+        self.key_info_dictionaries.get(&index).is_some()
     }
 
     pub fn first_identity_public_key(&self, security_level: SecurityLevel, purpose: Purpose) -> Option<IdentityPublicKey> {

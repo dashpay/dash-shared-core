@@ -18,6 +18,7 @@ use dpp::identity::identity_public_key::v0::IdentityPublicKeyV0;
 use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::{BinaryData, Identifier};
+use platform_value::string_encoding::Encoding;
 use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
 use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use dash_spv_crypto::keys::key::KeyKind;
@@ -36,6 +37,12 @@ const DEFAULT_SETTINGS: RequestSettings = RequestSettings {
     ban_failed_address: None,
 };
 const DEFAULT_IDENTITY_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: Some(Duration::from_millis(20000)),
+    timeout: Some(Duration::from_secs(0)),
+    retries: Some(DEFAULT_FETCH_IDENTITY_RETRY_COUNT),
+    ban_failed_address: None,
+};
+const KEY_HASHES_SETTINGS: RequestSettings = RequestSettings {
     connect_timeout: Some(Duration::from_millis(20000)),
     timeout: Some(Duration::from_secs(0)),
     retries: Some(DEFAULT_FETCH_IDENTITY_RETRY_COUNT),
@@ -151,17 +158,15 @@ impl IdentitiesManager {
     }
     pub async fn get_identities_for_key_hashes(&self, wallet_id: String, key_hashes: Vec<[u8; 20]>, ) -> Result<BTreeMap<[u8; 20], Identity>, Error> {
         let mut identities = BTreeMap::new();
-        for key_hash in key_hashes.into_iter() {
-            match Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), DEFAULT_SETTINGS).await {
-                Ok(Some(identity)) => {
+        for key_hash in key_hashes {
+            let maybe_identity = Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), KEY_HASHES_SETTINGS).await?;
+            match maybe_identity {
+                Some(identity) => {
                     println!("{self:?} Ok::get_identities_for_wallets -> key_hash: {}: identity_id: {}", key_hash.to_lower_hex_string(), identity.id().to_buffer().to_lower_hex_string());
                     identities.insert(key_hash, identity);
                 },
-                Ok(None) => {
+                None => {
                     println!("{self:?} None::get_identities_for_wallets -> key_hash: {}: identity_id: None", key_hash.to_lower_hex_string());
-                }
-                Err(error) => {
-                    println!("{self:?} Error::get_identities_for_wallets -> key_hash: {}: error: {}", key_hash.to_lower_hex_string(), error.to_string());
                 }
             }
         }
@@ -229,6 +234,44 @@ impl IdentitiesManager {
             }
         }
         Ok(identities)
+    }
+
+    pub async fn monitor_key_hash_one_by_one<
+        GetPublicKeyDataAtIndexPath: Fn(*const c_void, Vec<u32>) -> Vec<u8> + Send + Sync + Clone + 'static
+    >(
+        &self,
+        unused_index: u32,
+        derivation_path: *const c_void,
+        get_public_key_at_index_path: GetPublicKeyDataAtIndexPath
+    ) -> Result<BTreeMap<u32, Identity>, Error> {
+        let debug_string = format!("[IdentityManager] Monitor KeyHashes (one-by-one) {}", unused_index);
+        println!("{debug_string}");
+        let mut index = unused_index;
+        let mut identities = BTreeMap::new();
+        while let Ok((new_index, key_hash, Some(identity))) = self.fetch_by_index(index, derivation_path, get_public_key_at_index_path.clone()).await {
+            println!("{debug_string}/{}: Ok: key_hash: {}, identity: {}", new_index, key_hash.to_lower_hex_string(), identity.id().to_string(Encoding::Hex));
+            index = new_index;
+            identities.insert(new_index, identity);
+        }
+        Ok(identities)
+    }
+
+    pub async fn fetch_by_index<
+        GetPublicKeyDataAtIndexPath: Fn(*const c_void, Vec<u32>) -> Vec<u8> + Send + Sync + 'static
+    >(
+        &self,
+        index: u32,
+        derivation_path: *const c_void,
+        get_public_key_at_index_path: GetPublicKeyDataAtIndexPath
+    ) -> Result<(u32, [u8; 20], Option<Identity>), Error> {
+        let new_index = index + 1;
+        let indexes = vec![new_index | BIP32_HARD, 0 | BIP32_HARD];
+        let public_key_data = get_public_key_at_index_path(derivation_path, indexes);
+        let public_key_hash = hash160::Hash::hash(&public_key_data).to_byte_array();
+        println!("[IdentityManager] FetchByIndex ({})", index);
+        Identity::fetch_with_settings(self.sdk_ref(), PublicKeyHash(public_key_hash), KEY_HASHES_SETTINGS).await
+            .map_err(Error::from)
+            .map(|result| (new_index, public_key_hash, result))
     }
 
     pub async fn fetch_identity_network_state_information(

@@ -17,6 +17,16 @@ pub struct TransientDashPayUser {
     pub updated_at: Option<TimestampMillis>,
 }
 
+#[ferment_macro::export]
+impl TransientDashPayUser {
+    pub fn is_updated_after(&self, timestamp: u64) -> bool {
+        match self.updated_at {
+            None => false,
+            Some(updated_at) => updated_at > timestamp
+        }
+    }
+}
+
 impl TryFrom<&Document> for TransientDashPayUser {
     type Error = Error;
 
