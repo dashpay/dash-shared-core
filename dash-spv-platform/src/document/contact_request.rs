@@ -173,23 +173,6 @@ impl ContactRequestManager {
             }
         }
         Ok(contact_requests)
-
-        //
-        // let requests = process_contact_requests(&user_id, documents);
-        //
-        // // let requests = self.stream_incoming_contact_requests_with_contract(model.unique_id, since, start_after, contract, RetryStrategy::Linear(5), ContactRequestValidator::None, 1000).await?;
-        // let mut contact_requests = Vec::new();
-        // for contact_request in requests {
-        //     match contact_request {
-        //         ContactRequestKind::Incoming(request) => {
-        //             if !has_contact_request_with_id(context, true, request.owner_id, storage_context) {
-        //                 contact_requests.push(request);
-        //             }
-        //         },
-        //         ContactRequestKind::Outgoing(_) => {},
-        //     }
-        // }
-        // Ok(contact_requests)
     }
     pub async fn fetch_outgoing_contact_requests_in_context<
         HasContactRequestWithId: Fn(/*context*/*const c_void, /*direction*/ bool, /*identifier*/[u8; 32], /*storage_context*/*const c_void) -> bool + Send + Sync + 'static
