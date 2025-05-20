@@ -29,7 +29,7 @@ use dash_sdk::platform::transition::put_settings::PutSettings;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dashcore::consensus::Decodable;
-use dashcore::secp256k1::hashes::hex::DisplayHex;
+use dashcore::prelude::DisplayHex;
 use dashcore::Transaction;
 use data_contracts::SystemDataContract;
 use dpp::data_contract::{DataContract, DataContractFacade};
@@ -59,6 +59,7 @@ use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use drive_proof_verifier::types::evonode_status::EvoNodeStatus;
 use indexmap::IndexMap;
 use platform_value::{BinaryData, Bytes32, Identifier, Value, ValueMap};
+use platform_version::version::v8::PLATFORM_V8;
 use tokio::runtime::Runtime;
 use dash_spv_crypto::crypto::byte_util::{Random, Reversed};
 use dash_spv_crypto::keys::{IKey, OpaqueKey};
@@ -123,6 +124,7 @@ pub const MAINNET_ADDRESS_LIST: [&str; 158] = [
 fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Address>>(provider: C, address_list: T) -> Sdk {
     SdkBuilder::new(AddressList::from_iter(address_list))
         .with_context_provider(provider)
+        .with_version(&PLATFORM_V8)
         .build()
         .unwrap()
 }
@@ -740,6 +742,7 @@ impl PlatformSDK {
 
     pub async fn register_usernames_at_stage(&self, model: &mut IdentityModel, status: UsernameStatus, context: *const c_void) -> Result<bool, Error> {
         let username_full_paths = model.username_full_paths_with_status(status);
+        println!("[PlatformSDK] [Identity: {}] register_usernames_at_stage: {status:?}: username_full_path: {:?}", model.unique_id.to_lower_hex_string(), username_full_paths);
         if username_full_paths.is_empty() {
             Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernameFullPathsWithStatus(status)))
         } else {

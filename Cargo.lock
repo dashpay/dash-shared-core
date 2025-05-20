@@ -897,8 +897,8 @@ dependencies = [
 
 [[package]]
 name = "dapi-grpc"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "dapi-grpc-macros",
  "futures-core",
@@ -915,8 +915,8 @@ dependencies = [
 
 [[package]]
 name = "dapi-grpc-macros"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "heck 0.5.0",
  "quote",
@@ -960,8 +960,8 @@ dependencies = [
 
 [[package]]
 name = "dash-sdk"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -1195,8 +1195,8 @@ dependencies = [
 
 [[package]]
 name = "dashpay-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1206,8 +1206,8 @@ dependencies = [
 
 [[package]]
 name = "data-contracts"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "dashpay-contract",
  "dpns-contract",
@@ -1368,8 +1368,8 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "dpns-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1379,8 +1379,8 @@ dependencies = [
 
 [[package]]
 name = "dpp"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1428,8 +1428,8 @@ dependencies = [
 
 [[package]]
 name = "drive"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "bincode",
  "byteorder",
@@ -1439,7 +1439,7 @@ dependencies = [
  "grovedb-costs",
  "grovedb-epoch-based-storage-flags",
  "grovedb-path",
- "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8)",
  "hex",
  "indexmap 2.9.0",
  "integer-encoding",
@@ -1455,8 +1455,8 @@ dependencies = [
 
 [[package]]
 name = "drive-proof-verifier"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "bincode",
  "dapi-grpc",
@@ -1660,8 +1660,8 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "feature-flags-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -1990,7 +1990,7 @@ dependencies = [
 [[package]]
 name = "grovedb"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+source = "git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8#221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8"
 dependencies = [
  "bincode",
  "bincode_derive",
@@ -1998,7 +1998,7 @@ dependencies = [
  "grovedb-costs",
  "grovedb-merk",
  "grovedb-path",
- "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8)",
  "hex",
  "hex-literal",
  "indexmap 2.9.0",
@@ -2011,7 +2011,7 @@ dependencies = [
 [[package]]
 name = "grovedb-costs"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+source = "git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8#221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8"
 dependencies = [
  "integer-encoding",
  "intmap",
@@ -2021,7 +2021,7 @@ dependencies = [
 [[package]]
 name = "grovedb-epoch-based-storage-flags"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+source = "git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8#221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8"
 dependencies = [
  "grovedb-costs",
  "hex",
@@ -2033,7 +2033,7 @@ dependencies = [
 [[package]]
 name = "grovedb-merk"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+source = "git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8#221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8"
 dependencies = [
  "bincode",
  "bincode_derive",
@@ -2042,7 +2042,7 @@ dependencies = [
  "ed",
  "grovedb-costs",
  "grovedb-path",
- "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8)",
  "grovedb-visualize",
  "hex",
  "indexmap 2.9.0",
@@ -2053,7 +2053,7 @@ dependencies = [
 [[package]]
 name = "grovedb-path"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+source = "git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8#221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8"
 dependencies = [
  "hex",
 ]
@@ -2061,7 +2061,7 @@ dependencies = [
 [[package]]
 name = "grovedb-version"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+source = "git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8#221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8"
 dependencies = [
  "thiserror 2.0.12",
  "versioned-feature-core 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2079,7 +2079,7 @@ dependencies = [
 [[package]]
 name = "grovedb-visualize"
 version = "3.0.0"
-source = "git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3#6d8ce92abe0c888f0a0115a6c88effa04ea87ed3"
+source = "git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8#221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8"
 dependencies = [
  "hex",
  "itertools 0.14.0",
@@ -2363,9 +2363,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.11"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "497bbc33a26fdd4af9ed9c70d63f61cf56a938375fbb32df34db9b1cd6d643f2"
+checksum = "cf9f1e950e0d9d1d3c47184416723cf29c0d1f93bd8cccf37e4beb6b44f31710"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -2454,9 +2454,9 @@ checksum = "00210d6893afc98edb752b664b8890f0ef174c8adbb8d0be9710fa66fbbf72d3"
 
 [[package]]
 name = "icu_properties"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2549ca8c7241c82f59c80ba2a6f415d931c5b58d24fb8412caa1a1f02c49139a"
+checksum = "016c619c1eeb94efb86809b015c58f479963de65bdb6253345c1a1276f22e32b"
 dependencies = [
  "displaydoc",
  "icu_collections",
@@ -2470,9 +2470,9 @@ dependencies = [
 
 [[package]]
 name = "icu_properties_data"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8197e866e47b68f8f7d95249e172903bec06004b18b2937f1095d40a0c57de04"
+checksum = "298459143998310acd25ffe6810ed544932242d3f07083eee1084d83a71bd632"
 
 [[package]]
 name = "icu_provider"
@@ -2656,8 +2656,8 @@ dependencies = [
 
 [[package]]
 name = "json-schema-compatibility-validator"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "json-patch",
  "once_cell",
@@ -2739,8 +2739,8 @@ dependencies = [
 
 [[package]]
 name = "keyword-search-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -2848,8 +2848,8 @@ dependencies = [
 
 [[package]]
 name = "masternode-reward-shares-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -3337,8 +3337,8 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "platform-serialization"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "bincode",
  "platform-version",
@@ -3346,8 +3346,8 @@ dependencies = [
 
 [[package]]
 name = "platform-serialization-derive"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3357,8 +3357,8 @@ dependencies = [
 
 [[package]]
 name = "platform-value"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -3378,12 +3378,12 @@ dependencies = [
 
 [[package]]
 name = "platform-version"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "bincode",
  "ferment-macro",
- "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=6d8ce92abe0c888f0a0115a6c88effa04ea87ed3)",
+ "grovedb-version 3.0.0 (git+https://github.com/dashpay/grovedb?rev=221ca6ec6b8d2b192d334192bd5a7b2cab5b0aa8)",
  "once_cell",
  "thiserror 2.0.12",
  "versioned-feature-core 1.0.0 (git+https://github.com/dashpay/versioned-feature-core)",
@@ -3391,8 +3391,8 @@ dependencies = [
 
 [[package]]
 name = "platform-versioning"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3831,8 +3831,8 @@ dependencies = [
 
 [[package]]
 name = "rs-dapi-client"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "backon",
  "chrono",
@@ -4703,8 +4703,8 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "token-history-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -5219,8 +5219,8 @@ dependencies = [
 
 [[package]]
 name = "wallet-utils-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "platform-value",
  "platform-version",
@@ -5409,15 +5409,15 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows-core"
-version = "0.61.1"
+version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46ec44dc15085cea82cf9c78f85a9114c463a369786585ad2882d1ff0b0acf40"
+checksum = "c0fdd3ddb90610c7638aa2b3a3ab2904fb9e5cdbecc643ddb3647212781c4ae3"
 dependencies = [
  "windows-implement",
  "windows-interface",
  "windows-link",
  "windows-result",
- "windows-strings 0.4.1",
+ "windows-strings 0.4.2",
 ]
 
 [[package]]
@@ -5461,9 +5461,9 @@ dependencies = [
 
 [[package]]
 name = "windows-result"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b895b5356fc36103d0f64dd1e94dfa7ac5633f1c9dd6e80fe9ec4adef69e09d"
+checksum = "56f42bd332cc6c8eac5af113fc0c1fd6a8fd2aa08a0119358686e5160d0586c6"
 dependencies = [
  "windows-link",
 ]
@@ -5479,9 +5479,9 @@ dependencies = [
 
 [[package]]
 name = "windows-strings"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a7ab927b2637c19b3dbe0965e75d8f2d30bdd697a1516191cad2ec4df8fb28a"
+checksum = "56e6c93f3a0c3b36176cb1327a4958a0353d5d166c2a35cb268ace15e91d3b57"
 dependencies = [
  "windows-link",
 ]
@@ -5661,8 +5661,8 @@ dependencies = [
 
 [[package]]
 name = "withdrawals-contract"
-version = "2.0.0-rc.8"
-source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#615752b879a0dbfec597283521b93d18b1fa7170"
+version = "2.0.0-rc.11"
+source = "git+https://github.com/dashpay/platform?branch=test%2Fferment#0b51982eb55ffb0c83b948a22fd6a0097c1a3c94"
 dependencies = [
  "num_enum 0.5.11",
  "platform-value",
