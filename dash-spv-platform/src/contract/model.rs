@@ -15,12 +15,3 @@ pub struct ContractModel {
     pub state: ContractState,
     pub save: Arc<dyn Fn(*const c_void) -> bool>,
 }
-
-// impl ContractModel {
-//     pub fn new(state: ContractState) -> ContractModel {
-//         Self {
-//             state,
-//
-//         }
-//     }
-// }
