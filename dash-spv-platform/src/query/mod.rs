@@ -191,9 +191,9 @@ pub fn where_recipient_is(user_id: [u8; 32]) -> WhereClause {
 pub fn where_records_identity_is(user_id: [u8; 32]) -> WhereClause {
     WhereClause { field: "records.identity".to_string(), operator: WhereOperator::Equal, value: Value::Identifier(user_id) }
 }
-pub fn where_salted_domain_hash_is(hash: Vec<u8>) -> WhereClause {
-    WhereClause { field: "saltedDomainHash".to_string(), operator: WhereOperator::Equal, value: Value::Bytes(hash) }
+pub fn where_salted_domain_hash_is(hash: [u8; 32]) -> WhereClause {
+    WhereClause { field: "saltedDomainHash".to_string(), operator: WhereOperator::Equal, value: Value::Bytes32(hash) }
 }
-pub fn where_salted_domain_hash_in(hashes: Vec<Vec<u8>>) -> WhereClause {
-    WhereClause { field: "saltedDomainHash".to_string(), operator: WhereOperator::In, value: Value::Array(hashes.into_iter().map(|hash| Value::Bytes(hash)).collect()) }
+pub fn where_salted_domain_hash_in(hashes: Vec<[u8; 32]>) -> WhereClause {
+    WhereClause { field: "saltedDomainHash".to_string(), operator: WhereOperator::In, value: Value::Array(hashes.into_iter().map(|hash| Value::Bytes32(hash)).collect()) }
 }

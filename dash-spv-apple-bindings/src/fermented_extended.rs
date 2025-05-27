@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use ferment::{boxed, unbox_any};
+use ferment::{boxed, destroy_opt_primitive, unbox_any};
 use tokio::runtime::Runtime;
 use dash_spv_coinjoin::coinjoin_client_manager::CoinJoinClientManager;
 use crate::custom::dashcore::{dashcore_hash_types_BlockHash, dashcore_hash_types_ConfirmedHash, dashcore_hash_types_ConfirmedHashHashedWithProRegTx, dashcore_hash_types_CycleHash, dashcore_hash_types_InputsHash, dashcore_hash_types_MerkleRootMasternodeList, dashcore_hash_types_MerkleRootQuorums, dashcore_hash_types_ProTxHash, dashcore_hash_types_PubkeyHash, dashcore_hash_types_QuorumCommitmentHash, dashcore_hash_types_QuorumEntryHash, dashcore_hash_types_QuorumHash, dashcore_hash_types_QuorumSigningRequestId, dashcore_hash_types_QuorumVVecHash, dashcore_hash_types_ScriptHash, dashcore_hash_types_Sha256dHash, dashcore_hash_types_SpecialTransactionPayloadHash, dashcore_hash_types_TxMerkleNode, dashcore_hash_types_Txid};
@@ -29,11 +29,36 @@ pub unsafe extern "C" fn SocketAddr_destroy(self_: *mut SocketAddr) {
 pub unsafe extern "C" fn dash_spv_apple_bindings_DashSPVCore_destroy(self_: *mut DashSPVCore) {
     unbox_any(self_);
 }
+# [no_mangle]
+pub unsafe extern "C" fn dash_spv_platform_identity_model_IdentityModel_destroy(self_: *mut dash_spv_platform::identity::model::IdentityModel) {
+    unbox_any(self_);
+}
 
 # [no_mangle]
 pub unsafe extern "C" fn dash_spv_coinjoin_coinjoin_client_manager_CoinJoinClientManager_destroy(self_: *mut CoinJoinClientManager) {
     unbox_any(self_);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn u64_destroy(self_: *mut u64) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn i64_destroy(self_: *mut i64) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn u32_destroy(self_: *mut u32) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn i32_destroy(self_: *mut i32) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn u16_destroy(self_: *mut u16) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn i16_destroy(self_: *mut i16) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn u8_destroy(self_: *mut u8) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn i8_destroy(self_: *mut i8) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn usize_destroy(self_: *mut usize) { destroy_opt_primitive(self_); }
+#[no_mangle]
+pub unsafe extern "C" fn isize_destroy(self_: *mut isize) { destroy_opt_primitive(self_); }
 
 /// [u8; 32]
 #[no_mangle] pub unsafe extern "C" fn dashcore_hash_types_BlockHash_ctor(hash: *mut Arr_u8_32) -> *mut dashcore_hash_types_BlockHash {
@@ -208,4 +233,3 @@ pub unsafe extern "C" fn dash_spv_coinjoin_coinjoin_client_manager_CoinJoinClien
 #[no_mangle] pub unsafe extern "C" fn dashcore_hash_types_ScriptHash_inner(ptr: *mut dashcore_hash_types_ScriptHash) -> *mut Arr_u8_20 {
     to_ffi_bytes::<dashcore::hash_types::ScriptHash, _, _>(ptr)
 }
-

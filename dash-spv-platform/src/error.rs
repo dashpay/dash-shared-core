@@ -5,6 +5,7 @@ use dpp::errors::consensus::ConsensusError;
 use dash_spv_crypto::keys::KeyError;
 use dpp::errors::ProtocolError;
 use http::uri::InvalidUri;
+use crate::identity::username_registration_error::UsernameRegistrationError;
 use crate::util::{MaxRetryError, ValidationError};
 
 #[derive(Clone, Debug)]
@@ -14,7 +15,8 @@ pub enum Error {
     DashSDKError(String),
     Any(i32, String),
     MaxRetryExceeded(String),
-    InstantSendSignatureVerificationError(String)
+    InstantSendSignatureVerificationError(String),
+    UsernameRegistrationError(UsernameRegistrationError)
 }
 
 

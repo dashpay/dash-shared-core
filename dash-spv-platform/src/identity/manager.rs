@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Formatter};
+use std::os::raw::c_void;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-// use dashcore::hashes::hex::DisplayHex;
 use dpp::identity::{Identity, IdentityPublicKey, identity_public_key::key_type::KeyType};
 use dash_sdk::platform::Fetch;
 use dash_sdk::platform::types::identity::PublicKeyHash;
 use dash_sdk::{RequestSettings, Sdk};
 use dashcore::hashes::{hash160, Hash};
-use dashcore::secp256k1::hashes::hex::DisplayHex;
+use dashcore::prelude::DisplayHex;
 use dash_spv_macro::StreamManager;
 use dpp::identity::accessors::IdentityGettersV0;
 use dpp::identity::identity_public_key::accessors::v0::IdentityPublicKeyGettersV0;
@@ -18,18 +18,34 @@ use dpp::identity::identity_public_key::v0::IdentityPublicKeyV0;
 use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::{BinaryData, Identifier};
+use platform_value::string_encoding::Encoding;
 use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
-// use dash_spv_crypto::hashes::hash160;
 use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use dash_spv_crypto::keys::key::KeyKind;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use crate::error::Error;
+use crate::identity::model::IdentityModel;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 const KEYS_TO_CHECK: u32 = 5;
+pub const DEFAULT_FETCH_IDENTITY_RETRY_COUNT: usize = 5;
+pub const DEFAULT_FETCH_USERNAMES_RETRY_COUNT: usize = 5;
+
 const DEFAULT_SETTINGS: RequestSettings = RequestSettings {
     connect_timeout: Some(Duration::from_millis(20000)),
     timeout: Some(Duration::from_secs(0)),
     retries: Some(3),
+    ban_failed_address: None,
+};
+const DEFAULT_IDENTITY_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: Some(Duration::from_millis(20000)),
+    timeout: Some(Duration::from_secs(0)),
+    retries: Some(DEFAULT_FETCH_IDENTITY_RETRY_COUNT),
+    ban_failed_address: None,
+};
+const KEY_HASHES_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: Some(Duration::from_millis(20000)),
+    timeout: Some(Duration::from_secs(0)),
+    retries: Some(DEFAULT_FETCH_IDENTITY_RETRY_COUNT),
     ban_failed_address: None,
 };
 
@@ -142,17 +158,15 @@ impl IdentitiesManager {
     }
     pub async fn get_identities_for_key_hashes(&self, wallet_id: String, key_hashes: Vec<[u8; 20]>, ) -> Result<BTreeMap<[u8; 20], Identity>, Error> {
         let mut identities = BTreeMap::new();
-        for key_hash in key_hashes.into_iter() {
-            match Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), DEFAULT_SETTINGS).await {
-                Ok(Some(identity)) => {
+        for key_hash in key_hashes {
+            let maybe_identity = Identity::fetch_with_settings(&self.sdk, PublicKeyHash(key_hash), KEY_HASHES_SETTINGS).await?;
+            match maybe_identity {
+                Some(identity) => {
                     println!("{self:?} Ok::get_identities_for_wallets -> key_hash: {}: identity_id: {}", key_hash.to_lower_hex_string(), identity.id().to_buffer().to_lower_hex_string());
                     identities.insert(key_hash, identity);
                 },
-                Ok(None) => {
+                None => {
                     println!("{self:?} None::get_identities_for_wallets -> key_hash: {}: identity_id: None", key_hash.to_lower_hex_string());
-                }
-                Err(error) => {
-                    println!("{self:?} Error::get_identities_for_wallets -> key_hash: {}: error: {}", key_hash.to_lower_hex_string(), error.to_string());
                 }
             }
         }
@@ -222,6 +236,67 @@ impl IdentitiesManager {
         Ok(identities)
     }
 
+    pub async fn monitor_key_hash_one_by_one<
+        GetPublicKeyDataAtIndexPath: Fn(*const c_void, Vec<u32>) -> Vec<u8> + Send + Sync + Clone + 'static
+    >(
+        &self,
+        unused_index: u32,
+        derivation_path: *const c_void,
+        get_public_key_at_index_path: GetPublicKeyDataAtIndexPath
+    ) -> Result<BTreeMap<u32, Identity>, Error> {
+        let debug_string = format!("[IdentityManager] Monitor KeyHashes (one-by-one) {}", unused_index);
+        println!("{debug_string}");
+        let mut index = unused_index;
+        let mut identities = BTreeMap::new();
+        while let Ok((new_index, key_hash, Some(identity))) = self.fetch_by_index(index, derivation_path, get_public_key_at_index_path.clone()).await {
+            println!("{debug_string}/{}: Ok: key_hash: {}, identity: {}", new_index, key_hash.to_lower_hex_string(), identity.id().to_string(Encoding::Hex));
+            index = new_index;
+            identities.insert(new_index, identity);
+        }
+        Ok(identities)
+    }
+
+    pub async fn fetch_by_index<
+        GetPublicKeyDataAtIndexPath: Fn(*const c_void, Vec<u32>) -> Vec<u8> + Send + Sync + 'static
+    >(
+        &self,
+        index: u32,
+        derivation_path: *const c_void,
+        get_public_key_at_index_path: GetPublicKeyDataAtIndexPath
+    ) -> Result<(u32, [u8; 20], Option<Identity>), Error> {
+        let new_index = index + 1;
+        let indexes = vec![new_index | BIP32_HARD, 0 | BIP32_HARD];
+        let public_key_data = get_public_key_at_index_path(derivation_path, indexes);
+        let public_key_hash = hash160::Hash::hash(&public_key_data).to_byte_array();
+        println!("[IdentityManager] FetchByIndex ({})", index);
+        Identity::fetch_with_settings(self.sdk_ref(), PublicKeyHash(public_key_hash), KEY_HASHES_SETTINGS).await
+            .map_err(Error::from)
+            .map(|result| (new_index, public_key_hash, result))
+    }
+
+    pub async fn fetch_identity_network_state_information(
+        &self,
+        model: &mut IdentityModel,
+        context: *const c_void
+    ) -> Result<(bool, bool), Error> {
+        let debug_string = format!("[IdentityManager] Fetch Identity State ({})", model.unique_id.to_lower_hex_string());
+        println!("{debug_string}");
+        match Identity::fetch_with_settings(self.sdk_ref(), Identifier::from(model.unique_id), DEFAULT_IDENTITY_SETTINGS).await? {
+            Some(identity) => {
+                model.update_with_state_information(identity, context)?;
+                println!("{}: OK", debug_string);
+                Ok((true, true))
+            }
+            None if model.is_local => {
+                println!("{}: None (Ok)", debug_string);
+                Ok((true, false))
+            },
+            None => {
+                println!("{}: None (Error)", debug_string);
+                Err(Error::Any(0, "Identity expected here".to_string()))
+            }
+        }
+    }
 }
 
 // TODO: Here we have ugly thing with keys conversion.
@@ -268,6 +343,20 @@ pub fn opaque_key_from_identity_public_key(public_key: IdentityPublicKey) -> Res
                 .map_err(|_e| KeyError::WrongLength(public_key_data.len()))
                 .map(|pubkey| BLSKey::key_with_public_key(pubkey, false))
                 .map(OpaqueKey::BLS)
+        }
+        key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
+    }
+}
+#[ferment_macro::export]
+pub fn identity_public_key_data(public_key: IdentityPublicKey) -> Result<Vec<u8>, KeyError> {
+    let public_key_data = public_key.data();
+    match public_key.key_type() {
+        KeyType::ECDSA_SECP256K1 =>
+            ECDSAKey::key_with_public_key_data(public_key_data.as_slice()).map(|key| key.public_key_data()),
+        KeyType::BLS12_381 => {
+            <Vec<u8> as TryInto<[u8; 48]>>::try_into(public_key_data.to_vec())
+                .map_err(|_e| KeyError::WrongLength(public_key_data.len()))
+                .map(|pubkey| BLSKey::key_with_public_key(pubkey, false).public_key_data())
         }
         key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
     }
@@ -334,6 +423,15 @@ pub fn key_kind_from_key_type(key_type: KeyType) -> KeyKind {
         KeyType::EDDSA_25519_HASH160 => KeyKind::ED25519
     }
 }
+#[ferment_macro::export]
+pub fn key_kind_to_key_type(kind: KeyKind) -> KeyType {
+    match kind {
+        KeyKind::ECDSA => KeyType::ECDSA_SECP256K1,
+        KeyKind::BLS | KeyKind::BLSBasic => KeyType::BLS12_381,
+        KeyKind::ED25519 => KeyType::EDDSA_25519_HASH160,
+    }
+}
+
 #[ferment_macro::export]
 pub fn key_kind_to_key_type_index(kind: KeyKind) -> u8 {
     match kind {

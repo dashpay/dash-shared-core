@@ -24,13 +24,13 @@ impl SaltedDomainHashesManager {
     pub fn new(sdk: &Arc<Sdk>, chain_type: ChainType) -> Self {
         Self { sdk: Arc::clone(sdk), chain_type }
     }
-    pub fn query_preorder_salted_domain_hash(&self, contract: DataContract, hash: Vec<u8>) -> Result<DocumentQuery, Error> {
+    pub fn query_preorder_salted_domain_hash(&self, contract: DataContract, hash: [u8; 32]) -> Result<DocumentQuery, Error> {
         let mut query = DocumentQuery::new(Arc::new(contract), "preorder").map_err(Error::from)?;
         query.limit = 1;
         query.where_clauses = vec![where_salted_domain_hash_is(hash)];
         Ok(query)
     }
-    pub fn query_preorder_salted_domain_hashes(&self, contract: DataContract, hashes: Vec<Vec<u8>>) -> Result<DocumentQuery, Error> {
+    pub fn query_preorder_salted_domain_hashes(&self, contract: DataContract, hashes: Vec<[u8; 32]>) -> Result<DocumentQuery, Error> {
         let mut query = DocumentQuery::new(Arc::new(contract), "preorder").map_err(Error::from)?;
         query.limit = hashes.len() as u32;
         query.where_clauses = vec![where_salted_domain_hash_in(hashes)];
@@ -42,14 +42,14 @@ impl SaltedDomainHashesManager {
 
 #[ferment_macro::export]
 impl SaltedDomainHashesManager {
-    pub async fn preorder_salted_domain_hash(&self, hash: Vec<u8>) -> Result<Option<Document>, Error> {
+    pub async fn preorder_salted_domain_hash(&self, hash: [u8; 32]) -> Result<Option<Document>, Error> {
         self.with_contract(
             SystemDataContract::DPNS,
             hash,
             |contract, hash|
                 self.preorder_salted_domain_hash_with_contract(hash, contract)).await
     }
-    pub async fn preorder_salted_domain_hashes(&self, hashes: Vec<Vec<u8>>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+    pub async fn preorder_salted_domain_hashes(&self, hashes: Vec<[u8; 32]>) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         self.with_contract(
             SystemDataContract::DPNS,
             hashes,
@@ -57,7 +57,7 @@ impl SaltedDomainHashesManager {
                 self.preorder_salted_domain_hashes_with_contract(hashes, contract)).await
     }
 
-    pub async fn preorder_salted_domain_hash_stream(&self, hash: Vec<u8>, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<Option<Document>, Error> {
+    pub async fn preorder_salted_domain_hash_stream(&self, hash: [u8; 32], retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<Option<Document>, Error> {
         self.with_contract(
             SystemDataContract::DPNS,
             (hash, retry, options, delay),
@@ -65,7 +65,7 @@ impl SaltedDomainHashesManager {
                 self.stream_preorder_salted_domain_hash_with_contract(hash, contract, retry, options, delay)).await
     }
 
-    pub async fn preorder_salted_domain_hashes_stream(&self, hashes: Vec<Vec<u8>>, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+    pub async fn preorder_salted_domain_hashes_stream(&self, hashes: Vec<[u8; 32]>, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         self.with_contract(
             SystemDataContract::DPNS,
             (hashes, retry, options, delay),
@@ -74,21 +74,21 @@ impl SaltedDomainHashesManager {
     }
 
 
-    pub async fn preorder_salted_domain_hash_with_contract(&self, hash: Vec<u8>, contract: DataContract) -> Result<Option<Document>, Error> {
+    pub async fn preorder_salted_domain_hash_with_contract(&self, hash: [u8; 32], contract: DataContract) -> Result<Option<Document>, Error> {
         let query = self.query_preorder_salted_domain_hash(contract, hash)?;
         self.document_with_query(query).await
     }
 
-    pub async fn preorder_salted_domain_hashes_with_contract(&self, hashes: Vec<Vec<u8>>, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+    pub async fn preorder_salted_domain_hashes_with_contract(&self, hashes: Vec<[u8; 32]>, contract: DataContract) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_preorder_salted_domain_hashes(contract, hashes)?;
         self.many_documents_with_query(query).await
     }
 
-    pub async fn stream_preorder_salted_domain_hash_with_contract(&self, hash: Vec<u8>, contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<Option<Document>, Error> {
+    pub async fn stream_preorder_salted_domain_hash_with_contract(&self, hash: [u8; 32], contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<Option<Document>, Error> {
         let query = self.query_preorder_salted_domain_hash(contract, hash)?;
         self.stream_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }
-    pub async fn stream_preorder_salted_domain_hashes_with_contract(&self, hashes: Vec<Vec<u8>>, contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
+    pub async fn stream_preorder_salted_domain_hashes_with_contract(&self, hashes: Vec<[u8; 32]>, contract: DataContract, retry: RetryStrategy, options: SaltedDomainHashValidator, delay: u64) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         let query = self.query_preorder_salted_domain_hashes(contract, hashes)?;
         self.stream_many_with_settings::<SaltedDomainHashValidator, Document, DocumentQuery>(query, retry, StreamSettings::default_with_delay(delay), options).await
     }

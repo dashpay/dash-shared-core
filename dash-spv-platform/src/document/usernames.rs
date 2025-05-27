@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::query::{order_by_asc_normalized_label, where_domain_is, where_normalized_label_equal_to, where_normalized_label_in};
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[ferment_macro::export]
 pub enum UsernameStatus {
     NotPresent = 0,
@@ -55,6 +55,20 @@ impl UsernameStatus {
     }
     pub fn is_locked(&self) -> bool {
         matches!(self, UsernameStatus::Locked)
+    }
+
+    pub fn next_status(&self) -> Option<UsernameStatus> {
+        match self {
+            UsernameStatus::NotPresent => Some(UsernameStatus::Initial),
+            UsernameStatus::Initial => Some(UsernameStatus::PreorderRegistrationPending),
+            UsernameStatus::PreorderRegistrationPending => Some(UsernameStatus::Preordered),
+            UsernameStatus::Preordered => Some(UsernameStatus::RegistrationPending),
+            UsernameStatus::RegistrationPending => Some(UsernameStatus::Confirmed),
+            UsernameStatus::Confirmed => Some(UsernameStatus::TakenOnNetwork),
+            UsernameStatus::TakenOnNetwork => Some(UsernameStatus::VotingPeriod),
+            UsernameStatus::VotingPeriod => Some(UsernameStatus::Locked),
+            UsernameStatus::Locked => None,
+        }
     }
 }
 

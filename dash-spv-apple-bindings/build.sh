@@ -56,8 +56,11 @@ for target in "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-apple-ios" "a
         rustup target add "$target"
     fi
 done
-
+wait
+cp -p ferment_injections.rs src/fermented.rs
+wait
 rm -rf target/{framework,include,lib}
+wait
 cargo lipo --$BUILD_FLAG
 build_targets=(
     "x86_64-apple-ios"
@@ -65,7 +68,6 @@ build_targets=(
     "aarch64-apple-ios-sim"
     "x86_64-apple-darwin"
     "aarch64-apple-darwin"
-
 )
 export IPHONEOS_DEPLOYMENT_TARGET=$MIN_IOS
 export MACOSX_DEPLOYMENT_TARGET=$MIN_MACOS
@@ -76,6 +78,8 @@ if $OBJC; then
 else
   features=""
 fi
+
+mkdir -p target/{framework,include,lib/{ios,ios-simulator,macos}}
 
 fermentize=1
 for target in "${build_targets[@]}"; do
@@ -89,16 +93,14 @@ for target in "${build_targets[@]}"; do
         extra_features=""
     fi
 
-    if [ ! -f "$lib_path" ]; then
+#    if [ ! -f "$lib_path" ]; then
         cargo +nightly -Z build-std=std,compiler_builtins build \
             --features="$features $extra_features" \
             --target="$target" \
             --"$BUILD_FLAG"
-    fi
+#    fi
 done
-
 wait
-mkdir -p target/{framework,include,lib/{ios,ios-simulator,macos}}
 ./verify_o_set.sh $MIN_IOS ../target/"$BUILD_TYPE"
 ./verify_a_lib.sh $MIN_IOS ../target/x86_64-apple-ios/"$BUILD_TYPE"/lib${LIB_NAME}.a
 ./verify_a_lib.sh $MIN_IOS ../target/aarch64-apple-ios/"$BUILD_TYPE"/lib${LIB_NAME}.a
@@ -121,6 +123,33 @@ if $OBJC; then
       echo "❌clang-format not installed, install it by running $(brew install clang-format)"
   fi
 fi
+
+#TODO: there is a bug in cbindgen that can't deal with featured functions arguments
+sed -E -i '' '
+/dpp_data_contract_document_type_v1_DocumentTypeV1_ctor\(/,/token_costs_TokenCosts \*/ {
+  /StatelessJsonSchemaLazyValidator \*json_schema_validator/d
+}
+/dpp_data_contract_document_type_v1_DocumentTypeV1_ctor\(/,/token_costs_TokenCosts \*/ {
+  /token_costs_TokenCosts \*/i\
+#if (!defined(TEST) && defined(DPP_VALIDATION))\
+StatelessJsonSchemaLazyValidator *json_schema_validator,\
+#endif
+}
+' target/include/dash_spv_apple_bindings.h
+
+sed -E -i '' '
+/dpp_data_contract_document_type_v0_DocumentTypeV0_ctor\(/,/StatelessJsonSchemaLazyValidator \*json_schema_validator\);/ {
+  s/(\*security_level_requirement),/\1/;
+  s/StatelessJsonSchemaLazyValidator \*json_schema_validator\);/\
+#if (!defined(TEST) \&\& defined(DPP_VALIDATION))\
+,\
+                                                                                                                 StatelessJsonSchemaLazyValidator *json_schema_validator\
+#endif\
+);\
+/
+}
+' target/include/dash_spv_apple_bindings.h
+
 
 #TODO: ferment should be used instead of sed
 sed -i '' '/#ifndef/ a\

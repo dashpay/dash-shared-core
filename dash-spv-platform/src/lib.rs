@@ -13,6 +13,7 @@ pub mod cache;
 
 use std::collections::{BTreeMap, HashMap};
 use std::net::{Ipv4Addr, Ipv6Addr};
+use std::os::raw::c_void;
 use std::str::FromStr;
 use std::sync::Arc;
 use dapi_grpc::core::v0::GetTransactionRequest;
@@ -28,7 +29,7 @@ use dash_sdk::platform::transition::put_settings::PutSettings;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dashcore::consensus::Decodable;
-use dashcore::secp256k1::hashes::hex::DisplayHex;
+use dashcore::prelude::DisplayHex;
 use dashcore::Transaction;
 use data_contracts::SystemDataContract;
 use dpp::data_contract::{DataContract, DataContractFacade};
@@ -38,8 +39,8 @@ use dpp::data_contract::document_type::{DocumentType, DocumentTypeRef};
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dpp::data_contracts;
 use dpp::errors::ProtocolError;
-use dpp::identity::{Identity, IdentityPublicKey, v0::IdentityV0, IdentityFacade, KeyID};
-use dpp::document::Document;
+use dpp::identity::{Identity, IdentityPublicKey, v0::IdentityV0, IdentityFacade, KeyID, KeyType, SecurityLevel};
+use dpp::document::{Document, DocumentV0Getters};
 use dpp::document::document_factory::DocumentFactory;
 use dpp::identity::core_script::CoreScript;
 use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
@@ -58,8 +59,9 @@ use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use drive_proof_verifier::types::evonode_status::EvoNodeStatus;
 use indexmap::IndexMap;
 use platform_value::{BinaryData, Bytes32, Identifier, Value, ValueMap};
+use platform_version::version::v8::PLATFORM_V8;
 use tokio::runtime::Runtime;
-use dash_spv_crypto::crypto::byte_util::Reversed;
+use dash_spv_crypto::crypto::byte_util::{Random, Reversed};
 use dash_spv_crypto::keys::{IKey, OpaqueKey};
 use dash_spv_crypto::network::ChainType;
 use dash_spv_event_bus::DAPIAddressHandler;
@@ -67,15 +69,19 @@ use crate::cache::PlatformCache;
 use crate::contract::manager::ContractsManager;
 use crate::document::contact_request::ContactRequestManager;
 use crate::document::manager::DocumentsManager;
-use crate::document::salted_domain_hashes::SaltedDomainHashesManager;
-use crate::document::usernames::{UsernameStatus, UsernamesManager};
+use crate::document::salted_domain_hashes::{SaltedDomainHashValidator, SaltedDomainHashesManager};
+use crate::document::usernames::{UsernameStatus, UsernameValidator, UsernamesManager};
 use crate::error::Error;
-use crate::identity::manager::{key_type_from_opaque_key, IdentitiesManager};
+use crate::identity::manager::{key_kind_to_key_type, key_type_from_opaque_key, IdentitiesManager};
+use crate::identity::model::{domains_for_username_full_paths, IdentityModel, DEFAULT_USERNAME_REGISTRATION_PURPOSE, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL};
+use crate::identity::storage::username::SaveUsernameContext;
+use crate::identity::username_registration_error::UsernameRegistrationError;
 use crate::models::profile::Profile;
 use crate::provider::PlatformProvider;
 use crate::query::QueryKind;
 use crate::signer::CallbackSigner;
 use crate::thread_safe_context::FFIThreadSafeContext;
+use crate::util::RetryStrategy;
 
 const DEFAULT_TESTNET_ADDRESS_LIST: [&str; 19] = [
     "34.214.48.68",
@@ -118,6 +124,7 @@ pub const MAINNET_ADDRESS_LIST: [&str; 158] = [
 fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Address>>(provider: C, address_list: T) -> Sdk {
     SdkBuilder::new(AddressList::from_iter(address_list))
         .with_context_provider(provider)
+        .with_version(&PLATFORM_V8)
         .build()
         .unwrap()
 }
@@ -140,6 +147,8 @@ pub struct PlatformSDK {
     pub contracts: DataContractFacade,
     pub documents: DocumentFactory,
     pub state_transition: StateTransitionFactory,
+    pub get_data_contract_from_cache: Arc<dyn Fn(/*context*/*const c_void, SystemDataContract) -> DataContract>,
+
 
     // pub platform_client: PlatformGrpcClient
 }
@@ -586,7 +595,7 @@ impl PlatformSDK {
     }
 
     pub async fn register_username_domains_for_username_full_paths<
-        SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
+        SUC: Fn(*const c_void, UsernameStatus) + Send + Sync + 'static,
     >(
         &self,
         contract: DataContract,
@@ -594,7 +603,7 @@ impl PlatformSDK {
         username_values: Vec<Value>,
         entropy: [u8; 32],
         private_key: OpaqueKey,
-        save_context: *const std::os::raw::c_void,
+        save_context: *const c_void,
         save_callback: SUC,
     ) -> Result<StateTransitionProofResult, Error> {
         let document_type = contract.document_type_for_name("domain")
@@ -615,7 +624,7 @@ impl PlatformSDK {
     }
 
     pub async fn register_preordered_salted_domain_hashes_for_username_full_paths<
-        SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
+        SUC: Fn(*const c_void, UsernameStatus) + Send + Sync + 'static,
     >(
         &self,
         contract: DataContract,
@@ -623,7 +632,7 @@ impl PlatformSDK {
         salted_domain_hashes: Vec<Vec<u8>>,
         entropy: [u8; 32],
         private_key: OpaqueKey,
-        save_context: *const std::os::raw::c_void,
+        save_context: *const c_void,
         save_callback: SUC,
     ) -> Result<StateTransitionProofResult, Error> {
         let document_type = contract.document_type_for_name("preorder")
@@ -730,26 +739,193 @@ impl PlatformSDK {
     //     self.sdk_ref()
     //         .execute(GetStatusRequest::default(), RequestSettings::default())
     // }
+
+    pub async fn register_usernames_at_stage(&self, model: &mut IdentityModel, status: UsernameStatus, context: *const c_void) -> Result<bool, Error> {
+        let username_full_paths = model.username_full_paths_with_status(status);
+        println!("[PlatformSDK] [Identity: {}] register_usernames_at_stage: {status:?}: username_full_path: {:?}", model.unique_id.to_lower_hex_string(), username_full_paths);
+        if username_full_paths.is_empty() {
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernameFullPathsWithStatus(status)))
+        } else {
+            match status {
+                UsernameStatus::Initial =>
+                    self.register_initial_usernames(model, username_full_paths, context).await,
+                UsernameStatus::PreorderRegistrationPending =>
+                    self.register_preorder_registration_pending_usernames(model, username_full_paths, context).await,
+                UsernameStatus::Preordered =>
+                    self.register_preordered_usernames(model, username_full_paths, context).await,
+                UsernameStatus::RegistrationPending =>
+                    self.register_registration_pending_usernames(model, username_full_paths, context).await,
+                _ =>
+                    Err(Error::UsernameRegistrationError(UsernameRegistrationError::NotSupported(status))),
+            }
+        }
+    }
+
+    pub async fn register_initial_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
+        let salted_domain_hashes = model.salted_domain_hashes_for_username_full_paths(&username_full_paths, context);
+        if salted_domain_hashes.is_empty() {
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernamePreorderDocuments(UsernameStatus::Initial, username_full_paths)))
+        } else {
+            model.create_new_ecdsa_auth_key_of_level_if_needed(context, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL)?;
+            let identity_public_key = model.first_identity_public_key(DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL, DEFAULT_USERNAME_REGISTRATION_PURPOSE)
+                .ok_or(Error::Any(0, "Key with security_level: HIGH and purpose: AUTHENTICATION should exist".to_string()))?;
+            let entropy = <[u8; 32]>::random();
+            let data_contract = self.get_dpns_data_contract_in_context(context);
+            for salted_domain_hash in salted_domain_hashes.values() {
+                let map = Value::Map(ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes32(salted_domain_hash.clone()))]));
+                let document_type = data_contract.document_type_for_name("preorder")
+                    .map_err(Error::from)?;
+                let document = document_type.create_document_from_data(map, model.identifier(), 0, 0, entropy, self.sdk.version())
+                    .map_err(Error::from)?;
+                self.document_single2(document_type.to_owned_document_type(), document, entropy, identity_public_key.clone()).await?;
+            }
+            model.save_username_in_context(context, SaveUsernameContext::confirmed_username_full_paths(username_full_paths));
+            // self.save_username_in_context(context, )
+            // [self setAndSaveUsernameFullPaths:usernameFullPaths toStatus:DSBlockchainIdentityUsernameStatus_Preordered inContext:context];
+
+
+            Ok(true)
+            //self.register_preorder_registration_pending_usernames(platform, context).await
+        }
+    }
+    pub async fn register_preorder_registration_pending_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
+        let salted_domain_hashes = model.salted_domain_hashes_for_username_full_paths(&username_full_paths, context);
+        if salted_domain_hashes.is_empty() {
+            println!("[Identity] OK (No saltedDomainHashes)");
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernamePreorderDocuments(UsernameStatus::PreorderRegistrationPending, username_full_paths)))
+
+            // self.register_preordered_usernames(platform, context).await
+        } else {
+            let mut all_found = false;
+            let data_contract = self.get_dpns_data_contract_in_context(context);
+            let documents = self.salted_domain_hashes().stream_preorder_salted_domain_hashes_with_contract(salted_domain_hashes.values().cloned().collect(), data_contract, RetryStrategy::Linear(4), SaltedDomainHashValidator::None, 100).await?;
+            for (username_full_path, salted_domain_hash) in salted_domain_hashes {
+                for document in documents.values() {
+                    if let Some(document) = document {
+                        all_found &= model.process_salted_domain_hash_document(&username_full_path, salted_domain_hash, document, context);
+                    } else {
+                        all_found &= false;
+                    }
+                }
+            }
+            if all_found {
+                Ok(true)
+                // self.register_preordered_usernames(platform, context).await
+            } else {
+                // TODO: This needs to be done per username and not for all usernames
+                model.save_username_in_context(context, SaveUsernameContext::initial_username_full_paths(username_full_paths));
+                Ok(false)
+                // self.register_initial_usernames(platform, context).await
+            }
+        }
+    }
+
+    pub async fn register_preordered_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
+        let salted_domain_hashes = model.salted_domain_hashes_for_username_full_paths(&username_full_paths, context);
+        if salted_domain_hashes.is_empty() {
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernamePreorderDocuments(UsernameStatus::Preordered, username_full_paths)))
+        } else {
+            model.create_new_ecdsa_auth_key_of_level_if_needed(context, SecurityLevel::MASTER)?;
+            let data_contract = self.get_dpns_data_contract_in_context(context);
+            let document_type = data_contract.document_type_for_name("domain")
+                .map_err(Error::from)?;
+            let documents = model.create_salted_domain_hashes_documents(self.sdk.version(), &salted_domain_hashes, document_type)?;
+            if model.is_local {
+                Err(Error::Any(0, "Identity is not local".to_string()))
+            } else {
+                let private_key_data = model.get_main_private_key_in_context(context)
+                    .ok_or(Error::Any(0, "No private key".to_string()))?;
+                let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
+                let state_transition = self.documents.create_state_transition(documents, &mut nonce_counter)
+                    .map_err(Error::from)?;
+                self.sign_and_publish_state_transition(&private_key_data, key_kind_to_key_type(model.current_main_key_type), StateTransition::Batch(state_transition)).await?;
+                model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(username_full_paths));
+                Ok(true)
+                // self.register_registration_pending_usernames(platform, context).await
+            }
+        }
+    }
+
+    pub async fn register_registration_pending_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
+        let domains = domains_for_username_full_paths(&username_full_paths);
+        let data_contract = self.get_dpns_data_contract_in_context(context);
+        // let mut finished = false;
+        let mut count_all_found = 0;
+        let mut count_returned = 0;
+        let domains_count = domains.len();
+        for (domain, usernames) in domains {
+            let documents = self.usernames().stream_usernames_with_contract(domain, usernames.clone(), data_contract.clone(), RetryStrategy::Linear(5), UsernameValidator::None, 5000).await?;
+            let mut all_domain_found = false;
+
+
+            for username in usernames {
+                let lowercase_username = username.to_lowercase();
+                for maybe_document in documents.values() {
+                    if let Some(document) = maybe_document {
+                        let normalized_label = document.get("normalizedLabel").unwrap().as_text().unwrap();
+                        let label = document.get("label").unwrap().as_text().unwrap();
+                        let normalized_parent_domain_name = document.get("normalizedParentDomainName").unwrap().as_text().unwrap();
+                        let equal = normalized_label.eq(&lowercase_username);
+                        println!("[Identity]: {}: {} == {}", equal, normalized_label, lowercase_username);
+                        all_domain_found &= equal;
+                        if equal {
+                            model.set_username_status_confirmed(username.clone(), normalized_parent_domain_name.to_string(), label.to_string());
+                            model.save_username_in_context(context, SaveUsernameContext::confirmed_username(&username, normalized_parent_domain_name));
+                        }
+                    }
+                }
+            }
+            if all_domain_found {
+                count_all_found += 1;
+            }
+            count_returned += 1;
+            if count_returned == domains_count {
+                // finished = true;
+                return if count_all_found == domains_count {
+                    Ok(true)
+                } else {
+                    // TODO: This needs to be done per username and not for all usernames
+                    model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(username_full_paths));
+                    // TODO: should we introduce progress here to not to wait this step in some circumstances
+
+                    // self.register_preordered_usernames(platform, context).await
+                    Ok(false)
+                }
+            }
+        }
+        Ok(count_all_found == domains_count)
+    }
+
+    // pub async fn incoming_contact_requests_with_contract(&self, model: &mut IdentityModel, context: *const c_void) -> Result<bool, Error> {
+    //     // let mut debug_string = format!("[PlatformSDK] Fetch Incoming Contact Requests: (after: {})");
+    //     // NSMutableString *debugInfo = [NSMutableString stringWithFormat:@"%@ Fetch Incoming Contact Requests: (after: %@)", self.logPrefix, startAfter ? startAfter.hexString : @"NULL"];
+    //
+    // }
+    // pub async fn outgoing_contact_requests_with_contract(&self, model: &mut IdentityModel, context: *const c_void) -> Result<bool, Error> {
+    //
+    // }
 }
 
 
 impl PlatformSDK {
     pub fn new<
-        QP: Fn(u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
-        DC: Fn(*const std::os::raw::c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
-        AH: Fn(*const std::os::raw::c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
-        CS: Fn(*const std::os::raw::c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
-        CCS: Fn(*const std::os::raw::c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
+        GetQuorumPublicKey: Fn(u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
+        GetDataContract: Fn(*const c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
+        GetPlatformActivationHeight: Fn(*const c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
+        Sign: Fn(*const c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
+        CanSign: Fn(*const c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
+        GetDataContractFromCache: Fn(*const c_void, SystemDataContract) -> DataContract + Send + Sync + 'static,
     >(
         cache: Arc<PlatformCache>,
-        get_quorum_public_key: Arc<QP>,
-        get_data_contract: DC,
-        get_platform_activation_height: AH,
-        callback_signer: CS,
-        callback_can_sign: CCS,
+        get_quorum_public_key: Arc<GetQuorumPublicKey>,
+        get_data_contract: GetDataContract,
+        get_platform_activation_height: GetPlatformActivationHeight,
+        callback_signer: Sign,
+        callback_can_sign: CanSign,
+        get_data_contract_from_cache: GetDataContractFromCache,
         address_list: Option<Vec<&'static str>>,
         chain_type: ChainType,
-        context: *const std::os::raw::c_void,
+        context: *const c_void,
     ) -> Self {
         let context_arc = Arc::new(FFIThreadSafeContext::new(context));
 
@@ -762,6 +938,13 @@ impl PlatformSDK {
 
         let protocol_version = sdk.version().protocol_version;
         let sdk_arc = Arc::new(sdk);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .thread_name("dash-spv-platform")
+            .enable_io()
+            .enable_time()
+            .build()
+            .unwrap();
         Self {
             cache,
             identity_manager: Arc::new(IdentitiesManager::new(&sdk_arc, chain_type.clone())),
@@ -770,12 +953,13 @@ impl PlatformSDK {
             contact_requests: Arc::new(ContactRequestManager::new(&sdk_arc, chain_type.clone())),
             salted_domain_hashes: Arc::new(SaltedDomainHashesManager::new(&sdk_arc, chain_type.clone())),
             usernames: Arc::new(UsernamesManager::new(&sdk_arc, chain_type.clone())),
-            runtime: Arc::new(Runtime::new().unwrap()),
+            runtime: Arc::new(runtime),
             callback_signer: CallbackSigner::new(callback_signer, callback_can_sign, context_arc),
             identities: IdentityFacade::new(protocol_version),
             contracts: DataContractFacade::new(protocol_version).unwrap(),
             state_transition: StateTransitionFactory {},
             documents: DocumentFactory::new(protocol_version).unwrap(),
+            get_data_contract_from_cache: Arc::new(get_data_contract_from_cache),
             chain_type,
             sdk: sdk_arc
         }
@@ -822,8 +1006,25 @@ impl PlatformSDK {
         println!("publish_state_transition: {:?}", transition);
         transition.broadcast_and_wait(&self.sdk, None).await.map_err(Error::from)
     }
-}
 
+    pub async fn sign_and_publish_state_transition(&self, private_key: &[u8], key_type: KeyType, mut state_transition: StateTransition) -> Result<StateTransitionProofResult, Error> {
+        state_transition.sign_by_private_key(private_key, key_type, &NativeBlsModule)
+            .map_err(Error::from)?;
+        self.publish_state_transition(state_transition).await
+    }
+
+    pub fn get_data_contract_in_context(&self, context: *const c_void, system_data_contract: SystemDataContract) -> DataContract {
+        (self.get_data_contract_from_cache)(context, system_data_contract)
+    }
+    pub fn get_dpns_data_contract_in_context(&self, context: *const c_void) -> DataContract {
+        self.get_data_contract_in_context(context, SystemDataContract::DPNS)
+    }
+    pub fn get_dashpay_data_contract_in_context(&self, context: *const c_void) -> DataContract {
+        self.get_data_contract_in_context(context, SystemDataContract::Dashpay)
+    }
+
+
+}
 #[cfg(test)]
 mod tests {
 
