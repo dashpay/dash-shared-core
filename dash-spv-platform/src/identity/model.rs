@@ -1,13 +1,14 @@
 use std::cmp::max;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::os::raw::c_void;
 use std::sync::Arc;
 use dapi_grpc::Message;
+use dashcore::blockdata::transaction::outpoint::OutPoint;
 use dashcore::hashes::{sha256d, Hash};
 use dpp::data_contract::document_type::DocumentTypeRef;
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dpp::document::{Document, DocumentV0Getters};
-use dpp::identity::{Identity, IdentityPublicKey, KeyType};
+use dpp::identity::{Identity, IdentityPublicKey, KeyID, KeyType};
 use dpp::identity::accessors::IdentityGettersV0;
 use dpp::identity::identity_public_key::purpose::Purpose;
 use dpp::identity::identity_public_key::security_level::SecurityLevel;
@@ -22,9 +23,8 @@ use dash_spv_crypto::keys::{BLSKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use crate::document::usernames::UsernameStatus;
 use crate::error::Error;
 use crate::identity::key_info::KeyInfo;
-use crate::identity::storage::key::{IdentityKeyPlacement, SaveKeyContext};
 use crate::identity::key_status::IdentityKeyStatus;
-use crate::identity::manager::identity_public_key;
+use crate::identity::manager::{identity_public_key, key_kind_from_key_type};
 use crate::identity::registration_status::IdentityRegistrationStatus;
 use crate::identity::storage::username::SaveUsernameContext;
 use crate::identity::username_status_info::UsernameStatusInfo;
@@ -36,11 +36,16 @@ pub const DEFAULT_USERNAME_REGISTRATION_PURPOSE: Purpose = Purpose::AUTHENTICATI
 pub enum DerivationContextType {
 
 }
+
 #[ferment_macro::opaque]
 pub struct IdentityModel {
     pub identity: Option<Identity>,
+
+    pub registration_funding_private_key: Option<OpaqueKey>,
+    pub topup_funding_private_key: Option<OpaqueKey>,
+
     pub identity_registration_status: IdentityRegistrationStatus,
-    pub key_info_dictionaries: HashMap<u32, KeyInfo>,
+    pub key_info_dictionaries: BTreeMap<u32, KeyInfo>,
     pub username_domains: HashMap<String, Vec<u8>>,
     pub username_salts: HashMap<String, [u8; 32]>,
     pub username_statuses: HashMap<String, UsernameStatusInfo>,
@@ -71,20 +76,30 @@ pub struct IdentityModel {
 
     pub transient_dashpay_user: Option<TransientDashPayUser>,
 
+    pub locked_outpount: Option<OutPoint>,
+
     pub get_derivation_context: Arc<dyn Fn(*const c_void, KeyKind, OpaqueKey, u32, u32) -> *const c_void>,
-    pub save_key: Arc<dyn Fn(*const c_void, SaveKeyContext) -> bool>,
+
+    pub save_key_status: Arc<dyn Fn(/*identity*/*const c_void, /*storage_context*/*const c_void, u32, u32, KeyInfo) -> bool>,
+    pub save_remote_key_status: Arc<dyn Fn(/*identity*/*const c_void, /*storage_context*/*const c_void, u32, IdentityKeyStatus) -> bool>,
+
+    pub save_key_info: Arc<dyn Fn(/*identity*/*const c_void, /*storage_context*/ *const c_void, u32, u32, KeyInfo) -> bool>,
+    pub save_remote_key_info: Arc<dyn Fn(/*identity*/*const c_void, /*storage_context*/*const c_void, u32, KeyInfo) -> bool>,
+
     pub save_username: Arc<dyn Fn(/*context*/*const c_void, SaveUsernameContext)>,
 
     pub get_private_key: Arc<dyn Fn(/*context*/*const c_void, /*index*/u32, KeyKind) -> Option<Vec<u8>>>,
 
-    pub create_new_key: Arc<dyn Fn(/*context*/*const c_void, KeyKind, SecurityLevel, Purpose) -> Result<u32, Error>>,
-    pub active_private_keys_are_loaded: Arc<dyn Fn(*const c_void, /*is_local*/bool, /*key_info_dictionaries*/ HashMap<u32, KeyInfo>) -> Result<bool, Error>>
-    // activePrivateKeysAreLoadedWithFetchingError
+    pub create_new_key: Arc<dyn Fn(/*context*/*const c_void, KeyKind, SecurityLevel, Purpose, bool) -> Result<u32, Error>>,
+    pub active_private_keys_are_loaded: Arc<dyn Fn(*const c_void, /*is_local*/bool, /*key_info_dictionaries*/ BTreeMap<u32, KeyInfo>) -> Result<bool, Error>>
 }
 
 impl IdentityModel {
     pub fn save_username_in_context(&self, context: *const c_void, username_context: SaveUsernameContext) {
         (self.save_username)(context, username_context);
+    }
+    pub fn save_usernames_and_domains_in_context(&self, context: *const c_void, username_full_paths: Vec<String> ) {
+        (self.save_username)(context, SaveUsernameContext::confirmed_username_full_paths(self.usernames_and_domains(username_full_paths)));
     }
 
     pub fn get_main_private_key_in_context(&self, context: *const c_void) -> Option<Vec<u8>> {
@@ -95,13 +110,13 @@ impl IdentityModel {
         (self.active_private_keys_are_loaded)(context, self.is_local, self.key_info_dictionaries.clone())
     }
 
-    pub fn create_new_ecdsa_auth_key(&self, context: *const c_void, level: SecurityLevel) -> Result<u32, Error> {
-        (self.create_new_key)(context, KeyKind::ECDSA, level, Purpose::AUTHENTICATION)
+    pub fn create_new_ecdsa_auth_key(&self, context: *const c_void, level: SecurityLevel, save_key: bool) -> Result<u32, Error> {
+        (self.create_new_key)(context, KeyKind::ECDSA, level, Purpose::AUTHENTICATION, save_key)
     }
 
     pub fn create_new_ecdsa_auth_key_of_level_if_needed(&self, context: *const c_void, level: SecurityLevel) -> Result<u32, Error> {
         if self.keys_created == 0 {
-            self.create_new_ecdsa_auth_key(context, level)
+            self.create_new_ecdsa_auth_key(context, level, true)
         } else {
             Ok(u32::MAX)
         }
@@ -118,11 +133,14 @@ impl IdentityModel {
 impl IdentityModel {
     pub fn new<
         GetDerivationContext: Fn(*const c_void, KeyKind, OpaqueKey, u32, u32) -> *const c_void + Sync + Send + 'static,
-        SaveRegisteredKey: Fn(*const c_void, SaveKeyContext) -> bool + Sync + Send + 'static,
+        SaveKeyStatus: Fn(*const c_void, *const c_void, /*identity_index*/u32, /*key_index*/u32, KeyInfo) -> bool + Sync + Send + 'static,
+        SaveRemoteKeyStatus: Fn(*const c_void, *const c_void, u32, IdentityKeyStatus) -> bool + Sync + Send + 'static,
+        SaveKeyInfo: Fn(*const c_void, *const c_void, /*identity_index*/u32, /*key_index*/u32, KeyInfo) -> bool + Sync + Send + 'static,
+        SaveRemoteKeyInfo: Fn(*const c_void, *const c_void, u32, KeyInfo) -> bool + Sync + Send + 'static,
         SaveNewUsername: Fn(*const c_void, SaveUsernameContext) + Sync + Send + 'static,
         GetPrivateKeyAtIndex: Fn(*const c_void, u32, KeyKind) -> Option<Vec<u8>> + Sync + Send + 'static,
-        CreateNewKey: Fn(*const c_void, KeyKind, SecurityLevel, Purpose) -> Result<u32, Error> + Sync + Send + 'static,
-        ActivePrivateKeysAreLoaded: Fn(*const c_void, bool, HashMap<u32, KeyInfo>) -> Result<bool, Error> + Sync + Send + 'static,
+        CreateNewKey: Fn(*const c_void, KeyKind, SecurityLevel, Purpose, bool) -> Result<u32, Error> + Sync + Send + 'static,
+        ActivePrivateKeysAreLoaded: Fn(*const c_void, bool, BTreeMap<u32, KeyInfo>) -> Result<bool, Error> + Sync + Send + 'static,
 
     >(
         unique_id: [u8; 32],
@@ -132,7 +150,10 @@ impl IdentityModel {
         current_main_index: u32,
         current_main_key_type: KeyKind,
         get_derivation_context: GetDerivationContext,
-        save_key: SaveRegisteredKey,
+        save_key_status: SaveKeyStatus,
+        save_remote_key_status: SaveRemoteKeyStatus,
+        save_key_info: SaveKeyInfo,
+        save_remote_key_info: SaveRemoteKeyInfo,
         save_username: SaveNewUsername,
         get_private_key: GetPrivateKeyAtIndex,
         create_new_key: CreateNewKey,
@@ -142,6 +163,9 @@ impl IdentityModel {
             unique_id,
             identity_registration_status: status,
             identity: None,
+            locked_outpount: None,
+            registration_funding_private_key: None,
+            topup_funding_private_key: None,
             key_info_dictionaries: Default::default(),
             username_domains: Default::default(),
             username_salts: Default::default(),
@@ -162,7 +186,10 @@ impl IdentityModel {
             is_from_incoming_invitation: false,
             transient_dashpay_user: None,
             get_derivation_context: Arc::new(get_derivation_context),
-            save_key: Arc::new(save_key),
+            save_key_info: Arc::new(save_key_info),
+            save_remote_key_info: Arc::new(save_remote_key_info),
+            save_key_status: Arc::new(save_key_status),
+            save_remote_key_status: Arc::new(save_remote_key_status),
             save_username: Arc::new(save_username),
             get_private_key: Arc::new(get_private_key),
             create_new_key: Arc::new(create_new_key),
@@ -218,6 +245,26 @@ impl IdentityModel {
     }
     pub fn last_checked_outgoing_contacts_timestamp(&self) -> u64 {
         self.last_checked_outgoing_contacts_timestamp
+    }
+
+    pub fn set_registration_funding_private_key(&mut self, private_key: Option<OpaqueKey>) {
+        self.registration_funding_private_key = private_key;
+    }
+    pub fn registration_funding_private_key(&self) -> Option<OpaqueKey> {
+        self.registration_funding_private_key.clone()
+    }
+    pub fn has_registration_funding_private_key(&self) -> bool {
+        self.registration_funding_private_key.is_some()
+    }
+
+    pub fn set_topup_funding_private_key(&mut self, private_key: Option<OpaqueKey>) {
+        self.topup_funding_private_key = private_key;
+    }
+    pub fn topup_funding_private_key(&self) -> Option<OpaqueKey> {
+        self.topup_funding_private_key.clone()
+    }
+    pub fn has_topup_funding_private_key(&self) -> bool {
+        self.topup_funding_private_key.is_some()
     }
 
     pub fn set_unique_id(&mut self, unique_id: [u8; 32]) {
@@ -281,6 +328,22 @@ impl IdentityModel {
         self.current_main_key_type
     }
 
+    pub fn set_keys_created(&mut self, keys_created: u32) {
+        self.keys_created = keys_created;
+    }
+    pub fn keys_created(&self) -> u32 {
+        self.keys_created
+    }
+
+    pub fn set_locked_outpoint(&mut self, outpoint: Option<OutPoint>) {
+        self.locked_outpount = outpoint;
+    }
+    pub fn locked_outpoint(&self) -> Option<OutPoint> {
+        self.locked_outpount
+    }
+    pub fn has_locked_outpoint(&self) -> bool {
+        self.locked_outpount.is_some()
+    }
 
     pub fn full_path_for_username(username: &str, domain: &str) -> String {
         username.to_lowercase() + "." + &domain.to_lowercase()
@@ -349,6 +412,11 @@ impl IdentityModel {
     pub fn status_of_dashpay_username(&self, username: String) -> Option<UsernameStatus> {
         self.status_of_username_full_path(Self::full_path_for_username(&username, "dash"))
     }
+
+    pub fn is_dashpay_username_confirmed(&self, username: String) -> bool {
+        self.status_of_username_full_path(Self::full_path_for_username(&username, "dash")) == Some(UsernameStatus::Confirmed)
+    }
+
     pub fn status_of_username_full_path(&self, username_full_path: String) -> Option<UsernameStatus> {
         self.username_statuses.get(&username_full_path).map(|s| s.status.clone())
     }
@@ -408,7 +476,6 @@ impl IdentityModel {
     }
 
     /// Profile
-    ///
     pub fn maybe_user(&self) -> Option<TransientDashPayUser> {
         self.transient_dashpay_user.clone()
     }
@@ -502,21 +569,21 @@ impl IdentityModel {
     pub fn total_key_count(&self) -> usize {
         self.key_info_dictionaries.len()
     }
-    pub fn key_info_dictionaries(&self) -> HashMap<u32, KeyInfo> {
+    pub fn key_info_dictionaries(&self) -> BTreeMap<u32, KeyInfo> {
         self.key_info_dictionaries.clone()
     }
 
-    pub fn registered_key_info_dictionaries(&self) -> HashMap<u32, KeyInfo> {
+    pub fn registered_key_info_dictionaries(&self) -> BTreeMap<u32, KeyInfo> {
         self.key_info_dictionaries().into_iter().filter(|(_index, KeyInfo { key_status, .. })| key_status.is_registered()).collect()
     }
 
     pub fn active_keys_for_key_type(&self, kind: KeyKind) -> Vec<OpaqueKey> {
-        self.key_info_dictionaries.values().filter_map(|info| info.key_type.eq(&kind).then_some(&info.key)).cloned().collect()
+        self.key_info_dictionaries.values().filter_map(|info| info.kind().eq(&kind).then_some(&info.key)).cloned().collect()
     }
 
     pub fn verify_signature(&mut self, signature: Vec<u8>, kind: KeyKind, digest: [u8; 32]) -> bool {
         for info in self.key_info_dictionaries.values_mut() {
-            if info.key_type.eq(&kind) {
+            if info.kind().eq(&kind) {
                 if let Ok(true) = info.key.verify(&digest, &signature) {
                     return true;
                 }
@@ -550,13 +617,40 @@ impl IdentityModel {
         })
     }
     pub fn first_index_of_key_kind(&self, kind: KeyKind) -> Option<u32> {
-        self.key_info_dictionaries.iter().find_map(|(index, KeyInfo { key_type, .. })| kind.eq(&key_type).then_some(*index))
+        self.key_info_dictionaries.iter().find_map(|(index, key_info)| kind.eq(&key_info.kind()).then_some(*index))
+    }
+
+    pub fn first_index_of_ecdsa_auth_key_create_if_needed(&self, level: SecurityLevel, save_key_if_need: bool, context: *const c_void) -> Result<u32, Error> {
+        if let Some(index) = self.first_index_of_key_kind(KeyKind::ECDSA) {
+            Ok(index)
+        } else if self.is_local {
+            self.create_new_ecdsa_auth_key(context, level, save_key_if_need)
+        } else {
+            Ok(u32::MAX)
+        }
     }
 
     pub fn has_identity_public_key(&self, key: IdentityPublicKey) -> bool {
         self.key_at_index(key.id())
             .map(|opaque_key| opaque_key.public_key_data().eq(key.data().as_slice()))
             .unwrap_or_default()
+    }
+
+    pub fn maybe_private_key_for_identity_public_key(&self, identity_public_key: IdentityPublicKey, identity_context: *const c_void) -> Option<OpaqueKey> {
+        let key_id = identity_public_key.id();
+        let key_type = identity_public_key.key_type();
+        let key_kind = key_kind_from_key_type(key_type);
+        self.key_at_index(key_id).and_then(|key| {
+            if key.public_key_data().eq(identity_public_key.data().as_slice()) {
+                if let Some(maybe_private_key_data) = (self.get_private_key)(identity_context, key_id, key_kind) {
+                    key_kind.key_with_private_key_data_as_opt(&maybe_private_key_data)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
     }
 
     pub fn salted_domain_hashes_for_username_full_paths(&mut self, username_full_paths: &Vec<String>, context: *const c_void) -> HashMap<String, [u8; 32]> {
@@ -621,62 +715,79 @@ impl IdentityModel {
         }
     }
 
-    pub fn update_with_state_information(&mut self, identity: Identity, context: *const c_void) -> Result<bool, Error> {
-        self.credit_balance = identity.balance();
-        for (key_id, public_key) in identity.public_keys() {
-            let security_level = public_key.security_level();
-            let purpose = public_key.purpose();
-            let public_key_data = public_key.data();
-            let key = match public_key.key_type() {
-                KeyType::ECDSA_SECP256K1 =>
-                    ECDSAKey::key_with_public_key_data(public_key_data.as_slice())
-                        .map(OpaqueKey::ECDSA),
-                KeyType::BLS12_381 => {
-                    <Vec<u8> as TryInto<[u8; 48]>>::try_into(public_key_data.to_vec())
-                        .map_err(|_e| KeyError::WrongLength(public_key_data.len()))
-                        .map(|pubkey| BLSKey::key_with_public_key(pubkey, false))
-                        .map(OpaqueKey::BLS)
-                }
-                key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
-            }.map_err(Error::KeyError)?;
-            let key_type = key.kind();
-            let index = *key_id;
-            let maybe_key_info = self.key_info_at_index(index);
-            let add_key_info = maybe_key_info.as_ref().map(|key_info| key_info.key.public_key_data().eq(&public_key_data.0)).unwrap_or_default();
+    pub fn update_with_key_id_and_public_key(&mut self, index: KeyID, public_key: IdentityPublicKey, storage_context: *const c_void, context: *const c_void) -> Result<bool, Error> {
+        println!("update_with_key_id_and_public_key.1: {}: {:?}", index, public_key);
+        let security_level = public_key.security_level();
+        let purpose = public_key.purpose();
+        let public_key_data = public_key.data();
+        let key = match public_key.key_type() {
+            KeyType::ECDSA_SECP256K1 =>
+                ECDSAKey::key_with_public_key_data(public_key_data.as_slice())
+                    .map(OpaqueKey::ECDSA),
+            KeyType::BLS12_381 => {
+                <Vec<u8> as TryInto<[u8; 48]>>::try_into(public_key_data.to_vec())
+                    .map_err(|_e| KeyError::WrongLength(public_key_data.len()))
+                    .map(|pubkey| BLSKey::key_with_public_key(pubkey, false))
+                    .map(OpaqueKey::BLS)
+            }
+            key_type => Err(KeyError::Any(format!("unsupported type of key: {}", key_type))),
+        }.map_err(Error::KeyError)?;
+        // let key_type = key.kind();
+        let maybe_key_info = self.key_info_at_index(index);
+        let add_key_info = maybe_key_info.as_ref().map(|key_info| key_info.has_key_with_public_key_data(&public_key_data.0)).unwrap_or_default();
+        println!("update_with_key_id_and_public_key.2: {}: {}", self.is_local, add_key_info);
 
-            let maybe_update_or_error = if self.is_local {
-                let derivation_context = self.get_derivation_context(context, key_type, key.clone(), index);
-                if maybe_key_info.is_some() {
-                    if add_key_info {
-                        Ok(Some(SaveKeyContext::Status(IdentityKeyPlacement::Local(derivation_context))))
-                    } else {
-                        Err(Error::Any(0, "these should really match up".to_string()))
+        if self.is_local {
+            if maybe_key_info.is_some() {
+                if add_key_info {
+                    let key_info = KeyInfo::registered(key.clone(), security_level, purpose);
+                    self.add_key_info(index, key_info.clone());
+                    if !self.is_transient {
+                        (self.save_key_status)(context, storage_context, self.index, index, key_info);
                     }
                 } else {
-                    self.keys_created = max(self.keys_created, index + 1);
-                    Ok(Some(SaveKeyContext::Full(IdentityKeyPlacement::Local(derivation_context), key.clone(), security_level, purpose)))
+                    return Err(Error::Any(0, "these should really match up".to_string()));
                 }
             } else {
-                if let Some(KeyInfo { key_status, .. }) = maybe_key_info {
-                    if add_key_info {
-                        Ok((!key_status.is_registered()).then(|| SaveKeyContext::Status(IdentityKeyPlacement::Remote(index))))
-                    } else {
-                        Err(Error::Any(0, "these should really match up".to_string()))
+                self.keys_created = max(self.keys_created, index + 1);
+                let key_info = KeyInfo::registered(key.clone(), security_level, purpose);
+
+                if add_key_info {
+                    self.add_key_info(index, key_info.clone());
+                }
+                if !self.is_transient {
+                    (self.save_key_info)(context, storage_context, self.index, index, key_info);
+                }
+            }
+        } else {
+            if let Some(KeyInfo { key_status, .. }) = maybe_key_info {
+                if add_key_info {
+                    self.add_key_info(index, KeyInfo::registered(key, security_level, purpose));
+                    if !self.is_transient && !key_status.is_registered() {
+                        (self.save_remote_key_status)(context, storage_context, index, IdentityKeyStatus::Registered);
                     }
                 } else {
-                    self.keys_created = max(self.keys_created, index + 1);
-                    Ok(Some(SaveKeyContext::Full(IdentityKeyPlacement::Remote(index), key.clone(), security_level, purpose)))
+                    return Err(Error::Any(0, "these should really match up".to_string()));
                 }
-            };
-            if add_key_info {
-                self.add_key_info(index, KeyInfo::registered(key, key_type, security_level, purpose));
-            }
-            let maybe_save_key_context = maybe_update_or_error?;
-            if !self.is_transient {
-                if let Some(save_key_context) = maybe_save_key_context {
-                    (self.save_key)(context, save_key_context);
+            } else {
+                self.keys_created = max(self.keys_created, index + 1);
+                if add_key_info {
+                    self.add_key_info(index, KeyInfo::registered(key.clone(), security_level, purpose));
+                }
+                if !self.is_transient {
+                    (self.save_remote_key_info)(context, storage_context, index, KeyInfo::registered(key.clone(), security_level, purpose));
                 }
             }
+        }
+        println!("update_with_key_id_and_public_key.3: OK");
+        Ok(true)
+    }
+
+    pub fn update_with_state_information(&mut self, identity: Identity, storage_context: *const c_void, context: *const c_void) -> Result<bool, Error> {
+        println!("update_with_state_information: {:?}", identity);
+        self.credit_balance = identity.balance();
+        for (key_id, public_key) in identity.public_keys_owned() {
+            self.update_with_key_id_and_public_key(key_id, public_key, storage_context, context)?;
         }
         self.set_registration_status(IdentityRegistrationStatus::Registered);
         Ok(true)
@@ -715,6 +826,7 @@ impl IdentityModel {
             println!("[WARN] Username, lowercase username or domain is nil {:?}", document);
         }
     }
+
 }
 
 impl IdentityModel {

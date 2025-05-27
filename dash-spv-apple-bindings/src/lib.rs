@@ -27,14 +27,12 @@ use data_contracts::SystemDataContract;
 use dpp::data_contract::DataContract;
 use dpp::identity::identity_public_key::IdentityPublicKey;
 
-use dpp::prelude::CoreBlockHeight;
-use dpp::errors::ProtocolError;
 use drive_proof_verifier::error::ContextProviderError;
 use dash_spv_crypto::network::{ChainType, IHaveChainSettings};
 use dash_spv_masternode_processor::processing::MasternodeProcessor;
 use dash_spv_platform::PlatformSDK;
-use platform_value::{BinaryData, Identifier};
 use dash_spv_crypto::crypto::byte_util::Reversed;
+use dash_spv_crypto::keys::OpaqueKey;
 use dash_spv_masternode_processor::processing::processor::DiffConfig;
 use dash_spv_platform::cache::PlatformCache;
 use crate::ffi_core_provider::FFICoreProvider;
@@ -57,10 +55,10 @@ impl DashSPVCore {
 
     pub fn with_callbacks<
         // platform
-        GetDataContract: Fn(*const c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
-        GetPlatformActivationHeight: Fn(*const c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
-        Sign: Fn(*const c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
-        CanSign: Fn(*const c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
+        GetDataContract: Fn(*const c_void, [u8; 32]) -> Option<DataContract> + Send + Sync + 'static,
+        GetPlatformActivationHeight: Fn(*const c_void) -> u32 + Send + Sync + 'static,
+        Sign: Fn(*const c_void, IdentityPublicKey) -> Option<OpaqueKey> + Send + Sync + 'static,
+        CanSign: Fn(*const c_void, IdentityPublicKey) -> bool + Send + Sync + 'static,
         GetDataContractFromCache: Fn(*const c_void, SystemDataContract) -> DataContract + Send + Sync + 'static,
         // masternode
         GetBlockHeightByBlockHash: Fn(*const c_void, [u8; 32]) -> u32 + Send + Sync + 'static,

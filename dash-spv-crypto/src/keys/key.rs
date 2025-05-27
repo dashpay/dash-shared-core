@@ -486,10 +486,16 @@ impl KeyKind {
         let index_path = IndexPath::from(index_path);
         key.private_derive_to_path(&index_path)
     }
+    pub fn private_key_at_index_path_wrapped_as_opt(&self, seed: &[u8], index_path: Vec<u32>, derivation_path: IndexPathU256) -> Option<OpaqueKey> {
+        self.private_key_at_index_path_wrapped(seed, index_path, derivation_path).ok()
+    }
     pub fn derive_key_from_seed_wrapped(&self, seed: &[u8], derivation_path: IndexPathU256) -> Result<OpaqueKey, KeyError> {
         let key = self.key_with_seed_data(seed)?;
         let index_path = IndexPath::from(derivation_path);
         key.private_derive_to_path(&index_path)
+    }
+    pub fn derive_key_from_seed_wrapped_as_opt(&self, seed: &[u8], derivation_path: IndexPathU256) -> Option<OpaqueKey> {
+        self.derive_key_from_seed_wrapped(seed, derivation_path).ok()
     }
 
     pub fn key_with_private_key(&self, secret: &str, chain_type: ChainType) -> Result<OpaqueKey, KeyError> {
@@ -499,6 +505,9 @@ impl KeyKind {
             KeyKind::BLSBasic => BLSKey::key_with_private_key(secret, false).map(OpaqueKey::BLS),
             KeyKind::ED25519 => ED25519Key::key_with_private_key(secret).map(OpaqueKey::ED25519),
         }
+    }
+    pub fn key_with_private_key_opt(&self, secret: &str, chain_type: ChainType) -> Option<OpaqueKey> {
+        self.key_with_private_key(secret, chain_type).ok()
     }
 
     pub fn private_keys_at_index_paths_wrapped(
@@ -560,6 +569,9 @@ impl KeyKind {
             _ => BLSKey::key_with_private_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS),
         }
     }
+    pub fn key_with_private_key_data_as_opt(&self, data: &[u8]) -> Option<OpaqueKey> {
+        self.key_with_private_key_data(data).ok()
+    }
 
     pub fn key_with_seed_data(&self, seed: &[u8]) -> Result<OpaqueKey, KeyError> {
         match self {
@@ -568,6 +580,9 @@ impl KeyKind {
             _ => BLSKey::extended_private_key_with_seed_data(seed, *self == KeyKind::BLS).map(OpaqueKey::BLS)
         }
     }
+    pub fn key_with_seed_data_as_opt(&self, seed: &[u8]) -> Option<OpaqueKey> {
+        self.key_with_seed_data(seed).ok()
+    }
 
     pub fn key_with_public_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
         match self {
@@ -575,6 +590,9 @@ impl KeyKind {
             KeyKind::ED25519 => ED25519Key::key_with_public_key_data(data).map(OpaqueKey::ED25519),
             _ => BLSKey::key_with_public_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS),
         }
+    }
+    pub fn key_with_public_key_data_as_opt(&self, data: &[u8]) -> Option<OpaqueKey> {
+        self.key_with_public_key_data(data).ok()
     }
 
     pub fn key_init_with_extended_public_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
@@ -593,6 +611,9 @@ impl KeyKind {
             _ => BLSKey::key_with_extended_public_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
         }
     }
+    pub fn key_with_extended_public_key_data_as_opt(&self, data: &[u8]) -> Option<OpaqueKey> {
+        self.key_with_extended_public_key_data(data).ok()
+    }
 
     pub fn key_with_extended_private_key_data(&self, data: &[u8]) -> Result<OpaqueKey, KeyError> {
         match self {
@@ -600,6 +621,9 @@ impl KeyKind {
             KeyKind::ED25519 => ED25519Key::init_with_extended_private_key_data(data).map(OpaqueKey::ED25519),
             _ => BLSKey::init_with_extended_private_key_data(data, *self == KeyKind::BLS).map(OpaqueKey::BLS).map_err(KeyError::from)
         }
+    }
+    pub fn key_with_extended_private_key_data_as_opt(&self, data: &[u8]) -> Option<OpaqueKey> {
+        self.key_with_extended_private_key_data(data).ok()
     }
 
     pub fn derive_key_from_extended_private_key_data_for_index_path(&self, data: &[u8], index_path: Vec<u32>) -> Result<OpaqueKey, KeyError> {
@@ -614,8 +638,11 @@ impl KeyKind {
             _ => BLSKey::key_with_extended_private_key_data(data, *self == KeyKind::BLS)
                 .and_then(|key| key.private_derive_to_path(&index_path))
                 .map(OpaqueKey::BLS)
-
         }
+    }
+
+    pub fn derive_key_from_extended_private_key_data_for_index_path_as_opt(&self, data: &[u8], index_path: Vec<u32>) -> Option<OpaqueKey> {
+        self.derive_key_from_extended_private_key_data_for_index_path(data, index_path).ok()
     }
 
     /*pub fn private_derive_to_256bit_derivation_path_from_seed_and_store<IPATH, DPATH>(&self, seed: &Seed, derivation_path: &DPATH, store_private_key: bool) -> Option<Key>

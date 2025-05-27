@@ -262,16 +262,16 @@ impl MasternodeProcessor {
 
         let qr_info: QRInfo = deserialize(message)?;
 
-        let mut d = String::new();
-        d.push_str(format!("\ntip: {}", quorum_list_desc(&qr_info.mn_list_diff_h.new_quorums)).as_str());
-        d.push_str(format!("\n  h: {}", quorum_list_desc(&qr_info.mn_list_diff_h.new_quorums)).as_str());
-        d.push_str(format!("\n  h-c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_c.new_quorums)).as_str());
-        d.push_str(format!("\n h-2c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_2c.new_quorums)).as_str());
-        d.push_str(format!("\n h-3c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_3c.new_quorums)).as_str());
-        d.push_str(format!("\n h-4c{}", qr_info.quorum_snapshot_and_mn_list_diff_at_h_minus_4c.as_ref().map(|(q,qq)| quorum_list_desc(&qq.new_quorums)).unwrap_or_default()).as_str());
-        d.push_str(format!("\n lq/i{}", quorum_list_desc(&qr_info.last_commitment_per_index)).as_str());
-
-        println!("QRINFO quorums: {d}");
+        // let mut d = String::new();
+        // d.push_str(format!("\ntip: {}", quorum_list_desc(&qr_info.mn_list_diff_h.new_quorums)).as_str());
+        // d.push_str(format!("\n  h: {}", quorum_list_desc(&qr_info.mn_list_diff_h.new_quorums)).as_str());
+        // d.push_str(format!("\n  h-c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_c.new_quorums)).as_str());
+        // d.push_str(format!("\n h-2c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_2c.new_quorums)).as_str());
+        // d.push_str(format!("\n h-3c{}", quorum_list_desc(&qr_info.mn_list_diff_at_h_minus_3c.new_quorums)).as_str());
+        // d.push_str(format!("\n h-4c{}", qr_info.quorum_snapshot_and_mn_list_diff_at_h_minus_4c.as_ref().map(|(q,qq)| quorum_list_desc(&qq.new_quorums)).unwrap_or_default()).as_str());
+        // d.push_str(format!("\n lq/i{}", quorum_list_desc(&qr_info.last_commitment_per_index)).as_str());
+        //
+        // println!("QRINFO quorums: {d}");
 
         let get_height_fn = {
             |block_hash: &BlockHash| {

@@ -24,7 +24,7 @@ pub enum SaveUsernameContext {
         commit_save: bool,
     },
     UsernameFullPaths {
-        username_full_paths: Vec<String>,
+        usernames_and_domains: Vec<(String, String)>,
         status: UsernameStatus,
     }
 }
@@ -68,22 +68,22 @@ impl SaveUsernameContext {
             commit_save: true,
         }
     }
-    pub fn confirmed_username_full_paths(username_full_paths: Vec<String>) -> SaveUsernameContext {
+    pub fn confirmed_username_full_paths(usernames_and_domains: Vec<(String, String)>) -> SaveUsernameContext {
         SaveUsernameContext::UsernameFullPaths {
-            username_full_paths,
+            usernames_and_domains,
             status: UsernameStatus::Confirmed,
         }
     }
-    pub fn preordered_username_full_paths(username_full_paths: Vec<String>) -> SaveUsernameContext {
+    pub fn preordered_username_full_paths(usernames_and_domains: Vec<(String, String)>) -> SaveUsernameContext {
         SaveUsernameContext::UsernameFullPaths {
-            username_full_paths,
+            usernames_and_domains,
             status: UsernameStatus::Preordered,
         }
     }
 
-    pub fn initial_username_full_paths(username_full_paths: Vec<String>) -> SaveUsernameContext {
+    pub fn initial_username_full_paths(usernames_and_domains: Vec<(String, String)>) -> SaveUsernameContext {
         SaveUsernameContext::UsernameFullPaths {
-            username_full_paths,
+            usernames_and_domains,
             status: UsernameStatus::Initial,
         }
     }

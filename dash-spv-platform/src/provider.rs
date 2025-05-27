@@ -13,16 +13,16 @@ use crate::FFIThreadSafeContext;
 #[derive(Clone)]
 pub struct PlatformProvider {
     pub get_quorum_public_key: Arc<dyn Fn(u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync>,
-    pub get_data_contract: Arc<dyn Fn(*const c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync>,
-    pub get_platform_activation_height: Arc<dyn Fn(*const c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync>,
+    pub get_data_contract: Arc<dyn Fn(*const c_void, [u8; 32]) -> Option<DataContract> + Send + Sync>,
+    pub get_platform_activation_height: Arc<dyn Fn(*const c_void) -> u32 + Send + Sync>,
     pub context: Arc<FFIThreadSafeContext>
 }
 
 impl PlatformProvider {
     pub fn new<
         QPK: Fn(u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
-        DC: Fn(*const c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
-        AH: Fn(*const c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
+        DC: Fn(*const c_void, [u8; 32]) -> Option<DataContract> + Send + Sync + 'static,
+        AH: Fn(*const c_void) -> u32 + Send + Sync + 'static,
     >(
         get_quorum_public_key: Arc<QPK>,
         get_data_contract: DC,
@@ -47,12 +47,22 @@ impl ContextProvider for PlatformProvider {
         id: &Identifier,
         _platform_version: &PlatformVersion,
     ) -> Result<Option<Arc<DataContract>>, ContextProviderError> {
-        (self.get_data_contract)(self.context.get(), id.clone())
+        let context = self.context.inner.lock().unwrap();
+        let maybe_contract = (self.get_data_contract)(*context, id.to_buffer());
+        drop(context);
+        Ok(maybe_contract.map(Arc::new))
     }
 
 
     fn get_platform_activation_height(&self) -> Result<CoreBlockHeight, ContextProviderError> {
-        (self.get_platform_activation_height)(self.context.get())
+        let context = self.context.inner.lock().unwrap();
+        let block_height = (self.get_platform_activation_height)(*context);
+        drop(context);
+        if block_height == u32::MAX {
+            Err(ContextProviderError::Generic("Platform activation height is not set".to_string()))
+        } else {
+            Ok(block_height)
+        }
     }
 
     fn get_token_configuration(&self, token_id: &Identifier) -> Result<Option<TokenConfiguration>, ContextProviderError> {

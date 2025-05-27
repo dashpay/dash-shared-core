@@ -28,9 +28,12 @@ use dash_sdk::platform::transition::put_identity::PutIdentity;
 use dash_sdk::platform::transition::put_settings::PutSettings;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
+use dashcore::blockdata::transaction::Transaction;
 use dashcore::consensus::Decodable;
+use dashcore::ephemerealdata::instant_lock::InstantLock;
+use dashcore::OutPoint;
 use dashcore::prelude::DisplayHex;
-use dashcore::Transaction;
+use dashcore::transaction::special_transaction::TransactionPayload;
 use data_contracts::SystemDataContract;
 use dpp::data_contract::{DataContract, DataContractFacade};
 use dpp::data_contract::accessors::v0::{DataContractV0Getters, DataContractV0Setters};
@@ -39,11 +42,14 @@ use dpp::data_contract::document_type::{DocumentType, DocumentTypeRef};
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dpp::data_contracts;
 use dpp::errors::ProtocolError;
-use dpp::identity::{Identity, IdentityPublicKey, v0::IdentityV0, IdentityFacade, KeyID, KeyType, SecurityLevel};
+use dpp::identity::{Identity, IdentityPublicKey, IdentityFacade, KeyID, KeyType, SecurityLevel};
 use dpp::document::{Document, DocumentV0Getters};
 use dpp::document::document_factory::DocumentFactory;
+use dpp::errors::consensus::basic::BasicError;
+use dpp::errors::consensus::ConsensusError;
 use dpp::identity::core_script::CoreScript;
-use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
+use dpp::identity::state_transition::asset_lock_proof::{AssetLockProof, InstantAssetLockProof};
+use dpp::identity::state_transition::asset_lock_proof::chain::ChainAssetLockProof;
 use dpp::native_bls::NativeBlsModule;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
@@ -58,10 +64,11 @@ use drive::query::{OrderClause, WhereClause};
 use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use drive_proof_verifier::types::evonode_status::EvoNodeStatus;
 use indexmap::IndexMap;
-use platform_value::{BinaryData, Bytes32, Identifier, Value, ValueMap};
+use platform_value::{Bytes32, Identifier, Value, ValueMap};
 use platform_version::version::v8::PLATFORM_V8;
 use tokio::runtime::Runtime;
 use dash_spv_crypto::crypto::byte_util::{Random, Reversed};
+use dash_spv_crypto::derivation::BIP32_HARD;
 use dash_spv_crypto::keys::{IKey, OpaqueKey};
 use dash_spv_crypto::network::ChainType;
 use dash_spv_event_bus::DAPIAddressHandler;
@@ -72,7 +79,7 @@ use crate::document::manager::DocumentsManager;
 use crate::document::salted_domain_hashes::{SaltedDomainHashValidator, SaltedDomainHashesManager};
 use crate::document::usernames::{UsernameStatus, UsernameValidator, UsernamesManager};
 use crate::error::Error;
-use crate::identity::manager::{key_kind_to_key_type, key_type_from_opaque_key, IdentitiesManager};
+use crate::identity::manager::{identity_registration_public_key, key_kind_to_key_type, key_type_from_opaque_key, IdentitiesManager};
 use crate::identity::model::{domains_for_username_full_paths, IdentityModel, DEFAULT_USERNAME_REGISTRATION_PURPOSE, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL};
 use crate::identity::storage::username::SaveUsernameContext;
 use crate::identity::username_registration_error::UsernameRegistrationError;
@@ -438,20 +445,96 @@ impl PlatformSDK {
         let signed_transition = self.identity_registration_signed_transition_with_public_keys(public_keys, proof, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
-    pub async fn identity_register_using_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("identity_register_using_public_key_at_index: {public_key:?} -- {index} -- {proof:?} -- {private_key:?}");
-        let signed_transition = self.identity_registration_signed_transition_with_public_key_at_index(public_key, index, proof, private_key)?;
-        self.publish_state_transition(signed_transition).await
+
+    pub async fn create_and_publish_registration_transition(
+        &self,
+        model: &mut IdentityModel,
+        asset_lock_transaction: Transaction,
+        core_chain_locked_height: u32,
+        is_lock: Option<InstantLock>,
+        save_key_if_need: bool,
+        storage_context: *const c_void,
+        context: *const c_void
+    ) -> Result<bool, Error> {
+        let debug_string = "[PlatformSDK] create_and_publish_registration_transition".to_string();
+        if !model.has_registration_funding_private_key() {
+            return Err(Error::Any(500, "The blockchain identity funding private key should be first created with createFundingPrivateKeyWithCompletion".to_string()))
+        }
+        let index = model.first_index_of_ecdsa_auth_key_create_if_needed(SecurityLevel::MASTER, save_key_if_need, context)?;
+        println!("{debug_string}: index: {}", index);
+        if (index & !BIP32_HARD) != 0 {
+            return Err(Error::Any(0, "The index should be 0 here".to_string()));
+        }
+        if let Some(TransactionPayload::AssetLockPayloadType(..)) = &asset_lock_transaction.special_transaction_payload {
+            let output_index = 0;
+            let proof = match is_lock {
+                Some(instant_lock) => {
+                    AssetLockProof::Instant(InstantAssetLockProof {
+                        instant_lock,
+                        transaction: asset_lock_transaction.clone(),
+                        output_index,
+                    })
+                },
+                None => {
+                    AssetLockProof::Chain(ChainAssetLockProof {
+                        core_chain_locked_height,
+                        out_point: OutPoint::new(asset_lock_transaction.txid(), output_index),
+                    })
+                }
+            };
+            let opaque_private_key = model.registration_funding_private_key()
+                .ok_or(Error::Any(0, "The registration funding private key should be set".to_string()))?;
+            let opaque_public_key = model.key_at_index(index)
+                .ok_or(Error::Any(0, format!("The public key at index:{} should be set", index)))?;
+
+            let private_key = opaque_private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
+            let public_key = identity_registration_public_key(index, opaque_public_key);
+            let public_keys = BTreeMap::from_iter([(index, public_key.clone())]);
+            let identity = proof.create_identifier()
+                .and_then(|identifier| Identity::new_with_id_and_keys(identifier, public_keys.clone(), self.sdk.version()))
+                .map_err(Error::from)?;
+            println!("{debug_string}: sdk: {:p} identity: {:p} model: {:p} proof: {:p} private_key: {:p} signer: {:p}", self.sdk.as_ref(), &identity, model, &proof, &private_key, &self.callback_signer);
+            let result = identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &private_key, &self.callback_signer, Some(PutSettings::default())).await;
+
+            println!("{debug_string}: result: {:?}", result);
+            match result {
+                Ok(identity) => {
+                    model.update_with_state_information(identity, storage_context, context)?;
+                    Ok(true)
+                }
+                Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(ref err))) => {
+                    if let ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) = &**err {
+                        println!("{} ==> try with chain lock proof", err);
+
+                        let proof = AssetLockProof::Chain(ChainAssetLockProof {
+                            core_chain_locked_height,
+                            out_point: OutPoint::new(asset_lock_transaction.txid(), output_index),
+                        });
+                        let identity = proof.create_identifier()
+                            .and_then(|identifier| Identity::new_with_id_and_keys(identifier, public_keys, self.sdk.version()))
+                            .map_err(Error::from)?;
+                        let identity = identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &private_key, &self.callback_signer, Some(PutSettings::default())).await.map_err(Error::from)?;
+                        model.update_with_state_information(identity, storage_context, context)?;
+                        Ok(true)
+                    } else {
+                        Err(Error::DashSDKError(format!("{err:?}")))
+                    }
+                },
+                Err(e) => Err(Error::from(e))
+            }
+
+        } else {
+            Err(Error::Any(0, "Bad asset lock transaction".to_string()))
+
+        }
     }
-    pub async fn identity_register_using_public_key_at_index2(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
+    pub async fn identity_register_using_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
         println!("identity_register_using_public_key_at_index: {public_key:?} -- {index} -- {proof:?} -- {private_key:?}");
+        let public_keys = BTreeMap::from_iter([(index, public_key)]);
+        let identity = proof.create_identifier()
+            .and_then(|identifier| Identity::new_with_id_and_keys(identifier, public_keys, self.sdk.version()))
+            .map_err(Error::from)?;
         let maybe_private_key = private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
-        let identity = Identity::V0(IdentityV0 {
-            id: proof.create_identifier().map_err(Error::from)?,
-            public_keys: BTreeMap::from_iter([(index, public_key)]),
-            balance: 0,
-            revision: 0,
-        });
         identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
             .map_err(Error::from)
     }
@@ -518,7 +601,7 @@ impl PlatformSDK {
         identity_public_key: IdentityPublicKey,
     ) -> Result<Document, Error> {
         println!("document_single2: {document_type:?} -- {document:?} -- {}", entropy.to_lower_hex_string());
-        document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
+        document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, None, &self.callback_signer, Some(PutSettings::default())).await
             .map_err(Error::from)
     }
 
@@ -779,7 +862,7 @@ impl PlatformSDK {
                     .map_err(Error::from)?;
                 self.document_single2(document_type.to_owned_document_type(), document, entropy, identity_public_key.clone()).await?;
             }
-            model.save_username_in_context(context, SaveUsernameContext::confirmed_username_full_paths(username_full_paths));
+            model.save_username_in_context(context, SaveUsernameContext::confirmed_username_full_paths(model.usernames_and_domains(username_full_paths)));
             // self.save_username_in_context(context, )
             // [self setAndSaveUsernameFullPaths:usernameFullPaths toStatus:DSBlockchainIdentityUsernameStatus_Preordered inContext:context];
 
@@ -813,7 +896,7 @@ impl PlatformSDK {
                 // self.register_preordered_usernames(platform, context).await
             } else {
                 // TODO: This needs to be done per username and not for all usernames
-                model.save_username_in_context(context, SaveUsernameContext::initial_username_full_paths(username_full_paths));
+                model.save_username_in_context(context, SaveUsernameContext::initial_username_full_paths(model.usernames_and_domains(username_full_paths)));
                 Ok(false)
                 // self.register_initial_usernames(platform, context).await
             }
@@ -839,7 +922,7 @@ impl PlatformSDK {
                 let state_transition = self.documents.create_state_transition(documents, &mut nonce_counter)
                     .map_err(Error::from)?;
                 self.sign_and_publish_state_transition(&private_key_data, key_kind_to_key_type(model.current_main_key_type), StateTransition::Batch(state_transition)).await?;
-                model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(username_full_paths));
+                model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(model.usernames_and_domains(username_full_paths)));
                 Ok(true)
                 // self.register_registration_pending_usernames(platform, context).await
             }
@@ -885,7 +968,7 @@ impl PlatformSDK {
                     Ok(true)
                 } else {
                     // TODO: This needs to be done per username and not for all usernames
-                    model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(username_full_paths));
+                    model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(model.usernames_and_domains(username_full_paths)));
                     // TODO: should we introduce progress here to not to wait this step in some circumstances
 
                     // self.register_preordered_usernames(platform, context).await
@@ -910,10 +993,10 @@ impl PlatformSDK {
 impl PlatformSDK {
     pub fn new<
         GetQuorumPublicKey: Fn(u32, [u8; 32], u32) -> Result<[u8; 48], ContextProviderError> + Send + Sync + 'static,
-        GetDataContract: Fn(*const c_void, Identifier) -> Result<Option<Arc<DataContract>>, ContextProviderError> + Send + Sync + 'static,
-        GetPlatformActivationHeight: Fn(*const c_void) -> Result<CoreBlockHeight, ContextProviderError> + Send + Sync + 'static,
-        Sign: Fn(*const c_void, &IdentityPublicKey, Vec<u8>) -> Result<BinaryData, ProtocolError> + Send + Sync + 'static,
-        CanSign: Fn(*const c_void, &IdentityPublicKey) -> bool + Send + Sync + 'static,
+        GetDataContract: Fn(*const c_void, [u8; 32]) -> Option<DataContract> + Send + Sync + 'static,
+        GetPlatformActivationHeight: Fn(*const c_void) -> u32 + Send + Sync + 'static,
+        Sign: Fn(*const c_void, IdentityPublicKey) -> Option<OpaqueKey> + Send + Sync + 'static,
+        CanSign: Fn(*const c_void, IdentityPublicKey) -> bool + Send + Sync + 'static,
         GetDataContractFromCache: Fn(*const c_void, SystemDataContract) -> DataContract + Send + Sync + 'static,
     >(
         cache: Arc<PlatformCache>,

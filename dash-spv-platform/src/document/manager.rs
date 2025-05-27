@@ -16,7 +16,7 @@ use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::Identifier;
 use platform_value::string_encoding::Encoding;
-use platform_version::version::PlatformVersion;
+
 use dash_spv_crypto::crypto::byte_util::Random;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_macro::StreamManager;
@@ -104,10 +104,11 @@ impl DocumentsManager {
         let document_type = contract.document_type_for_name(document_type)
             .map_err(ProtocolError::from)?;
         let entropy = <[u8; 32]>::random();
+
         document_type
-            .create_document_from_data(document.properties().into(), document.owner_id(), block_height, core_block_height, entropy, PlatformVersion::latest())
+            .create_document_from_data(document.properties().into(), document.owner_id(), block_height, core_block_height, entropy, self.sdk_ref().version())
             .map_err(Error::from)?
-            .put_to_platform_and_wait_for_response(&self.sdk, document_type.to_owned_document_type(), entropy, identity_public_key, signer, None)
+            .put_to_platform_and_wait_for_response(&self.sdk, document_type.to_owned_document_type(), entropy, identity_public_key, None, signer, None)
             .await
             .map_err(Error::from)
 

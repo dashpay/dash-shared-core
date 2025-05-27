@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 #[derive(Clone, Debug)]
 #[ferment_macro::opaque]
 pub struct FFIThreadSafeContext {
-    inner: Arc<Mutex<*const std::ffi::c_void>>
+    pub inner: Arc<Mutex<*const std::ffi::c_void>>
 }
 unsafe impl Send for FFIThreadSafeContext {}
 unsafe impl Sync for FFIThreadSafeContext {}

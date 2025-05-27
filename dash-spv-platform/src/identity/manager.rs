@@ -244,7 +244,7 @@ impl IdentitiesManager {
         derivation_path: *const c_void,
         get_public_key_at_index_path: GetPublicKeyDataAtIndexPath
     ) -> Result<BTreeMap<u32, Identity>, Error> {
-        let debug_string = format!("[IdentityManager] Monitor KeyHashes (one-by-one) {}", unused_index);
+        let debug_string = format!("[IdentityManager] Monitor KeyHashes (one-by-one) starting from {}", unused_index);
         println!("{debug_string}");
         let mut index = unused_index;
         let mut identities = BTreeMap::new();
@@ -277,13 +277,20 @@ impl IdentitiesManager {
     pub async fn fetch_identity_network_state_information(
         &self,
         model: &mut IdentityModel,
+        storage_context: *const c_void,
         context: *const c_void
     ) -> Result<(bool, bool), Error> {
-        let debug_string = format!("[IdentityManager] Fetch Identity State ({})", model.unique_id.to_lower_hex_string());
+        let debug_string = format!("[IdentityManager] Fetch Identity State ({}:{})", model.unique_id.to_lower_hex_string(), model.index);
         println!("{debug_string}");
-        match Identity::fetch_with_settings(self.sdk_ref(), Identifier::from(model.unique_id), DEFAULT_IDENTITY_SETTINGS).await? {
+        let sdk_ref = self.sdk_ref();
+        println!("{debug_string} sdk_ref: {}", sdk_ref.network);
+        let identifier: Identifier = model.unique_id.into();
+        println!("{debug_string} identifier: {:?}", identifier);
+        let maybe_identity = Identity::fetch_with_settings(sdk_ref, identifier, DEFAULT_IDENTITY_SETTINGS).await?;
+        println!("{debug_string} maybe_identity: {:?}", maybe_identity);
+        match maybe_identity {
             Some(identity) => {
-                model.update_with_state_information(identity, context)?;
+                model.update_with_state_information(identity, storage_context, context)?;
                 println!("{}: OK", debug_string);
                 Ok((true, true))
             }
