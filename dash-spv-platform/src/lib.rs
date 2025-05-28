@@ -26,6 +26,7 @@ use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
 use dash_sdk::platform::transition::put_document::PutDocument;
 use dash_sdk::platform::transition::put_identity::PutIdentity;
 use dash_sdk::platform::transition::put_settings::PutSettings;
+use dash_sdk::platform::transition::waitable::Waitable;
 use dash_sdk::platform::types::evonode::EvoNode;
 use dash_sdk::sdk::AddressList;
 use dashcore::blockdata::transaction::Transaction;
@@ -33,7 +34,6 @@ use dashcore::consensus::Decodable;
 use dashcore::ephemerealdata::instant_lock::InstantLock;
 use dashcore::OutPoint;
 use dashcore::prelude::DisplayHex;
-use dashcore::transaction::special_transaction::TransactionPayload;
 use data_contracts::SystemDataContract;
 use dpp::data_contract::{DataContract, DataContractFacade};
 use dpp::data_contract::accessors::v0::{DataContractV0Getters, DataContractV0Setters};
@@ -435,7 +435,7 @@ impl PlatformSDK {
     pub async fn identity_register2(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
         println!("identity_register: {identity:?} -- {proof:?} -- {private_key:?}");
         let maybe_private_key = private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
-        identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
+        identity.put_to_platform_and_wait_for_response(self.sdk_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
             .map_err(Error::from)
     }
 
@@ -456,7 +456,9 @@ impl PlatformSDK {
         storage_context: *const c_void,
         context: *const c_void
     ) -> Result<bool, Error> {
-        let debug_string = "[PlatformSDK] create_and_publish_registration_transition".to_string();
+        let debug_string = format!("[PlatformSDK: {}] register identity", model.unique_id.to_lower_hex_string());
+        let asset_lock_tx_id = asset_lock_transaction.txid();
+        println!("{debug_string}: asset_lock_tx_id: {} is_lock_tx_id: {}", asset_lock_tx_id.to_string(), is_lock.as_ref().map(|tx| tx.txid.to_string()).unwrap_or_default());
         if !model.has_registration_funding_private_key() {
             return Err(Error::Any(500, "The blockchain identity funding private key should be first created with createFundingPrivateKeyWithCompletion".to_string()))
         }
@@ -465,69 +467,65 @@ impl PlatformSDK {
         if (index & !BIP32_HARD) != 0 {
             return Err(Error::Any(0, "The index should be 0 here".to_string()));
         }
-        if let Some(TransactionPayload::AssetLockPayloadType(..)) = &asset_lock_transaction.special_transaction_payload {
-            let output_index = 0;
-            let proof = match is_lock {
-                Some(instant_lock) => {
-                    AssetLockProof::Instant(InstantAssetLockProof {
-                        instant_lock,
-                        transaction: asset_lock_transaction.clone(),
-                        output_index,
-                    })
-                },
-                None => {
-                    AssetLockProof::Chain(ChainAssetLockProof {
+
+        let output_index = 0;
+        let proof = match is_lock {
+            Some(instant_lock) => {
+                AssetLockProof::Instant(InstantAssetLockProof {
+                    instant_lock,
+                    transaction: asset_lock_transaction.clone(),
+                    output_index,
+                })
+            },
+            None => {
+                AssetLockProof::Chain(ChainAssetLockProof {
+                    core_chain_locked_height,
+                    out_point: OutPoint::new(asset_lock_tx_id, output_index),
+                })
+            }
+        };
+        let opaque_private_key = model.registration_funding_private_key()
+            .ok_or(Error::Any(0, "The registration funding private key should be set".to_string()))?;
+        let opaque_public_key = model.key_at_index(index)
+            .ok_or(Error::Any(0, format!("The public key at index:{} should be set", index)))?;
+
+        let private_key = opaque_private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
+        let public_key = identity_registration_public_key(index, opaque_public_key);
+        let public_keys = BTreeMap::from_iter([(index, public_key.clone())]);
+        let proof_id = proof.create_identifier().map_err(Error::from)?;
+        let identity = Identity::new_with_id_and_keys(proof_id, public_keys.clone(), self.sdk.version()).map_err(Error::from)?;
+        println!("{debug_string}: sdk: {:p} identity: {:p} {identity:?} model: {:p} proof: {:p} {proof:?} private_key: {:p} signer: {:p}", self.sdk_ref(), &identity, model, &proof, &private_key, &self.callback_signer);
+        let settings = PutSettings::default();
+        let state_transition = identity.put_to_platform(self.sdk_ref(), proof, &private_key, &self.callback_signer, Some(settings)).await.map_err(Error::from)?;
+        println!("{debug_string}: state_transition: {:p} {:?}", &state_transition, state_transition);
+        let result = Identity::wait_for_response(self.sdk_ref(), state_transition, Some(settings)).await;
+        println!("{debug_string}: result: {:?}", result);
+        match result {
+            Ok(identity) => {
+                model.update_with_state_information(identity, storage_context, context)?;
+                Ok(true)
+            }
+            Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(ref err))) => {
+                if let ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) = &**err {
+                    println!("{} ==> try with chain lock proof", err);
+                    let proof = AssetLockProof::Chain(ChainAssetLockProof {
                         core_chain_locked_height,
-                        out_point: OutPoint::new(asset_lock_transaction.txid(), output_index),
-                    })
-                }
-            };
-            let opaque_private_key = model.registration_funding_private_key()
-                .ok_or(Error::Any(0, "The registration funding private key should be set".to_string()))?;
-            let opaque_public_key = model.key_at_index(index)
-                .ok_or(Error::Any(0, format!("The public key at index:{} should be set", index)))?;
-
-            let private_key = opaque_private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
-            let public_key = identity_registration_public_key(index, opaque_public_key);
-            let public_keys = BTreeMap::from_iter([(index, public_key.clone())]);
-            let identity = proof.create_identifier()
-                .and_then(|identifier| Identity::new_with_id_and_keys(identifier, public_keys.clone(), self.sdk.version()))
-                .map_err(Error::from)?;
-            println!("{debug_string}: sdk: {:p} identity: {:p} model: {:p} proof: {:p} private_key: {:p} signer: {:p}", self.sdk.as_ref(), &identity, model, &proof, &private_key, &self.callback_signer);
-            let result = identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &private_key, &self.callback_signer, Some(PutSettings::default())).await;
-
-            println!("{debug_string}: result: {:?}", result);
-            match result {
-                Ok(identity) => {
+                        out_point: OutPoint::new(asset_lock_tx_id, output_index),
+                    });
+                    let proof_id = proof.create_identifier().map_err(Error::from)?;
+                    let identity = Identity::new_with_id_and_keys(proof_id, public_keys.clone(), self.sdk.version()).map_err(Error::from)?;
+                    let state_transition = identity.put_to_platform(self.sdk_ref(), proof, &private_key, &self.callback_signer, Some(PutSettings::default())).await.map_err(Error::from)?;
+                    let identity = Identity::wait_for_response(self.sdk_ref(), state_transition, Some(settings)).await.map_err(Error::from)?;
                     model.update_with_state_information(identity, storage_context, context)?;
                     Ok(true)
+                } else {
+                    Err(Error::DashSDKError(format!("{err:?}")))
                 }
-                Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(ref err))) => {
-                    if let ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) = &**err {
-                        println!("{} ==> try with chain lock proof", err);
-
-                        let proof = AssetLockProof::Chain(ChainAssetLockProof {
-                            core_chain_locked_height,
-                            out_point: OutPoint::new(asset_lock_transaction.txid(), output_index),
-                        });
-                        let identity = proof.create_identifier()
-                            .and_then(|identifier| Identity::new_with_id_and_keys(identifier, public_keys, self.sdk.version()))
-                            .map_err(Error::from)?;
-                        let identity = identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &private_key, &self.callback_signer, Some(PutSettings::default())).await.map_err(Error::from)?;
-                        model.update_with_state_information(identity, storage_context, context)?;
-                        Ok(true)
-                    } else {
-                        Err(Error::DashSDKError(format!("{err:?}")))
-                    }
-                },
-                Err(e) => Err(Error::from(e))
-            }
-
-        } else {
-            Err(Error::Any(0, "Bad asset lock transaction".to_string()))
-
+            },
+            Err(e) => Err(Error::from(e))
         }
     }
+
     pub async fn identity_register_using_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
         println!("identity_register_using_public_key_at_index: {public_key:?} -- {index} -- {proof:?} -- {private_key:?}");
         let public_keys = BTreeMap::from_iter([(index, public_key)]);
@@ -535,7 +533,7 @@ impl PlatformSDK {
             .and_then(|identifier| Identity::new_with_id_and_keys(identifier, public_keys, self.sdk.version()))
             .map_err(Error::from)?;
         let maybe_private_key = private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
-        identity.put_to_platform_and_wait_for_response(self.sdk.as_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
+        identity.put_to_platform_and_wait_for_response(self.sdk_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
             .map_err(Error::from)
     }
 
@@ -601,7 +599,7 @@ impl PlatformSDK {
         identity_public_key: IdentityPublicKey,
     ) -> Result<Document, Error> {
         println!("document_single2: {document_type:?} -- {document:?} -- {}", entropy.to_lower_hex_string());
-        document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, None, &self.callback_signer, Some(PutSettings::default())).await
+        document.put_to_platform_and_wait_for_response(self.sdk_ref(), document_type, entropy, identity_public_key, None, &self.callback_signer, Some(PutSettings::default())).await
             .map_err(Error::from)
     }
 
@@ -1046,6 +1044,10 @@ impl PlatformSDK {
             chain_type,
             sdk: sdk_arc
         }
+    }
+
+    pub fn sdk_ref(&self) -> &Sdk {
+        &self.sdk
     }
 
 

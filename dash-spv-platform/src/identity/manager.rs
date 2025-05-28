@@ -237,12 +237,15 @@ impl IdentitiesManager {
     }
 
     pub async fn monitor_key_hash_one_by_one<
-        GetPublicKeyDataAtIndexPath: Fn(*const c_void, Vec<u32>) -> Vec<u8> + Send + Sync + Clone + 'static
+        GetPublicKeyDataAtIndexPath: Fn(*const c_void, Vec<u32>) -> Vec<u8> + Send + Sync + Clone + 'static,
+        NotifyProgress: Fn(*const c_void, u32, [u8; 20], Identity) + Send + Sync + Clone + 'static,
     >(
         &self,
         unused_index: u32,
         derivation_path: *const c_void,
-        get_public_key_at_index_path: GetPublicKeyDataAtIndexPath
+        get_public_key_at_index_path: GetPublicKeyDataAtIndexPath,
+        notify_progress: NotifyProgress,
+        context: *const c_void
     ) -> Result<BTreeMap<u32, Identity>, Error> {
         let debug_string = format!("[IdentityManager] Monitor KeyHashes (one-by-one) starting from {}", unused_index);
         println!("{debug_string}");
@@ -250,6 +253,7 @@ impl IdentitiesManager {
         let mut identities = BTreeMap::new();
         while let Ok((new_index, key_hash, Some(identity))) = self.fetch_by_index(index, derivation_path, get_public_key_at_index_path.clone()).await {
             println!("{debug_string}/{}: Ok: key_hash: {}, identity: {}", new_index, key_hash.to_lower_hex_string(), identity.id().to_string(Encoding::Hex));
+            notify_progress(context, index, key_hash, identity.clone());
             index = new_index;
             identities.insert(new_index, identity);
         }
@@ -265,8 +269,7 @@ impl IdentitiesManager {
         get_public_key_at_index_path: GetPublicKeyDataAtIndexPath
     ) -> Result<(u32, [u8; 20], Option<Identity>), Error> {
         let new_index = index + 1;
-        let indexes = vec![new_index | BIP32_HARD, 0 | BIP32_HARD];
-        let public_key_data = get_public_key_at_index_path(derivation_path, indexes);
+        let public_key_data = get_public_key_at_index_path(derivation_path, vec![new_index | BIP32_HARD, 0 | BIP32_HARD]);
         let public_key_hash = hash160::Hash::hash(&public_key_data).to_byte_array();
         println!("[IdentityManager] FetchByIndex ({})", index);
         Identity::fetch_with_settings(self.sdk_ref(), PublicKeyHash(public_key_hash), KEY_HASHES_SETTINGS).await
@@ -280,14 +283,11 @@ impl IdentitiesManager {
         storage_context: *const c_void,
         context: *const c_void
     ) -> Result<(bool, bool), Error> {
-        let debug_string = format!("[IdentityManager] Fetch Identity State ({}:{})", model.unique_id.to_lower_hex_string(), model.index);
+        let debug_string = format!("[IdentityManager: {}: {}] Fetch Identity State", model.unique_id.to_lower_hex_string(), model.index);
         println!("{debug_string}");
         let sdk_ref = self.sdk_ref();
-        println!("{debug_string} sdk_ref: {}", sdk_ref.network);
         let identifier: Identifier = model.unique_id.into();
-        println!("{debug_string} identifier: {:?}", identifier);
         let maybe_identity = Identity::fetch_with_settings(sdk_ref, identifier, DEFAULT_IDENTITY_SETTINGS).await?;
-        println!("{debug_string} maybe_identity: {:?}", maybe_identity);
         match maybe_identity {
             Some(identity) => {
                 model.update_with_state_information(identity, storage_context, context)?;
