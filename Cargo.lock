@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "dash_spv_apple_bindings"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "cbindgen 0.24.5",
  "dash-spv-coinjoin",
