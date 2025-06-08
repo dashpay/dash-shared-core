@@ -134,15 +134,13 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                 [v, data @ ..] if *v == script_map.pubkey => {
                     OP_DUP.into_u8().enc(&mut writer);
                     OP_HASH160.into_u8().enc(&mut writer);
-                    // writer.append_script_push_data(data.to_vec());
                     data.to_vec().append_script_push_data(&mut writer);
                     OP_EQUALVERIFY.into_u8().enc(&mut writer);
                     OP_CHECKSIG.into_u8().enc(&mut writer);
                 },
                 [v, data @ ..] if *v == script_map.script => {
                     OP_HASH160.into_u8().enc(&mut writer);
-                    writer.append_script_push_data(data.to_vec());
-                    // data.to_vec().append_script_push_data(&mut writer);
+                    data.to_vec().append_script_push_data(&mut writer);
                     OP_EQUAL.into_u8().enc(&mut writer);
                 },
                 _ => {}
