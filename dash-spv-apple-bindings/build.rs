@@ -17,11 +17,13 @@ fn main() {
         .with_cbindgen_config_from_file("cbindgen.toml")
         .with_default_mod_name()
         .with_external_crates(vec![
+            "dash-spv-chain",
             "dash-spv-coinjoin",
             "dash-spv-crypto",
             "dash-spv-keychain",
             "dash-spv-masternode-processor",
             "dash-spv-platform",
+            "dash-spv-storage",
             "dash-sdk",
             "platform-value",
             "platform-version",

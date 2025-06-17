@@ -10,17 +10,21 @@ pub mod models;
 pub mod query;
 pub mod transition;
 pub mod cache;
+mod wallet_cache;
+mod notifications;
 
 use std::collections::{BTreeMap, HashMap};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::os::raw::c_void;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use bitflags::bitflags;
 use dapi_grpc::core::v0::GetTransactionRequest;
 use dapi_grpc::platform::v0::get_documents_request::get_documents_request_v0::Start;
 use dash_sdk::{dpp, RequestSettings, Sdk, SdkBuilder};
 use dash_sdk::dapi_client::{Address, AddressListError, DapiRequestExecutor};
-use dash_sdk::platform::FetchUnproved;
+use dash_sdk::platform::{Fetch, FetchMany, FetchUnproved};
 use dash_sdk::platform::transition::put_contract::PutContract;
 use dash_sdk::platform::transition::broadcast::BroadcastStateTransition;
 use dash_sdk::platform::transition::put_document::PutDocument;
@@ -28,11 +32,12 @@ use dash_sdk::platform::transition::put_identity::PutIdentity;
 use dash_sdk::platform::transition::put_settings::PutSettings;
 use dash_sdk::platform::transition::waitable::Waitable;
 use dash_sdk::platform::types::evonode::EvoNode;
+use dash_sdk::platform::types::identity::PublicKeyHash;
 use dash_sdk::sdk::AddressList;
 use dashcore::blockdata::transaction::Transaction;
 use dashcore::consensus::Decodable;
 use dashcore::ephemerealdata::instant_lock::InstantLock;
-use dashcore::OutPoint;
+use dashcore::hashes::{hash160, Hash};
 use dashcore::prelude::DisplayHex;
 use data_contracts::SystemDataContract;
 use dpp::data_contract::{DataContract, DataContractFacade};
@@ -42,14 +47,15 @@ use dpp::data_contract::document_type::{DocumentType, DocumentTypeRef};
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dpp::data_contracts;
 use dpp::errors::ProtocolError;
-use dpp::identity::{Identity, IdentityPublicKey, IdentityFacade, KeyID, KeyType, SecurityLevel};
+use dpp::identity::{Identity, IdentityFacade, Purpose};
+use dpp::identity::identity_public_key::{IdentityPublicKey, KeyID, KeyType, SecurityLevel};
 use dpp::document::{Document, DocumentV0Getters};
 use dpp::document::document_factory::DocumentFactory;
 use dpp::errors::consensus::basic::BasicError;
 use dpp::errors::consensus::ConsensusError;
+use dpp::identity::accessors::IdentityGettersV0;
 use dpp::identity::core_script::CoreScript;
-use dpp::identity::state_transition::asset_lock_proof::{AssetLockProof, InstantAssetLockProof};
-use dpp::identity::state_transition::asset_lock_proof::chain::ChainAssetLockProof;
+use dpp::identity::state_transition::asset_lock_proof::AssetLockProof;
 use dpp::native_bls::NativeBlsModule;
 use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use dpp::serialization::Signable;
@@ -65,30 +71,56 @@ use drive_proof_verifier::{ContextProvider, error::ContextProviderError};
 use drive_proof_verifier::types::evonode_status::EvoNodeStatus;
 use indexmap::IndexMap;
 use platform_value::{Bytes32, Identifier, Value, ValueMap};
+use platform_value::string_encoding::Encoding;
+use platform_version::version::PlatformVersion;
 use platform_version::version::v8::PLATFORM_V8;
 use tokio::runtime::Runtime;
-use dash_spv_crypto::crypto::byte_util::{Random, Reversed};
-use dash_spv_crypto::derivation::BIP32_HARD;
-use dash_spv_crypto::keys::{IKey, OpaqueKey};
+use dash_spv_chain::{ChainManager, chain::{ChainController, ChainRef}, ChainError};
+use dash_spv_chain::derivation::{DerivationController, DerivationRef};
+use dash_spv_chain::notification::{NotificationRef, IDENTITY_UPDATE_EVENT_KEY_UPDATE, INVITATION_DID_UPDATE_NOTIFICATION};
+use dash_spv_crypto::crypto::byte_util::{Random, Reversed, Zeroable};
+use dash_spv_crypto::derivation::{IIndexPath, IndexPath, BIP32_HARD};
+use dash_spv_crypto::derivation::derivation_path_kind::DerivationPathKind;
+use dash_spv_crypto::keys::{DeriveKey, ECDSAKey, IKey, KeyError, OpaqueKey};
 use dash_spv_crypto::network::ChainType;
+use dash_spv_crypto::util::data_append::DataAppend;
+use dash_spv_crypto::util::from_hash160_for_script_map;
 use dash_spv_event_bus::DAPIAddressHandler;
+use dash_spv_keychain::{KeyChainKey, KeyChainValue, KeychainController, KeychainRef};
+use dash_spv_storage::{StorageContext, StorageRef};
+use dash_spv_storage::controller::StorageController;
+use dash_spv_storage::predicate::Predicate;
 use crate::cache::PlatformCache;
 use crate::contract::manager::ContractsManager;
-use crate::document::contact_request::ContactRequestManager;
-use crate::document::manager::DocumentsManager;
-use crate::document::salted_domain_hashes::{SaltedDomainHashValidator, SaltedDomainHashesManager};
-use crate::document::usernames::{UsernameStatus, UsernameValidator, UsernamesManager};
+use crate::document::contact_request::{ContactRequestManager, CONTACT_REQUEST_SETTINGS, DAPI_DOCUMENT_RESPONSE_COUNT_LIMIT};
+use crate::document::manager::{DocumentsManager, PROFILE_SETTINGS, USERNAME_SETTINGS};
+use crate::document::salted_domain_hashes::SaltedDomainHashesManager;
+use crate::document::usernames::{UsernameStatus, UsernamesManager};
 use crate::error::Error;
-use crate::identity::manager::{identity_registration_public_key, key_kind_to_key_type, key_type_from_opaque_key, IdentitiesManager};
-use crate::identity::model::{domains_for_username_full_paths, IdentityModel, DEFAULT_USERNAME_REGISTRATION_PURPOSE, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL};
-use crate::identity::storage::username::SaveUsernameContext;
+use crate::identity::callback::IdentityCallbacks;
+use crate::identity::controller::{IdentityController, SaveIdentity};
+use crate::identity::invitation::InvitationModel;
+use crate::identity::key_info::KeyInfo;
+use crate::identity::key_status::IdentityKeyStatus;
+use crate::identity::manager::{identity_registration_public_key, key_type_from_opaque_key, IdentitiesManager, DEFAULT_FETCH_IDENTITY_RETRY_COUNT};
+use crate::identity::model::{domains_for_username_full_paths, AssetLockSubmissionError, IdentityModel, DEFAULT_PROFILE_REGISTRATION_PURPOSE, DEFAULT_PROFILE_REGISTRATION_SECURITY_LEVEL, DEFAULT_USERNAME_REGISTRATION_PURPOSE, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL};
+use crate::identity::query_step::QueryStep;
+use crate::identity::registration_step::RegistrationStep;
 use crate::identity::username_registration_error::UsernameRegistrationError;
-use crate::models::profile::Profile;
+use crate::models::contact_request::ContactRequest;
+use crate::models::profile::ProfileModel;
+use crate::models::transient_dashpay_user::TransientDashPayUser;
+use crate::notifications::{IdentityDidUpdate, InvitationDidUpdate};
 use crate::provider::PlatformProvider;
 use crate::query::QueryKind;
 use crate::signer::CallbackSigner;
 use crate::thread_safe_context::FFIThreadSafeContext;
-use crate::util::RetryStrategy;
+use crate::transition::registration_model::RegistrationTransitionModel;
+use crate::wallet_cache::WalletCache;
+
+pub const WALLET_BLOCKCHAIN_USERS_KEY: &str = "WALLET_BLOCKCHAIN_USERS_KEY";
+pub const IDENTITY_INDEX_KEY: &str = "IDENTITY_INDEX_KEY";
+pub const IDENTITY_LOCKED_OUTPUT_KEY: &str = "IDENTITY_LOCKED_OUTPUT_KEY";
 
 const DEFAULT_TESTNET_ADDRESS_LIST: [&str; 19] = [
     "34.214.48.68",
@@ -135,13 +167,73 @@ fn create_sdk<C: ContextProvider + 'static, T: IntoIterator<Item = Address>>(pro
         .build()
         .unwrap()
 }
+pub const PUT_DOCUMENT_SETTINGS: PutSettings = PutSettings {
+    request_settings: RequestSettings {
+        connect_timeout: None,
+        timeout: None,
+        retries: Some(5),
+        ban_failed_address: None,
+    },
+    identity_nonce_stale_time_s: None,
+    user_fee_increase: None,
+    state_transition_creation_options: None,
+    wait_timeout: None,
+};
+const KEY_HASHES_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: Some(Duration::from_millis(20000)),
+    timeout: Some(Duration::from_secs(0)),
+    retries: Some(DEFAULT_FETCH_IDENTITY_RETRY_COUNT),
+    ban_failed_address: None,
+};
+const DEFAULT_IDENTITY_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: Some(Duration::from_millis(20000)),
+    timeout: Some(Duration::from_secs(0)),
+    retries: Some(DEFAULT_FETCH_IDENTITY_RETRY_COUNT),
+    ban_failed_address: None,
+};
+
+pub const REQUEST_SALTED_DOMAIN_HASHES_SETTINGS: RequestSettings = RequestSettings {
+    connect_timeout: None,
+    timeout: None,
+    retries: Some(4),
+    ban_failed_address: None,
+};
+
+bitflags! {
+    #[derive(Copy, Clone, PartialEq, Debug)]
+    pub struct PlatformSyncStateKind: u32 {
+        const None = 0;
+        const KeyHashes = 1;
+        const Unsynced = 2;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[ferment_macro::export]
+pub enum PlatformSyncStateNotification {
+    Start,
+    Finish { timestamp: u64 },
+    AddStateKind {
+        kind: u32
+    },
+    RemoveStateKind {
+        kind: u32
+    },
+    QueueChanged {
+        count: u32,
+        max_amount: u32
+    }
+}
+
 
 #[ferment_macro::opaque]
 pub struct PlatformSDK {
     pub runtime: Arc<Runtime>,
     pub chain_type: ChainType,
     pub sdk: Arc<Sdk>,
-    pub cache: Arc<PlatformCache>,
+    pub chain: Arc<ChainManager>,
+    pub identity_callbacks: Arc<IdentityCallbacks>,
+    pub cache: PlatformCache,
     pub callback_signer: CallbackSigner,
     pub identity_manager: Arc<IdentitiesManager>,
     pub contract_manager: Arc<ContractsManager>,
@@ -154,8 +246,12 @@ pub struct PlatformSDK {
     pub contracts: DataContractFacade,
     pub documents: DocumentFactory,
     pub state_transition: StateTransitionFactory,
+
+
     pub get_data_contract_from_cache: Arc<dyn Fn(/*context*/*const c_void, SystemDataContract) -> DataContract>,
 
+    // pub sign_and_publish_asset_lock_transaction: Arc<dyn Fn(*const c_void, /*topup_duff_amount*/u64, /*account_context*/ *const c_void, /*prompt*/String, /*steps*/u32) -> Result<u32, AssetLockSubmissionError>>,
+    pub notify_sync_state: Arc<dyn Fn(*const c_void, Vec<PlatformSyncStateNotification>)>,
 
     // pub platform_client: PlatformGrpcClient
 }
@@ -220,6 +316,7 @@ macro_rules! query_contract_docs {
         $self.doc_manager.documents_with_query(query).await
     }};
 }
+
 
 #[ferment_macro::export]
 impl PlatformSDK {
@@ -293,6 +390,25 @@ impl PlatformSDK {
         let contract = self.contract_manager.fetch_contract_by_id_error_if_none(contract_id).await?;
         self.doc_manager.put_document(document, document_type, block_height, core_block_height, contract, identity_public_key, &self.callback_signer).await
     }
+    pub async fn publish_document<'a>(&self, document_type: DocumentTypeRef<'a>, identity_public_key: IdentityPublicKey, value: Value, owner_id: Identifier, entropy: [u8; 32]) -> Result<Document, Error> {
+        let debug_string = format!("[PlatformSDK] {} Publish Document: ", owner_id.to_string(Encoding::Hex));
+        println!("{debug_string}: Publish document: {document_type:?}");
+        let document = document_type.create_document_from_data(value, owner_id, 0, 0, entropy, self.sdk_version())
+            .map_err(Error::from)?;
+        println!("{debug_string}: Publish document: {document:?}");
+        let state_transition = document.put_to_platform(
+            self.sdk_ref(),
+            document_type.to_owned_document_type(),
+            entropy,
+            identity_public_key,
+            None,
+            &self.callback_signer,
+            Some(PUT_DOCUMENT_SETTINGS)
+        ).await?;
+        println!("{debug_string}: Wait for response: {state_transition:?}");
+        Document::wait_for_response(self.sdk_ref(), state_transition, Some(PUT_DOCUMENT_SETTINGS)).await.map_err(Error::from)
+    }
+
     pub async fn dpns_domain_starts_with(&self, contract_id: Identifier, document_type: &str, starts_with: &str) -> Result<IndexMap<Identifier, Option<Document>>, Error> {
         query_contract_docs!(self, contract_id, document_type, dpns_domain, starts_with)
     }
@@ -312,27 +428,6 @@ impl PlatformSDK {
         contract.put_to_platform_and_wait_for_response(&self.sdk, identity_public_key, &self.callback_signer, None)
             .await
             .map_err(Error::from)
-    }
-
-    // #[cfg(feature = "state-transitions")]
-    /// Create signed transition
-    pub fn identity_registration_signed_transition(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
-        self.identities.create_identity_create_transition(&identity, proof)
-            .map_err(Error::from)
-            .and_then(|transition|
-                Self::sign_transition(StateTransition::IdentityCreate, transition, private_key))
-    }
-    pub fn identity_registration_signed_transition_with_public_keys(&self, public_keys: BTreeMap<u32, IdentityPublicKey>, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
-        self.identities.create_identity_create_transition_using_public_keys(public_keys, proof)
-            .map_err(Error::from)
-            .and_then(|(_identity, transition)|
-                Self::sign_transition(StateTransition::IdentityCreate, transition, private_key))
-    }
-    pub fn identity_registration_signed_transition_with_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
-        self.identities.create_identity_create_transition_using_public_keys(BTreeMap::from_iter([(index, public_key)]), proof)
-            .map_err(Error::from)
-            .and_then(|(_identity, transition)|
-                Self::sign_transition(StateTransition::IdentityCreate, transition, private_key))
     }
 
     pub fn identity_topup_signed_transition(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransition, Error> {
@@ -368,7 +463,7 @@ impl PlatformSDK {
         let created = CreatedDataContract::from_contract_and_identity_nonce(
             data_contract,
             nonce,
-            self.sdk.version(),
+            self.sdk_version(),
         ).map_err(Error::from)?;
         let transition = self.contracts.create_data_contract_create_transition(created)
             .map_err(Error::from)?;
@@ -381,40 +476,6 @@ impl PlatformSDK {
     }
 
     #[cfg(feature = "state-transitions")]
-    pub fn document_single_signed_transition(
-        &self,
-        action_type: DocumentTransitionActionType,
-        document_type: DocumentType,
-        document: Document,
-        entropy: [u8; 32],
-        private_key: OpaqueKey
-    ) -> Result<StateTransition, Error> {
-        let doc_type_ref = document_type.as_ref();
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(action_type, vec![(document, doc_type_ref, Bytes32(entropy), None)])]);
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
-            .map_err(Error::from)?;
-        Self::sign_transition(StateTransition::Batch, transition, private_key)
-    }
-
-    #[cfg(feature = "state-transitions")]
-    pub fn document_single_on_table_signed_transition(
-        &self,
-        data_contract: DataContract,
-        action_type: DocumentTransitionActionType,
-        table_name: &str,
-        document: Document,
-        entropy: [u8; 32],
-        private_key: OpaqueKey
-    ) -> Result<StateTransition, Error> {
-        let document_type = data_contract.document_type_for_name(table_name).map_err(Error::from)?;
-        let documents_iter = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(action_type, vec![(document, document_type, Bytes32(entropy), None)])]);
-        let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-        let transition = self.documents.create_state_transition(documents_iter, &mut nonce_counter)
-            .map_err(Error::from)?;
-        Self::sign_transition(StateTransition::Batch, transition, private_key)
-    }
-    #[cfg(feature = "state-transitions")]
     pub fn document_batch_signed_transition<'a>(
         &self,
         documents: HashMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32, Option<TokenPaymentInfo>)>>,
@@ -426,97 +487,167 @@ impl PlatformSDK {
         Self::sign_transition(StateTransition::Batch, transition, private_key)
     }
 
+    pub fn add_wallet_if_not_exist(&mut self, wallet_id: &str) -> bool {
+        if self.cache.wallets.contains_key(wallet_id) {
+            return false
+        }
+        self.cache.wallets.insert(wallet_id.to_string(), WalletCache::new(wallet_id.to_string(), Arc::clone(&self.chain), Arc::clone(&self.identity_callbacks)));
+        true
+    }
+
+    pub fn create_new_ecdsa_auth_key_if_need(&self, controller: &mut IdentityController, level: SecurityLevel, save_key: bool) -> Result<u32, Error> {
+        if let Some(index) = controller.model.first_index_of_ecdsa_key_with_security_level(level) {
+            Ok(index)
+        } else if let Some(ref wallet_id) = controller.model.wallet_id() {
+            let identity_id = controller.model.unique_id;
+            let derivation_path_kind = DerivationPathKind::IdentityECDSA;
+            let derivation_path = self.chain.get_derivation_path(wallet_id, derivation_path_kind);
+            let key_id = controller.model.keys_created() as u32;
+            println!("create_new_ecdsa_auth_key_if_need: level: {} save: {}", level, save_key);
+            let identity_index = controller.model.index;
+            let hardened_key_index = key_id | BIP32_HARD;
+            let hardened_index_path_indexes = vec![identity_index | BIP32_HARD, hardened_key_index];
+            let hardened_index_path = IndexPath::index_path_with_indexes(hardened_index_path_indexes);
+            let key = self.chain.derivation.wallet_based_extended_private_key_location_string(derivation_path);
+            let keychain_key = KeyChainKey::GetDataBytesKey { key };
+            if let Ok(KeyChainValue::Bytes(extended_private_key_data)) = self.chain.keychain.get(keychain_key) {
+                let private_key = ECDSAKey::key_with_extended_private_key_data(&extended_private_key_data)
+                    .map_err(Error::KeyError)?;
+                let derived_key = private_key.private_derive_to_path(&hardened_index_path)
+                    .map_err(Error::KeyError)?;
+                let derived_public_key_data = derived_key.public_key_data();
+                let public_key = ECDSAKey::key_with_public_key_data(&derived_public_key_data)
+                    .map_err(Error::KeyError)?;
+                let public_key_data = public_key.public_key_data();
+                let equal = derived_public_key_data.eq(&public_key_data);
+                if !equal {
+                    return Err(Error::KeyError(KeyError::Any("Private keys should be equal".to_string())))
+                }
+                let key_info = KeyInfo::registering(OpaqueKey::ECDSA(public_key), level, Purpose::AUTHENTICATION);
+                controller.model.add_key_info(key_id, key_info);
+                if save_key && !controller.model.is_transient() && self.cache.has_active_identity(&controller.model) {
+
+                    let private_key_data = derived_key.private_key_data()
+                        .map_err(Error::KeyError)?;
+
+                    let key_path_entity_count = self.storage_ref()
+                        .count(
+                            Predicate::KeyPathContext {
+                                wallet_id: wallet_id.clone(),
+                                identity_id,
+                                derivation_path_kind: derivation_path_kind.to_index(),
+                                index_path: hardened_index_path.indexes().clone()
+                            },
+                            StorageContext::View
+                        )
+                        .map_err(Error::StorageError)?;
+                    if key_path_entity_count > 0 {
+                        return Ok(key_id);
+                    }
+                    controller.callbacks.save(
+                        controller.model.context_type.clone(),
+                        StorageContext::View,
+                        SaveIdentity::NewKey {
+                            identity_id,
+                            derivation_path_kind: derivation_path_kind.to_index(),
+                            index_path: hardened_index_path.indexes.clone(),
+                            key_type: 0,
+                            public_key_data,
+                            key_status: IdentityKeyStatus::Registering.to_index(),
+                            key_id,
+                            security_level: level as u8,
+                            purpose: Purpose::AUTHENTICATION as u8,
+                        });
+
+                    let keychain_key = KeyChainKey::GetDataBytesKey { key: format!("{}-{}-{}.{}", controller.model.unique_id_string(), self.chain.derivation.standalone_extended_public_key_unique_id(derivation_path), identity_index, key_id) };
+                    let keychain_value = KeyChainValue::Bytes(private_key_data);
+                    self.chain.keychain_ref().set(keychain_key, keychain_value, true)
+                        .map_err(Error::KeychainError)?;
+
+                    self.chain.notification_ref()
+                        .identity_did_update(ferment::boxed(IdentityDidUpdate::new(self.chain_type.clone(), controller.model.clone(), vec![IDENTITY_UPDATE_EVENT_KEY_UPDATE])) as *mut c_void);
+                }
+
+                Ok(key_id)
+            } else {
+                Err(Error::Any(0, format!("failed to get extended private key for wallet: {}", wallet_id)))
+            }
+        } else {
+            Err(Error::Any(0, format!("no wallet for identity: {}", controller.model.unique_id().to_lower_hex_string())))
+        }
+    }
+
     /// Publish state transition
-    pub async fn identity_register(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("identity_register: {identity:?} -- {proof:?} -- {private_key:?}");
-        let signed_transition = self.identity_registration_signed_transition(identity, proof, private_key)?;
-        self.publish_state_transition(signed_transition).await
-    }
-    pub async fn identity_register2(&self, identity: Identity, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
-        println!("identity_register: {identity:?} -- {proof:?} -- {private_key:?}");
-        let maybe_private_key = private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
-        identity.put_to_platform_and_wait_for_response(self.sdk_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
-            .map_err(Error::from)
-    }
-
-
-    pub async fn identity_register_using_public_keys(&self, public_keys: BTreeMap<u32, IdentityPublicKey>, proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
-        println!("identity_register_using_public_keys: {public_keys:?} -- {proof:?} -- {private_key:?}");
-        let signed_transition = self.identity_registration_signed_transition_with_public_keys(public_keys, proof, private_key)?;
-        self.publish_state_transition(signed_transition).await
-    }
-
     pub async fn create_and_publish_registration_transition(
         &self,
-        model: &mut IdentityModel,
-        asset_lock_transaction: Transaction,
-        core_chain_locked_height: u32,
-        is_lock: Option<InstantLock>,
-        save_key_if_need: bool,
-        storage_context: *const c_void,
-        context: *const c_void
+        controller: &mut IdentityController,
+        registration_model: RegistrationTransitionModel,
+        storage_context: StorageContext,
     ) -> Result<bool, Error> {
-        let debug_string = format!("[PlatformSDK: {}] register identity", model.unique_id.to_lower_hex_string());
-        let asset_lock_tx_id = asset_lock_transaction.txid();
-        println!("{debug_string}: asset_lock_tx_id: {} is_lock_tx_id: {}", asset_lock_tx_id.to_string(), is_lock.as_ref().map(|tx| tx.txid.to_string()).unwrap_or_default());
-        if !model.has_registration_funding_private_key() {
+        let debug_string = format!("[PlatformSDK] {} register identity", controller.log_prefix());
+        let asset_lock_tx_id = registration_model.asset_lock_tx_id();
+        println!("{debug_string}: asset_lock_tx_id: {} ({:?}) is_lock_tx_id: {}", asset_lock_tx_id.to_string(), registration_model.transaction_model.transaction, registration_model.instant_lock.as_ref().map(|tx| tx.txid.to_string()).unwrap_or_default());
+
+        if !controller.model.has_registration_funding_private_key() {
             return Err(Error::Any(500, "The blockchain identity funding private key should be first created with createFundingPrivateKeyWithCompletion".to_string()))
         }
-        let index = model.first_index_of_ecdsa_auth_key_create_if_needed(SecurityLevel::MASTER, save_key_if_need, context)?;
+        //let index = controller.first_index_of_ecdsa_auth_key_create_if_needed(SecurityLevel::MASTER, !registration_model.is_transient)?;
+
+
+        let index = self.create_new_ecdsa_auth_key_if_need(controller, SecurityLevel::MASTER, !registration_model.is_transient)?;
+
+
+
         println!("{debug_string}: index: {}", index);
         if (index & !BIP32_HARD) != 0 {
             return Err(Error::Any(0, "The index should be 0 here".to_string()));
         }
 
-        let output_index = 0;
-        let proof = match is_lock {
-            Some(instant_lock) => {
-                AssetLockProof::Instant(InstantAssetLockProof {
-                    instant_lock,
-                    transaction: asset_lock_transaction.clone(),
-                    output_index,
-                })
-            },
+        if let Some(InstantLock { txid, ..}) = &registration_model.instant_lock {
+            if !asset_lock_tx_id.eq(txid) {
+                return Err(Error::Any(0, format!("isd tx id {} doesnt't match with {}", txid.to_string(), asset_lock_tx_id.to_string())));
+            }
+        }
+
+        let proof = match &registration_model.instant_lock {
+            Some(..) => {
+                AssetLockProof::Instant(registration_model.create_instant_proof())
+            }
             None => {
-                AssetLockProof::Chain(ChainAssetLockProof {
-                    core_chain_locked_height,
-                    out_point: OutPoint::new(asset_lock_tx_id, output_index),
-                })
+                AssetLockProof::Chain(registration_model.create_chain_proof())
             }
         };
-        let opaque_private_key = model.registration_funding_private_key()
+        let opaque_private_key = controller.model.registration_funding_private_key()
             .ok_or(Error::Any(0, "The registration funding private key should be set".to_string()))?;
-        let opaque_public_key = model.key_at_index(index)
+        let opaque_public_key = controller.model.key_at_index(index)
             .ok_or(Error::Any(0, format!("The public key at index:{} should be set", index)))?;
 
         let private_key = opaque_private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
         let public_key = identity_registration_public_key(index, opaque_public_key);
         let public_keys = BTreeMap::from_iter([(index, public_key.clone())]);
         let proof_id = proof.create_identifier().map_err(Error::from)?;
-        let identity = Identity::new_with_id_and_keys(proof_id, public_keys.clone(), self.sdk.version()).map_err(Error::from)?;
-        println!("{debug_string}: sdk: {:p} identity: {:p} {identity:?} model: {:p} proof: {:p} {proof:?} private_key: {:p} signer: {:p}", self.sdk_ref(), &identity, model, &proof, &private_key, &self.callback_signer);
-        let settings = PutSettings::default();
-        let state_transition = identity.put_to_platform(self.sdk_ref(), proof, &private_key, &self.callback_signer, Some(settings)).await.map_err(Error::from)?;
+        let identity = Identity::new_with_id_and_keys(proof_id, public_keys.clone(), self.sdk_version()).map_err(Error::from)?;
+        println!("{debug_string}: sdk: {:p} identity: {:p} {identity:?} model: {:p} proof: {:p} {proof:?} private_key: {:p} signer: {:p}", self.sdk_ref(), &identity, controller, &proof, &private_key, &self.callback_signer);
+        let state_transition = identity.put_to_platform(self.sdk_ref(), proof, &private_key, &self.callback_signer, Some(PUT_DOCUMENT_SETTINGS)).await.map_err(Error::from)?;
         println!("{debug_string}: state_transition: {:p} {:?}", &state_transition, state_transition);
-        let result = Identity::wait_for_response(self.sdk_ref(), state_transition, Some(settings)).await;
+        let result = Identity::wait_for_response(self.sdk_ref(), state_transition, Some(PUT_DOCUMENT_SETTINGS)).await;
         println!("{debug_string}: result: {:?}", result);
         match result {
             Ok(identity) => {
-                model.update_with_state_information(identity, storage_context, context)?;
+                let is_active = self.cache.has_active_identity(&controller.model);
+                controller.update_with_state_information(identity, is_active, storage_context)?;
                 Ok(true)
             }
             Err(dash_sdk::Error::Protocol(ProtocolError::ConsensusError(ref err))) => {
                 if let ConsensusError::BasicError(BasicError::InvalidInstantAssetLockProofSignatureError(err)) = &**err {
                     println!("{} ==> try with chain lock proof", err);
-                    let proof = AssetLockProof::Chain(ChainAssetLockProof {
-                        core_chain_locked_height,
-                        out_point: OutPoint::new(asset_lock_tx_id, output_index),
-                    });
+                    let proof = AssetLockProof::Chain(registration_model.create_chain_proof());
                     let proof_id = proof.create_identifier().map_err(Error::from)?;
-                    let identity = Identity::new_with_id_and_keys(proof_id, public_keys.clone(), self.sdk.version()).map_err(Error::from)?;
-                    let state_transition = identity.put_to_platform(self.sdk_ref(), proof, &private_key, &self.callback_signer, Some(PutSettings::default())).await.map_err(Error::from)?;
-                    let identity = Identity::wait_for_response(self.sdk_ref(), state_transition, Some(settings)).await.map_err(Error::from)?;
-                    model.update_with_state_information(identity, storage_context, context)?;
+                    let identity = Identity::new_with_id_and_keys(proof_id, public_keys.clone(), self.sdk_version()).map_err(Error::from)?;
+                    let state_transition = identity.put_to_platform(self.sdk_ref(), proof, &private_key, &self.callback_signer, Some(PUT_DOCUMENT_SETTINGS)).await.map_err(Error::from)?;
+                    let identity = Identity::wait_for_response(self.sdk_ref(), state_transition, Some(PUT_DOCUMENT_SETTINGS)).await.map_err(Error::from)?;
+                    let is_active = self.cache.has_active_identity(&controller.model);
+                    controller.update_with_state_information(identity, is_active, storage_context)?;
                     Ok(true)
                 } else {
                     Err(Error::DashSDKError(format!("{err:?}")))
@@ -524,17 +655,6 @@ impl PlatformSDK {
             },
             Err(e) => Err(Error::from(e))
         }
-    }
-
-    pub async fn identity_register_using_public_key_at_index(&self, public_key: IdentityPublicKey, index: u32, proof: AssetLockProof, private_key: OpaqueKey) -> Result<Identity, Error> {
-        println!("identity_register_using_public_key_at_index: {public_key:?} -- {index} -- {proof:?} -- {private_key:?}");
-        let public_keys = BTreeMap::from_iter([(index, public_key)]);
-        let identity = proof.create_identifier()
-            .and_then(|identifier| Identity::new_with_id_and_keys(identifier, public_keys, self.sdk.version()))
-            .map_err(Error::from)?;
-        let maybe_private_key = private_key.convert_opaque_key_to_ecdsa_private_key(&self.chain_type).map_err(Error::KeyError)?;
-        identity.put_to_platform_and_wait_for_response(self.sdk_ref(), proof, &maybe_private_key, &self.callback_signer, Some(PutSettings::default())).await
-            .map_err(Error::from)
     }
 
     pub async fn identity_topup(&self, identity_id: [u8; 32], proof: AssetLockProof, private_key: OpaqueKey) -> Result<StateTransitionProofResult, Error> {
@@ -578,47 +698,15 @@ impl PlatformSDK {
     #[cfg(feature = "state-transitions")]
     pub async fn document_single(
         &self,
-        action_type: DocumentTransitionActionType,
-        document_type: DocumentType,
-        document: Document,
-        entropy: [u8; 32],
-        private_key: OpaqueKey
-    ) -> Result<StateTransitionProofResult, Error> {
-        // TODO: switch onto DocumentsBatchTransition::new_document_creation_transition_from_document
-        // DocumentsBatchTransition::DocumentsBatchTransition::new_document_creation_transition_from_document()
-        println!("document_single: {action_type:?} -- {document_type:?} -- {document:?} -- {} -- {private_key:?}", entropy.to_lower_hex_string());
-        let signed_transition = self.document_single_signed_transition(action_type, document_type, document, entropy, private_key)?;
-        self.publish_state_transition(signed_transition).await
-    }
-    #[cfg(feature = "state-transitions")]
-    pub async fn document_single2(
-        &self,
         document_type: DocumentType,
         document: Document,
         entropy: [u8; 32],
         identity_public_key: IdentityPublicKey,
     ) -> Result<Document, Error> {
-        println!("document_single2: {document_type:?} -- {document:?} -- {}", entropy.to_lower_hex_string());
-        document.put_to_platform_and_wait_for_response(self.sdk_ref(), document_type, entropy, identity_public_key, None, &self.callback_signer, Some(PutSettings::default())).await
+        println!("[PlatformSDK]: Publish single document: {document_type:?} -- {document:?} -- {}", entropy.to_lower_hex_string());
+        document.put_to_platform_and_wait_for_response(self.sdk_ref(), document_type, entropy, identity_public_key, None, &self.callback_signer, Some(PUT_DOCUMENT_SETTINGS)).await
             .map_err(Error::from)
     }
-
-    #[cfg(feature = "state-transitions")]
-    pub async fn document_single_on_table(
-        &self,
-        data_contract: DataContract,
-        action_type: DocumentTransitionActionType,
-        table_name: &str,
-        document: Document,
-        entropy: [u8; 32],
-        private_key: OpaqueKey
-    ) -> Result<StateTransitionProofResult, Error> {
-        println!("document_single_on_table: {data_contract:?} -- {action_type:?} -- {table_name} -- {document:?} -- {} -- {private_key:?}", entropy.to_lower_hex_string());
-        let signed_transition = self.document_single_on_table_signed_transition(data_contract, action_type, table_name, document, entropy, private_key)?;
-        self.publish_state_transition(signed_transition).await
-    }
-
-
 
     pub fn friend_request_document(
         &self,
@@ -637,7 +725,7 @@ impl PlatformSDK {
         let document_type = contract.document_type_for_name(table_name)
             .map_err(Error::from)?;
         let dict = friend_request_value(to_user_id, created_at, encrypted_extended_public_key_data, sender_key_index, recipient_key_index, account_reference);
-        document_type.create_document_from_data(dict, owner_id, 1000, 1000, entropy, self.sdk.version())
+        document_type.create_document_from_data(dict, owner_id, 1000, 1000, entropy, self.sdk_version())
             .map_err(Error::from)
     }
 
@@ -667,153 +755,60 @@ impl PlatformSDK {
     ) -> Result<StateTransitionProofResult, Error> {
         let document_type = contract.document_type_for_name("contactRequest")
             .map_err(ProtocolError::from)?;
+
+        // self.publish_document(document_type, )
+
         let owner_id = Identifier::from(identity_id);
-        let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
+        let document = document_type.create_document_from_data(value, owner_id, 0, 0, entropy, self.sdk_version())
             .map_err(Error::from)?;
         let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)])]);
         let signed_transition = self.document_batch_signed_transition(documents_iter, private_key)?;
         self.publish_state_transition(signed_transition).await
     }
 
-    pub async fn register_username_domains_for_username_full_paths<
-        SUC: Fn(*const c_void, UsernameStatus) + Send + Sync + 'static,
-    >(
-        &self,
-        contract: DataContract,
-        identity_id: [u8; 32],
-        username_values: Vec<Value>,
-        entropy: [u8; 32],
-        private_key: OpaqueKey,
-        save_context: *const c_void,
-        save_callback: SUC,
-    ) -> Result<StateTransitionProofResult, Error> {
-        let document_type = contract.document_type_for_name("domain")
-            .map_err(ProtocolError::from)?;
-        let owner_id = Identifier::from(identity_id);
-        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::new();
-        for value in username_values.into_iter() {
-            let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, self.sdk.version())
-                .map_err(Error::from)?;
-            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)]);
-        }
-        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
-        self.publish_state_transition(signed_transition).await
-            .map(|result| {
-                save_callback(save_context, UsernameStatus::Confirmed);
-                result
-            })
-    }
-
-    pub async fn register_preordered_salted_domain_hashes_for_username_full_paths<
-        SUC: Fn(*const c_void, UsernameStatus) + Send + Sync + 'static,
-    >(
-        &self,
-        contract: DataContract,
-        identity_id: [u8; 32],
-        salted_domain_hashes: Vec<Vec<u8>>,
-        entropy: [u8; 32],
-        private_key: OpaqueKey,
-        save_context: *const c_void,
-        save_callback: SUC,
-    ) -> Result<StateTransitionProofResult, Error> {
-        let document_type = contract.document_type_for_name("preorder")
-            .map_err(ProtocolError::from)?;
-        let owner_id = Identifier::from(identity_id);
-        let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::new();
-        for salted_domain_hash in salted_domain_hashes.into_iter() {
-            let map = ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]);
-            let document = document_type.create_document_from_data(Value::Map(map), owner_id, 1000, 1000, entropy, self.sdk.version())
-                .map_err(Error::from)?;
-            documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)]);
-        }
-
-        let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
-        save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
-
-        self.publish_state_transition(signed_transition).await
-            .map(|result| {
-                save_callback(save_context, UsernameStatus::Preordered);
-                result
-            })
-    }
-
-    pub async fn register_preordered_salted_domain_hash_for_username_full_path(
-        &self, 
-        contract: DataContract,
-        identity_id: [u8; 32], 
-        identity_public_key: IdentityPublicKey, 
-        salted_domain_hash: Vec<u8>, 
-        entropy: [u8; 32]
-    ) -> Result<Document, Error> {
-        println!("register_preordered_salted_domain_hash_for_username_full_path: {} -- {identity_public_key:?} -- {} -- {}", identity_id.to_lower_hex_string(), salted_domain_hash.to_lower_hex_string(), entropy.to_lower_hex_string());
-        let map = Value::Map(ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]));
-        let document_type = contract.document_type_for_name("preorder")
-            .map_err(Error::from)?;
-        let document = document_type.create_document_from_data(map, Identifier::from(identity_id), 0, 0, entropy, self.sdk.version())
-            .map_err(Error::from)?;
-        self.document_single2(document_type.to_owned_document_type(), document, entropy, identity_public_key).await
-    }
-
-    // pub async fn register_preordered_salted_domain_hashes_for_username_full_paths2<
-    //     SUC: Fn(*const std::os::raw::c_void, UsernameStatus) + Send + Sync + 'static,
-    // >(
-    //     &self,
-    //     contract: DataContract,
-    //     identity_id: [u8; 32],
-    //     salted_domain_hashes: Vec<Vec<u8>>,
-    //     entropy: [u8; 32],
-    //     private_key: OpaqueKey,
-    //     save_context: *const std::os::raw::c_void,
-    //     save_callback: SUC,
-    // ) -> Result<StateTransitionProofResult, Error> {
-    //     let document_type = contract.document_type_for_name("preorder")
-    //         .map_err(ProtocolError::from)?;
-    //     let owner_id = Identifier::from(identity_id);
-    //     let mut documents = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
-    //     for salted_domain_hash in salted_domain_hashes.into_iter() {
-    //         let map = Value::Map(ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes(salted_domain_hash))]));
-    //         let document = document_type.create_document_from_data(map, owner_id, 0, 0, entropy, self.sdk.version())
-    //             .map_err(Error::from)?;
-    //         documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
-    //     }
-    //
-    //     Document::put_to_platform_and_wait_for_response(self.sdk.as_ref(), )
-    //
-    //     let signed_transition = self.document_batch_signed_transition(documents, private_key)?;
-    //     save_callback(save_context, UsernameStatus::PreorderRegistrationPending);
-    //
-    //     self.publish_state_transition(signed_transition).await
-    //         .map(|result| {
-    //             save_callback(save_context, UsernameStatus::Preordered);
-    //             result
-    //         })
-    //
-    //     // document.put_to_platform_and_wait_for_response(self.sdk.as_ref(), document_type, entropy, identity_public_key, &self.callback_signer, Some(PutSettings::default())).await
-    //     //     .map_err(Error::from)
-    //
-    // }
 
     pub async fn sign_and_publish_profile(
         &self,
         contract: DataContract,
-        identity_id: [u8; 32],
-        profile: Profile,
-        entropy: [u8; 32],
-        document_id: Option<[u8; 32]>,
-        private_key: OpaqueKey
-    ) -> Result<StateTransitionProofResult, Error> {
+        controller: &mut IdentityController,
+        profile_model: ProfileModel,
+    ) -> Result<Document, Error> {
+        let wallet_id = controller.model.wallet_id().unwrap();
+        let owner_id = controller.model.owner_id();
+        let debug_string = format!("[PlatformSDK] {} Sign and Publish Profile", owner_id.to_string(Encoding::Hex));
+        println!("{debug_string}");
         let document_type = contract.document_type_for_name("profile")
             .map_err(ProtocolError::from)?;
-        let owner_id = Identifier::from(identity_id);
-        let document = match document_id {
-            None =>
-                document_type.create_document_from_data(profile.to_value(), owner_id, 1000, 1000, entropy, self.sdk.version()),
-            Some(document_id) =>
-                document_type.create_document_with_prevalidated_properties(Identifier::from(document_id), owner_id, 1000, 1000, profile.to_prevalidated_properties(), self.sdk.version()),
+        let ProfileModel { profile, document_id, entropy_data } = profile_model;
+        // controller.create_new_ecdsa_auth_key_of_level_if_needed(DEFAULT_PROFILE_REGISTRATION_SECURITY_LEVEL, !self.chain.is_wallet_transient(&wallet_id))?;
+        self.create_new_ecdsa_auth_key_if_need(controller, DEFAULT_PROFILE_REGISTRATION_SECURITY_LEVEL, !self.chain.is_wallet_transient(&wallet_id))?;
+
+
+
+        let identity_public_key = controller.model.first_identity_public_key(DEFAULT_PROFILE_REGISTRATION_SECURITY_LEVEL, DEFAULT_PROFILE_REGISTRATION_PURPOSE)
+            .ok_or(Error::Any(0, format!("Key with security_level: {DEFAULT_PROFILE_REGISTRATION_SECURITY_LEVEL} and purpose: {DEFAULT_PROFILE_REGISTRATION_PURPOSE} should exist")))?;
+
+        let document = if document_id.is_zero() {
+            document_type.create_document_from_data(profile.to_value(), owner_id, 0, 0, entropy_data, self.sdk_version())
+        } else {
+            document_type.create_document_with_prevalidated_properties(Identifier::from(document_id), owner_id, 0, 0, profile.to_prevalidated_properties(), self.sdk_version())
         }.map_err(Error::from)?;
-        let documents_iter = HashMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32, Option<TokenPaymentInfo>)>>::from_iter([(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy), None)])]);
-        let signed_transition = self.document_batch_signed_transition(documents_iter, private_key)?;
-        self.publish_state_transition(signed_transition).await
+
+        let state_transition = document.put_to_platform(
+            self.sdk_ref(),
+            document_type.to_owned_document_type(),
+            entropy_data,
+            identity_public_key,
+            None,
+            &self.callback_signer,
+            Some(PUT_DOCUMENT_SETTINGS)
+        ).await?;
+
+        println!("{debug_string}: Wait for response: {state_transition:?}");
+        let document = Document::wait_for_response(self.sdk_ref(), state_transition, Some(PUT_DOCUMENT_SETTINGS)).await?;
+        controller.save_profile_revision(StorageContext::Platform, profile.revision);
+        println!("{debug_string}: OK({document:?})");
+        Ok(document)
     }
 
     // pub async fn check_ping_times(&self, masternodes: Vec<MasternodeEntry>) -> Result<GetStatusResponse, Error> {
@@ -821,124 +816,144 @@ impl PlatformSDK {
     //         .execute(GetStatusRequest::default(), RequestSettings::default())
     // }
 
-    pub async fn register_usernames_at_stage(&self, model: &mut IdentityModel, status: UsernameStatus, context: *const c_void) -> Result<bool, Error> {
-        let username_full_paths = model.username_full_paths_with_status(status);
-        println!("[PlatformSDK] [Identity: {}] register_usernames_at_stage: {status:?}: username_full_path: {:?}", model.unique_id.to_lower_hex_string(), username_full_paths);
+    pub async fn register_usernames_at_stage(&self, controller: &mut IdentityController, status: UsernameStatus) -> Result<(bool, Option<UsernameStatus>), Error> {
+        let username_full_paths = controller.model.username_full_paths_with_status(status);
+        println!("[PlatformSDK] {} register_usernames_at_stage: {status:?}: username_full_path: {:?}", controller.log_prefix(), username_full_paths);
         if username_full_paths.is_empty() {
-            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernameFullPathsWithStatus(status)))
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoFullPathsWithStatus { status, next_status: status.next_status() } ))
         } else {
             match status {
                 UsernameStatus::Initial =>
-                    self.register_initial_usernames(model, username_full_paths, context).await,
+                    self.register_initial_usernames(controller, username_full_paths).await,
                 UsernameStatus::PreorderRegistrationPending =>
-                    self.register_preorder_registration_pending_usernames(model, username_full_paths, context).await,
+                    self.register_preorder_registration_pending_usernames(controller, username_full_paths).await,
                 UsernameStatus::Preordered =>
-                    self.register_preordered_usernames(model, username_full_paths, context).await,
+                    self.register_preordered_usernames(controller, username_full_paths).await,
                 UsernameStatus::RegistrationPending =>
-                    self.register_registration_pending_usernames(model, username_full_paths, context).await,
+                    self.register_registration_pending_usernames(controller, username_full_paths).await,
                 _ =>
                     Err(Error::UsernameRegistrationError(UsernameRegistrationError::NotSupported(status))),
             }
         }
     }
 
-    pub async fn register_initial_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
-        let salted_domain_hashes = model.salted_domain_hashes_for_username_full_paths(&username_full_paths, context);
+    pub async fn register_initial_usernames(&self, controller: &mut IdentityController, username_full_paths: Vec<String>) -> Result<(bool, Option<UsernameStatus>), Error> {
+        let status = UsernameStatus::Initial;
+        let debug_string = format!("[PlatformSDK] {} register_usernames::initial", controller.log_prefix());
+        println!("{debug_string}");
+        let salted_domain_hashes = controller.salted_domain_hashes_for_username_full_paths(&username_full_paths);
         if salted_domain_hashes.is_empty() {
-            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernamePreorderDocuments(UsernameStatus::Initial, username_full_paths)))
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoPreorderDocuments { status, next_status: status.next_status(), username_full_paths } ))
         } else {
-            model.create_new_ecdsa_auth_key_of_level_if_needed(context, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL)?;
-            let identity_public_key = model.first_identity_public_key(DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL, DEFAULT_USERNAME_REGISTRATION_PURPOSE)
-                .ok_or(Error::Any(0, "Key with security_level: HIGH and purpose: AUTHENTICATION should exist".to_string()))?;
+            self.create_new_ecdsa_auth_key_if_need(controller, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL, true)?;
+
+
+            let identity_public_key = controller.model.first_identity_public_key(DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL, DEFAULT_USERNAME_REGISTRATION_PURPOSE)
+                .ok_or(Error::Any(0, format!("Key with security_level: {DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL} and purpose: {DEFAULT_USERNAME_REGISTRATION_PURPOSE} should exist")))?;
             let entropy = <[u8; 32]>::random();
-            let data_contract = self.get_dpns_data_contract_in_context(context);
+
+            let data_contract = self.get_dpns_data_contract();
+            let document_type = data_contract.document_type_for_name("preorder")
+                .map_err(Error::from)?;
+            let owner_id = controller.model.owner_id();
+            println!("{debug_string}: Publish document: owner: {} ({})", owner_id.to_string(Encoding::Hex), owner_id);
+            println!("{debug_string}: Publish document: entropy: {}", entropy.to_lower_hex_string());
+            println!("{debug_string}: Publish {document_type:?}");
             for salted_domain_hash in salted_domain_hashes.values() {
                 let map = Value::Map(ValueMap::from_iter([(Value::Text("saltedDomainHash".to_string()), Value::Bytes32(salted_domain_hash.clone()))]));
-                let document_type = data_contract.document_type_for_name("preorder")
-                    .map_err(Error::from)?;
-                let document = document_type.create_document_from_data(map, model.identifier(), 0, 0, entropy, self.sdk.version())
-                    .map_err(Error::from)?;
-                self.document_single2(document_type.to_owned_document_type(), document, entropy, identity_public_key.clone()).await?;
+                let document = self.publish_document(document_type, identity_public_key.clone(), map, owner_id, entropy).await?;
+                println!("{debug_string}: salted_domain_hash: {}: OK({document:?})", salted_domain_hash.to_lower_hex_string());
             }
-            model.save_username_in_context(context, SaveUsernameContext::confirmed_username_full_paths(model.usernames_and_domains(username_full_paths)));
-            // self.save_username_in_context(context, )
-            // [self setAndSaveUsernameFullPaths:usernameFullPaths toStatus:DSBlockchainIdentityUsernameStatus_Preordered inContext:context];
-
-
-            Ok(true)
-            //self.register_preorder_registration_pending_usernames(platform, context).await
+            if self.cache.has_active_identity(&controller.model) {
+                controller.save_confirmed_username_full_paths_if_need(username_full_paths);
+            }
+            Ok((true, status.next_status()))
         }
     }
-    pub async fn register_preorder_registration_pending_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
-        let salted_domain_hashes = model.salted_domain_hashes_for_username_full_paths(&username_full_paths, context);
+    pub async fn register_preorder_registration_pending_usernames(&self, controller: &mut IdentityController, username_full_paths: Vec<String>) -> Result<(bool, Option<UsernameStatus>), Error> {
+        let status = UsernameStatus::PreorderRegistrationPending;
+        let debug_string = format!("[PlatformSDK] {} Register Usernames (Preorder Registration Pending)", controller.log_prefix());
+        println!("{debug_string}");
+        let salted_domain_hashes = controller.salted_domain_hashes_for_username_full_paths(&username_full_paths);
         if salted_domain_hashes.is_empty() {
             println!("[Identity] OK (No saltedDomainHashes)");
-            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernamePreorderDocuments(UsernameStatus::PreorderRegistrationPending, username_full_paths)))
-
-            // self.register_preordered_usernames(platform, context).await
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoPreorderDocuments { status, next_status: status.next_status(), username_full_paths } ))
         } else {
             let mut all_found = false;
-            let data_contract = self.get_dpns_data_contract_in_context(context);
-            let documents = self.salted_domain_hashes().stream_preorder_salted_domain_hashes_with_contract(salted_domain_hashes.values().cloned().collect(), data_contract, RetryStrategy::Linear(4), SaltedDomainHashValidator::None, 100).await?;
+            let data_contract = self.get_dpns_data_contract();
+            let query = self.salted_domain_hashes().query_preorder_salted_domain_hashes(data_contract, salted_domain_hashes.values().cloned().collect())?;
+            let (documents, _) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(REQUEST_SALTED_DOMAIN_HASHES_SETTINGS)).await?;
             for (username_full_path, salted_domain_hash) in salted_domain_hashes {
                 for document in documents.values() {
                     if let Some(document) = document {
-                        all_found &= model.process_salted_domain_hash_document(&username_full_path, salted_domain_hash, document, context);
+                        all_found &= controller.process_salted_domain_hash_document(&username_full_path, salted_domain_hash, document);
                     } else {
                         all_found &= false;
                     }
                 }
             }
             if all_found {
-                Ok(true)
-                // self.register_preordered_usernames(platform, context).await
+                Ok((true, status.next_status()))
             } else {
                 // TODO: This needs to be done per username and not for all usernames
-                model.save_username_in_context(context, SaveUsernameContext::initial_username_full_paths(model.usernames_and_domains(username_full_paths)));
-                Ok(false)
-                // self.register_initial_usernames(platform, context).await
+                if self.cache.has_active_identity(&controller.model) {
+                    controller.save_initial_username_full_paths_if_need(username_full_paths);
+                }
+
+                Ok((false, status.next_status()))
             }
         }
     }
 
-    pub async fn register_preordered_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
-        let salted_domain_hashes = model.salted_domain_hashes_for_username_full_paths(&username_full_paths, context);
+    pub async fn register_preordered_usernames(&self, controller: &mut IdentityController, username_full_paths: Vec<String>) -> Result<(bool, Option<UsernameStatus>), Error> {
+        let status = UsernameStatus::Preordered;
+        let debug_string = format!("[PlatformSDK] {} Register Usernames (Preordered)", controller.log_prefix());
+        println!("{debug_string}");
+        let salted_domain_hashes = controller.salted_domain_hashes_for_username_full_paths(&username_full_paths);
         if salted_domain_hashes.is_empty() {
-            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoUsernamePreorderDocuments(UsernameStatus::Preordered, username_full_paths)))
+            Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoPreorderDocuments { status, next_status: status.next_status(), username_full_paths }))
         } else {
-            model.create_new_ecdsa_auth_key_of_level_if_needed(context, SecurityLevel::MASTER)?;
-            let data_contract = self.get_dpns_data_contract_in_context(context);
+            self.create_new_ecdsa_auth_key_if_need(controller, DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL, true)?;
+
+            let data_contract = self.get_dpns_data_contract();
             let document_type = data_contract.document_type_for_name("domain")
                 .map_err(Error::from)?;
-            let documents = model.create_salted_domain_hashes_documents(self.sdk.version(), &salted_domain_hashes, document_type)?;
-            if model.is_local {
+            if controller.is_local() {
                 Err(Error::Any(0, "Identity is not local".to_string()))
             } else {
-                let private_key_data = model.get_main_private_key_in_context(context)
-                    .ok_or(Error::Any(0, "No private key".to_string()))?;
-                let mut nonce_counter = BTreeMap::<(Identifier, Identifier), u64>::new();
-                let state_transition = self.documents.create_state_transition(documents, &mut nonce_counter)
-                    .map_err(Error::from)?;
-                self.sign_and_publish_state_transition(&private_key_data, key_kind_to_key_type(model.current_main_key_type), StateTransition::Batch(state_transition)).await?;
-                model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(model.usernames_and_domains(username_full_paths)));
-                Ok(true)
-                // self.register_registration_pending_usernames(platform, context).await
+                let owner_id = controller.model.owner_id();
+                let identity_public_key = controller.model.first_identity_public_key(DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL, DEFAULT_USERNAME_REGISTRATION_PURPOSE)
+                    .ok_or(Error::Any(0, format!("Key with security_level: {DEFAULT_USERNAME_REGISTRATION_SECURITY_LEVEL} and purpose: {DEFAULT_USERNAME_REGISTRATION_PURPOSE} should exist")))?;
+                let entropy = <[u8; 32]>::random();
+                for username_full_path in salted_domain_hashes.keys() {
+                    let value = controller.model.to_salted_domain_hash_value(username_full_path);
+                    let document = self.publish_document(document_type, identity_public_key.clone(), value, owner_id, entropy).await?;
+                    println!("{debug_string}: salted_domain_hash: {username_full_path}: OK({document:?})");
+                }
+                if self.cache.has_active_identity(&controller.model) {
+                    controller.save_preordered_username_full_paths_if_need(username_full_paths);
+                }
+                Ok((true, Some(UsernameStatus::RegistrationPending)))
             }
         }
     }
 
-    pub async fn register_registration_pending_usernames(&self, model: &mut IdentityModel, username_full_paths: Vec<String>, context: *const c_void) -> Result<bool, Error> {
+    pub async fn register_registration_pending_usernames(&self, controller: &mut IdentityController, username_full_paths: Vec<String>) -> Result<(bool, Option<UsernameStatus>), Error> {
+        let status = UsernameStatus::RegistrationPending;
+        let debug_string = format!("[PlatformSDK] {} Register Usernames (Registration Pending)", controller.log_prefix());
+        println!("{debug_string}");
         let domains = domains_for_username_full_paths(&username_full_paths);
-        let data_contract = self.get_dpns_data_contract_in_context(context);
+        let data_contract = self.get_dpns_data_contract();
+        // let wallet_context = self.chain.get_wallet_by_id(controller.model.wallet_id.as_ref().unwrap().as_str());
+
         // let mut finished = false;
         let mut count_all_found = 0;
         let mut count_returned = 0;
         let domains_count = domains.len();
         for (domain, usernames) in domains {
-            let documents = self.usernames().stream_usernames_with_contract(domain, usernames.clone(), data_contract.clone(), RetryStrategy::Linear(5), UsernameValidator::None, 5000).await?;
+            let query = self.usernames().query_usernames(data_contract.clone(), domain, usernames.clone())?;
+            let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(USERNAME_SETTINGS)).await?;
             let mut all_domain_found = false;
-
-
             for username in usernames {
                 let lowercase_username = username.to_lowercase();
                 for maybe_document in documents.values() {
@@ -950,8 +965,10 @@ impl PlatformSDK {
                         println!("[Identity]: {}: {} == {}", equal, normalized_label, lowercase_username);
                         all_domain_found &= equal;
                         if equal {
-                            model.set_username_status_confirmed(username.clone(), normalized_parent_domain_name.to_string(), label.to_string());
-                            model.save_username_in_context(context, SaveUsernameContext::confirmed_username(&username, normalized_parent_domain_name));
+                            controller.model.set_username_status_confirmed(username.clone(), normalized_parent_domain_name.to_string(), label.to_string());
+                            if self.cache.has_active_identity(&controller.model) {
+                                controller.save_confirmed_username_and_domain_if_need(&username, normalized_parent_domain_name);
+                            }
                         }
                     }
                 }
@@ -963,28 +980,979 @@ impl PlatformSDK {
             if count_returned == domains_count {
                 // finished = true;
                 return if count_all_found == domains_count {
-                    Ok(true)
+                    Ok((true, status.next_status()))
                 } else {
                     // TODO: This needs to be done per username and not for all usernames
-                    model.save_username_in_context(context, SaveUsernameContext::preordered_username_full_paths(model.usernames_and_domains(username_full_paths)));
+                    if self.cache.has_active_identity(&controller.model) {
+                        controller.save_preordered_username_full_paths_if_need(username_full_paths);
+                    }
                     // TODO: should we introduce progress here to not to wait this step in some circumstances
-
-                    // self.register_preordered_usernames(platform, context).await
-                    Ok(false)
+                    Ok((false, status.next_status()))
                 }
             }
         }
-        Ok(count_all_found == domains_count)
+        Ok((count_all_found == domains_count, status.next_status()))
     }
 
-    // pub async fn incoming_contact_requests_with_contract(&self, model: &mut IdentityModel, context: *const c_void) -> Result<bool, Error> {
-    //     // let mut debug_string = format!("[PlatformSDK] Fetch Incoming Contact Requests: (after: {})");
-    //     // NSMutableString *debugInfo = [NSMutableString stringWithFormat:@"%@ Fetch Incoming Contact Requests: (after: %@)", self.logPrefix, startAfter ? startAfter.hexString : @"NULL"];
-    //
-    // }
-    // pub async fn outgoing_contact_requests_with_contract(&self, model: &mut IdentityModel, context: *const c_void) -> Result<bool, Error> {
-    //
-    // }
+    pub async fn fetch_needed_state_information(&self, controller: &mut IdentityController, storage_context: StorageContext) -> Result<u32, Error> {
+        let debug_string = format!("[PlatformSDK] {} Fetch Needed State Information", controller.log_prefix());
+        println!("{debug_string}");
+        let mut steps_needed = QueryStep::None;
+        let has_no_active_keys = controller.model.active_key_count() == 0;
+        let is_local_identity = controller.is_local();
+        if (has_no_active_keys && is_local_identity) || controller.model.usernames_are_outdated() {
+            steps_needed.insert(QueryStep::Username);
+        }
+
+        if has_no_active_keys {
+            steps_needed.insert(QueryStep::Identity);
+            if is_local_identity {
+                steps_needed.insert(QueryStep::Profile | QueryStep::ContactRequests);
+            } else if controller.model.profile_is_outdated() {
+                steps_needed.insert(QueryStep::Profile);
+            }
+        } else {
+            let created_at = controller.matching_dashpay_user_entity_created_at(storage_context);
+            if created_at == 0 && controller.model.profile_is_outdated() {
+                steps_needed.insert(QueryStep::Profile);
+            }
+
+            if is_local_identity {
+                if controller.model.incoming_contacts_is_outdated() {
+                    steps_needed.insert(QueryStep::IncomingContactRequests);
+                }
+                if controller.model.outgoing_contacts_is_outdated() {
+                    steps_needed.insert(QueryStep::OutgoingContactRequests);
+                }
+            }
+        }
+        self.fetch_network_state_information(controller, steps_needed.bits(), storage_context).await
+    }
+
+    pub async fn fetch_if_needed_network_state_information(&self, controller: &mut IdentityController, query_steps: u32, storage_context: StorageContext) -> Result<u32, Error> {
+        let debug_string = format!("[PlatformSDK] {} Fetch (If needed) Network State Info ({:?})", controller.log_prefix(), query_steps);
+        println!("{debug_string}");
+        if controller.model.active_key_count() == 0 {
+            if controller.is_local() {
+                self.fetch_network_state_information(controller, query_steps, storage_context).await
+            } else {
+                let mut steps_needed = QueryStep::Identity;
+                if controller.model.usernames_are_outdated() {
+                    steps_needed |= QueryStep::Username;
+                }
+                if controller.model.profile_is_outdated() {
+                    steps_needed |= QueryStep::Profile;
+                }
+                self.fetch_network_state_information(controller, QueryStep::from_bits(steps_needed.bits() | query_steps).unwrap().bits(), storage_context).await
+            }
+        } else {
+            let mut steps_needed = QueryStep::None;
+            if controller.model.usernames_are_outdated() {
+                steps_needed |= QueryStep::Username;
+            }
+            let created_at = controller.matching_dashpay_user_entity_created_at(storage_context);
+            if created_at == 0 && controller.model.profile_is_outdated() {
+                steps_needed |= QueryStep::Profile;
+            }
+            if controller.is_local() && controller.model.incoming_contacts_is_outdated() {
+                steps_needed |= QueryStep::IncomingContactRequests;
+            }
+            if controller.is_local() && controller.model.outgoing_contacts_is_outdated() {
+                steps_needed |= QueryStep::OutgoingContactRequests;
+            }
+            if steps_needed.is_empty() {
+                Ok(0)
+            } else {
+                self.fetch_network_state_information(controller, QueryStep::from_bits(steps_needed.bits() | query_steps).unwrap().bits(), storage_context).await
+            }
+        }
+    }
+
+    pub async fn fetch_network_state_information(&self, controller: &mut IdentityController, query_steps: u32, storage_context: StorageContext) -> Result<u32, Error> {
+        let query_steps = QueryStep::from_bits(query_steps).ok_or(Error::Any(0, "Invalid query step".to_string()))?;
+        let debug_string = format!("[PlatformSDK] {} Fetch Network State Info ({:?})", controller.log_prefix(), query_steps);
+        println!("{debug_string}");
+        if query_steps.contains(QueryStep::Identity) {
+            match self.fetch_identity_network_state_information(controller, storage_context).await {
+                Ok((false, _)) => Ok(QueryStep::Identity.bits()),
+                Ok((_, false)) => Ok(QueryStep::NoIdentity.bits()),
+                Err(error) => Err(error),
+                _ => self.fetch_l3_network_state_information(controller, query_steps.bits(), storage_context).await,
+            }
+        } else {
+            self.fetch_l3_network_state_information(controller, query_steps.bits(), storage_context).await
+        }
+    }
+
+    pub async fn fetch_identity_network_state_information(
+        &self,
+        controller: &mut IdentityController,
+        storage_context: StorageContext,
+    ) -> Result<(bool, bool), Error> {
+        let debug_string = format!("[PlatformSDK] {} Fetch Identity State", controller.log_prefix());
+        println!("{debug_string}");
+        let sdk_ref = self.sdk_ref();
+        let identifier: Identifier = controller.unique_id().into();
+        let maybe_identity = Identity::fetch_with_settings(sdk_ref, identifier, DEFAULT_IDENTITY_SETTINGS).await?;
+        match maybe_identity {
+            Some(identity) => {
+                let is_active = self.cache.has_active_identity(&controller.model);
+
+                controller.update_with_state_information(identity, is_active, storage_context)?;
+                println!("{}: OK", debug_string);
+                Ok((true, true))
+            }
+            None if controller.is_local() => {
+                println!("{}: None (Ok)", debug_string);
+                Ok((true, false))
+            },
+            None => {
+                println!("{}: None (Error)", debug_string);
+                Err(Error::Any(0, "Identity expected here".to_string()))
+            }
+        }
+    }
+
+    pub async fn fetch_l3_network_state_information(&self, controller: &mut IdentityController, query_steps: u32, storage_context: StorageContext) -> Result<u32, Error> {
+        let query_steps = QueryStep::from_bits(query_steps).ok_or(Error::Any(0, "Invalid query step".to_string()))?;
+        let debug_string = format!("[PlatformSDK] {} Fetch L3 Network State Information", controller.log_prefix());
+        println!("{debug_string}: {query_steps:?}");
+        if !query_steps.contains(QueryStep::Identity) && controller.model.active_key_count() == 0 {
+            println!("{debug_string}: Error: Attempting to query without keys");
+            // We need to fetch keys if we want to query other information
+            return Err(Error::AttemptQueryWithoutKeys);
+        }
+        let mut failure_step = QueryStep::None;
+        let mut errors = Vec::<Error>::new();
+
+        let mut process_step = |step: QueryStep, result: Result<bool, Error>| {
+            match result {
+                Ok(success) => {
+                    if !success {
+                        failure_step |= step;
+                    }
+                },
+                Err(error) => {
+                    failure_step |= step;
+                    errors.push(error);
+                }
+            }
+        };
+
+        if query_steps.contains(QueryStep::Username) {
+            process_step(QueryStep::Username, self.fetch_usernames(controller, self.get_dpns_data_contract()).await);
+        }
+        if query_steps.contains(QueryStep::Profile) {
+            process_step(QueryStep::Profile, self.fetch_profile_in_context(controller, self.get_dashpay_data_contract(), storage_context).await);
+        }
+        if query_steps.contains(QueryStep::OutgoingContactRequests) {
+            process_step(QueryStep::OutgoingContactRequests, self.fetch_outgoing_contact_requests_in_context(controller, self.get_dashpay_data_contract(), None, storage_context).await);
+        }
+        if query_steps.contains(QueryStep::IncomingContactRequests) {
+            process_step(QueryStep::IncomingContactRequests, self.fetch_incoming_contact_requests_in_context(controller, self.get_dashpay_data_contract(), None, storage_context).await);
+        }
+        println!("{debug_string}: Ok({query_steps:?} / {failure_step:?})");
+
+        Ok(failure_step.bits())
+    }
+    pub async fn fetch_all_identity_state_info(&self, controller: &mut IdentityController, storage_context: StorageContext) -> Result<u32, Error> {
+        let debug_string = format!("[PlatformSDK] {} Fetch All Identity State Info", controller.log_prefix());
+        println!("{debug_string}");
+        let mut query = QueryStep::Identity | QueryStep::Username | QueryStep::Profile;
+        if controller.is_local() {
+            query |= QueryStep::ContactRequests;
+        }
+        self.fetch_network_state_information(controller, query.bits(), storage_context).await
+    }
+
+    pub async fn fetch_contact_requests_in_context(&self, controller: &mut IdentityController, storage_context: StorageContext) -> Result<bool, Error> {
+        let debug_string = format!("[PlatformSDK] {} Fetch Contact Requests in context", controller.log_prefix());
+        println!("{debug_string}");
+        let contract = self.get_dashpay_data_contract();
+        self.fetch_incoming_contact_requests_in_context(controller, contract.clone(), None, storage_context).await?;
+        self.fetch_outgoing_contact_requests_in_context(controller, contract, None, storage_context).await
+    }
+
+    pub async fn continue_registering_profile_on_network<
+        NotifyProgress: Fn(*const c_void, u32) + Send + Sync + Clone + 'static
+    >(
+        &self,
+        controller: &mut IdentityController,
+        steps: u32,
+        steps_already_completed: u32,
+        progress_handler: NotifyProgress,
+        progress_context: *const c_void
+    ) -> Result<u32, Error> {
+        let debug_string = format!("[PlatformSDK] {} Continue: Profile: ", controller.log_prefix());
+        let steps = RegistrationStep::from_bits(steps)
+            .ok_or(Error::Any(0, "Invalid query step".to_string()))?;
+        let mut steps_already_completed = RegistrationStep::from_bits(steps_already_completed)
+            .ok_or(Error::Any(0, "Invalid completed query step".to_string()))?;
+        println!("{debug_string} {steps:?} / {steps_already_completed:?}");
+        if !steps.contains(RegistrationStep::Profile) {
+            println!("{debug_string}: Ok(No profile step)");
+            return Ok(steps_already_completed.bits());
+        }
+
+        let storage_context = StorageContext::Platform;
+        let profile = controller.load_profile(storage_context)?;
+        let dashpay_contract = self.get_dashpay_data_contract();
+        let revision = profile.profile.revision;
+        let result = self.sign_and_publish_profile(dashpay_contract, controller, profile).await?;
+        println!("{}: Ok({:?})", debug_string, result);
+        controller.save_profile_revision(storage_context, revision);
+        steps_already_completed.insert(RegistrationStep::Profile);
+        progress_handler(progress_context, RegistrationStep::Profile.bits());
+        Ok(steps_already_completed.bits())
+    }
+
+    pub async fn continue_registering_usernames_on_network<
+        NotifyProgress: Fn(*const c_void, u32) + Send + Sync + Clone + 'static
+    >(
+        &self,
+        controller: &mut IdentityController,
+        steps: u32,
+        steps_already_completed: u32,
+        progress_handler: NotifyProgress,
+        progress_context: *const c_void
+    ) -> Result<u32, Error> {
+        let debug_string = format!("[PlatformSDK] {} Continue: Usernames:", controller.log_prefix());
+        println!("{debug_string} {steps:?} / {steps_already_completed:?}");
+
+        let steps = RegistrationStep::from_bits(steps)
+            .ok_or(Error::Any(0, "Invalid registration step".to_string()))?;
+        let mut steps_already_completed = RegistrationStep::from_bits(steps_already_completed)
+            .ok_or(Error::Any(0, "Invalid completed registration step".to_string()))?;
+        if !steps.contains(RegistrationStep::Username) {
+            println!("{debug_string}: Ok(No Username step)");
+            return Ok(steps_already_completed.bits());
+        }
+        let success = self.register_usernames(controller).await?;
+
+        println!("{debug_string}: Ok({success})");
+        if success {
+            progress_handler(progress_context, RegistrationStep::Username.bits());
+            steps_already_completed.insert(RegistrationStep::Username);
+            self.continue_registering_profile_on_network(controller, steps.bits(), steps_already_completed.bits(), progress_handler, progress_context).await
+        } else {
+            Ok(steps_already_completed.bits())
+        }
+    }
+
+    pub async fn register_usernames(&self, controller: &mut IdentityController) -> Result<bool, Error> {
+        let debug_string = format!("[PlatformSDK] {} Register Usernames:", controller.log_prefix());
+        let mut status = UsernameStatus::Initial;
+        let mut last_error: Option<Error> = None;
+        let success = loop {
+            match self.register_usernames_at_stage(controller, status).await {
+                Ok((success, Some(next_status))) => {
+                    println!("{debug_string} Ok(success: {success}, next_status: {next_status:?})");
+                    status = next_status;
+                },
+                Err(Error::UsernameRegistrationError(UsernameRegistrationError::NoPreorderDocuments { next_status: Some(next_status), .. } |
+                                                     UsernameRegistrationError::NoFullPathsWithStatus { next_status:  Some(next_status), ..})) => {
+                    println!("{debug_string} Error(next_status: {next_status:?})");
+                    status = next_status;
+                },
+                Ok((successful, None)) => {
+                    println!("{debug_string} Ok({successful})");
+                    break successful;
+                }
+                Err(err) => {
+                    last_error = Some(err.clone());
+                    println!("{debug_string}: Err({err:?})");
+                    break false;
+                }
+            }
+        };
+        last_error.map(Err).unwrap_or(Ok(success))
+    }
+
+    pub async fn continue_registering_identity_on_network<
+        NotifyProgress: Fn(*const c_void, u32) + Send + Sync + Clone + 'static
+    >(
+        &self,
+        controller: &mut IdentityController,
+        steps: u32,
+        steps_already_completed: u32,
+        progress_handler: NotifyProgress,
+        progress_context: *const c_void
+    ) -> Result<u32, Error> {
+        let debug_string = format!("[PlatformSDK] {} Continue: Identity:", controller.log_prefix());
+        println!("{debug_string} {steps:?} / {steps_already_completed:?}");
+        let steps = RegistrationStep::from_bits(steps)
+            .ok_or(Error::Any(0, "Invalid query step".to_string()))?;
+        let mut steps_already_completed = RegistrationStep::from_bits(steps_already_completed)
+            .ok_or(Error::Any(0, "Invalid completed query step".to_string()))?;
+        if !steps.contains(RegistrationStep::Identity) {
+            println!("{debug_string} Ok(No identity step)");
+            return Ok(steps_already_completed.bits());
+        }
+        let registration_model = controller.get_registration_transition_model()
+            .ok_or(Error::AssetLockTransactionShouldBeKnown)?;
+        match self.create_and_publish_registration_transition(controller, registration_model, StorageContext::Platform).await {
+            Ok(true) => {
+                steps_already_completed.insert(RegistrationStep::Identity);
+                progress_handler(progress_context, RegistrationStep::Identity.bits());
+                println!("{debug_string}: Ok({steps_already_completed:?}/{steps_already_completed:?})");
+                self.continue_registering_usernames_on_network(controller, steps.bits(), steps_already_completed.bits(), progress_handler, progress_context).await
+            },
+            Ok(false) => {
+                println!("{debug_string} Ok(unsuccessful)");
+                Ok(steps_already_completed.bits())
+            },
+            Err(error) => {
+                println!("{debug_string} Error: {error:?}");
+                Err(error)
+            }
+        }
+    }
+
+    pub async fn continue_registering_on_network<
+        NotifyProgress: Fn(*const c_void, u32) + Send + Sync + Clone + 'static
+    >(
+        &mut self,
+        controller: &mut IdentityController,
+        steps: u32,
+        topup_duff_amount: u64,
+        // funding_account_context: *const c_void,
+        prompt: String,
+        storage_context: StorageContext,
+        progress_handler: NotifyProgress,
+        progress_context: *const c_void
+
+    ) -> Result<u32, Error> {
+        let debug_string = format!("[PlatformSDK] {} Continue:", controller.log_prefix());
+        println!("{debug_string} {steps:?}");
+
+        if controller.model.asset_lock_registration_model.is_none() {
+            self.register_on_network(controller, steps, topup_duff_amount, prompt, progress_handler, progress_context).await
+        } else if !controller.model.is_registered() {
+            self.continue_registering_identity_on_network(controller, steps, RegistrationStep::L1Steps.bits(), progress_handler, progress_context).await
+        } else if controller.model.unregistered_username_full_paths_count() > 0 {
+            self.continue_registering_usernames_on_network(controller, steps, RegistrationStep::L1Steps.bits() | RegistrationStep::Identity.bits(), progress_handler, progress_context).await
+        } else if controller.get_stored_remote_profile_revision(storage_context) < 1 {
+            self.continue_registering_profile_on_network(controller, steps, RegistrationStep::L1Steps.bits() | RegistrationStep::Identity.bits(), progress_handler, progress_context).await
+        } else {
+            Ok(steps)
+        }
+    }
+
+    pub async fn register_on_network<
+        NotifyProgress: Fn(*const c_void, u32) + Send + Sync + Clone + 'static
+    >(
+        &mut self,
+        controller: &mut IdentityController,
+        steps: u32,
+        topup_duff_amount: u64,
+        // funding_account_context: *const c_void,
+        prompt: String,
+        progress_handler: NotifyProgress,
+        progress_context: *const c_void
+    ) -> Result<u32, Error> {
+        let steps = RegistrationStep::from_bits(steps)
+            .ok_or(Error::Any(0, "Invalid query step".to_string()))?;
+        let debug_string = format!("[PlatformSDK] {} Register On Network: {steps:?}", controller.log_prefix());
+        println!("{debug_string}");
+        let mut steps_completed = RegistrationStep::None;
+
+        if !controller.has_extended_public_keys() {
+            println!("{debug_string}: ERROR: AttemptQueryWithoutKeys");
+            return Err(Error::AttemptQueryWithoutKeys);
+        }
+        if !steps.contains(RegistrationStep::FundingTransactionCreation) {
+            println!("{debug_string}: Ok: No FundingTransactionCreation step");
+            return Ok(steps_completed.bits());
+        }
+
+        let derivation_kind = if controller.model.is_outgoing_invitation() {
+            DerivationPathKind::InvitationFunding
+        } else {
+            DerivationPathKind::IdentityRegistrationFunding
+        };
+        let wallet_id = controller.model.wallet_id().ok_or(Error::CannotSignIdentityWithoutWallet)?;
+        let derivation_path = self.chain.get_derivation_path(&wallet_id, derivation_kind);
+        let asset_lock_registration_address = self.chain.derivation_ref().address_at_index_path(derivation_path, vec![controller.model.index()]);
+        let asset_lock_registration_script = DataAppend::script_pub_key_for_address(asset_lock_registration_address.as_str(), self.chain_type.script_map_ref());
+        let wallet_context = self.chain.get_wallet_by_id(&wallet_id);
+        self.add_wallet_if_not_exist(&wallet_id);
+        let wallet_cache = self.cache.wallets.get_mut(&wallet_id).unwrap();
+        match self.chain.wallet.publish_asset_lock_transaction(wallet_context, topup_duff_amount, asset_lock_registration_script, prompt) {
+            Ok(transaction_model) => {
+                steps_completed.insert(RegistrationStep::FundingTransactionCreation);
+                if !steps.contains(RegistrationStep::LocalInWalletPersistence) {
+                    return Ok(steps_completed.bits());
+                }
+                let credit_burn_public_key_hash = transaction_model.maybe_credit_burn_public_key_hash()
+                    .ok_or(Error::AssetLockSubmission(AssetLockSubmissionError { steps_completed: steps_completed.bits() }))?;
+                let identity_id = transaction_model.credit_burn_identity_identifier();
+                let locked_outpoint = transaction_model.locked_outpoint();
+                controller.model.unique_id = identity_id;
+                controller.model.set_locked_outpoint(Some(locked_outpoint.clone()));
+                if controller.model.is_outgoing_invitation {
+                    controller.model.set_asset_lock_registration_model(transaction_model);
+                    let invitation = InvitationModel::with_identity(identity_id, wallet_id.clone());
+                    wallet_cache.register_invitation(invitation.clone());
+                    controller.save_model_in_context(StorageContext::Platform);
+
+                    // wallet_cache.mark_address_hash_as_used(credit_burn_public_key_hash.as_byte_array(), DerivationPathKind::InvitationFunding);
+                    let address = from_hash160_for_script_map(credit_burn_public_key_hash.as_byte_array(), self.chain.controller.chain_type.script_map_ref());
+                    let derivation_path = self.chain.get_derivation_path(&wallet_id, DerivationPathKind::InvitationFunding);
+                    self.chain.derivation_ref().mark_address_as_used(derivation_path, address);
+
+                    self.chain.notification_ref()
+                        .notify_main_thread(INVITATION_DID_UPDATE_NOTIFICATION, ferment::boxed(InvitationDidUpdate::new(self.chain_type.clone(), invitation)) as *mut c_void);
+
+                } else {
+                    controller.model.set_asset_lock_registration_hash(transaction_model.transaction.txid().to_byte_array());
+                    wallet_cache.register_identity(controller.clone());
+                    controller.save_model_in_context(StorageContext::Platform);
+                    // wallet_cache.mark_address_hash_as_used(credit_burn_public_key_hash.as_byte_array(), DerivationPathKind::IdentityRegistrationFunding);
+                    let address = from_hash160_for_script_map(credit_burn_public_key_hash.as_byte_array(), self.chain.controller.chain_type.script_map_ref());
+                    let derivation_path = self.chain.get_derivation_path(&wallet_id, DerivationPathKind::IdentityRegistrationFunding);
+                    self.chain.derivation_ref().mark_address_as_used(derivation_path, address);
+
+                }
+                steps_completed.insert(RegistrationStep::LocalInWalletPersistence);
+
+                if !steps.contains(RegistrationStep::FundingTransactionAccepted) {
+                    println!("{debug_string}: Ok (Asset Lock Transaction no FundingTransactionAccepted)");
+                    return Ok(steps_completed.bits());
+                }
+
+                println!("{debug_string}: Ok({steps_completed:?})");
+                self.continue_registering_identity_on_network(controller, steps.bits(), steps_completed.bits(), progress_handler, progress_context).await
+            },
+            Err(ChainError::Cancelled) => {
+                steps_completed.insert(RegistrationStep::Cancelled);
+                println!("{debug_string}: Cancelled");
+                Ok(steps_completed.bits())
+            },
+            Err(ChainError::SigningError(description) | ChainError::TransactionPublishError(description)) => {
+                println!("{debug_string}: {description}");
+                Err(Error::AssetLockSubmission(AssetLockSubmissionError { steps_completed: steps_completed.bits() }))
+            },
+            Err(ChainError::InstantSendLockError(description)) => {
+                println!("{debug_string}: {description}");
+                steps_completed.insert(RegistrationStep::FundingTransactionCreation);
+                steps_completed.insert(RegistrationStep::LocalInWalletPersistence);
+                Err(Error::AssetLockSubmission(AssetLockSubmissionError { steps_completed: steps_completed.bits() }))
+            }
+        }
+    }
+
+    pub async fn register_on_network_with_wallet_id_and_index<
+        NotifyProgress: Fn(*const c_void, u32) + Send + Sync + Clone + 'static
+    >(
+        &mut self,
+        wallet_id: &str,
+        index: u32,
+        steps: u32,
+        topup_duff_amount: u64,
+        prompt: String,
+        progress_handler: NotifyProgress,
+        progress_context: *const c_void
+    ) -> Result<u32, Error> {
+        self.add_wallet_if_not_exist(wallet_id);
+        let controller = self.cache.identity_by_index(wallet_id, index)
+            .ok_or(Error::Any(0, format!("No identity for {wallet_id}: {index}")))?;
+        let chain = Arc::clone(&self.chain);
+
+        let steps = RegistrationStep::from_bits(steps)
+            .ok_or(Error::Any(0, "Invalid query step".to_string()))?;
+        let debug_string = format!("[PlatformSDK] {} Register On Network: {steps:?}", controller.log_prefix());
+        println!("{debug_string}");
+        let mut steps_completed = RegistrationStep::None;
+
+        if !controller.has_extended_public_keys() {
+            println!("{debug_string}: ERROR: AttemptQueryWithoutKeys");
+            return Err(Error::AttemptQueryWithoutKeys);
+        }
+        if !steps.contains(RegistrationStep::FundingTransactionCreation) {
+            println!("{debug_string}: Ok: No FundingTransactionCreation step");
+            return Ok(steps_completed.bits());
+        }
+
+        let derivation_kind = if controller.model.is_outgoing_invitation() {
+            DerivationPathKind::InvitationFunding
+        } else {
+            DerivationPathKind::IdentityRegistrationFunding
+        };
+        let derivation_path = chain.get_derivation_path(wallet_id, derivation_kind);
+        let asset_lock_registration_address = chain.derivation_ref().address_at_index_path(derivation_path, vec![controller.model.index()]);
+        let asset_lock_registration_script = DataAppend::script_pub_key_for_address(asset_lock_registration_address.as_str(), self.chain_type.script_map_ref());
+        let wallet_context = chain.get_wallet_by_id(wallet_id);
+
+        let transaction_model = chain.wallet.publish_asset_lock_transaction(wallet_context, topup_duff_amount, asset_lock_registration_script, prompt)
+            .map_err(|err| {
+                match err {
+                    ChainError::Cancelled => {
+                        steps_completed.insert(RegistrationStep::Cancelled);
+                        println!("{debug_string}: Cancelled");
+                        Error::AssetLockSubmission(AssetLockSubmissionError { steps_completed: steps_completed.bits() })
+                        // Ok(steps_completed.bits())
+                    }
+                    ChainError::SigningError(description) | ChainError::TransactionPublishError(description) => {
+                        println!("{debug_string}: {description}");
+                        Error::AssetLockSubmission(AssetLockSubmissionError { steps_completed: steps_completed.bits() })
+                    }
+                    ChainError::InstantSendLockError(description) => {
+                        println!("{debug_string}: {description}");
+                        steps_completed.insert(RegistrationStep::FundingTransactionCreation);
+                        steps_completed.insert(RegistrationStep::LocalInWalletPersistence);
+                        Error::AssetLockSubmission(AssetLockSubmissionError { steps_completed: steps_completed.bits() })
+                    }
+                }
+            })?;
+
+        steps_completed.insert(RegistrationStep::FundingTransactionCreation);
+        if !steps.contains(RegistrationStep::LocalInWalletPersistence) {
+            return Ok(steps_completed.bits());
+        }
+        let credit_burn_public_key_hash = transaction_model.maybe_credit_burn_public_key_hash()
+            .ok_or(Error::AssetLockSubmission(AssetLockSubmissionError { steps_completed: steps_completed.bits() }))?;
+        let identity_id = transaction_model.credit_burn_identity_identifier();
+        let locked_outpoint = transaction_model.locked_outpoint();
+        let WalletCache {
+            identities,
+            invitations,
+            default_identity_index,
+            ..
+        } = self.cache.wallets.get_mut(wallet_id).unwrap();
+        let is_known_by_id = identities.contains_key(&identity_id);
+        let is_known_by_index = identities.values().any(|controller| controller.index() == index);
+
+
+        let controller = if is_known_by_id {
+            identities.get_mut(&identity_id).unwrap()
+        } else if is_known_by_index {
+            let controller = identities.values_mut().find_map(|controller| (controller.index() == index).then_some(controller)).unwrap();
+            controller.model.unique_id = identity_id;
+            controller
+        } else {
+            let model = IdentityModel::with_index_and_unique_id(index, identity_id, wallet_id.to_string());
+            let controller = IdentityController::with_model(model, Arc::clone(&self.identity_callbacks));
+            identities.insert(identity_id, controller);
+            identities.get_mut(&identity_id).unwrap()
+        };
+
+        controller.model.set_locked_outpoint(Some(locked_outpoint.clone()));
+        if controller.model.is_outgoing_invitation {
+            controller.model.set_asset_lock_registration_model(transaction_model);
+            let invitation = InvitationModel::with_identity(identity_id, wallet_id.to_string());
+            invitations.insert(locked_outpoint.clone(), invitation.clone());
+            _ = chain.save_invitation_into_keychain(wallet_id, locked_outpoint.clone(), index);
+            controller.save_model_in_context(StorageContext::Platform);
+            chain.mark_address_hash_as_used(credit_burn_public_key_hash.as_byte_array(), DerivationPathKind::InvitationFunding, wallet_id);
+            chain.notification_ref()
+                .notify_main_thread(INVITATION_DID_UPDATE_NOTIFICATION, ferment::boxed(InvitationDidUpdate::new(self.chain_type.clone(), invitation)) as *mut c_void);
+        } else {
+            controller.model.set_asset_lock_registration_hash(transaction_model.transaction.txid().to_byte_array());
+            if !is_known_by_id && !is_known_by_index {
+                _ = chain.save_identity_into_keychain(wallet_id, controller.unique_id(), controller.model.to_keychain_value());
+                let index = controller.index();
+                // if !controller.unique_id().eq(&[0u8; 32]) {
+                //     identities.insert(controller.unique_id(), controller.clone());
+                // }
+                if default_identity_index.is_none() && index == 0 {
+                    *default_identity_index = Some(index);
+                }
+            }
+            controller.save_model_in_context(StorageContext::Platform);
+            chain.mark_address_hash_as_used(credit_burn_public_key_hash.as_byte_array(), DerivationPathKind::IdentityRegistrationFunding, wallet_id);
+        }
+        steps_completed.insert(RegistrationStep::LocalInWalletPersistence);
+
+        if !steps.contains(RegistrationStep::FundingTransactionAccepted) {
+            println!("{debug_string}: Ok (Asset Lock Transaction no FundingTransactionAccepted)");
+            return Ok(steps_completed.bits());
+        }
+
+        println!("{debug_string}: Ok({steps_completed:?})");
+        self.continue_registering_identity_on_network(controller, steps.bits(), steps_completed.bits(), progress_handler, progress_context).await
+    }
+
+    pub async fn sync_identities<
+        NotifyProgress: Fn(*const c_void) + Send + Sync + Clone + 'static,
+    >(
+        &mut self,
+        block_height: u32,
+        notify_progress: NotifyProgress,
+    ) -> Result<bool, Error> {
+        let debug_string = "[PlatformSDK] Sync Identities:".to_string();
+        println!("{debug_string} KeyHashes");
+        let wallets_to_sync = self.cache.wallets.len() as u32;
+        let chain_context = self.chain.get_chain();
+        self.notify_sync_state(chain_context, vec![
+            PlatformSyncStateNotification::Start,
+            PlatformSyncStateNotification::AddStateKind { kind: PlatformSyncStateKind::KeyHashes.bits() },
+            PlatformSyncStateNotification::QueueChanged { count: 0, max_amount: wallets_to_sync }
+        ]);
+        let mut errors = Vec::<Error>::new();
+        let wallet_ids: Vec<String> = self.cache.wallets.keys().cloned().collect();
+        for (wallet_index, wallet_id) in wallet_ids.into_iter().enumerate() {
+            let unused_index = self.cache.wallets.get(&wallet_id).map(|wallet| wallet.unused_identity_index()).unwrap_or_default();
+            let result = self.monitor_key_hash_one_by_one(&wallet_id, unused_index, notify_progress.clone(), chain_context).await;
+
+            match result {
+                Ok(result) => {
+                    for (index, identity) in result {
+                        let controller = IdentityController::at_index_with_identity(
+                            index,
+                            identity,
+                            wallet_id.clone(),
+                            Arc::clone(&self.identity_callbacks),
+                        );
+
+                        let keychain_value = self.chain.maybe_keychain_identity(
+                            &wallet_id,
+                            index,
+                            controller.unique_id(),
+                            controller.model.locked_outpount.clone(),
+                        );
+
+                        if let Ok(true) = keychain_value.and_then(|value| self.chain.keychain.set(KeyChainKey::wallet_identities_key(&wallet_id), value, false)) {
+                            controller.save_model_in_context(StorageContext::Platform);
+
+                            if let Some(wallet) = self.cache.wallets.get_mut(&wallet_id) {
+                                wallet.identities.insert(controller.unique_id(), controller);
+
+                                if let Some(default_index) = wallet.default_identity_index {
+                                    println!("{debug_string} Default Identity: already set {}", default_index);
+                                } else {
+                                    println!("{debug_string} Default Identity: set to {index}");
+                                    wallet.default_identity_index = Some(index);
+                                }
+                            }
+                        }
+
+                        self.notify_sync_state(chain_context, vec![
+                            PlatformSyncStateNotification::QueueChanged { count: wallet_index as u32, max_amount: wallets_to_sync }
+                        ]);
+                    }
+                }
+                Err(err) => {
+                    println!("{debug_string}: {err:?}");
+                    errors.push(err);
+                }
+            }
+        }
+
+        let num_unsynced = self.cache.unsynced_identities_count_at_block_height(block_height);
+        println!("{debug_string} Unsynced: {}", num_unsynced);
+        let notifications = if num_unsynced > 0 {
+            vec![
+                PlatformSyncStateNotification::RemoveStateKind { kind: PlatformSyncStateKind::KeyHashes.bits() },
+                PlatformSyncStateNotification::AddStateKind { kind: PlatformSyncStateKind::Unsynced.bits() },
+                PlatformSyncStateNotification::QueueChanged { count: 0, max_amount: num_unsynced as u32 }
+            ]
+        } else {
+            vec![
+                PlatformSyncStateNotification::RemoveStateKind { kind: PlatformSyncStateKind::KeyHashes.bits() }
+            ]
+        };
+        self.notify_sync_state(chain_context, notifications);
+
+        let identity_handles = self.cache.unsynced_identity_handles_at_block_height(block_height);
+        let num_unsynced = identity_handles.len();
+        for (unsynced_index, (wallet_id, identity_id)) in identity_handles.into_iter().enumerate() {
+            self.process_unsynced_identity(
+                &wallet_id,
+                &identity_id,
+                chain_context,
+                unsynced_index as u32,
+                num_unsynced as u32,
+                &mut errors,
+            ).await;
+        }
+        self.notify_sync_state(chain_context, vec![
+            PlatformSyncStateNotification::QueueChanged { count: 0, max_amount: 0 },
+            PlatformSyncStateNotification::Finish { timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
+        ]);
+        Ok(errors.len() == 0)
+    }
+    pub async fn process_unsynced_identity(
+        &mut self,
+        wallet_id: &str,
+        identity_id: &[u8; 32],
+        chain_context: *const c_void,
+        unsynced_index: u32,
+        max_amount: u32,
+        errors: &mut Vec<Error>,
+    ) {
+        let controller = {
+            self.cache.wallets
+                .get_mut(wallet_id)
+                .and_then(|wallet| wallet.identities.get_mut(identity_id))
+                .map(|c| c as *mut IdentityController)
+        };
+
+        if let Some(controller_ptr) = controller {
+            let controller = unsafe { &mut *controller_ptr };
+
+            if let Err(err) = self.fetch_needed_state_information(controller, StorageContext::Platform).await {
+                errors.push(err);
+            }
+
+            self.notify_sync_state(chain_context, vec![
+                PlatformSyncStateNotification::QueueChanged {
+                    count: unsynced_index + 1,
+                    max_amount,
+                },
+            ]);
+        }
+    }
+
+    pub async fn monitor_key_hash_one_by_one<
+        NotifyProgress: Fn(*const c_void) + Send + Sync + Clone + 'static,
+    >(
+        &self,
+        wallet_id: &str,
+        unused_index: u32,
+        notify_progress: NotifyProgress,
+        chain_context: *const c_void
+    ) -> Result<BTreeMap<u32, Identity>, Error> {
+        let debug_string = format!("[PlatformSDK] Monitor KeyHashes (one-by-one) starting from {}", unused_index);
+        println!("{debug_string}");
+        let mut index = unused_index;
+        let mut identities = BTreeMap::new();
+        let derivation_path = self.chain.get_derivation_path(wallet_id, DerivationPathKind::IdentityECDSA);
+        while let Ok((new_index, key_hash, Some(identity))) = self.fetch_identity_by_index(index, derivation_path).await {
+            println!("{debug_string}/{}: Ok: key_hash: {}, identity: {}", new_index, key_hash.to_lower_hex_string(), identity.id().to_string(Encoding::Hex));
+            notify_progress(chain_context);
+            index = new_index;
+            identities.insert(new_index, identity);
+        }
+        Ok(identities)
+    }
+
+    pub async fn fetch_identity_by_index(
+        &self,
+        index: u32,
+        derivation_path: *const c_void,
+    ) -> Result<(u32, [u8; 20], Option<Identity>), Error> {
+        let debug_string = format!("[PlatformSDK] Fetch by index {}", index);
+        let new_index = index + 1;
+        let public_key_data = self.chain.derivation_ref().public_key_data_at_index_path(derivation_path, vec![new_index | BIP32_HARD, 0 | BIP32_HARD]);
+        let public_key_hash = hash160::Hash::hash(&public_key_data).to_byte_array();
+        println!("{debug_string}");
+        let result = Identity::fetch_with_settings(self.sdk_ref(), PublicKeyHash(public_key_hash), KEY_HASHES_SETTINGS).await
+            .map_err(Error::from)
+            .map(|result| (new_index, public_key_hash, result));
+        println!("{debug_string}: Result: {result:?}");
+        result
+    }
+
+    pub async fn register_identity<
+        NotifyProgress: Fn(*const c_void, u32) + Send + Sync + Clone + 'static
+    >(
+        &mut self,
+        wallet_id: &str,
+        index: u32,
+        steps: u32,
+        topup_duff_amount: u64,
+        prompt: String,
+        progress_handler: NotifyProgress,
+        progress_context: *const c_void
+    ) -> Result<u32, Error> {
+        self.register_on_network_with_wallet_id_and_index(wallet_id, index, steps, topup_duff_amount, prompt, progress_handler, progress_context).await
+/*        let controller = self.cache.identity_by_index_mut(wallet_id, index)
+            .ok_or(Error::Any(0, format!("No identity for {wallet_id}: {index}")))?;
+        self.register_on_network(controller, steps, topup_duff_amount, prompt, progress_handler, progress_context).await
+*/    }
+
+    pub async fn fetch_usernames(&self, controller: &mut IdentityController, contract: DataContract) -> Result<bool, Error> {
+        let debug_string = format!("[DocManager] {} Fetch Usernames", controller.log_prefix());
+        println!("{debug_string}");
+        let query = self.doc_manager.query_dpns_documents_for_identity_with_user_id(contract, controller.unique_id())?;
+        let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(USERNAME_SETTINGS)).await?;
+        println!("{debug_string}: OK({})", documents.len());
+        for (identifier, maybe_document) in documents {
+            if let Some(document) = maybe_document {
+                controller.update_with_username_document(document);
+            } else {
+                println!("[WARN] Document {} is nil", identifier.to_string(Encoding::Hex));
+            }
+        }
+        Ok(true)
+    }
+
+    pub async fn fetch_profile(&self, model: &mut IdentityModel, contract: DataContract) -> Result<TransientDashPayUser, Error> {
+        let debug_string = format!("[DocManager] {} Fetch Profile", model.log_prefix());
+        println!("{debug_string}");
+        let user_id = model.unique_id;
+        let query = self.doc_manager.query_dashpay_profile_for_user_id(contract, user_id)?;
+        let (document, _metadata) = Document::fetch_with_metadata(self.sdk_ref(), query, Some(PROFILE_SETTINGS)).await?;
+        match document {
+            Some(doc) =>
+                Ok(TransientDashPayUser::with_profile_document(doc)),
+            None =>
+                Err(Error::Any(0, format!("Profile for {} not found", user_id.to_lower_hex_string())))
+        }
+
+    }
+    pub async fn fetch_profile_in_context(&self, controller: &mut IdentityController, contract: DataContract, storage_context: StorageContext) -> Result<bool, Error> {
+        let debug_string = format!("[DocManager] {} Fetch Profile in context", controller.log_prefix());
+        println!("{debug_string}");
+        match self.fetch_profile(&mut controller.model, contract).await {
+            Ok(user) if self.cache.has_active_identity(&controller.model) => {
+                println!("{debug_string}: Ok({user:?})");
+                Ok(controller.save_profile(storage_context, user))
+            },
+            Ok(_) => {
+                println!("{debug_string}: Ok(IdentityIsNoLongerActive)");
+                Err(Error::IdentityIsNoLongerActive(controller.unique_id()))
+            },
+            Err(err) => {
+                println!("{debug_string}: Err({err:?})");
+                Err(err)
+            },
+        }
+
+
+    }
+
+    pub async fn fetch_incoming_contact_requests(
+        &self,
+        controller: &mut IdentityController,
+        contract: DataContract,
+        since: u64,
+        start_after: Option<[u8; 32]>,
+        storage_context: StorageContext,
+    ) ->Result<(Vec<ContactRequest>, Option<[u8; 32]>), Error> {
+        let debug_string = format!("[CRManager] {} Fetch OCR", controller.log_prefix());
+        println!("{debug_string}");
+        let user_id = controller.unique_id();
+        let query = self.contact_requests.query_incoming_contact_requests(contract, user_id, since, start_after)?;
+        let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(CONTACT_REQUEST_SETTINGS)).await?;
+        let mut contact_requests = Vec::new();
+        for (_, document) in documents {
+            if let Some(doc) = document {
+                let request = ContactRequest::try_from(doc)?;
+                if user_id.eq(&request.recipient) && !controller.has_incoming_contact_request_with_id(storage_context, request.owner_id) {
+                    contact_requests.push(request);
+                }
+            }
+        }
+        let has_more = contact_requests.len() == DAPI_DOCUMENT_RESPONSE_COUNT_LIMIT;
+        if !has_more {
+            let now = SystemTime::now().duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_millis() as u64;
+
+            controller.model.set_last_checked_outgoing_contacts_timestamp(now);
+        }
+        let start_after = contact_requests.last().map(|req| req.id);
+        if !self.cache.has_active_identity(&controller.model) {
+            return Err(Error::Any(0, "Identity is not active".to_string()));
+        }
+        Ok((contact_requests, start_after))
+    }
+    pub async fn fetch_outgoing_contact_requests(
+        &self,
+        controller: &mut IdentityController,
+        contract: DataContract,
+        since: u64,
+        start_after: Option<[u8; 32]>,
+        storage_context: StorageContext,
+    ) -> Result<(Vec<ContactRequest>, Option<[u8; 32]>), Error> {
+        let debug_string = format!("[CRManager] {} Fetch OCR", controller.log_prefix());
+        println!("{debug_string}");
+        let user_id = controller.unique_id();
+        let query = self.contact_requests.query_outgoing_contact_requests(contract, user_id, since, start_after)?;
+        let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(CONTACT_REQUEST_SETTINGS)).await?;
+        let mut contact_requests = Vec::new();
+        for (_, document) in documents {
+            if let Some(doc) = document {
+                let request = ContactRequest::try_from(doc)?;
+                let recipient = request.recipient;
+                if !user_id.eq(&recipient) && !controller.has_outgoing_contact_request_with_id(storage_context, recipient) {
+                    contact_requests.push(request);
+                }
+            }
+        }
+        let has_more = contact_requests.len() == DAPI_DOCUMENT_RESPONSE_COUNT_LIMIT;
+        if !has_more {
+            let now = SystemTime::now().duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_millis() as u64;
+
+            controller.model.set_last_checked_outgoing_contacts_timestamp(now);
+        }
+        let start_after = contact_requests.last().map(|req| req.id);
+        if !self.cache.has_active_identity(&controller.model) {
+            return Err(Error::Any(0, "Identity is not active".to_string()));
+        }
+        println!("{debug_string}: OK({}, {start_after:?})", contact_requests.len());
+        Ok((contact_requests, start_after))
+    }
+
+    pub async fn fetch_incoming_contact_requests_in_context(
+        &self,
+        controller: &mut IdentityController,
+        contract: DataContract,
+        start_after: Option<[u8; 32]>,
+        storage_context: StorageContext,
+    ) -> Result<bool, Error> {
+        let debug_string = format!("[DocManager] {} Fetch ICR", controller.log_prefix());
+        println!("{debug_string}");
+        let loaded = controller.active_private_keys_are_loaded()?;
+        if !loaded {
+            println!("{debug_string}: Err(Private keys are not loaded)");
+            return Err(Error::Any(0, "Private keys are not loaded".to_string()));
+        }
+
+        let timestamp = controller.model.last_checked_incoming_contacts_timestamp();
+        let since = if timestamp >= 3600 { timestamp - 3600 } else { 0 };
+        let mut start_after = start_after.clone();
+        let mut success = true;
+        while let Ok((requests, maybe_after)) = self.fetch_incoming_contact_requests(controller, contract.clone(), since, start_after, storage_context).await {
+            if !requests.is_empty() {
+                success &= controller.save_outgoing_contact_requests(storage_context, requests);
+            }
+            if maybe_after.is_some() {
+                start_after = maybe_after;
+            } else {
+                break;
+            }
+        }
+        println!("{debug_string}: OK({success})");
+        Ok(success)
+    }
+
+    pub async fn fetch_outgoing_contact_requests_in_context(
+        &self,
+        controller: &mut IdentityController,
+        contract: DataContract,
+        start_after: Option<[u8; 32]>,
+        storage_context: StorageContext,
+    ) -> Result<bool, Error> {
+        let debug_string = format!("[DocManager] {} Fetch OCR", controller.log_prefix());
+        println!("{debug_string}");
+        let loaded = controller.active_private_keys_are_loaded()?;
+        if !loaded {
+            println!("{debug_string}: Err(Private keys are not loaded)");
+            return Err(Error::Any(0, "Private keys are not loaded".to_string()));
+        }
+
+        let timestamp = controller.model.last_checked_outgoing_contacts_timestamp();
+        let since = if timestamp >= 3600 { timestamp - 3600 } else { 0 };
+        let mut start_after = start_after.clone();
+        let mut success = true;
+        while let Ok((requests, maybe_after)) = self.fetch_outgoing_contact_requests(controller, contract.clone(), since, start_after, storage_context).await {
+            if !requests.is_empty() {
+                success &= controller.save_outgoing_contact_requests(storage_context, requests);
+            }
+            if maybe_after.is_some() {
+                start_after = maybe_after;
+            } else {
+                break;
+            }
+        }
+        println!("{debug_string}: OK({success})");
+        Ok(success)
+    }
+
 }
 
 
@@ -996,14 +1964,22 @@ impl PlatformSDK {
         Sign: Fn(*const c_void, IdentityPublicKey) -> Option<OpaqueKey> + Send + Sync + 'static,
         CanSign: Fn(*const c_void, IdentityPublicKey) -> bool + Send + Sync + 'static,
         GetDataContractFromCache: Fn(*const c_void, SystemDataContract) -> DataContract + Send + Sync + 'static,
+        SignAndPublishAssetLockTransaction: Fn(*const c_void, /*topup_duff_amount*/u64, /*account_context*/ *const c_void, /*prompt*/String, /*steps*/u32) -> Result<u32, AssetLockSubmissionError> + Sync + Send + 'static,
+        // MaybeWalletIdentity: Fn(/*wallet_context*/*const c_void, [u8; 32], IdentityDictionaryItemValue) -> Option<IdentityController> + Send + Sync + 'static,
+        // MaybeWalletInvitation: Fn(/*wallet_context*/*const c_void, [u8; 36], u32) -> Option<InvitationModel> + Send + Sync + 'static,
+        NotifySyncState: Fn(*const c_void, Vec<PlatformSyncStateNotification>) + Send + Sync + 'static,
     >(
-        cache: Arc<PlatformCache>,
+        chain: Arc<ChainManager>,
+        identity_callbacks: IdentityCallbacks,
         get_quorum_public_key: Arc<GetQuorumPublicKey>,
         get_data_contract: GetDataContract,
         get_platform_activation_height: GetPlatformActivationHeight,
         callback_signer: Sign,
         callback_can_sign: CanSign,
         get_data_contract_from_cache: GetDataContractFromCache,
+        // sign_and_publish_asset_lock_transaction: SignAndPublishAssetLockTransaction,
+
+        notify_sync_state: NotifySyncState,
         address_list: Option<Vec<&'static str>>,
         chain_type: ChainType,
         context: *const c_void,
@@ -1014,11 +1990,13 @@ impl PlatformSDK {
             ChainType::MainNet => Vec::from_iter(MAINNET_ADDRESS_LIST),
             _ => Vec::from_iter(DEFAULT_TESTNET_ADDRESS_LIST),
         });
+
         let provider = PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, context_arc.clone());
         let sdk = create_sdk(provider, host_list.iter().filter_map(|s| Address::from_str(format!("https://{s}:{}", chain_type.platform_port()).as_str()).ok()));
 
         let protocol_version = sdk.version().protocol_version;
         let sdk_arc = Arc::new(sdk);
+        let cache = PlatformCache::new(Arc::clone(&chain));
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .thread_name("dash-spv-platform")
@@ -1027,7 +2005,9 @@ impl PlatformSDK {
             .build()
             .unwrap();
         Self {
+            chain,
             cache,
+            identity_callbacks: Arc::new(identity_callbacks),
             identity_manager: Arc::new(IdentitiesManager::new(&sdk_arc, chain_type.clone())),
             contract_manager: Arc::new(ContractsManager::new(&sdk_arc, chain_type.clone())),
             doc_manager: Arc::new(DocumentsManager::new(&sdk_arc, chain_type.clone())),
@@ -1041,15 +2021,32 @@ impl PlatformSDK {
             state_transition: StateTransitionFactory {},
             documents: DocumentFactory::new(protocol_version).unwrap(),
             get_data_contract_from_cache: Arc::new(get_data_contract_from_cache),
+            // sign_and_publish_asset_lock_transaction: Arc::new(sign_and_publish_asset_lock_transaction),
+            notify_sync_state: Arc::new(notify_sync_state),
+            sdk: sdk_arc,
             chain_type,
-            sdk: sdk_arc
         }
     }
 
     pub fn sdk_ref(&self) -> &Sdk {
         &self.sdk
     }
+    pub fn sdk_version(&self) -> &PlatformVersion {
+        self.sdk.version()
+    }
 
+    pub fn get_dashpay_data_contract(&self) -> DataContract {
+        self.get_data_contract_in_context(self.chain.get_chain(), SystemDataContract::Dashpay)
+    }
+    pub fn get_dpns_data_contract(&self) -> DataContract {
+        self.get_data_contract_in_context(self.chain.get_chain(), SystemDataContract::DPNS)
+    }
+    pub fn get_data_contract_in_context(&self, context: *const c_void, system_data_contract: SystemDataContract) -> DataContract {
+        (self.get_data_contract_from_cache)(context, system_data_contract)
+    }
+    pub fn notify_sync_state(&self, context: *const c_void, notifications: Vec<PlatformSyncStateNotification>) {
+        (self.notify_sync_state)(context, notifications)
+    }
 
     #[cfg(feature = "state-transitions")]
     pub async fn document_batch<'a>(
@@ -1098,101 +2095,33 @@ impl PlatformSDK {
         self.publish_state_transition(state_transition).await
     }
 
-    pub fn get_data_contract_in_context(&self, context: *const c_void, system_data_contract: SystemDataContract) -> DataContract {
-        (self.get_data_contract_from_cache)(context, system_data_contract)
-    }
-    pub fn get_dpns_data_contract_in_context(&self, context: *const c_void) -> DataContract {
-        self.get_data_contract_in_context(context, SystemDataContract::DPNS)
-    }
-    pub fn get_dashpay_data_contract_in_context(&self, context: *const c_void) -> DataContract {
-        self.get_data_contract_in_context(context, SystemDataContract::Dashpay)
-    }
-
-
 }
+
+impl KeychainRef for PlatformSDK {
+    fn keychain_ref(&self) -> &KeychainController {
+        self.chain.keychain_ref()
+    }
+}
+
+impl StorageRef for PlatformSDK {
+    fn storage_ref(&self) -> &StorageController {
+        self.chain.storage_ref()
+    }
+}
+
+impl ChainRef for PlatformSDK {
+    fn chain_ref(&self) -> &ChainController {
+        self.chain.chain_ref()
+    }
+}
+impl DerivationRef for PlatformSDK {
+    fn derivation_ref(&self) -> &DerivationController {
+        self.chain.derivation_ref()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-
-    // pub fn identity_contract_bounds(id: Identifier, contract_identifier: Option<Identifier>) -> Result<Identity, ProtocolError> {
-    //     let mut rng = rand::rngs::StdRng::from_entropy();
-    //     let ipk1 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
-    //     let ipk2 = IdentityPublicKeyV0::random_ecdsa_master_authentication_key_with_rng(1, &mut rng, LATEST_PLATFORM_VERSION)?.0;
-    //     let public_keys = BTreeMap::from_iter([(1, IdentityPublicKey::V0(
-    //         IdentityPublicKeyV0 {
-    //             id: ipk1.id(),
-    //             purpose: Purpose::AUTHENTICATION,
-    //             security_level: SecurityLevel::MASTER,
-    //             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
-    //             key_type: KeyType::ECDSA_SECP256K1,
-    //             read_only: false,
-    //             data: ipk1.data().clone(),
-    //             disabled_at: Some(1)
-    //         }
-    //     )), (2, IdentityPublicKey::V0(
-    //         IdentityPublicKeyV0 {
-    //             id: ipk2.id(),
-    //             purpose: Purpose::AUTHENTICATION,
-    //             security_level: SecurityLevel::MASTER,
-    //             contract_bounds: contract_identifier.map(|id| ContractBounds::SingleContract { id }),
-    //             key_type: KeyType::ECDSA_SECP256K1,
-    //             read_only: ipk2.read_only(),
-    //             data: ipk2.data().clone(),
-    //             disabled_at: Some(1)
-    //         }
-    //     ))]);
-    //     Ok(Identity::V0(IdentityV0 { id, public_keys, balance: 2, revision: 1 }))
-    // }
-
-    // #[tokio::test]
-    // async fn test_mainnet_get_identities_for_wallets_public_keys() {
-    //     async fn mainnet_get_identities_for_wallets_public_keys() -> Result<BTreeMap<String, BTreeMap<[u8; 20], Identity>>, Error> {
-    //         let key_hashes =
-    //             [[56, 130, 69, 49, 128, 208, 91, 105, 110, 162, 39, 35, 66, 49, 38, 28, 133, 213, 133, 252], [91, 201, 141, 60, 109, 100, 243, 8, 136, 121, 118, 100, 169, 165, 198, 96, 228, 231, 76, 164], [238, 40, 164, 26, 84, 158, 90, 227, 77, 165, 195, 121, 94, 23, 24, 160, 173, 14, 21, 48], [102, 22, 141, 109, 43, 97, 177, 93, 105, 200, 103, 76, 134, 17, 198, 209, 120, 167, 71, 53], [59, 216, 144, 232, 223, 201, 28, 131, 40, 174, 25, 104, 227, 51, 26, 85, 54, 46, 98, 114]];
-    //
-    //         let context_arc = Arc::new(FFIThreadSafeContext::new(std::ptr::null()));
-    //         let get_data_contract = |ctx, identifier| {
-    //             println!("get_data_contract: {:?}", identifier);
-    //             Err(ContextProviderError::Generic("DDDDD".to_string()))
-    //         };
-    //         let get_quorum_public_key = |ctx, quorum_type, quorum_hash, core_chain_locked_height| {
-    //             println!("get_quorum_public_key: {:?} {:?} {}", quorum_type, quorum_hash, core_chain_locked_height);
-    //             Err(ContextProviderError::Generic("DDDDD".to_string()))
-    //         };
-    //         let get_platform_activation_height = |ctx| {
-    //             println!("get_platform_activation_height");
-    //             Ok(0)
-    //         };
-    //         // let masternode_provider = Arc::new(MasternodeProvider::new());
-    //         let address_list = Vec::from_iter(MAINNET_ADDRESS_LIST.iter().filter_map(|s| Address::from_str(format!("https://{s}:443").as_str()).ok()));
-    //         let sdk = create_sdk(
-    //             PlatformProvider::new(get_quorum_public_key, get_data_contract, get_platform_activation_height, context_arc.clone()), address_list);
-    //
-    //         let sdk_arc = Arc::new(sdk);
-    //         let manager = IdentitiesManager::new(&sdk_arc);
-    //         let key_hashes = BTreeMap::from_iter([("fcd1b9a4fc61468a".to_string(), key_hashes.to_vec())]);
-    //         manager.get_identities_for_wallets_public_keys(key_hashes).await
-    //     }
-    //
-    //     match mainnet_get_identities_for_wallets_public_keys().await {
-    //         Ok(result) => {
-    //             println!("Ok: {:?}", result);
-    //         },
-    //         Err(err) => {
-    //             println!("Error: {:?}", err);
-    //         }
-    //     }
-    // }
-
-    // fn values_to_documents<'a>(document_type: DocumentTypeRef<'a>, identity_id: [u8; 32], entropy: [u8; 32], values: Vec<Value>, version: &'a PlatformVersion) -> Result<IndexMap<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef<'a>, Bytes32)>>, Error> {
-    //     let owner_id = Identifier::from(identity_id);
-    //     let mut documents = IndexMap::<DocumentTransitionActionType, Vec<(Document, DocumentTypeRef, Bytes32)>>::new();
-    //     for value in values.into_iter() {
-    //         let document = document_type.create_document_from_data(value, owner_id, 1000, 1000, entropy, version)
-    //             .map_err(Error::from)?;
-    //         documents.insert(DocumentTransitionActionType::Create, vec![(document, document_type, Bytes32(entropy))]);
-    //     }
-    //     Ok(documents)
-    // }
 
     use std::collections::BTreeMap;
     use std::str::FromStr;
@@ -1237,38 +2166,6 @@ mod tests {
                 context_arc.clone()),
             address_list)
     }
-    // #[tokio::test]
-    // async fn search_identity_by_name() {
-    //     use dpp::system_data_contracts::SystemDataContract;
-    //     use dash_sdk::platform::DocumentQuery;
-    //     let chain = ChainType::TestNet;
-    //     let sdk = create_test_sdk(&chain);
-    //     let contract_id = SystemDataContract::DPNS.id();
-    //     let sdk_arc = Arc::new(sdk);
-    //     let doc_manager = DocumentsManager::new(&sdk_arc, chain);
-    //
-    //     let query = DocumentQuery::new_with_data_contract_id(&sdk_arc, contract_id, "domain").await;
-    //     match query {
-    //         Ok(doc_query) => {
-    //             match doc_manager.documents_with_query(doc_query).await {
-    //                 Ok(result) => {
-    //                     println!("Ok: {:?}", result);
-    //                 }
-    //                 Err(err) => {
-    //                     println!("Error: {:?}", err);
-    //                 }
-    //             }
-    //         }
-    //         Err(error) => {
-    //             println!("{:?}", error);
-    //         }
-    //     }
-    //     // let domain = "dash";
-    //     // let name = "asdtwotwooct";
-    //
-    //
-    //
-    // }
 
     #[tokio::test]
     async fn test_testnet_get_identities_for_wallets_public_keys() {

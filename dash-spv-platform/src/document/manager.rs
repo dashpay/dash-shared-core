@@ -1,12 +1,10 @@
-use std::os::raw::c_void;
+
 use std::sync::Arc;
 use dash_sdk::{platform::{DocumentQuery, FetchMany}, RequestSettings, Sdk};
-use dash_sdk::platform::Fetch;
 use dpp::data_contract::DataContract;
 use dpp::data_contract::accessors::v0::DataContractV0Getters;
 use dpp::data_contract::document_type::methods::DocumentTypeV0Methods;
 use dash_sdk::platform::transition::put_document::PutDocument;
-use dashcore::prelude::DisplayHex;
 use dpp::data_contracts::SystemDataContract;
 use dpp::document::{Document, DocumentV0Getters};
 use dpp::errors::ProtocolError;
@@ -15,15 +13,12 @@ use dpp::prelude::{BlockHeight, CoreBlockHeight};
 use drive_proof_verifier::types::RetrievedObjects;
 use indexmap::IndexMap;
 use platform_value::Identifier;
-use platform_value::string_encoding::Encoding;
 
 use dash_spv_crypto::crypto::byte_util::Random;
 use dash_spv_crypto::network::ChainType;
 use dash_spv_macro::StreamManager;
 use crate::error::Error;
 use crate::identity::manager::DEFAULT_FETCH_USERNAMES_RETRY_COUNT;
-use crate::identity::model::IdentityModel;
-use crate::models::transient_dashpay_user::TransientDashPayUser;
 use crate::query::{order_by_asc_normalized_label, order_by_asc_owner_id, where_domain_is_dash, where_normalized_label_equal_to, where_normalized_label_starts_with, where_owner_in, where_owner_is, where_records_identity_is};
 use crate::signer::CallbackSigner;
 use crate::util::{RetryStrategy, StreamManager, StreamSettings, StreamSpec, Validator};
@@ -245,31 +240,7 @@ impl DocumentsManager {
     }
 
 
-    pub async fn fetch_usernames(&self, model: &mut IdentityModel, contract: DataContract, context: *const c_void) -> Result<bool, Error> {
-        let user_id = model.unique_id;
-        let query = self.query_dpns_documents_for_identity_with_user_id(contract, user_id)?;
-        let (documents, _metadata) = Document::fetch_many_with_metadata(self.sdk_ref(), query, Some(USERNAME_SETTINGS)).await?;
-        for (identifier, maybe_document) in documents {
-            if let Some(document) = maybe_document {
-                model.update_with_username_document(document, context);
-            } else {
-                println!("[WARN] Document {} is nil", identifier.to_string(Encoding::Hex));
-            }
-        }
-        Ok(true)
-    }
 
-    pub async fn fetch_profile(&self, model: &mut IdentityModel, contract: DataContract) -> Result<TransientDashPayUser, Error> {
-        let user_id = model.unique_id;
-        let query = self.query_dashpay_profile_for_user_id(contract, user_id)?;
-        let (document, _metadata) = Document::fetch_with_metadata(self.sdk_ref(), query, Some(PROFILE_SETTINGS)).await?;
-        match document {
-            Some(doc) =>
-                Ok(TransientDashPayUser::with_profile_document(doc)),
-            None =>
-                Err(Error::Any(0, format!("Profile for {} not found", user_id.to_lower_hex_string())))
-        }
 
-    }
 }
 

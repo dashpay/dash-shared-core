@@ -10,11 +10,13 @@ publish = true
 [dependencies]
 anyhow = { version = "1.0" }
 byte = "0.2"
+dash-spv-chain = { workspace = true, features = [] }
 dash-spv-coinjoin = { workspace = true, features = [] }
 dash-spv-keychain = { workspace = true }
 dash-spv-crypto = { workspace = true, features = ["default"] }
 dash-spv-masternode-processor = { workspace = true, features = ["default"] }
 dash-spv-platform = { workspace = true }
+dash-spv-storage = { workspace = true }
 
 dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "rand", "signer", "serde", "apple", "message_verification", "quorum_validation", "ed25519-dalek"], default-features = false, branch = "feat/ferment" }
 dash-sdk = { git = "https://github.com/dashpay/platform", branch = "test/ferment", package = "dash-sdk", features = ["apple"] }

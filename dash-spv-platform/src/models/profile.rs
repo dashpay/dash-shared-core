@@ -3,6 +3,14 @@ use platform_value::{Value, ValueMap};
 
 #[derive(Clone)]
 #[ferment_macro::export]
+pub struct ProfileModel {
+    pub profile: Profile,
+    pub entropy_data: [u8; 32],
+    pub document_id: [u8; 32],
+}
+
+#[derive(Clone)]
+#[ferment_macro::export]
 pub struct Profile {
     pub updated_at: u64,
     pub created_at: u64,

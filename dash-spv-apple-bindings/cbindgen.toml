@@ -14,11 +14,13 @@ parse_deps = true
 #expand = ["dash-spv-masternode-processor", ]
 include = [
     "ferment",
+    "dash-spv-chain",
     "dash-spv-coinjoin",
     "dash-spv-crypto",
     "dash-spv-keychain",
     "dash-spv-masternode-processor",
     "dash-spv-platform",
+    "dash-spv-storage",
     "dash-sdk",
     "data-contracts",
     "platform-value",
@@ -35,11 +37,13 @@ include = [
 ]
 extra_bindings = [
     "ferment",
+    "dash-spv-chain",
     "dash-spv-coinjoin",
     "dash-spv-crypto",
     "dash-spv-keychain",
     "dash-spv-masternode-processor",
     "dash-spv-platform",
+    "dash-spv-storage",
     "dash-sdk",
     "data-contracts",
     "platform-value",

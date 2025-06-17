@@ -1,3 +1,5 @@
+pub mod registration_model;
+
 use dashcore::blockdata::transaction::{OutPoint, Transaction, txin::TxIn, txout::TxOut};
 use dashcore::ephemerealdata::instant_lock::InstantLock;
 use dashcore::hashes::Hash;
@@ -39,6 +41,11 @@ pub fn chain_proof(core_chain_locked_height: u32, txid: [u8; 32], vout: u32) -> 
             vout,
         },
     })
+}
+
+#[ferment_macro::export]
+pub fn transaction_to_string(transaction: Transaction) -> String {
+    format!("{:?}", transaction)
 }
 
 mod tests {

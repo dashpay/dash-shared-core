@@ -1,6 +1,7 @@
 pub mod index_path;
 pub mod uint256_index_path;
 pub mod factory;
+pub mod derivation_path_kind;
 // pub mod derivation_path;
 
 pub use self::index_path::{IIndexPath, IndexPath};

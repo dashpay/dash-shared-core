@@ -8,3 +8,6 @@ pub mod registration_status;
 pub mod storage;
 pub mod username_status_info;
 pub mod username_registration_error;
+pub mod registration_step;
+pub mod callback;
+pub mod controller;

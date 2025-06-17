@@ -4,7 +4,7 @@ use dpp::identity::identity_public_key::security_level::SecurityLevel;
 use dash_spv_crypto::keys::key::KeyKind;
 use crate::identity::key_status::IdentityKeyStatus;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub struct KeyInfo {
     pub key: OpaqueKey,
@@ -16,8 +16,25 @@ pub struct KeyInfo {
 #[ferment_macro::export]
 impl KeyInfo {
 
+    pub fn of_purpose(&self, purpose: Purpose) -> bool {
+        purpose.eq(&self.purpose)
+    }
+    pub fn of_security_level(&self, security_level: SecurityLevel) -> bool {
+        security_level.eq(&self.security_level)
+    }
+    pub fn of_key_status(&self, key_status: IdentityKeyStatus) -> bool {
+        key_status.eq(&self.key_status)
+    }
+
+    pub fn is_ecdsa(&self) -> bool {
+        self.kind() == KeyKind::ECDSA
+    }
+
     pub fn kind(&self) -> KeyKind {
         self.key.kind()
+    }
+    pub fn kind_index(&self) -> i16 {
+        i16::from(self.key.kind())
     }
     pub fn registered(key: OpaqueKey, security_level: SecurityLevel, purpose: Purpose) -> KeyInfo {
         Self {

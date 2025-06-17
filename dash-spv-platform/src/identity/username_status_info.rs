@@ -1,7 +1,7 @@
 use crate::document::usernames::UsernameStatus;
 
 #[ferment_macro::export]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UsernameStatusInfo {
     pub proper: Option<String>,
     pub domain: Option<String>,

@@ -1,0 +1,19 @@
+[package]
+name = "dash-spv-chain"
+version = "0.0.1"
+description = "Library for interactions with Chain"
+
+edition = "2021"
+publish = false
+
+[dependencies]
+ferment-macro = { version = "0.2", package = "ferment-macro" }
+dash-spv-crypto = { workspace = true }
+dash-spv-keychain = { workspace = true }
+dash-spv-storage = { workspace = true }
+dashcore = { git = "https://github.com/dashpay/rust-dashcore", features = ["std", "secp-recovery", "apple"], default-features = false, branch = "feat/ferment" }
+
+[features]
+
+[lib]
+name = "dash_spv_chain"

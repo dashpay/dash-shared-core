@@ -16,6 +16,43 @@
     unused_unsafe,
     unused_variables
 )]
+pub mod types {
+    pub mod dash_spv_platform {
+        pub mod error {
+            pub struct dash_spv_platform_error_Error {
+
+            }
+            impl ferment::FFIConversionFrom<dash_spv_platform::error::Error> for dash_spv_platform_error_Error {
+                unsafe fn ffi_from_const(ffi: *const dash_spv_platform_error_Error) -> dash_spv_platform::error::Error {
+                    panic!("ffff")
+                }
+            }
+            impl ferment::FFIConversionTo<dash_spv_platform::error::Error> for dash_spv_platform_error_Error {
+                unsafe fn ffi_to_const(obj: dash_spv_platform::error::Error) -> *const dash_spv_platform_error_Error {
+                    panic!("ffff")
+                }
+            }
+
+        }
+    }
+}
+#[allow(
+    clippy::let_and_return,
+    clippy::suspicious_else_formatting,
+    clippy::redundant_field_names,
+    dead_code,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    redundant_semicolons,
+    unreachable_patterns,
+    unused_braces,
+    unused_imports,
+    unused_parens,
+    unused_qualifications,
+    unused_unsafe,
+    unused_variables
+)]
 pub mod generics {
     use crate as dash_spv_apple_bindings;
 
@@ -426,4 +463,38 @@ pub mod generics {
     pub unsafe extern "C" fn Arr_u8_4_destroy(ffi: *mut Arr_u8_4) {
         ferment::unbox_any(ffi);
     }
+
+
+    # [repr (C)] # [derive (Clone)]
+    pub struct Result_ok_u32_err_dash_spv_platform_error_Error {
+        pub ok : * mut u32 ,
+        pub error : * mut crate :: fermented :: types :: dash_spv_platform :: error :: dash_spv_platform_error_Error
+    }
+    impl ferment :: FFIConversionFrom < Result < u32 , dash_spv_platform :: error :: Error > > for Result_ok_u32_err_dash_spv_platform_error_Error {
+        unsafe fn ffi_from_const (ffi : * const Result_ok_u32_err_dash_spv_platform_error_Error) -> Result < u32 , dash_spv_platform :: error :: Error > {
+            let ffi_ref = & * ffi ;
+            ferment :: fold_to_result (ffi_ref . ok , | o | * o , ffi_ref . error , | o | < crate :: fermented :: types :: dash_spv_platform :: error :: dash_spv_platform_error_Error as ferment :: FFIConversionFrom < dash_spv_platform :: error :: Error >> :: ffi_from (o)) }
+    }
+    impl ferment :: FFIConversionTo < Result < u32 , dash_spv_platform :: error :: Error > > for Result_ok_u32_err_dash_spv_platform_error_Error {
+        unsafe fn ffi_to_const (obj : Result < u32 , dash_spv_platform :: error :: Error >) -> * const Result_ok_u32_err_dash_spv_platform_error_Error {
+            ferment :: boxed ({ let (ok , error) = ferment :: to_result (obj , | o | ferment :: boxed (o) , | o | ferment :: FFIConversionTo :: ffi_to (o)) ;
+                Self { ok , error } })
+        }
+    }
+    impl Drop for Result_ok_u32_err_dash_spv_platform_error_Error {
+        fn drop (& mut self) { unsafe { ferment :: destroy_opt_primitive (self . ok) ; ferment :: unbox_any_opt (self . error) ; } }
+    }
+    # [repr (C)]
+    # [derive (Clone)]
+    pub struct Fn_ARGS_std_os_raw_c_void_u32_std_os_raw_c_void_RTRN_ {
+        caller: unsafe extern "C" fn(*const std::os::raw::c_void, u32, *const std::os::raw::c_void)
+    }
+    impl Fn_ARGS_std_os_raw_c_void_u32_std_os_raw_c_void_RTRN_ {
+        pub unsafe fn call(&self, o_0: *const std::os::raw::c_void, o_1: u32, o_2: *const std::os::raw::c_void) {
+            let ffi_result = (self.caller)(o_0, o_1, o_2);
+            ffi_result
+        }
+    }
+    unsafe impl Send for Fn_ARGS_std_os_raw_c_void_u32_std_os_raw_c_void_RTRN_ { }
+    unsafe impl Sync for Fn_ARGS_std_os_raw_c_void_u32_std_os_raw_c_void_RTRN_ { }
 }

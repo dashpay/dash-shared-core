@@ -5,6 +5,10 @@ use dpp::errors::consensus::ConsensusError;
 use dash_spv_crypto::keys::KeyError;
 use dpp::errors::ProtocolError;
 use http::uri::InvalidUri;
+use dash_spv_chain::ChainError;
+use dash_spv_keychain::KeyChainError;
+use dash_spv_storage::error::StorageError;
+use crate::identity::model::AssetLockSubmissionError;
 use crate::identity::username_registration_error::UsernameRegistrationError;
 use crate::util::{MaxRetryError, ValidationError};
 
@@ -12,11 +16,23 @@ use crate::util::{MaxRetryError, ValidationError};
 #[ferment_macro::export]
 pub enum Error {
     KeyError(KeyError),
+    KeychainError(KeyChainError),
+    Chain(ChainError),
+    StorageError(StorageError),
     DashSDKError(String),
     Any(i32, String),
     MaxRetryExceeded(String),
     InstantSendSignatureVerificationError(String),
-    UsernameRegistrationError(UsernameRegistrationError)
+    UsernameRegistrationError(UsernameRegistrationError),
+    RegisterKeysBeforeIdentity(u32),
+    AttemptQueryWithoutKeys,
+    IdentityIsNoLongerActive([u8; 32]),
+    AssetLockSubmission(AssetLockSubmissionError),
+    AssetLockTransactionShouldBeKnown,
+    AssetLockInstantLockShouldBeKnownWhenTxUnconfirmed,
+    AssetLockNoCreditBurnPubKeyHash,
+    DerivationIndexesDoesntMatch,
+    CannotSignIdentityWithoutWallet
 }
 
 

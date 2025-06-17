@@ -58,8 +58,10 @@ for target in "x86_64-apple-darwin" "aarch64-apple-darwin" "x86_64-apple-ios" "a
 done
 wait
 cp -p ferment_injections.rs src/fermented.rs
+cp -p ferment_injections_post.rs src/fermented_post.rs
 wait
-rm -rf target/{framework,include,lib}
+rm -rf target/{framework,lib}
+#rm -rf target/{framework,include,lib}
 wait
 cargo lipo --$BUILD_FLAG
 build_targets=(

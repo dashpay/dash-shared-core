@@ -237,3 +237,4 @@ impl<T> IIndexPath for IndexPath<T> where T: Clone + Debug + Encodable + IndexHa
         &self.hardened
     }
 }
+

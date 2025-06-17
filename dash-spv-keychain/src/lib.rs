@@ -1,13 +1,24 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
-#[derive(Clone)]
+pub const DERIVATION_PATH_EXTENDED_PUBLIC_KEY_WALLET_BASED_LOCATION: &str ="DP_EPK_WBL";
+pub const DERIVATION_PATH_EXTENDED_PUBLIC_KEY_STANDALONE_BASED_LOCATION: &str ="DP_EPK_SBL";
+pub const DERIVATION_PATH_STANDALONE_INFO_DICTIONARY_LOCATION: &str ="DP_SIDL";
+pub const DERIVATION_PATH_EXTENDED_SECRET_KEY_WALLET_BASED_LOCATION: &str ="DP_ESK_WBL";
+
+
+#[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub enum KeyChainKey {
+    GetDataBytesKey { key: String },
     StandaloneInfoDictionaryLocationString { extended_public_key_identifier: String },
     StandaloneExtendedPublicKeyLocationString { extended_public_key_identifier: String },
     HasKnownBalanceUniqueIDString { reference: u32, unique_id: String },
     WalletBasedExtendedPrivateKeyLocationString { unique_id: String },
     WalletBasedExtendedPublicKeyLocationString { unique_id: String },
+    WalletIdentitiesKey { wallet_id: String },
+    WalletIdentitiesDefaultIndexKey { wallet_id: String },
+    WalletInvitationsKey { wallet_id: String },
 }
 
 impl KeyChainKey {
@@ -26,20 +37,51 @@ impl KeyChainKey {
     pub fn wallet_based_extended_public_key_location_string(unique_id: &str) -> Self {
         Self::WalletBasedExtendedPublicKeyLocationString { unique_id: unique_id.to_string() }
     }
+    pub fn wallet_identities_key(wallet_id: &str) -> Self {
+        Self::WalletIdentitiesKey { wallet_id: wallet_id.to_string() }
+    }
+    pub fn wallet_identities_default_index_key(wallet_id: &str) -> Self {
+        Self::WalletIdentitiesDefaultIndexKey { wallet_id: wallet_id.to_string() }
+    }
+
+    pub fn wallet_invitations_key(wallet_id: &str) -> Self {
+        Self::WalletInvitationsKey { wallet_id: wallet_id.to_string() }
+    }
+
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+#[ferment_macro::export]
+pub enum IdentityDictionaryItemValue {
+    Index {
+        index: u32
+    },
+    Outpoint {
+        index: u32,
+        locked_outpoint_data: [u8; 36],
+    },
+}
+#[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub enum KeyChainValue {
     Bytes(Vec<u8>),
     Int64(i64),
     String(String),
+    IdentityDictionary(HashMap<[u8; 32], IdentityDictionaryItemValue>),
+    InvitationDictionary(HashMap<[u8; 36], u32>),
+    None,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[ferment_macro::export]
 pub enum KeyChainError {
-    OsStatusCode(i32)
+    OsStatusCode(i32),
+    WrongDataFormatForKey(String),
+    WrongDataFormat(String),
+}
+
+pub trait KeychainRef {
+    fn keychain_ref(&self) -> &KeychainController;
 }
 
 #[derive(Clone)]

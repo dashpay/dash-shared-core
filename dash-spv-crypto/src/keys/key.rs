@@ -4,6 +4,7 @@ use dashcore::hashes::{sha256, sha256d, Hash};
 use crate::derivation::{IIndexPath, IndexPath, index_path::{Extremum, IndexHardSoft}};
 use dashcore::consensus::Encodable;
 use crate::crypto::byte_util::{clone_into_array, Reversed};
+use crate::derivation::derivation_path_kind::DerivationPathKind;
 use crate::keys::{BLSKey, DeriveKey, ECDSAKey, ED25519Key, IKey, KeyError};
 use crate::keys::bls_key::g1_element_serialized;
 use crate::keys::crypto_data::CryptoData;
@@ -460,6 +461,14 @@ impl From<&Vec<u32>> for IndexPath<u32> {
 
 #[ferment_macro::export]
 impl KeyKind {
+
+    pub fn identity_derivation_kind(&self) -> DerivationPathKind {
+        match self {
+            KeyKind::ECDSA => DerivationPathKind::IdentityECDSA,
+            KeyKind::BLS | KeyKind::BLSBasic => DerivationPathKind::IdentityECDSA,
+            KeyKind::ED25519 => panic!("should not be called for ED25519 keys")
+        }
+    }
 
     pub fn equal_to_kind(&self, kind: KeyKind) -> bool {
         kind.eq(self)

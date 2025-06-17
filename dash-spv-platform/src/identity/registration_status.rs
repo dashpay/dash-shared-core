@@ -1,5 +1,5 @@
 #[ferment_macro::export]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IdentityRegistrationStatus {
     Unknown = 0,
     Registered = 1,

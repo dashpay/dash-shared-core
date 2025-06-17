@@ -1,0 +1,15 @@
+[package]
+name = "dash-spv-storage"
+version = "0.1.0"
+description = "Library for interactions with Core Data"
+
+edition = "2021"
+publish = false
+
+[dependencies]
+ferment-macro = { version = "0.2", package = "ferment-macro" }
+
+[features]
+
+[lib]
+name = "dash_spv_storage"

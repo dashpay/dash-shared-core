@@ -318,6 +318,14 @@ impl IHaveChainSettings for DevnetType {
         format!("Devnet - {}.{}", self.identifier(), self.version())
     }
 }
+impl ChainType {
+    pub fn script_map_ref(&self) -> &ScriptMap {
+        match self {
+            ChainType::MainNet => &ScriptMap::MAINNET,
+            _ => &ScriptMap::TESTNET,
+        }
+    }
+}
 // Params
 #[ferment_macro::export]
 impl ChainType {
